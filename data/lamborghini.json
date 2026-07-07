@@ -1,0 +1,493 @@
+{
+  "make": {
+    "name": "Lamborghini",
+    "slug": "lamborghini"
+  },
+  "models": [
+    {
+      "name": "350 GT",
+      "slug": "350-gt",
+      "productionStartYear": 1964,
+      "productionEndYear": 1966,
+      "category": "Classic GT",
+      "bodyStyle": "2+2 Coupe",
+      "productionCount": 120,
+      "description": "Lamborghini's first production car established the company as a serious grand-touring rival with a refined V12 and Touring bodywork.",
+      "spec": {
+        "engine": "3.5L V12",
+        "horsepower": "280 hp",
+        "transmission": "5-speed manual",
+        "drivetrain": "RWD",
+        "topSpeed": "158 mph"
+      }
+    },
+    {
+      "name": "400 GT",
+      "slug": "400-gt",
+      "productionStartYear": 1966,
+      "productionEndYear": 1968,
+      "category": "Classic GT",
+      "bodyStyle": "2+2 Coupe",
+      "productionCount": 247,
+      "description": "An enlarged and more practical development of the 350 GT, the 400 GT helped Lamborghini mature as a road-car maker.",
+      "spec": {
+        "engine": "3.9L V12",
+        "horsepower": "320 hp",
+        "transmission": "5-speed manual",
+        "drivetrain": "RWD",
+        "topSpeed": "155 mph"
+      }
+    },
+    {
+      "name": "Miura",
+      "slug": "miura",
+      "productionStartYear": 1966,
+      "productionEndYear": 1973,
+      "category": "Supercar",
+      "bodyStyle": "Berlinetta",
+      "productionCount": 764,
+      "description": "The Miura's transverse mid-mounted V12 and Marcello Gandini styling helped define the modern supercar template.",
+      "spec": {
+        "engine": "3.9L V12",
+        "horsepower": "345-380 hp",
+        "transmission": "5-speed manual",
+        "drivetrain": "RWD",
+        "topSpeed": "171 mph",
+        "zeroToSixty": "6.7 seconds"
+      }
+    },
+    {
+      "name": "Espada",
+      "slug": "espada",
+      "productionStartYear": 1968,
+      "productionEndYear": 1978,
+      "category": "Grand Tourer",
+      "bodyStyle": "4-seat Coupe",
+      "productionCount": 1217,
+      "description": "A dramatic four-seat V12 grand tourer that became one of Lamborghini's longest-running early models.",
+      "spec": {
+        "engine": "3.9L V12",
+        "horsepower": "325-350 hp",
+        "transmission": "5-speed manual / automatic",
+        "drivetrain": "RWD",
+        "topSpeed": "155 mph"
+      }
+    },
+    {
+      "name": "Islero",
+      "slug": "islero",
+      "productionStartYear": 1968,
+      "productionEndYear": 1969,
+      "category": "Grand Tourer",
+      "bodyStyle": "2+2 Coupe",
+      "productionCount": 225,
+      "description": "The Islero replaced the 400 GT with understated styling and Lamborghini V12 performance.",
+      "spec": {
+        "engine": "3.9L V12",
+        "horsepower": "320-350 hp",
+        "transmission": "5-speed manual",
+        "drivetrain": "RWD"
+      }
+    },
+    {
+      "name": "Jarama",
+      "slug": "jarama",
+      "productionStartYear": 1970,
+      "productionEndYear": 1976,
+      "category": "Grand Tourer",
+      "bodyStyle": "2+2 Coupe",
+      "productionCount": 328,
+      "description": "A compact front-engined V12 2+2 grand tourer with angular Bertone-era styling.",
+      "spec": {
+        "engine": "3.9L V12",
+        "horsepower": "350-365 hp",
+        "transmission": "5-speed manual / automatic",
+        "drivetrain": "RWD"
+      }
+    },
+    {
+      "name": "Urraco",
+      "slug": "urraco",
+      "productionStartYear": 1973,
+      "productionEndYear": 1979,
+      "category": "Sports Car",
+      "bodyStyle": "2+2 Coupe",
+      "productionCount": 791,
+      "description": "A smaller mid-engined V8 Lamborghini intended to broaden the range below the V12 flagships.",
+      "spec": {
+        "engine": "V8",
+        "horsepower": "180-265 hp",
+        "transmission": "5-speed manual",
+        "drivetrain": "RWD"
+      }
+    },
+    {
+      "name": "Countach",
+      "slug": "countach",
+      "productionStartYear": 1974,
+      "productionEndYear": 1990,
+      "category": "Supercar",
+      "bodyStyle": "Berlinetta",
+      "productionCount": 1983,
+      "description": "The wedge-shaped Countach turned Lamborghini into a bedroom-wall icon with scissor doors, outrageous proportions and V12 performance.",
+      "spec": {
+        "engine": "3.9L-5.2L V12",
+        "displacement": "3,929 cc - 5,167 cc",
+        "cylinders": "V12",
+        "horsepower": "375-455 hp",
+        "transmission": "5-speed manual",
+        "drivetrain": "RWD",
+        "topSpeed": "179 mph",
+        "zeroToSixty": "4.8 seconds"
+      },
+      "variants": [
+        {
+          "name": "LP400",
+          "slug": "lp400",
+          "productionStartYear": 1974,
+          "productionEndYear": 1978,
+          "description": "Original periscopio Countach variant with the cleanest early bodywork and 3.9-liter V12."
+        },
+        {
+          "name": "LP400 S",
+          "slug": "lp400-s",
+          "productionStartYear": 1978,
+          "productionEndYear": 1982,
+          "description": "Wider, more aggressive Countach variant that introduced the flared-arch visual identity."
+        },
+        {
+          "name": "LP500 S",
+          "slug": "lp500-s",
+          "productionStartYear": 1982,
+          "productionEndYear": 1985,
+          "description": "Five-liter Countach evolution with more displacement and the established wide-body look."
+        },
+        {
+          "name": "5000 QV",
+          "slug": "5000-qv",
+          "productionStartYear": 1985,
+          "productionEndYear": 1988,
+          "description": "Quattrovalvole Countach with four-valve cylinder heads and the most powerful pre-anniversary production specification."
+        },
+        {
+          "name": "25th Anniversary",
+          "slug": "25th-anniversary",
+          "productionStartYear": 1988,
+          "productionEndYear": 1990,
+          "description": "Final Marcello Gandini-era Countach production evolution with Horacio Pagani-influenced aerodynamic detailing."
+        },
+        {
+          "name": "LPI 800-4",
+          "slug": "lpi-800-4",
+          "productionStartYear": 2021,
+          "productionEndYear": 2022,
+          "productionCount": 112,
+          "description": "Limited hybrid V12 homage to the Countach, based on Aventador-era architecture."
+        }
+      ]
+    },
+    {
+      "name": "Silhouette",
+      "slug": "silhouette",
+      "productionStartYear": 1976,
+      "productionEndYear": 1979,
+      "category": "Sports Car",
+      "bodyStyle": "Targa",
+      "productionCount": 54,
+      "description": "A rare open-roof V8 Lamborghini that evolved the Urraco concept into a sharper targa sports car.",
+      "spec": {
+        "engine": "3.0L V8",
+        "horsepower": "260 hp",
+        "transmission": "5-speed manual",
+        "drivetrain": "RWD"
+      }
+    },
+    {
+      "name": "Jalpa",
+      "slug": "jalpa",
+      "productionStartYear": 1981,
+      "productionEndYear": 1988,
+      "category": "Sports Car",
+      "bodyStyle": "Targa",
+      "productionCount": 410,
+      "description": "The Jalpa was Lamborghini's final V8 model before the modern Audi era, offering a more approachable counterpart to the Countach.",
+      "spec": {
+        "engine": "3.5L V8",
+        "horsepower": "255 hp",
+        "transmission": "5-speed manual",
+        "drivetrain": "RWD",
+        "topSpeed": "145 mph"
+      }
+    },
+    {
+      "name": "LM002",
+      "slug": "lm002",
+      "productionStartYear": 1986,
+      "productionEndYear": 1993,
+      "category": "Performance SUV",
+      "bodyStyle": "SUV",
+      "productionCount": 328,
+      "description": "A V12-powered off-road Lamborghini that anticipated the idea of a high-performance luxury SUV decades before the Urus.",
+      "spec": {
+        "engine": "5.2L V12",
+        "horsepower": "444 hp",
+        "transmission": "5-speed manual",
+        "drivetrain": "4WD",
+        "topSpeed": "118 mph"
+      }
+    },
+    {
+      "name": "Diablo",
+      "slug": "diablo",
+      "productionStartYear": 1990,
+      "productionEndYear": 2001,
+      "category": "Supercar",
+      "bodyStyle": "Berlinetta / Roadster",
+      "productionCount": 2884,
+      "description": "The Diablo carried Lamborghini into the 1990s with a 200-mph-capable V12 flagship and later all-wheel-drive VT variants.",
+      "spec": {
+        "engine": "5.7L-6.0L V12",
+        "horsepower": "485-575 hp",
+        "transmission": "5-speed manual",
+        "drivetrain": "RWD / AWD",
+        "topSpeed": "202 mph",
+        "zeroToSixty": "4.0 seconds"
+      }
+    },
+    {
+      "name": "Murcielago",
+      "slug": "murcielago",
+      "productionStartYear": 2001,
+      "productionEndYear": 2010,
+      "category": "Supercar",
+      "bodyStyle": "Berlinetta / Roadster",
+      "productionCount": 4099,
+      "description": "The Murcielago was Lamborghini's first new flagship under Audi stewardship, pairing a V12 with all-wheel drive and dramatic proportions.",
+      "spec": {
+        "engine": "6.2L-6.5L V12",
+        "horsepower": "572-661 hp",
+        "transmission": "6-speed manual / e-gear automated manual",
+        "drivetrain": "AWD",
+        "topSpeed": "212 mph",
+        "zeroToSixty": "3.2 seconds"
+      }
+    },
+    {
+      "name": "Gallardo",
+      "slug": "gallardo",
+      "productionStartYear": 2003,
+      "productionEndYear": 2013,
+      "category": "Sports Car",
+      "bodyStyle": "Coupe / Spyder",
+      "productionCount": 14022,
+      "description": "The V10 Gallardo became Lamborghini's best-selling model of its era and built the foundation for the modern entry supercar line.",
+      "spec": {
+        "engine": "5.0L-5.2L V10",
+        "horsepower": "493-562 hp",
+        "transmission": "6-speed manual / e-gear automated manual",
+        "drivetrain": "RWD / AWD",
+        "topSpeed": "202 mph",
+        "zeroToSixty": "3.4 seconds"
+      }
+    },
+    {
+      "name": "Reventon",
+      "slug": "reventon",
+      "productionStartYear": 2007,
+      "productionEndYear": 2009,
+      "category": "Limited Special",
+      "bodyStyle": "Coupe / Roadster",
+      "productionCount": 36,
+      "description": "A limited Murcielago-based special with stealth-aircraft-inspired styling that previewed Lamborghini's next design language.",
+      "spec": {
+        "engine": "6.5L V12",
+        "horsepower": "641-661 hp",
+        "transmission": "6-speed e-gear automated manual",
+        "drivetrain": "AWD",
+        "topSpeed": "211 mph"
+      }
+    },
+    {
+      "name": "Aventador",
+      "slug": "aventador",
+      "productionStartYear": 2011,
+      "productionEndYear": 2022,
+      "category": "Supercar",
+      "bodyStyle": "Coupe / Roadster",
+      "productionCount": 11465,
+      "description": "The Aventador introduced a new carbon monocoque and new-generation V12, becoming Lamborghini's definitive 2010s flagship.",
+      "spec": {
+        "engine": "6.5L V12",
+        "horsepower": "690-769 hp",
+        "transmission": "7-speed ISR automated manual",
+        "drivetrain": "AWD",
+        "topSpeed": "217 mph",
+        "zeroToSixty": "2.8 seconds"
+      }
+    },
+    {
+      "name": "Sesto Elemento",
+      "slug": "sesto-elemento",
+      "productionStartYear": 2011,
+      "productionEndYear": 2012,
+      "category": "Limited Special",
+      "bodyStyle": "Track-focused coupe",
+      "productionCount": 20,
+      "description": "An ultra-light carbon-fiber V10 special focused on extreme power-to-weight rather than road-car practicality.",
+      "spec": {
+        "engine": "5.2L V10",
+        "horsepower": "562 hp",
+        "transmission": "6-speed e-gear automated manual",
+        "drivetrain": "AWD",
+        "zeroToSixty": "2.5 seconds",
+        "weight": "2,202 lb"
+      }
+    },
+    {
+      "name": "Veneno",
+      "slug": "veneno",
+      "productionStartYear": 2013,
+      "productionEndYear": 2014,
+      "category": "Limited Special",
+      "bodyStyle": "Coupe / Roadster",
+      "productionCount": 13,
+      "description": "A radical Aventador-based anniversary special built in tiny numbers with extreme aero-focused bodywork.",
+      "spec": {
+        "engine": "6.5L V12",
+        "horsepower": "740 hp",
+        "transmission": "7-speed ISR automated manual",
+        "drivetrain": "AWD",
+        "topSpeed": "221 mph",
+        "zeroToSixty": "2.8 seconds"
+      }
+    },
+    {
+      "name": "Huracan",
+      "slug": "huracan",
+      "productionStartYear": 2014,
+      "productionEndYear": 2024,
+      "category": "Sports Car",
+      "bodyStyle": "Coupe / Spyder",
+      "description": "The Huracan replaced the Gallardo with a naturally aspirated V10, modern dual-clutch gearbox and broad lineup of road and track variants.",
+      "spec": {
+        "engine": "5.2L V10",
+        "horsepower": "602-631 hp",
+        "torque": "413-443 lb-ft",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD / AWD",
+        "topSpeed": "202 mph",
+        "zeroToSixty": "2.9 seconds"
+      }
+    },
+    {
+      "name": "Centenario",
+      "slug": "centenario",
+      "productionStartYear": 2016,
+      "productionEndYear": 2017,
+      "category": "Limited Special",
+      "bodyStyle": "Coupe / Roadster",
+      "productionCount": 40,
+      "description": "A limited Aventador-based model celebrating Ferruccio Lamborghini's centenary, featuring active aero and rear-wheel steering.",
+      "spec": {
+        "engine": "6.5L V12",
+        "horsepower": "759 hp",
+        "transmission": "7-speed ISR automated manual",
+        "drivetrain": "AWD",
+        "topSpeed": "217 mph"
+      }
+    },
+    {
+      "name": "Urus",
+      "slug": "urus",
+      "productionStartYear": 2018,
+      "category": "Performance SUV",
+      "bodyStyle": "SUV",
+      "description": "The Urus brought Lamborghini into the modern performance-SUV segment with twin-turbo V8 power and high-volume production.",
+      "spec": {
+        "engine": "4.0L twin-turbo V8",
+        "horsepower": "641-657 hp",
+        "torque": "627 lb-ft",
+        "transmission": "8-speed automatic",
+        "drivetrain": "AWD",
+        "topSpeed": "190 mph",
+        "zeroToSixty": "3.3 seconds"
+      }
+    },
+    {
+      "name": "Sian FKP 37",
+      "slug": "sian-fkp-37",
+      "productionStartYear": 2019,
+      "productionEndYear": 2022,
+      "category": "Hybrid Limited Special",
+      "bodyStyle": "Coupe / Roadster",
+      "productionCount": 82,
+      "description": "Lamborghini's first production hybrid paired Aventador V12 hardware with supercapacitor assistance and limited-series styling.",
+      "spec": {
+        "engine": "6.5L V12 mild hybrid",
+        "horsepower": "807 hp",
+        "transmission": "7-speed ISR automated manual",
+        "drivetrain": "AWD",
+        "topSpeed": "217 mph",
+        "zeroToSixty": "2.8 seconds"
+      }
+    },
+    {
+      "name": "Essenza SCV12",
+      "slug": "essenza-scv12",
+      "productionStartYear": 2020,
+      "productionEndYear": 2021,
+      "category": "Track Special",
+      "bodyStyle": "Track coupe",
+      "productionCount": 40,
+      "description": "A track-only V12 Lamborghini developed by Squadra Corse with racing aerodynamics and no road-car compromise.",
+      "spec": {
+        "engine": "6.5L V12",
+        "horsepower": "819 hp",
+        "transmission": "6-speed sequential",
+        "drivetrain": "RWD"
+      }
+    },
+    {
+      "name": "Revuelto",
+      "slug": "revuelto",
+      "productionStartYear": 2023,
+      "category": "Plug-in Hybrid Supercar",
+      "bodyStyle": "Coupe",
+      "description": "The Revuelto succeeds the Aventador with a new V12 plug-in hybrid powertrain, carbon structure and all-wheel-drive electric assistance.",
+      "spec": {
+        "engine": "6.5L V12 plug-in hybrid",
+        "horsepower": "1001 hp",
+        "transmission": "8-speed dual-clutch",
+        "drivetrain": "AWD",
+        "topSpeed": "217 mph",
+        "zeroToSixty": "2.5 seconds"
+      }
+    },
+    {
+      "name": "Temerario",
+      "slug": "temerario",
+      "productionStartYear": 2025,
+      "category": "Plug-in Hybrid Sports Car",
+      "bodyStyle": "Coupe",
+      "description": "The Temerario replaces the Huracan with a high-revving twin-turbo V8 plug-in hybrid powertrain.",
+      "spec": {
+        "engine": "4.0L twin-turbo V8 plug-in hybrid",
+        "horsepower": "907 hp",
+        "transmission": "8-speed dual-clutch",
+        "drivetrain": "AWD"
+      }
+    },
+    {
+      "name": "Lanzador",
+      "slug": "lanzador",
+      "productionStartYear": 2028,
+      "category": "Concept / Future Production",
+      "bodyStyle": "2+2 high-riding GT",
+      "description": "A preview of Lamborghini's electric grand touring direction, positioned as a future fourth model line.",
+      "spec": {
+        "engine": "Electric",
+        "drivetrain": "AWD"
+      }
+    }
+  ]
+}

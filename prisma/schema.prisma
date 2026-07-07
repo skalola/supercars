@@ -1,0 +1,182 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Make {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  slug      String   @unique
+  models    Model[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Model {
+  id                  String      @id @default(uuid())
+  makeId              String
+  name                String
+  slug                String
+  years               String?
+  productionStartYear Int?
+  productionEndYear   Int?
+  category            String?
+  bodyStyle           String?
+  productionCount     Int?
+  description         String?
+
+  make                Make        @relation(fields: [makeId], references: [id])
+  vehicles            Vehicle[]
+  spec                ModelSpec?
+  images              ModelImage[]
+  variants            ModelVariant[]
+  garageItems         GarageItem[]
+
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  @@unique([makeId, slug])
+}
+
+model ModelSpec {
+  id            String   @id @default(uuid())
+  modelId       String   @unique
+  engine        String?
+  displacement  String?
+  cylinders     String?
+  horsepower    String?
+  torque        String?
+  transmission  String?
+  drivetrain    String?
+  topSpeed      String?
+  zeroToSixty   String?
+  weight        String?
+
+  model         Model    @relation(fields: [modelId], references: [id])
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model ModelVariant {
+  id                  String   @id @default(uuid())
+  modelId             String
+  name                String
+  slug                String
+  productionStartYear Int?
+  productionEndYear   Int?
+  productionCount     Int?
+  description         String?
+
+  model               Model    @relation(fields: [modelId], references: [id])
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([modelId, slug])
+}
+
+model ModelImage {
+  id        String   @id @default(uuid())
+  modelId   String
+  url       String
+  source    String?
+  type      String?
+
+  model     Model    @relation(fields: [modelId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([modelId, url])
+}
+
+model Vehicle {
+  id           String @id @default(uuid())
+  vin          String @unique
+  modelId      String
+  year         Int
+  color        String?
+  mileage      Int?
+  transmission String?
+  drivetrain   String?
+  engine       String?
+  status       String @default("UNCLAIMED")
+
+  model        Model @relation(fields: [modelId], references: [id])
+  images       VehicleImage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model VehicleImage {
+  id          String   @id @default(uuid())
+  vehicleId   String
+  url         String
+  alt         String?
+  isPrimary   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+
+  accounts      Account[]
+  sessions      Session[]
+  garageItems   GarageItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?
+  access_token       String?
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model GarageItem {
+  id        String   @id @default(cuid())
+  userId    String
+  modelId   String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  model     Model    @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, modelId])
+}

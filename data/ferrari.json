@@ -1,0 +1,743 @@
+{
+  "make": {
+    "name": "Ferrari",
+    "slug": "ferrari"
+  },
+  "models": [
+    {
+      "name": "166 Inter",
+      "slug": "166-inter",
+      "productionStartYear": 1948,
+      "productionEndYear": 1950,
+      "category": "Classic GT",
+      "bodyStyle": "Coupe",
+      "productionCount": 38,
+      "description": "Ferrari's first true road-going grand tourer, evolved from the early 166 sports-racing chassis and bodied by coachbuilders including Touring.",
+      "spec": {
+        "engine": "2.0L Colombo V12",
+        "horsepower": "110 hp",
+        "transmission": "5-speed manual",
+        "drivetrain": "RWD",
+        "topSpeed": "106 mph"
+      }
+    },
+    {
+      "name": "250 GT Series",
+      "slug": "250-series",
+      "productionStartYear": 1952,
+      "productionEndYear": 1964,
+      "category": "Classic GT",
+      "bodyStyle": "Coupe / Berlinetta / Spider / Cabriolet",
+      "description": "The 250 family became Ferrari's defining 1950s and early 1960s GT line, spanning road cars, California Spiders, Tour de France berlinettas and the legendary GTO.",
+      "spec": {
+        "engine": "3.0L Colombo V12",
+        "horsepower": "220-300 hp",
+        "transmission": "4-speed manual / 5-speed manual",
+        "drivetrain": "RWD"
+      }
+    },
+    {
+      "name": "250 GTO",
+      "slug": "250-gto",
+      "productionStartYear": 1962,
+      "productionEndYear": 1964,
+      "category": "Homologation Supercar",
+      "bodyStyle": "Berlinetta",
+      "productionCount": 36,
+      "description": "A competition-bred 250 created for GT racing homologation, now one of the most celebrated and valuable Ferraris ever built.",
+      "spec": {
+        "engine": "3.0L Colombo V12",
+        "horsepower": "296 hp",
+        "transmission": "5-speed manual",
+        "drivetrain": "RWD",
+        "topSpeed": "174 mph",
+        "zeroToSixty": "5.4 seconds",
+        "weight": "1,940 lb"
+      }
+    },
+    {
+      "name": "275 GTB",
+      "slug": "275-gtb",
+      "productionStartYear": 1964,
+      "productionEndYear": 1968,
+      "category": "Classic GT",
+      "bodyStyle": "Berlinetta",
+      "description": "A front-engined V12 berlinetta that introduced independent rear suspension and transaxle layout to Ferrari road cars.",
+      "spec": {
+        "engine": "3.3L Colombo V12",
+        "horsepower": "280-300 hp",
+        "transmission": "5-speed manual",
+        "drivetrain": "RWD",
+        "topSpeed": "160 mph"
+      }
+    },
+    {
+      "name": "365 GTB/4 Daytona",
+      "slug": "daytona",
+      "productionStartYear": 1968,
+      "productionEndYear": 1973,
+      "category": "Grand Tourer",
+      "bodyStyle": "Berlinetta / Spider",
+      "productionCount": 1406,
+      "description": "The Daytona was Ferrari's dramatic late-1960s front-engined flagship, pairing a long-nose Pininfarina body with a high-output V12.",
+      "spec": {
+        "engine": "4.4L Colombo V12",
+        "horsepower": "352 hp",
+        "transmission": "5-speed manual",
+        "drivetrain": "RWD",
+        "topSpeed": "174 mph",
+        "zeroToSixty": "5.4 seconds"
+      }
+    },
+    {
+      "name": "Dino 246 GT/GTS",
+      "slug": "dino",
+      "productionStartYear": 1969,
+      "productionEndYear": 1974,
+      "category": "Sports Car",
+      "bodyStyle": "Coupe / Targa",
+      "productionCount": 3761,
+      "description": "Named for Enzo Ferrari's son, the Dino brought mid-engined handling and a compact V6 to Ferrari's road-car lineage.",
+      "spec": {
+        "engine": "2.4L V6",
+        "horsepower": "192 hp",
+        "transmission": "5-speed manual",
+        "drivetrain": "RWD",
+        "topSpeed": "146 mph",
+        "zeroToSixty": "7.1 seconds"
+      }
+    },
+    {
+      "name": "Berlinetta Boxer",
+      "slug": "berlinetta-boxer",
+      "productionStartYear": 1973,
+      "productionEndYear": 1984,
+      "category": "Supercar",
+      "bodyStyle": "Berlinetta",
+      "description": "Ferrari's first mid-engined flat-12 flagship road-car family, covering the 365 GT4 BB, 512 BB and 512 BBi.",
+      "spec": {
+        "engine": "Flat-12",
+        "horsepower": "340-360 hp",
+        "transmission": "5-speed manual",
+        "drivetrain": "RWD",
+        "topSpeed": "175 mph"
+      }
+    },
+    {
+      "name": "308 GTB/GTS",
+      "slug": "308",
+      "productionStartYear": 1975,
+      "productionEndYear": 1985,
+      "category": "Sports Car",
+      "bodyStyle": "Berlinetta / Targa",
+      "description": "The 308 defined Ferrari's compact mid-engined V8 formula and became one of the brand's most recognizable shapes.",
+      "spec": {
+        "engine": "2.9L V8",
+        "horsepower": "214-252 hp",
+        "transmission": "5-speed manual",
+        "drivetrain": "RWD",
+        "topSpeed": "156 mph"
+      }
+    },
+    {
+      "name": "Mondial",
+      "slug": "mondial",
+      "productionStartYear": 1980,
+      "productionEndYear": 1993,
+      "category": "Grand Tourer",
+      "bodyStyle": "2+2 Coupe / Cabriolet",
+      "description": "A mid-engined 2+2 Ferrari offered as a coupe and cabriolet, designed to add everyday usability to the V8 range.",
+      "spec": {
+        "engine": "V8",
+        "horsepower": "214-300 hp",
+        "transmission": "5-speed manual",
+        "drivetrain": "RWD"
+      }
+    },
+    {
+      "name": "288 GTO",
+      "slug": "288-gto",
+      "productionStartYear": 1984,
+      "productionEndYear": 1987,
+      "category": "Homologation Supercar",
+      "bodyStyle": "Berlinetta",
+      "productionCount": 272,
+      "description": "Built for Group B homologation, the 288 GTO transformed the 308 silhouette into a twin-turbocharged limited-production supercar.",
+      "spec": {
+        "engine": "2.9L twin-turbo V8",
+        "displacement": "2,855 cc",
+        "cylinders": "V8",
+        "horsepower": "400 hp",
+        "torque": "366 lb-ft",
+        "transmission": "5-speed manual",
+        "drivetrain": "RWD",
+        "topSpeed": "189 mph",
+        "zeroToSixty": "4.9 seconds",
+        "weight": "2,557 lb"
+      }
+    },
+    {
+      "name": "328 GTB/GTS",
+      "slug": "328",
+      "productionStartYear": 1985,
+      "productionEndYear": 1989,
+      "category": "Sports Car",
+      "bodyStyle": "Berlinetta / Targa",
+      "description": "An evolution of the 308 with cleaner detailing, more displacement and improved usability.",
+      "spec": {
+        "engine": "3.2L V8",
+        "horsepower": "270 hp",
+        "transmission": "5-speed manual",
+        "drivetrain": "RWD",
+        "topSpeed": "166 mph"
+      }
+    },
+    {
+      "name": "Testarossa",
+      "slug": "testarossa",
+      "productionStartYear": 1984,
+      "productionEndYear": 1996,
+      "category": "Supercar",
+      "bodyStyle": "Berlinetta",
+      "description": "The side-straked flat-12 Testarossa family became Ferrari's definitive 1980s flagship and continued through the 512 TR and F512 M.",
+      "spec": {
+        "engine": "4.9L flat-12",
+        "horsepower": "380-440 hp",
+        "transmission": "5-speed manual",
+        "drivetrain": "RWD",
+        "topSpeed": "180 mph"
+      }
+    },
+    {
+      "name": "F40",
+      "slug": "f40",
+      "productionStartYear": 1987,
+      "productionEndYear": 1992,
+      "category": "Supercar",
+      "bodyStyle": "Berlinetta",
+      "productionCount": 1311,
+      "description": "Created to celebrate Ferrari's 40th anniversary, the F40 was a raw twin-turbo supercar and the final Ferrari launched under Enzo Ferrari's lifetime.",
+      "spec": {
+        "engine": "2.9L twin-turbo V8",
+        "displacement": "2,936 cc",
+        "cylinders": "V8",
+        "horsepower": "471 hp",
+        "torque": "426 lb-ft",
+        "transmission": "5-speed manual",
+        "drivetrain": "RWD",
+        "topSpeed": "201 mph",
+        "zeroToSixty": "4.1 seconds",
+        "weight": "2,425 lb"
+      },
+      "variants": [
+        {
+          "name": "F40 LM",
+          "slug": "f40-lm",
+          "productionStartYear": 1989,
+          "productionEndYear": 1994,
+          "productionCount": 19,
+          "description": "Competition-focused F40 developed for racing use with more power, reduced weight and revised aerodynamics."
+        },
+        {
+          "name": "F40 Competizione",
+          "slug": "f40-competizione",
+          "productionStartYear": 1991,
+          "productionEndYear": 1994,
+          "description": "Late competition evolution of the F40 platform, closely related to the LM program."
+        }
+      ]
+    },
+    {
+      "name": "348",
+      "slug": "348",
+      "productionStartYear": 1989,
+      "productionEndYear": 1995,
+      "category": "Sports Car",
+      "bodyStyle": "Berlinetta / Targa / Spider",
+      "description": "The 348 replaced the 328 with a longitudinal V8, side intake design cues and a sharper late-1980s chassis.",
+      "spec": {
+        "engine": "3.4L V8",
+        "horsepower": "300-320 hp",
+        "transmission": "5-speed manual",
+        "drivetrain": "RWD",
+        "topSpeed": "171 mph"
+      }
+    },
+    {
+      "name": "456 GT",
+      "slug": "456",
+      "productionStartYear": 1992,
+      "productionEndYear": 2003,
+      "category": "Grand Tourer",
+      "bodyStyle": "2+2 Coupe",
+      "description": "A front-engined V12 2+2 that restored Ferrari's elegant grand touring lineage for the 1990s.",
+      "spec": {
+        "engine": "5.5L V12",
+        "horsepower": "436 hp",
+        "transmission": "6-speed manual / 4-speed automatic",
+        "drivetrain": "RWD",
+        "topSpeed": "186 mph"
+      }
+    },
+    {
+      "name": "F355",
+      "slug": "f355",
+      "productionStartYear": 1994,
+      "productionEndYear": 1999,
+      "category": "Sports Car",
+      "bodyStyle": "Berlinetta / GTS / Spider",
+      "description": "The F355 refined Ferrari's mid-engined V8 platform with five valves per cylinder, a soaring soundtrack and modernized usability.",
+      "spec": {
+        "engine": "3.5L V8",
+        "horsepower": "375 hp",
+        "transmission": "6-speed manual / F1 automated manual",
+        "drivetrain": "RWD",
+        "topSpeed": "183 mph",
+        "zeroToSixty": "4.6 seconds"
+      }
+    },
+    {
+      "name": "F50",
+      "slug": "f50",
+      "productionStartYear": 1995,
+      "productionEndYear": 1997,
+      "category": "Supercar",
+      "bodyStyle": "Targa",
+      "productionCount": 349,
+      "description": "The F50 translated Ferrari Formula One influence into a road-going carbon-chassis hypercar with a naturally aspirated V12.",
+      "spec": {
+        "engine": "4.7L naturally aspirated V12",
+        "horsepower": "513 hp",
+        "torque": "347 lb-ft",
+        "transmission": "6-speed manual",
+        "drivetrain": "RWD",
+        "topSpeed": "202 mph",
+        "zeroToSixty": "3.8 seconds",
+        "weight": "2,712 lb"
+      }
+    },
+    {
+      "name": "550 Maranello",
+      "slug": "550",
+      "productionStartYear": 1996,
+      "productionEndYear": 2001,
+      "category": "Grand Tourer",
+      "bodyStyle": "Coupe",
+      "description": "A front-engined V12 flagship that revived the classic Ferrari GT layout in a modern, high-speed form.",
+      "spec": {
+        "engine": "5.5L V12",
+        "horsepower": "478 hp",
+        "transmission": "6-speed manual",
+        "drivetrain": "RWD",
+        "topSpeed": "199 mph"
+      }
+    },
+    {
+      "name": "360 Modena",
+      "slug": "360-modena",
+      "productionStartYear": 1999,
+      "productionEndYear": 2005,
+      "category": "Sports Car",
+      "bodyStyle": "Berlinetta / Spider",
+      "description": "The 360 introduced an aluminum spaceframe, a new visual language and a more modern mid-engined V8 Ferrari experience.",
+      "spec": {
+        "engine": "3.6L V8",
+        "horsepower": "395 hp",
+        "transmission": "6-speed manual / F1 automated manual",
+        "drivetrain": "RWD",
+        "topSpeed": "183 mph",
+        "zeroToSixty": "4.5 seconds"
+      }
+    },
+    {
+      "name": "575M Maranello",
+      "slug": "575",
+      "productionStartYear": 2002,
+      "productionEndYear": 2006,
+      "category": "Grand Tourer",
+      "bodyStyle": "Coupe",
+      "description": "An updated Maranello with a larger V12, revised chassis tuning and available F1-style paddle-shift transmission.",
+      "spec": {
+        "engine": "5.75L V12",
+        "horsepower": "508 hp",
+        "transmission": "6-speed manual / F1 automated manual",
+        "drivetrain": "RWD",
+        "topSpeed": "202 mph"
+      }
+    },
+    {
+      "name": "Enzo",
+      "slug": "enzo",
+      "productionStartYear": 2002,
+      "productionEndYear": 2004,
+      "category": "Hypercar",
+      "bodyStyle": "Berlinetta",
+      "productionCount": 400,
+      "description": "Named after Ferrari's founder, the Enzo used carbon construction, active aerodynamics and a new V12 to showcase Ferrari's early-2000s technology.",
+      "spec": {
+        "engine": "6.0L naturally aspirated V12",
+        "horsepower": "651 hp",
+        "torque": "485 lb-ft",
+        "transmission": "6-speed automated manual",
+        "drivetrain": "RWD",
+        "topSpeed": "217 mph",
+        "zeroToSixty": "3.1 seconds",
+        "weight": "3,020 lb"
+      }
+    },
+    {
+      "name": "612 Scaglietti",
+      "slug": "612-scaglietti",
+      "productionStartYear": 2004,
+      "productionEndYear": 2011,
+      "category": "Grand Tourer",
+      "bodyStyle": "2+2 Coupe",
+      "description": "A large aluminum-bodied V12 2+2 grand tourer named in honor of coachbuilder Sergio Scaglietti.",
+      "spec": {
+        "engine": "5.7L V12",
+        "horsepower": "533 hp",
+        "transmission": "6-speed manual / F1 automated manual",
+        "drivetrain": "RWD",
+        "topSpeed": "199 mph"
+      }
+    },
+    {
+      "name": "F430",
+      "slug": "f430",
+      "productionStartYear": 2004,
+      "productionEndYear": 2009,
+      "category": "Sports Car",
+      "bodyStyle": "Berlinetta / Spider",
+      "description": "The F430 advanced the V8 line with a new 4.3-liter engine, E-Diff technology and sharper aerodynamics.",
+      "spec": {
+        "engine": "4.3L V8",
+        "horsepower": "483 hp",
+        "transmission": "6-speed manual / F1 automated manual",
+        "drivetrain": "RWD",
+        "topSpeed": "196 mph",
+        "zeroToSixty": "3.9 seconds"
+      }
+    },
+    {
+      "name": "599 GTB Fiorano",
+      "slug": "599",
+      "productionStartYear": 2006,
+      "productionEndYear": 2012,
+      "category": "Grand Tourer",
+      "bodyStyle": "Coupe",
+      "description": "A V12 flagship GT powered by an Enzo-derived engine and named for Ferrari's Fiorano test track.",
+      "spec": {
+        "engine": "6.0L V12",
+        "horsepower": "612 hp",
+        "transmission": "6-speed manual / F1 automated manual",
+        "drivetrain": "RWD",
+        "topSpeed": "205 mph"
+      }
+    },
+    {
+      "name": "California",
+      "slug": "california",
+      "productionStartYear": 2008,
+      "productionEndYear": 2017,
+      "category": "Grand Tourer",
+      "bodyStyle": "Retractable hardtop convertible",
+      "description": "A front-engined V8 GT that broadened Ferrari's range with a folding hardtop and dual-clutch transmission.",
+      "spec": {
+        "engine": "V8",
+        "horsepower": "453-552 hp",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "196 mph"
+      }
+    },
+    {
+      "name": "458 Italia",
+      "slug": "458-italia",
+      "productionStartYear": 2009,
+      "productionEndYear": 2015,
+      "category": "Sports Car",
+      "bodyStyle": "Berlinetta / Spider",
+      "description": "A landmark naturally aspirated V8 Ferrari known for its engine response, aerodynamic integration and clean Pininfarina design.",
+      "spec": {
+        "engine": "4.5L V8",
+        "horsepower": "562 hp",
+        "torque": "398 lb-ft",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "202 mph",
+        "zeroToSixty": "3.4 seconds",
+        "weight": "3,274 lb"
+      }
+    },
+    {
+      "name": "FF",
+      "slug": "ff",
+      "productionStartYear": 2011,
+      "productionEndYear": 2016,
+      "category": "Grand Tourer",
+      "bodyStyle": "Shooting brake",
+      "description": "Ferrari's four-seat shooting brake introduced the brand's 4RM all-wheel-drive system to a V12 GT.",
+      "spec": {
+        "engine": "6.3L V12",
+        "horsepower": "651 hp",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "AWD",
+        "topSpeed": "208 mph"
+      }
+    },
+    {
+      "name": "F12berlinetta",
+      "slug": "f12berlinetta",
+      "productionStartYear": 2012,
+      "productionEndYear": 2017,
+      "category": "Grand Tourer",
+      "bodyStyle": "Coupe",
+      "description": "A front-engined V12 berlinetta that paired extreme naturally aspirated performance with advanced aerodynamic management.",
+      "spec": {
+        "engine": "6.3L V12",
+        "horsepower": "730 hp",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "211 mph",
+        "zeroToSixty": "3.1 seconds"
+      }
+    },
+    {
+      "name": "LaFerrari",
+      "slug": "laferrari",
+      "productionStartYear": 2013,
+      "productionEndYear": 2018,
+      "category": "Hybrid Hypercar",
+      "bodyStyle": "Berlinetta / Aperta",
+      "productionCount": 710,
+      "description": "Ferrari's first flagship hybrid hypercar combined a V12 with HY-KERS assistance and active aerodynamics.",
+      "spec": {
+        "engine": "6.3L V12 hybrid",
+        "horsepower": "950 hp",
+        "torque": "664 lb-ft",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "217 mph",
+        "zeroToSixty": "2.6 seconds",
+        "weight": "3,495 lb"
+      }
+    },
+    {
+      "name": "488 GTB",
+      "slug": "488-gtb",
+      "productionStartYear": 2015,
+      "productionEndYear": 2019,
+      "category": "Sports Car",
+      "bodyStyle": "Berlinetta / Spider",
+      "description": "The 488 brought twin-turbocharging back to Ferrari's mainstream mid-engined V8 line with major gains in torque and efficiency.",
+      "spec": {
+        "engine": "3.9L twin-turbo V8",
+        "horsepower": "661 hp",
+        "torque": "561 lb-ft",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "205 mph",
+        "zeroToSixty": "3.0 seconds"
+      }
+    },
+    {
+      "name": "GTC4Lusso",
+      "slug": "gtc4lusso",
+      "productionStartYear": 2016,
+      "productionEndYear": 2020,
+      "category": "Grand Tourer",
+      "bodyStyle": "Shooting brake",
+      "description": "A refined evolution of the FF, offered with V12 all-wheel drive or rear-drive twin-turbo V8 power.",
+      "spec": {
+        "engine": "6.3L V12 / 3.9L twin-turbo V8",
+        "horsepower": "602-681 hp",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "AWD / RWD"
+      }
+    },
+    {
+      "name": "812 Superfast",
+      "slug": "812-superfast",
+      "productionStartYear": 2017,
+      "productionEndYear": 2024,
+      "category": "Grand Tourer",
+      "bodyStyle": "Coupe / Targa",
+      "description": "Ferrari's naturally aspirated V12 grand tourer successor to the F12, later joined by the open 812 GTS and limited Competizione variants.",
+      "spec": {
+        "engine": "6.5L V12",
+        "horsepower": "789 hp",
+        "torque": "530 lb-ft",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "211 mph",
+        "zeroToSixty": "2.8 seconds"
+      }
+    },
+    {
+      "name": "Portofino",
+      "slug": "portofino",
+      "productionStartYear": 2017,
+      "productionEndYear": 2023,
+      "category": "Grand Tourer",
+      "bodyStyle": "Retractable hardtop convertible",
+      "description": "The Portofino replaced the California T as Ferrari's open-front-engined V8 GT.",
+      "spec": {
+        "engine": "3.9L twin-turbo V8",
+        "horsepower": "591-612 hp",
+        "transmission": "7-speed dual-clutch / 8-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "199 mph"
+      }
+    },
+    {
+      "name": "Monza SP1/SP2",
+      "slug": "monza-sp1-sp2",
+      "productionStartYear": 2018,
+      "productionEndYear": 2022,
+      "category": "Icona",
+      "bodyStyle": "Speedster",
+      "productionCount": 499,
+      "description": "The first Icona models reimagined Ferrari barchetta sports racers as limited-production single- and two-seat V12 speedsters.",
+      "spec": {
+        "engine": "6.5L V12",
+        "horsepower": "799 hp",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "186 mph"
+      }
+    },
+    {
+      "name": "F8 Tributo",
+      "slug": "f8-tributo",
+      "productionStartYear": 2019,
+      "productionEndYear": 2023,
+      "category": "Sports Car",
+      "bodyStyle": "Berlinetta / Spider",
+      "description": "The F8 celebrated Ferrari's award-winning twin-turbo V8 while refining the 488 platform's aerodynamics and controls.",
+      "spec": {
+        "engine": "3.9L twin-turbo V8",
+        "horsepower": "710 hp",
+        "torque": "568 lb-ft",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "211 mph",
+        "zeroToSixty": "2.9 seconds"
+      }
+    },
+    {
+      "name": "Roma",
+      "slug": "roma",
+      "productionStartYear": 2020,
+      "category": "Grand Tourer",
+      "bodyStyle": "Coupe / Spider",
+      "description": "A front-mid-engined V8 GT inspired by classic Ferrari elegance and offered in coupe and Spider forms.",
+      "spec": {
+        "engine": "3.9L twin-turbo V8",
+        "horsepower": "612 hp",
+        "transmission": "8-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "199 mph",
+        "zeroToSixty": "3.4 seconds"
+      }
+    },
+    {
+      "name": "SF90 Stradale",
+      "slug": "sf90-stradale",
+      "productionStartYear": 2019,
+      "category": "Plug-in Hybrid Supercar",
+      "bodyStyle": "Berlinetta / Spider",
+      "description": "Ferrari's series-production plug-in hybrid flagship combines a twin-turbo V8 with three electric motors and all-wheel drive.",
+      "spec": {
+        "engine": "4.0L twin-turbo V8 plug-in hybrid",
+        "horsepower": "986 hp",
+        "torque": "590 lb-ft",
+        "transmission": "8-speed dual-clutch",
+        "drivetrain": "AWD",
+        "topSpeed": "211 mph",
+        "zeroToSixty": "2.5 seconds"
+      }
+    },
+    {
+      "name": "296 GTB/GTS",
+      "slug": "296-gtb-gts",
+      "productionStartYear": 2021,
+      "category": "Plug-in Hybrid Sports Car",
+      "bodyStyle": "Berlinetta / Spider",
+      "description": "A compact plug-in hybrid Ferrari pairing a twin-turbo V6 with electric assistance for the modern mid-engined sports-car range.",
+      "spec": {
+        "engine": "3.0L twin-turbo V6 plug-in hybrid",
+        "horsepower": "819 hp",
+        "torque": "546 lb-ft",
+        "transmission": "8-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "205 mph",
+        "zeroToSixty": "2.9 seconds"
+      }
+    },
+    {
+      "name": "Daytona SP3",
+      "slug": "daytona-sp3",
+      "productionStartYear": 2022,
+      "category": "Icona",
+      "bodyStyle": "Targa",
+      "productionCount": 599,
+      "description": "An Icona-series limited model celebrating Ferrari sports-prototype victories with dramatic bodywork and a naturally aspirated V12.",
+      "spec": {
+        "engine": "6.5L V12",
+        "horsepower": "829 hp",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "211 mph",
+        "zeroToSixty": "2.85 seconds"
+      }
+    },
+    {
+      "name": "Purosangue",
+      "slug": "purosangue",
+      "productionStartYear": 2023,
+      "category": "Performance SUV",
+      "bodyStyle": "Four-door crossover",
+      "description": "Ferrari's first four-door four-seat production model, using a naturally aspirated V12 and performance-focused chassis systems.",
+      "spec": {
+        "engine": "6.5L V12",
+        "horsepower": "715 hp",
+        "torque": "528 lb-ft",
+        "transmission": "8-speed dual-clutch",
+        "drivetrain": "AWD",
+        "topSpeed": "193 mph",
+        "zeroToSixty": "3.3 seconds"
+      }
+    },
+    {
+      "name": "12Cilindri",
+      "slug": "12cilindri",
+      "productionStartYear": 2024,
+      "category": "Grand Tourer",
+      "bodyStyle": "Coupe / Spider",
+      "description": "The 12Cilindri carries Ferrari's front-engined naturally aspirated V12 grand touring tradition into the current lineup.",
+      "spec": {
+        "engine": "6.5L V12",
+        "horsepower": "819 hp",
+        "transmission": "8-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "211 mph",
+        "zeroToSixty": "2.9 seconds"
+      }
+    },
+    {
+      "name": "F80",
+      "slug": "f80",
+      "productionStartYear": 2025,
+      "category": "Hybrid Hypercar",
+      "bodyStyle": "Berlinetta",
+      "productionCount": 799,
+      "description": "Ferrari's next-generation halo car, combining endurance-racing and Formula One-inspired hybrid technology in a limited-production flagship.",
+      "spec": {
+        "engine": "3.0L twin-turbo V6 hybrid",
+        "horsepower": "1184 hp",
+        "transmission": "8-speed dual-clutch",
+        "drivetrain": "AWD"
+      }
+    }
+  ]
+}
