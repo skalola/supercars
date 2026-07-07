@@ -153,7 +153,7 @@ export default async function ModelPage({ params }: ModelPageProps) {
   const garageItem = session?.user ? await prisma.garageItem.findUnique({
     where: {
       userId_modelId: {
-        userId: session.user.id,
+        userId: session.user.id as string,
         modelId: model.id,
       },
     },
