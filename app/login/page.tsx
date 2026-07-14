@@ -15,14 +15,6 @@ export default function LoginPage() {
             Continue with Google
           </button>
         </form>
-        <form action={async () => {
-          "use server";
-          await signIn("apple", { redirectTo: "/garage" });
-        }}>
-          <button type="submit" style={{ width: "100%", padding: "12px 16px", borderRadius: 8, border: "1px solid #ddd", cursor: "pointer" }}>
-            Continue with Apple
-          </button>
-        </form>
         <Link href="/" style={{ color: "#2563eb", marginTop: 8 }}>Back to home</Link>
       </div>
     </main>

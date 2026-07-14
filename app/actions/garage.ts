@@ -10,23 +10,38 @@ export async function toggleGarageItem(modelId: string) {
     return { ok: false, reason: "unauthenticated" };
   }
 
+  const userId = session.user.id;
+
   const existing = await prisma.garageItem.findUnique({
     where: {
       userId_modelId: {
-        userId: session.user.id,
+        userId,
         modelId,
       },
     },
   });
 
   if (existing) {
+    // Remove the garage item
     await prisma.garageItem.delete({
       where: { id: existing.id },
+    });
+
+    // Also handle ownership: remove association and reset status if they had a vehicle of this model
+    await prisma.vehicle.updateMany({
+      where: {
+        modelId,
+        ownerId: userId,
+      },
+      data: {
+        ownerId: null,
+        status: "UNCLAIMED",
+      },
     });
   } else {
     await prisma.garageItem.create({
       data: {
-        userId: session.user.id,
+        userId,
         modelId,
       },
     });

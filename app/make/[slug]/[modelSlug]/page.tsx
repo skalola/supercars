@@ -159,6 +159,13 @@ export default async function ModelPage({ params }: ModelPageProps) {
     },
   }) : null;
 
+  const claimedVehicle = session?.user ? await prisma.vehicle.findFirst({
+    where: {
+      modelId: model.id,
+      ownerId: session.user.id as string,
+    },
+  }) : null;
+
   const heroImage = getHeroImage(modelImages);
 
   const specs = [
@@ -261,6 +268,41 @@ export default async function ModelPage({ params }: ModelPageProps) {
         )}
       </div>
 
+      <div style={{ marginTop: 24, padding: 20, border: "1px solid #e5e7eb", borderRadius: 12, background: "#f9fafb" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 14, color: "#666", fontWeight: 600 }}>Ownership</div>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>
+              {claimedVehicle ? (
+                <span style={{ color: claimedVehicle.status === "CLAIMED" ? "#059669" : "#d97706" }}>
+                  {claimedVehicle.status === "CLAIMED" ? "CLAIMED" : "CLAIM PENDING"}
+                </span>
+              ) : garageItem ? (
+                <span style={{ color: "#666" }}>In My Garage</span>
+              ) : (
+                "Not Claimed"
+              )}
+            </div>
+          </div>
+          {session?.user && garageItem && !claimedVehicle && (
+            <Link 
+              href={`/claim/${model.id}`}
+              style={{ 
+                padding: "8px 16px", 
+                background: "#000", 
+                color: "#fff", 
+                borderRadius: 8, 
+                textDecoration: "none", 
+                fontSize: 14, 
+                fontWeight: 600 
+              }}
+            >
+              Claim This Vehicle
+            </Link>
+          )}
+        </div>
+      </div>
+
       <div
         style={{
           display: "grid",
@@ -268,6 +310,7 @@ export default async function ModelPage({ params }: ModelPageProps) {
           gap: 12,
           marginTop: 28,
         }}
+
       >
         <div>
           <div style={{ color: "#777", fontSize: 13 }}>Production years</div>
@@ -382,6 +425,28 @@ export default async function ModelPage({ params }: ModelPageProps) {
           <p style={{ color: "#777" }}>No VIN-level vehicles recorded yet.</p>
         )}
       </section>
+
+      {claimedVehicle && claimedVehicle.status === "CLAIMED" && (
+        <section style={{ marginTop: 48, padding: 32, background: "#f8fafc", borderRadius: 24, border: "1px solid #e2e8f0" }}>
+          <h2 style={{ fontSize: 28, marginBottom: 24 }}>Owner Dashboard</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
+            {[
+              "Market Price",
+              "Inspection Report",
+              "Service History",
+              "Upcoming Maintenance",
+              "Awards",
+              "List Vehicle For Sale",
+              "Book Service",
+            ].map((item) => (
+              <div key={item} style={{ padding: 20, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12 }}>
+                <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>{item}</div>
+                <div style={{ color: "#94a3b8", fontSize: 14 }}>Coming Soon</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   );
 }

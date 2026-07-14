@@ -35,6 +35,7 @@ model Model {
   images              ModelImage[]
   variants            ModelVariant[]
   garageItems         GarageItem[]
+  maintenanceRules    MaintenanceRule[]
 
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
@@ -100,15 +101,69 @@ model Vehicle {
   vin          String @unique
   modelId      String
   year         Int
+  
+  // Identity
+  trim         String?
+  series       String?
+  manufacturer String?
+  destinationMarket String?
+  
+  // Details
   color        String?
   mileage      Int?
-  transmission String?
-  drivetrain   String?
+  bodyStyle    String?
+  vehicleType  String?
+  doors        String?
+  fuelType     String?
+  
+  // Engine & Performance
   engine       String?
+  engineConfiguration String?
+  engineCylinders String?
+  displacement String?
+  turbo        String?
+  transmission String?
+  transmissionSpeeds String?
+  drivetrain   String?
+  engineHP     String?
+  engineKW     String?
+  engineManufacturer String?
+  
+  // Manufacturing
+  plantCountry String?
+  plantCity    String?
+  plantState   String?
+  
+  // Safety
+  abs                  String?
+  esc                  String?
+  tpms                 String?
+  rearVisibilitySystem String?
+  parkAssist           String?
+  adaptiveDrivingBeam  String?
+  airBagLocFront       String?
+  airBagLocKnee        String?
+  airBagLocSide        String?
+  pretensioner         String?
+  seatBeltsAll         String?
+
+  // Others
+  gvwr         String?
+  brakeSystem  String?
+  electrificationLevel String?
+  
   status       String @default("UNCLAIMED")
+  ownerId      String?
 
   model        Model @relation(fields: [modelId], references: [id])
+  owner        User?   @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   images       VehicleImage[]
+  profile      VehicleProfile?
+  modifications VehicleModification[]
+  serviceRecords ServiceRecord[]
+  awards       VehicleAward[]
+  photos       VehiclePhoto[]
+  documents    VehicleDocument[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -128,6 +183,7 @@ model VehicleImage {
 
 model User {
   id            String    @id @default(cuid())
+  username      String?   @unique
   name          String?
   email         String?   @unique
   emailVerified DateTime?
@@ -136,6 +192,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   garageItems   GarageItem[]
+  vehicles      Vehicle[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -179,4 +236,95 @@ model GarageItem {
   model     Model    @relation(fields: [modelId], references: [id], onDelete: Cascade)
 
   @@unique([userId, modelId])
+}
+
+model VehicleProfile {
+  id             String   @id @default(uuid())
+  vehicleId      String   @unique
+  exteriorColor  String?
+  interiorColor  String?
+  currentMileage Int?
+  ownerNotes     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  vehicle        Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+}
+
+model VehicleModification {
+  id             String   @id @default(uuid())
+  vehicleId      String
+  name           String
+  brand          String?
+  description    String?
+  installedDate  String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  vehicle        Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+}
+
+model ServiceRecord {
+  id             String   @id @default(uuid())
+  vehicleId      String
+  serviceDate    DateTime
+  mileage        Int?
+  shopName       String?
+  description    String?
+  cost           Float?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  vehicle        Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+}
+
+model VehicleAward {
+  id             String   @id @default(uuid())
+  vehicleId      String
+  title          String
+  eventName      String?
+  awardDate      DateTime?
+  description    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  vehicle        Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+}
+
+model VehiclePhoto {
+  id           String   @id @default(uuid())
+  vehicleId    String
+  filePath     String
+  caption      String?
+  displayOrder Int      @default(0)
+  isHero       Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  vehicle      Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+}
+
+model VehicleDocument {
+  id           String   @id @default(uuid())
+  vehicleId    String
+  title        String
+  documentType String
+  filePath     String
+  createdAt    DateTime @default(now())
+
+  vehicle      Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+}
+
+model MaintenanceRule {
+  id             String   @id @default(uuid())
+  modelId        String?
+  category       String
+  serviceName    String
+  description    String?
+  intervalMiles  Int?
+  intervalMonths Int?
+  priority       String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  model          Model?   @relation(fields: [modelId], references: [id], onDelete: Cascade)
 }
