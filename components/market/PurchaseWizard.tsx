@@ -2,10 +2,12 @@
 
 import React, { useState } from "react";
 import {
-  createPurchasePlaceholder,
-  createInsuranceRequestPlaceholder,
-  createDeliveryRequestPlaceholder
+  createDealerPurchasePackage,
+  createInsuranceQuotePackage,
+  createTransportQuotePackage
 } from "@/app/actions/purchase";
+
+type DeliveryMethod = "ENCLOSED" | "STANDARD";
 
 type PurchaseWizardProps = {
   vin: string;
@@ -51,7 +53,7 @@ export default function PurchaseWizard({
   });
 
   const [deliveryDate, setDeliveryDate] = useState("");
-  const [deliveryMethod, setDeliveryMethod] = useState("ENCLOSED");
+  const [deliveryMethod, setDeliveryMethod] = useState<DeliveryMethod>("ENCLOSED");
   const [deliverySubmitted, setDeliverySubmitted] = useState(false);
 
   const resetWizard = () => {
@@ -633,14 +635,15 @@ export default function PurchaseWizard({
 
                       if (purchaseId) {
                         try {
-                          await createDeliveryRequestPlaceholder(
+                          await createTransportQuotePackage({
                             purchaseId,
-                            { streetAddress, city, state, postalCode },
-                            deliveryMethod,
+                            address: { streetAddress, city, state, postalCode },
+                            transportMethod: deliveryMethod,
                             deliveryDate
-                          );
-                        } catch (err: any) {
-                          alert(err.message || "Failed to submit delivery request.");
+                          });
+                        } catch (error) {
+                          const message = error instanceof Error ? error.message : "Failed to submit delivery request.";
+                          alert(message);
                           return;
                         }
                       }
@@ -715,23 +718,29 @@ export default function PurchaseWizard({
                   alert("Please contact the seller to proceed.");
                 } else if (step === 4) {
                   try {
-                    const result = await createPurchasePlaceholder(listingId, askingPrice);
+                    const result = await createDealerPurchasePackage({
+                      listingId,
+                      amount: askingPrice,
+                      buyerName: formData.name,
+                      buyerEmail: formData.email,
+                      buyerMessage: `Interested in purchasing ${year} ${make} ${model} (${vin})`,
+                    });
                     setPurchaseId(result.id);
                     setStep(5);
-                  } catch (err: any) {
-                    alert(err.message || "Failed to initialize purchase order.");
+                  } catch (error) {
+                    const message = error instanceof Error ? error.message : "Failed to initialize purchase offer.";
+                    alert(message);
                   }
                 } else if (step === 5) {
                   if (!insuranceSelected) {
                     alert("Please select an insurance option.");
                     return;
                   }
-                  const statusVal = insuranceSelected === "EXISTS" ? "COMPLETED" : "QUOTE_STARTED";
-                  if (purchaseId) {
+                  if (purchaseId && insuranceSelected === "QUOTES") {
                     try {
-                      await createInsuranceRequestPlaceholder(purchaseId, statusVal);
-                    } catch (err: any) {
-                      console.error("Failed to update placeholder insurance request:", err);
+                      await createInsuranceQuotePackage({ purchaseId, status: "QUOTE_STARTED" });
+                    } catch (error) {
+                      console.error("Failed to update insurance request:", error);
                     }
                   }
                   setStep(6);

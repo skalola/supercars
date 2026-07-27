@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { resolveModel } from "@/lib/market-sources/model-matcher";
+import { upsertPartnerContact } from "@/lib/fulfillment/partner-registry";
 import { defaultInventorySources } from "./sources";
 import type {
   CrawlerSourceResult,
@@ -151,6 +152,20 @@ export async function ingestCrawlerListings(
         type: listing.sourceType,
         active: true,
       },
+    });
+
+    // Enforce Sprint 7.2 Partner Contact Registry:
+    // Auto-register partner contact. If email is not present from crawler, set email = null and contactStatus = UNRESOLVED_EMAIL.
+    // NEVER guess emails.
+    await upsertPartnerContact({
+      name: listing.sourceName,
+      type: listing.sourceType === "DEALER" ? "DEALER" : "DEALER",
+      website: listing.url || undefined,
+      location: listing.location || listing.dealerName || undefined,
+      makeSpecialization: listing.make as "Ferrari" | "Lamborghini",
+      marketSourceId: source.id,
+      confidence: "PUBLIC_SOURCE",
+      email: null, // Crawler listing has no published email -> UNRESOLVED_EMAIL (do not guess!)
     });
 
     const existingVehicle = await prisma.vehicle.findUnique({

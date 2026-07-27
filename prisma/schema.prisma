@@ -104,7 +104,7 @@ model Vehicle {
   vin          String @unique
   modelId      String
   year         Int
-  
+
   // Identity
   trim         String?
   series       String?
@@ -171,6 +171,7 @@ model Vehicle {
   vinDiscovery VinDiscovery?
   insuranceRequests InsuranceRequest[]
   deliveryRequests  DeliveryRequest[]
+  fulfillmentRequests FulfillmentRequest[]
 
   mileageStatus         String?  @default("COMPLETE")
   vinIdentityStatus     String?  @default("VALID")
@@ -202,6 +203,7 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   image         String?
+  role          String?   @default("USER")
 
   accounts      Account[]
   sessions      Session[]
@@ -211,6 +213,7 @@ model User {
   purchases         Purchase[]
   insuranceRequests InsuranceRequest[]
   deliveryRequests  DeliveryRequest[]
+  fulfillmentRequests FulfillmentRequest[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -364,6 +367,7 @@ model MarketSource {
   listings  Listing[]
   sales     MarketSale[]
   vinDiscoverySources VinDiscoverySource[]
+  partnerContact PartnerContact?
 }
 
 model Listing {
@@ -398,6 +402,7 @@ model Listing {
   vehicle     Vehicle?      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   seller      User?         @relation(fields: [sellerId], references: [id], onDelete: Cascade)
   purchases   Purchase[]
+  fulfillmentRequests FulfillmentRequest[]
 
   priceStatus      String?   @default("VALID_PRICE")
   freshnessStatus  String?   @default("ACTIVE")
@@ -488,6 +493,7 @@ model Purchase {
   buyer            User              @relation(fields: [buyerId], references: [id], onDelete: Cascade)
   insuranceRequest InsuranceRequest?
   deliveryRequest  DeliveryRequest?
+  fulfillmentRequests FulfillmentRequest[]
 }
 
 model InsuranceRequest {
@@ -522,4 +528,210 @@ model DeliveryRequest {
   purchase        Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   vehicle         Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+}
+
+// ──────────────────────────────────────────────
+// Sprint 7.0: Fulfillment Core Infrastructure
+// ──────────────────────────────────────────────
+
+model FulfillmentRequest {
+  id                     String   @id @default(uuid())
+  /// Type: DEALER_PURCHASE | INSURANCE_QUOTE | TRANSPORT_QUOTE | SERVICE_BOOKING
+  requestType            String
+  /// Status: DRAFT | READY_TO_SEND | SENT | VIEWED | ACCEPTED | DECLINED | EXPIRED | CANCELLED | COMPLETED
+  status                 String   @default("DRAFT")
+  publicTransactionToken String   @unique @default(uuid())
+
+  /// Payment Status: NOT_REQUIRED | AUTHORIZATION_PENDING | AUTHORIZED | CAPTURE_PENDING | CAPTURED | REFUNDED | VOIDED | FAILED | CANCELLED
+  paymentStatus              String    @default("NOT_REQUIRED")
+  cancellationReason         String?
+  cancelledByActor           String?
+  expectedPlatformFee        Float     @default(0)
+  expectedPartnerCommission  Float     @default(0)
+  collectedAmount            Float     @default(0)
+  refundableAmount           Float     @default(0)
+  partnerAcceptedAt          DateTime?
+  completedAt                DateTime?
+  /// Payout Status: UNSETTLED | PENDING_RECONCILIATION | RECONCILED | PAYOUT_COMPLETED
+  payoutStatus               String    @default("UNSETTLED")
+
+  buyerId                String?
+  vehicleId              String?
+  listingId              String?
+  purchaseId             String?
+  notes                  String?
+
+  buyer                  User?     @relation(fields: [buyerId], references: [id], onDelete: SetNull)
+  vehicle                Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  listing                Listing?  @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  purchase               Purchase? @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+
+  parties                FulfillmentParty[]
+  packages               FulfillmentPackage[]
+  events                 FulfillmentEvent[]
+  fees                   FulfillmentFee[]
+  depositIntents         DepositIntent[]
+  partnerTokens          PartnerDecisionToken[]
+
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([requestType, status])
+  @@index([publicTransactionToken])
+}
+
+model FulfillmentParty {
+  id                   String   @id @default(uuid())
+  fulfillmentRequestId String
+  /// Type: BUYER | SELLER | DEALER | INSURANCE_CARRIER | TRANSPORT_PROVIDER | SERVICE_CENTER | PLATFORM
+  partyType            String
+  userId               String?
+  name                 String
+  email                String?
+  phone                String?
+  companyName          String?
+  address              String?
+  roleDescription      String?
+  partnerContactId     String?
+
+  fulfillmentRequest   FulfillmentRequest @relation(fields: [fulfillmentRequestId], references: [id], onDelete: Cascade)
+  partnerContact       PartnerContact?    @relation(fields: [partnerContactId], references: [id], onDelete: SetNull)
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([fulfillmentRequestId])
+}
+
+model FulfillmentPackage {
+  id                   String   @id @default(uuid())
+  fulfillmentRequestId String
+  title                String
+  description          String?
+  /// JSON-encoded string holding the scoped partner data package
+  scope                String
+
+  fulfillmentRequest   FulfillmentRequest @relation(fields: [fulfillmentRequestId], references: [id], onDelete: Cascade)
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([fulfillmentRequestId])
+}
+
+model FulfillmentEvent {
+  id                   String   @id @default(uuid())
+  fulfillmentRequestId String
+  previousStatus       String?
+  newStatus            String
+  /// ActorType: BUYER | PARTNER | SYSTEM | ADMIN
+  actorType            String   @default("SYSTEM")
+  actorId              String?
+  note                 String?
+  metadata             String?
+
+  fulfillmentRequest   FulfillmentRequest @relation(fields: [fulfillmentRequestId], references: [id], onDelete: Cascade)
+
+  createdAt            DateTime @default(now())
+
+  @@index([fulfillmentRequestId])
+}
+
+model FulfillmentFee {
+  id                   String   @id @default(uuid())
+  fulfillmentRequestId String
+  /// FeeType: COMMISSION | SERVICE_FEE | TRANSPORT_FEE | REFERRAL_FEE | DEPOSIT
+  feeType              String
+  amount               Float
+  currency             String   @default("USD")
+  /// Status: ESTIMATED | AUTHORIZED | CAPTURED | REFUNDED | WAIVED
+  status               String   @default("ESTIMATED")
+  description          String?
+
+  fulfillmentRequest   FulfillmentRequest @relation(fields: [fulfillmentRequestId], references: [id], onDelete: Cascade)
+
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([fulfillmentRequestId])
+}
+
+model DepositIntent {
+  id                   String    @id @default(uuid())
+  fulfillmentRequestId String
+  amount               Float
+  currency             String    @default("USD")
+  /// Status: AUTHORIZED | HELD | CAPTURED | RELEASED | REFUNDED
+  status               String    @default("AUTHORIZED")
+  paymentMethod        String?
+  transactionRef       String?
+  expiresAt            DateTime?
+  capturedAt           DateTime?
+  releasedAt           DateTime?
+
+  fulfillmentRequest   FulfillmentRequest @relation(fields: [fulfillmentRequestId], references: [id], onDelete: Cascade)
+
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([fulfillmentRequestId])
+}
+
+model PartnerDecisionToken {
+  id                   String    @id @default(uuid())
+  fulfillmentRequestId String
+  token                String    @unique @default(uuid())
+  partnerPartyId       String?
+  partnerName          String?
+  partnerEmail         String?
+  expiresAt            DateTime?
+  viewedAt             DateTime?
+  actionTakenAt        DateTime?
+  /// Action: ACCEPTED | DECLINED | EXPIRED
+  actionTaken          String?
+
+  fulfillmentRequest   FulfillmentRequest @relation(fields: [fulfillmentRequestId], references: [id], onDelete: Cascade)
+
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([token])
+  @@index([fulfillmentRequestId])
+}
+
+// ──────────────────────────────────────────────
+// Sprint 7.2: Partner Contact Registry
+// ──────────────────────────────────────────────
+
+model PartnerContact {
+  id                  String   @id @default(uuid())
+  name                String
+  /// Type: DEALER | INSURER | TRANSPORTER | SERVICE_SHOP
+  type                String
+  email               String?
+  phone               String?
+  website             String?
+  sourceDomain        String?
+  makeSpecialization  String?  @default("ALL") // Ferrari | Lamborghini | ALL
+  location            String?
+  active              Boolean  @default(true)
+  /// ContactSource: IMPORTED_LISTING | PUBLIC_WEBSITE | MANUALLY_VERIFIED
+  contactSource       String   @default("PUBLIC_WEBSITE")
+  /// Confidence: VERIFIED | PUBLIC_SOURCE | MANUAL_REVIEW | UNRESOLVED_EMAIL
+  confidence          String   @default("PUBLIC_SOURCE")
+  /// ContactStatus: RESOLVED | UNRESOLVED_EMAIL
+  contactStatus       String   @default("RESOLVED")
+  lastVerifiedAt      DateTime?
+
+  marketSourceId      String?  @unique
+  marketSource        MarketSource? @relation(fields: [marketSourceId], references: [id], onDelete: SetNull)
+
+  fulfillmentParties  FulfillmentParty[]
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([name])
+  @@index([type, makeSpecialization])
+  @@index([contactStatus])
 }

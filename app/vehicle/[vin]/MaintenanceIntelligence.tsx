@@ -4,7 +4,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { completeMaintenanceItem } from "@/app/actions/passport";
+import Link from "next/link";
+import { completeMaintenanceItem, createServiceBookingPackage } from "@/app/actions/passport";
 
 type MaintenanceIntelligenceProps = {
   vin: string;
@@ -44,6 +45,29 @@ export default function MaintenanceIntelligence({
   const [selectedShop, setSelectedShop] = useState("");
   const [preferredDate, setPreferredDate] = useState("");
   const [preferredTime, setPreferredTime] = useState("10:00 AM");
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
+  const [bookingTxToken, setBookingTxToken] = useState<string | null>(null);
+
+  async function handleSubmitBooking() {
+    if (!bookingRule) return;
+    try {
+      setIsSubmittingBooking(true);
+      const result = await createServiceBookingPackage({
+        vin,
+        serviceName: bookingRule.serviceName,
+        shopName: selectedShop,
+        preferredDate,
+        preferredTime,
+        notes: `Vehicle Passport service booking for ${makeName} (${vin})`,
+      });
+      setBookingTxToken(result.publicTransactionToken);
+      setBookingStep(4);
+    } catch (err: any) {
+      alert(err.message || "Failed to submit service booking request.");
+    } finally {
+      setIsSubmittingBooking(false);
+    }
+  }
 
   const getShops = () => {
     const makeLower = makeName ? makeName.toLowerCase() : "";
@@ -733,19 +757,20 @@ export default function MaintenanceIntelligence({
                   </button>
                   <button 
                     type="button"
-                    onClick={() => setBookingStep(4)}
+                    onClick={handleSubmitBooking}
+                    disabled={isSubmittingBooking}
                     style={{
-                      backgroundColor: "#10b981",
+                      backgroundColor: isSubmittingBooking ? "#9ca3af" : "#10b981",
                       color: "#ffffff",
                       border: "none",
                       padding: "8px 16px",
                       borderRadius: "8px",
                       fontSize: "13px",
                       fontWeight: 600,
-                      cursor: "pointer"
+                      cursor: isSubmittingBooking ? "not-allowed" : "pointer"
                     }}
                   >
-                    Submit Booking Request
+                    {isSubmittingBooking ? "Submitting Request..." : "Submit Booking Request"}
                   </button>
                 </div>
               </div>
@@ -756,14 +781,24 @@ export default function MaintenanceIntelligence({
               <div style={{ display: "grid", gap: "16px", textAlign: "center", padding: "10px 0" }}>
                 <span style={{ fontSize: "40px" }}>🎉</span>
                 <h4 style={{ fontSize: "18px", fontWeight: 700, color: "#065f46", margin: 0 }}>
-                  Booking request submitted.
+                  Service Booking Submitted
                 </h4>
                 <p style={{ fontSize: "14px", color: "#374151", margin: 0, lineHeight: 1.5 }}>
-                  The selected certified shop (<strong>{selectedShop}</strong>) will review your request.
+                  Fulfillment request created for <strong>{selectedShop}</strong>. Your $100 deposit is authorized on hold until the shop accepts your appointment.
                 </p>
-                <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>
-                  You will receive confirmation once accepted.
-                </p>
+                {bookingTxToken && (
+                  <Link
+                    href={`/transactions/${bookingTxToken}`}
+                    style={{
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      color: "#2563eb",
+                      textDecoration: "underline",
+                    }}
+                  >
+                    Track Booking in Transaction Hub →
+                  </Link>
+                )}
                 <div style={{ display: "flex", justifyContent: "center", marginTop: "10px" }}>
                   <button 
                     type="button"
@@ -779,7 +814,7 @@ export default function MaintenanceIntelligence({
                       cursor: "pointer"
                     }}
                   >
-                    Done
+                    Close
                   </button>
                 </div>
               </div>

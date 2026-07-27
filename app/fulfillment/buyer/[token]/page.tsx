@@ -1,0 +1,370 @@
+import React from "react";
+import { getBuyerFulfillmentTransaction } from "@/lib/fulfillment/service";
+
+interface BuyerPageProps {
+  params: Promise<{
+    token: string;
+  }>;
+}
+
+export default async function BuyerFulfillmentPage({ params }: BuyerPageProps) {
+  const { token } = await params;
+  const data = await getBuyerFulfillmentTransaction(token);
+
+  if ("error" in data || !data.request) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.card}>
+          <div style={styles.badgeError}>Transaction Not Found</div>
+          <h1 style={styles.heading}>Invalid Transaction Link</h1>
+          <p style={styles.subtext}>{data.message || "Unable to locate fulfillment record."}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const req = data.request;
+
+  return (
+    <div style={styles.container}>
+      <div style={styles.header}>
+        <div>
+          <div style={styles.headerTitle}>SUPERCAR OWNERSHIP FULFILLMENT HUB</div>
+          <h1 style={styles.title}>
+            {req.requestType.replace("_", " ")} — {req.status}
+          </h1>
+        </div>
+        <div style={styles.statusBadge}>{req.status}</div>
+      </div>
+
+      <div style={styles.mainGrid}>
+        {/* Left Column: Transaction Details & Event Audit Log */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          {req.vehicle && (
+            <div style={styles.card}>
+              <div style={styles.sectionTag}>VEHICLE DETAILS</div>
+              <h2 style={styles.vehicleTitle}>
+                {req.vehicle.year} {req.vehicle.model.make.name} {req.vehicle.model.name}
+              </h2>
+              {req.vehicle.trim && <div style={styles.vehicleSub}>{req.vehicle.trim}</div>}
+              <div style={styles.vinTag}>VIN: {req.vehicle.vin}</div>
+            </div>
+          )}
+
+          <div style={styles.card}>
+            <div style={styles.sectionTag}>FULFILLMENT AUDIT LOG & EVENT TIMELINE</div>
+            <div style={styles.timeline}>
+              {req.events.map((event) => (
+                <div key={event.id} style={styles.timelineItem}>
+                  <div style={styles.timelineMarker} />
+                  <div style={styles.timelineContent}>
+                    <div style={styles.timelineHeader}>
+                      <span style={styles.timelineStatus}>
+                        {event.previousStatus ? `${event.previousStatus} → ` : ""}
+                        {event.newStatus}
+                      </span>
+                      <span style={styles.timelineTime}>
+                        {new Date(event.createdAt).toLocaleString()}
+                      </span>
+                    </div>
+                    {event.note && <div style={styles.timelineNote}>{event.note}</div>}
+                    <div style={styles.timelineActor}>
+                      Actor: {event.actorType} {event.actorId ? `(${event.actorId})` : ""}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Parties, Fees & Deposit Hold */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          {req.depositIntents.length > 0 && (
+            <div style={styles.card}>
+              <div style={styles.sectionTag}>DEPOSIT AUTHORIZATION HOLD</div>
+              {req.depositIntents.map((deposit) => (
+                <div key={deposit.id} style={styles.depositBox}>
+                  <div style={styles.depositAmount}>
+                    ${deposit.amount.toLocaleString()} {deposit.currency}
+                  </div>
+                  <div style={styles.depositStatusBadge}>{deposit.status}</div>
+                  <p style={styles.depositSubtext}>
+                    {deposit.status === "AUTHORIZED" || deposit.status === "HELD"
+                      ? "Funds are authorized but NOT captured. Capture occurs only upon partner acceptance."
+                      : deposit.status === "CAPTURED"
+                      ? "Deposit captured following partner acceptance."
+                      : "Deposit hold released."}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={styles.card}>
+            <div style={styles.sectionTag}>PARTICIPATING PARTIES</div>
+            <div style={styles.partiesList}>
+              {req.parties.length === 0 ? (
+                <div style={styles.subtext}>No parties assigned yet.</div>
+              ) : (
+                req.parties.map((party) => (
+                  <div key={party.id} style={styles.partyCard}>
+                    <div style={styles.partyRole}>{party.partyType}</div>
+                    <div style={styles.partyName}>{party.name}</div>
+                    {party.companyName && (
+                      <div style={styles.partyCompany}>{party.companyName}</div>
+                    )}
+                    {party.email && <div style={styles.partyDetail}>{party.email}</div>}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {req.fees.length > 0 && (
+            <div style={styles.card}>
+              <div style={styles.sectionTag}>ESTIMATED / AUTHORIZED FEES</div>
+              {req.fees.map((fee) => (
+                <div key={fee.id} style={styles.feeRow}>
+                  <div>
+                    <div style={styles.feeType}>{fee.feeType}</div>
+                    {fee.description && (
+                      <div style={styles.feeSub}>{fee.description}</div>
+                    )}
+                  </div>
+                  <div style={styles.feeAmount}>
+                    ${fee.amount.toLocaleString()} ({fee.status})
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const styles: Record<string, React.CSSProperties> = {
+  container: {
+    minHeight: "100vh",
+    backgroundColor: "#0B0F19",
+    color: "#F8FAFC",
+    fontFamily: "Inter, system-ui, -apple-system, sans-serif",
+    padding: "32px 24px",
+    maxWidth: "1200px",
+    margin: "0 auto",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "32px",
+    paddingBottom: "16px",
+    borderBottom: "1px solid #1E293B",
+  },
+  headerTitle: {
+    fontSize: "11px",
+    fontWeight: 700,
+    letterSpacing: "1.5px",
+    color: "#64748B",
+    marginBottom: "4px",
+  },
+  title: {
+    fontSize: "24px",
+    fontWeight: 800,
+    color: "#F8FAFC",
+  },
+  statusBadge: {
+    backgroundColor: "#1E293B",
+    color: "#38BDF8",
+    padding: "6px 16px",
+    borderRadius: "20px",
+    fontSize: "13px",
+    fontWeight: 700,
+  },
+  mainGrid: {
+    display: "grid",
+    gridTemplateColumns: "1fr 400px",
+    gap: "24px",
+  },
+  card: {
+    backgroundColor: "#111827",
+    borderRadius: "12px",
+    padding: "24px",
+    border: "1px solid #1F2937",
+  },
+  sectionTag: {
+    fontSize: "11px",
+    fontWeight: 700,
+    letterSpacing: "1px",
+    color: "#6B7280",
+    marginBottom: "16px",
+  },
+  vehicleTitle: {
+    fontSize: "20px",
+    fontWeight: 700,
+    color: "#F9FAFB",
+  },
+  vehicleSub: {
+    fontSize: "14px",
+    color: "#9CA3AF",
+    marginTop: "4px",
+  },
+  vinTag: {
+    display: "inline-block",
+    marginTop: "12px",
+    padding: "4px 8px",
+    backgroundColor: "#1F2937",
+    borderRadius: "4px",
+    fontFamily: "monospace",
+    fontSize: "12px",
+    color: "#D1D5DB",
+  },
+  timeline: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "16px",
+    position: "relative",
+    paddingLeft: "16px",
+    borderLeft: "2px solid #1F2937",
+  },
+  timelineItem: {
+    position: "relative",
+  },
+  timelineMarker: {
+    position: "absolute",
+    left: "-21px",
+    top: "4px",
+    width: "8px",
+    height: "8px",
+    borderRadius: "50%",
+    backgroundColor: "#3B82F6",
+  },
+  timelineContent: {
+    backgroundColor: "#1F2937",
+    borderRadius: "8px",
+    padding: "12px",
+  },
+  timelineHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "4px",
+  },
+  timelineStatus: {
+    fontSize: "13px",
+    fontWeight: 700,
+    color: "#60A5FA",
+  },
+  timelineTime: {
+    fontSize: "11px",
+    color: "#9CA3AF",
+  },
+  timelineNote: {
+    fontSize: "13px",
+    color: "#E5E7EB",
+    marginBottom: "4px",
+  },
+  timelineActor: {
+    fontSize: "11px",
+    color: "#6B7280",
+  },
+  depositBox: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+  },
+  depositAmount: {
+    fontSize: "22px",
+    fontWeight: 800,
+    color: "#10B981",
+  },
+  depositStatusBadge: {
+    display: "inline-block",
+    backgroundColor: "#065F46",
+    color: "#A7F3D0",
+    padding: "4px 10px",
+    borderRadius: "12px",
+    fontSize: "11px",
+    fontWeight: 700,
+    width: "fit-content",
+  },
+  depositSubtext: {
+    fontSize: "12px",
+    color: "#9CA3AF",
+    lineHeight: "1.4",
+  },
+  partiesList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "12px",
+  },
+  partyCard: {
+    backgroundColor: "#1F2937",
+    borderRadius: "8px",
+    padding: "12px",
+  },
+  partyRole: {
+    fontSize: "10px",
+    fontWeight: 700,
+    color: "#3B82F6",
+    letterSpacing: "0.5px",
+    marginBottom: "2px",
+  },
+  partyName: {
+    fontSize: "14px",
+    fontWeight: 700,
+    color: "#F9FAFB",
+  },
+  partyCompany: {
+    fontSize: "12px",
+    color: "#9CA3AF",
+  },
+  partyDetail: {
+    fontSize: "12px",
+    color: "#6B7280",
+    marginTop: "2px",
+  },
+  feeRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "8px 0",
+    borderBottom: "1px solid #1F2937",
+  },
+  feeType: {
+    fontSize: "13px",
+    fontWeight: 600,
+    color: "#E5E7EB",
+  },
+  feeSub: {
+    fontSize: "11px",
+    color: "#6B7280",
+  },
+  feeAmount: {
+    fontSize: "13px",
+    fontWeight: 700,
+    color: "#34D399",
+  },
+  badgeError: {
+    display: "inline-block",
+    backgroundColor: "#7F1D1D",
+    color: "#FECACA",
+    padding: "4px 10px",
+    borderRadius: "4px",
+    fontSize: "11px",
+    fontWeight: 700,
+    marginBottom: "12px",
+  },
+  heading: {
+    fontSize: "24px",
+    fontWeight: 700,
+    color: "#F8FAFC",
+    marginBottom: "8px",
+  },
+  subtext: {
+    fontSize: "13px",
+    color: "#94A3B8",
+  },
+};
