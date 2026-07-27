@@ -4,13 +4,18 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import MaintenanceIntelligence from "./MaintenanceIntelligence";
-
+import { getMarketSummary } from "@/lib/market-intelligence";
+import MarketPriceHistory from "@/components/market/MarketPriceHistory";
+import PurchaseWizard from "@/components/market/PurchaseWizard";
+import OwnerSaleControls from "@/components/market/OwnerSaleControls";
+import { getVehicleHeroImage } from "@/lib/vehicle-images";
 
 type VehiclePageProps = {
   params: Promise<{ vin: string }>;
+  searchParams?: Promise<{ success?: string }>;
 };
 
-export default async function VehiclePage({ params }: VehiclePageProps) {
+export default async function VehiclePage({ params, searchParams }: VehiclePageProps) {
   const { vin } = await params;
   const session = (globalThis as any).mockSession !== undefined ? (globalThis as any).mockSession : await auth();
 
@@ -20,6 +25,7 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
       model: {
         include: {
           make: true,
+          images: true,
         },
       },
       images: {
@@ -41,10 +47,13 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
       documents: {
         orderBy: { createdAt: "desc" },
       },
+      listings: {
+        orderBy: { createdAt: "desc" },
+      },
     },
   });
 
-  if (!vehicle) {
+  if (!vehicle || vehicle.inventoryStatus === "REMOVED" || vehicle.inventoryStatus === "NEEDS_REVIEW") {
     return (
       <div style={{ padding: 40 }}>
         <h1>Vehicle not found</h1>
@@ -52,14 +61,17 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
     );
   }
 
-  const maintenanceRules = await prisma.maintenanceRule.findMany({
-    where: {
-      OR: [
-        { modelId: null },
-        { modelId: vehicle.modelId }
-      ]
-    }
-  });
+  const [maintenanceRules, market] = await Promise.all([
+    prisma.maintenanceRule.findMany({
+      where: {
+        OR: [
+          { modelId: null },
+          { modelId: vehicle.modelId }
+        ]
+      }
+    }),
+    getMarketSummary(vehicle.modelId),
+  ]);
 
   const priorityOrder: Record<string, number> = {
     REQUIRED: 1,
@@ -74,7 +86,8 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
     return (a.intervalMiles || 0) - (b.intervalMiles || 0);
   });
 
-  const currentMileage = vehicle.profile?.currentMileage;
+  // Check mileage in priority: 1. Vehicle.currentMileage, 2. Vehicle mileage decoded/imported data, 3. User-entered mileage
+  const currentMileage = (vehicle as any).currentMileage ?? vehicle.mileage ?? vehicle.profile?.currentMileage ?? null;
 
   // Dynamic Health Score calculations
   let healthScore = 0;
@@ -234,16 +247,140 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
     },
   ];
 
+  const { success: successParam } = (await searchParams) || {};
   const isOwner = !!(session?.user?.id && vehicle.ownerId === session.user.id && vehicle.status === "CLAIMED");
+  const resolvedHeroImage = getVehicleHeroImage(vehicle);
   const heroPhoto = vehicle.photos?.find((p: any) => p.isHero) || vehicle.photos?.[0];
 
+  const activeListing = vehicle.listings.find((l) => l.status === "ACTIVE" && l.validationStatus === "VALID" && l.priceStatus !== "PRICE_INVALID");
+  const isForSale = !!activeListing;
+  const askingPrice = activeListing?.askingPrice || activeListing?.price || null;
   return (
     <div style={{ padding: 40, fontFamily: "system-ui", maxWidth: 800, margin: "0 auto" }}>
-      <h1 style={{ fontSize: 42, marginBottom: 32 }}>
-        {vehicle.model.make.name} {vehicle.model.name}
-      </h1>
+      {/* Upgraded Hero block: Displays Year Make Model, FOR SALE badge, Asking Price, Verified Owner badge */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: 32 }}>
+        <h1 style={{ fontSize: 42, margin: 0 }}>
+          {vehicle.year} {vehicle.model.make.name} {vehicle.model.name}
+        </h1>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
+          {isForSale && (
+            <span style={{
+              backgroundColor: "#fef3c7",
+              color: "#d97706",
+              fontSize: "12px",
+              fontWeight: "bold",
+              padding: "4px 8px",
+              borderRadius: "6px",
+              textTransform: "uppercase",
+              border: "1px solid #fcd34d"
+            }}>
+              FOR SALE
+            </span>
+          )}
+          {vehicle.status === "CLAIMED" && (
+            <span style={{
+              backgroundColor: "#dbeafe",
+              color: "#1d4ed8",
+              fontSize: "12px",
+              fontWeight: "bold",
+              padding: "4px 8px",
+              borderRadius: "6px",
+            }}>
+              ✓ Verified Owner
+            </span>
+          )}
+          {isForSale && askingPrice !== null && (
+            <span style={{
+              fontSize: "20px",
+              fontWeight: 800,
+              color: "#10b981",
+              marginLeft: "8px"
+            }}>
+              ${askingPrice.toLocaleString()}
+            </span>
+          )}
+        </div>
+      </div>
 
-      {!isOwner && vehicle.photos && vehicle.photos.length > 0 && (
+      {/* Success Banners */}
+      {successParam === "listed" && (
+        <div style={{
+          backgroundColor: "#dcfce7",
+          color: "#15803d",
+          border: "1px solid #bbf7d0",
+          padding: "12px 16px",
+          borderRadius: "8px",
+          marginBottom: "20px",
+          fontSize: "14px",
+          fontWeight: 600
+        }}>
+          ✓ Vehicle successfully listed for sale!
+        </div>
+      )}
+      {successParam === "removed" && (
+        <div style={{
+          backgroundColor: "#fee2e2",
+          color: "#991b1b",
+          border: "1px solid #fecaca",
+          padding: "12px 16px",
+          borderRadius: "8px",
+          marginBottom: "20px",
+          fontSize: "14px",
+          fontWeight: 600
+        }}>
+          ✓ Listing removed successfully.
+        </div>
+      )}
+
+      {/* Buyer CTA Block */}
+      {!isOwner && isForSale && (
+        <section style={{
+          border: "1px solid #bfdbfe",
+          borderRadius: "16px",
+          padding: "24px",
+          backgroundColor: "#eff6ff",
+          marginBottom: "32px",
+          boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)"
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
+            <div>
+              <span style={{
+                backgroundColor: "#dbeafe",
+                color: "#1e40af",
+                fontSize: "11px",
+                fontWeight: "bold",
+                padding: "4px 8px",
+                borderRadius: "6px",
+                textTransform: "uppercase"
+              }}>
+                Available For Purchase
+              </span>
+              <h3 style={{ fontSize: "20px", fontWeight: 800, color: "#1e3a8a", margin: "8px 0 4px 0" }}>
+                Interested in acquiring this supercar?
+              </h3>
+              <p style={{ fontSize: "14px", color: "#3b82f6", margin: 0 }}>
+                List Price: <strong style={{ color: "#1e3a8a" }}>${askingPrice?.toLocaleString()}</strong>
+              </p>
+            </div>
+            <div style={{ minWidth: "160px" }}>
+              <PurchaseWizard
+                vin={vehicle.vin}
+                year={vehicle.year}
+                make={vehicle.model.make.name}
+                model={vehicle.model.name}
+                askingPrice={askingPrice || 0}
+                mileage={vehicle.profile?.currentMileage || vehicle.mileage}
+                color={vehicle.profile?.exteriorColor || vehicle.color}
+                listingId={activeListing.id}
+              />
+            </div>
+          </div>
+        </section>
+      )}
+
+
+
+      {!isOwner && resolvedHeroImage && (
         <section style={{
           border: "1px solid #e5e7eb",
           borderRadius: "16px",
@@ -254,19 +391,17 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
           marginBottom: "32px"
         }}>
           <h2 style={{ fontSize: "20px", fontWeight: 700, margin: 0, color: "#111827" }}>Vehicle Photos</h2>
-          {heroPhoto && (
-            <div style={{ position: "relative", width: "100%", paddingTop: "56.25%", borderRadius: "12px", overflow: "hidden", backgroundColor: "#f3f4f6" }}>
-              <img src={heroPhoto.filePath} alt={heroPhoto.caption || "Vehicle Hero"} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-              {heroPhoto.caption && (
-                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.5)", color: "#ffffff", padding: "8px 12px", fontSize: "13px" }}>
-                  {heroPhoto.caption}
-                </div>
-              )}
-            </div>
-          )}
-          {vehicle.photos.length > 1 && (
+          <div style={{ position: "relative", width: "100%", paddingTop: "56.25%", borderRadius: "12px", overflow: "hidden", backgroundColor: "#f3f4f6" }}>
+            <img src={resolvedHeroImage} alt="Vehicle Hero" style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+            {vehicle.photos?.find((p: any) => p.filePath === resolvedHeroImage)?.caption && (
+              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.5)", color: "#ffffff", padding: "8px 12px", fontSize: "13px" }}>
+                {vehicle.photos.find((p: any) => p.filePath === resolvedHeroImage)?.caption}
+              </div>
+            )}
+          </div>
+          {vehicle.photos && vehicle.photos.length > 1 && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: "12px" }}>
-              {vehicle.photos.filter((p: any) => p.id !== heroPhoto?.id).map((p: any) => (
+              {vehicle.photos.filter((p: any) => p.filePath !== resolvedHeroImage).map((p: any) => (
                 <div key={p.id} style={{ position: "relative", paddingTop: "66.67%", borderRadius: "8px", overflow: "hidden", backgroundColor: "#f3f4f6" }}>
                   <img src={p.filePath} alt={p.caption || "Vehicle Thumbnail"} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }} />
                 </div>
@@ -276,7 +411,7 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
         </section>
       )}
 
-      {vehicle.status === "CLAIMED" && (
+      {isOwner && (
         <section style={{
           border: "1px solid #e5e7eb",
           borderRadius: "16px",
@@ -326,26 +461,29 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
             </div>
             
             {isOwner && (
-              <a href={`/vehicle/${vehicle.vin}/edit`} style={{
-                backgroundColor: "#111827",
-                color: "#ffffff",
-                padding: "8px 16px",
-                borderRadius: "8px",
-                fontSize: "14px",
-                fontWeight: 600,
-                textDecoration: "none",
-                cursor: "pointer",
-                transition: "background-color 0.2s"
-              }}>
-                Edit Vehicle
-              </a>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <a href={`/vehicle/${vehicle.vin}/edit`} style={{
+                  backgroundColor: "#111827",
+                  color: "#ffffff",
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  textDecoration: "none",
+                  cursor: "pointer",
+                  transition: "background-color 0.2s"
+                }}>
+                  Edit Vehicle
+                </a>
+                <OwnerSaleControls vin={vin} isForSale={isForSale} askingPrice={askingPrice} />
+              </div>
             )}
           </div>
 
           {/* Summary Cards */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
             {/* 1. Hero Photo */}
-            {heroPhoto ? (
+            {resolvedHeroImage ? (
               <div style={{
                 borderRadius: "12px",
                 overflow: "hidden",
@@ -354,7 +492,7 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
                 minHeight: "140px",
                 backgroundColor: "#f3f4f6"
               }}>
-                <img src={heroPhoto.filePath} alt="Hero Vehicle" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <img src={resolvedHeroImage} alt="Hero Vehicle" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               </div>
             ) : (
               <div style={{
@@ -392,7 +530,7 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
                   if (currentMileage === null || currentMileage === undefined) {
                     return (
                       <div style={{ fontSize: "13px", color: "#9ca3af", marginTop: "8px", fontStyle: "italic" }}>
-                        Add current mileage to generate personalized maintenance recommendations.
+                        Add current mileage to get personalized recommendations.
                       </div>
                     );
                   }
@@ -447,24 +585,54 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
               </div>
             </div>
 
-            {/* 3. Market Value (Future Market Data Placeholder) */}
-            <div style={{
-              border: "2px dashed #e5e7eb",
-              borderRadius: "12px",
-              padding: "32px 16px",
-              textAlign: "center",
-              backgroundColor: "#ffffff",
-              color: "#9ca3af",
-              fontSize: "14px",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "center",
-              alignItems: "center",
-              gap: "4px"
-            }}>
-              <div style={{ fontSize: "24px", marginBottom: "8px" }}>💰</div>
-              <div>[ Future Market Value ]</div>
-            </div>
+            {/* 3. Market Value */}
+            {market.hasData ? (
+              <div style={{
+                border: "1px solid #e5e7eb",
+                borderRadius: "12px",
+                padding: "16px",
+                backgroundColor: "#ffffff",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+              }}>
+                <div>
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", display: "block" }}>Market Value</span>
+                  {market.range && (
+                    <div style={{ marginTop: "8px" }}>
+                      <div style={{ fontSize: "14px", fontWeight: 700, color: "#111827" }}>
+                        ${market.range.averageAskingPrice.toLocaleString()}
+                      </div>
+                      <div style={{ fontSize: "12px", color: "#4b5563", marginTop: "2px" }}>
+                        ${market.range.lowestPrice.toLocaleString()} &ndash; ${market.range.highestPrice.toLocaleString()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "12px" }}>
+                  <span style={{ fontSize: "14px" }}>📊</span>
+                  <span style={{ fontSize: "11px", fontWeight: 600, color: "#4b5563" }}>{market.supply.activeListingCount} active listing{market.supply.activeListingCount !== 1 ? "s" : ""}</span>
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                border: "2px dashed #e5e7eb",
+                borderRadius: "12px",
+                padding: "32px 16px",
+                textAlign: "center",
+                backgroundColor: "#ffffff",
+                color: "#9ca3af",
+                fontSize: "14px",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                alignItems: "center",
+                gap: "4px"
+              }}>
+                <div style={{ fontSize: "24px", marginBottom: "8px" }}>💰</div>
+                <div>[ Future Market Value ]</div>
+              </div>
+            )}
 
           </div>
 
@@ -798,6 +966,67 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
         })}
       </div>
 
+      {/* Market Intelligence Section (visible to everyone) */}
+      <section style={{
+        border: "1px solid #e5e7eb",
+        borderRadius: "16px",
+        padding: "24px",
+        backgroundColor: "#ffffff",
+        display: "grid",
+        gap: "16px",
+        marginTop: "32px",
+        marginBottom: "32px"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+          <span style={{ fontSize: "18px" }}>📊</span>
+          <span style={{ fontWeight: 700, color: "#111827", fontSize: "16px" }}>Market Intelligence</span>
+        </div>
+
+        {market.hasData ? (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+              {market.range && (
+                <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12, background: "#f9fafb" }}>
+                  <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, textTransform: "uppercase" }}>Average Asking Price</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "#111827", marginTop: 4 }}>${market.range.averageAskingPrice.toLocaleString()}</div>
+                </div>
+              )}
+              {market.range && (
+                <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12, background: "#f9fafb" }}>
+                  <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, textTransform: "uppercase" }}>Market Range</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: "#111827", marginTop: 4 }}>${market.range.lowestPrice.toLocaleString()} &ndash; ${market.range.highestPrice.toLocaleString()}</div>
+                </div>
+              )}
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12, background: "#f9fafb" }}>
+                <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, textTransform: "uppercase" }}>Active Listings</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: "#111827", marginTop: 4 }}>{market.supply.activeListingCount}</div>
+              </div>
+              {market.recentSales.salesCount > 0 && (
+                <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12, background: "#f9fafb" }}>
+                  <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, textTransform: "uppercase" }}>Recent Sales</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "#111827", marginTop: 4 }}>{market.recentSales.salesCount}</div>
+                </div>
+              )}
+            </div>
+            
+            {vehicle.modelId && (
+              <div style={{ marginTop: "8px" }}>
+                <MarketPriceHistory modelId={vehicle.modelId} />
+              </div>
+            )}
+          </>
+        ) : (
+          <div>
+            <div style={{ fontSize: "14px", color: "#6b7280", fontStyle: "italic" }}>
+              No market data available yet.
+            </div>
+            <div style={{ fontSize: "12px", color: "#4b5563", marginTop: "12px", borderTop: "1px solid #f3f4f6", paddingTop: "8px" }}>
+              <strong>Monitored Sources:</strong> Bring a Trailer, RM Sotheby&apos;s, DuPont Registry, Ferrari Dealer Network, Lamborghini Dealer Network
+            </div>
+          </div>
+        )}
+      </section>
+
       {/* Maintenance Intelligence Section */}
       <MaintenanceIntelligence
         vin={vehicle.vin}
@@ -805,6 +1034,7 @@ export default async function VehiclePage({ params }: VehiclePageProps) {
         currentMileage={currentMileage ?? null}
         sortedRules={sortedRules}
         serviceRecords={vehicle.serviceRecords}
+        makeName={vehicle.model.make.name}
       />
     </div>
   );

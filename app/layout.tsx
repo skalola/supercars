@@ -33,6 +33,9 @@ export default async function RootLayout({
             <Link href="/make/lamborghini" style={{ textDecoration: "none", color: "#111827", padding: "8px 12px", borderRadius: 999, border: "1px solid #e5e7eb", fontWeight: 600 }}>
               Lamborghini
             </Link>
+            <Link href="/inventory" style={{ textDecoration: "none", color: "#111827", padding: "8px 12px", borderRadius: 999, border: "1px solid #e5e7eb", fontWeight: 600, backgroundColor: "#f3f4f6" }}>
+              Inventory
+            </Link>
           </nav>
 
           <Link href="/garage" style={{ textDecoration: "none", color: "#111827", fontWeight: 700 }}>

@@ -6,7 +6,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "crawl-inventory": "tsx --env-file .env scripts/crawl-inventory.ts",
+    "ingest-inventory": "tsx scripts/ingest-inventory.ts",
+    "ingest-bat-inventory": "tsx scripts/ingest-bat-inventory.ts",
+    "ingest-dupont-inventory": "tsx scripts/ingest-dupont-inventory.ts",
+    "ingest-ferrari-inventory": "tsx --env-file .env scripts/ingest-ferrari-inventory.ts",
+    "ingest-lamborghini-inventory": "tsx --env-file .env scripts/ingest-lamborghini-inventory.ts",
+    "validate-inventory": "tsx scripts/validate-inventory.ts",
+    "validate-vehicle-data": "tsx scripts/validate-vehicle-data.ts",
+    "inventory-quality-report": "tsx scripts/inventory-quality-report.ts",
+    "report-vin-conflicts": "tsx scripts/report-vin-conflicts.ts",
+    "crawl-dealer-inventory": "tsx --env-file .env scripts/crawl-dealer-inventory.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",

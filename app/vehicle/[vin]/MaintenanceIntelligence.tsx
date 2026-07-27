@@ -12,6 +12,7 @@ type MaintenanceIntelligenceProps = {
   currentMileage: number | null;
   sortedRules: any[];
   serviceRecords: any[];
+  makeName: string;
 };
 
 export default function MaintenanceIntelligence({
@@ -19,7 +20,8 @@ export default function MaintenanceIntelligence({
   isOwner,
   currentMileage,
   sortedRules,
-  serviceRecords
+  serviceRecords,
+  makeName
 }: MaintenanceIntelligenceProps) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
@@ -34,6 +36,38 @@ export default function MaintenanceIntelligence({
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Booking Form State
+  const [bookingModalOpen, setBookingModalOpen] = useState(false);
+  const [bookingRule, setBookingRule] = useState<any | null>(null);
+  const [bookingStep, setBookingStep] = useState(1);
+  const [selectedShop, setSelectedShop] = useState("");
+  const [preferredDate, setPreferredDate] = useState("");
+  const [preferredTime, setPreferredTime] = useState("10:00 AM");
+
+  const getShops = () => {
+    const makeLower = makeName ? makeName.toLowerCase() : "";
+    if (makeLower.includes("ferrari")) {
+      return ["Ferrari of Houston", "Ferrari San Francisco", "Ferrari Palm Beach"];
+    } else if (makeLower.includes("lamborghini")) {
+      return ["Lamborghini Houston", "Lamborghini Dallas", "Lamborghini Newport Beach"];
+    } else {
+      const parts = [`${makeName} of Houston`, `${makeName} San Francisco`, `${makeName} Palm Beach`].filter(Boolean);
+      return parts.length > 0 ? parts : ["Certified Supercar Service Houston", "Certified Supercar Service Dallas", "Certified Supercar Service Newport Beach"];
+    }
+  };
+
+  const openBookingFlow = (rule: any) => {
+    setBookingRule(rule);
+    setBookingStep(1);
+    const shops = getShops();
+    setSelectedShop(shops[0] || "");
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    setPreferredDate(tomorrow.toISOString().split("T")[0]);
+    setPreferredTime("10:00 AM");
+    setBookingModalOpen(true);
+  };
 
   // Prefill helper when opening the modal
   const openCompletionForm = (rule: any) => {
@@ -110,7 +144,7 @@ export default function MaintenanceIntelligence({
           color: "#6b7280"
         }}>
           <span style={{ fontSize: "24px", display: "block", marginBottom: "8px" }}>💡</span>
-          Add current mileage to generate personalized maintenance recommendations.
+          Add current mileage to get personalized recommendations.
         </div>
       ) : (
         <div style={{ display: "grid", gap: "24px" }}>
@@ -260,22 +294,42 @@ export default function MaintenanceIntelligence({
                       </div>
 
                       {isOwner && (
-                        <button
-                          onClick={() => openCompletionForm(rule)}
-                          style={{
-                            backgroundColor: "#111827",
-                            color: "#ffffff",
-                            border: "none",
-                            padding: "8px 16px",
-                            borderRadius: "8px",
-                            fontSize: "13px",
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            transition: "background-color 0.2s"
-                          }}
-                        >
-                          Mark Completed
-                        </button>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px", minWidth: "120px" }}>
+                          <button
+                            onClick={() => openCompletionForm(rule)}
+                            style={{
+                              backgroundColor: "#111827",
+                              color: "#ffffff",
+                              border: "none",
+                              padding: "8px 16px",
+                              borderRadius: "8px",
+                              fontSize: "13px",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              transition: "background-color 0.2s",
+                              width: "100%"
+                            }}
+                          >
+                            Mark Completed
+                          </button>
+                          <button
+                            onClick={() => openBookingFlow(rule)}
+                            style={{
+                              backgroundColor: "#ffffff",
+                              color: "#111827",
+                              border: "1px solid #d1d5db",
+                              padding: "8px 16px",
+                              borderRadius: "8px",
+                              fontSize: "13px",
+                              fontWeight: 600,
+                              cursor: "pointer",
+                              transition: "background-color 0.2s",
+                              width: "100%"
+                            }}
+                          >
+                            Schedule Service
+                          </button>
+                        </div>
                       )}
                     </div>
                   );
@@ -448,6 +502,289 @@ export default function MaintenanceIntelligence({
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Schedule Service Booking Modal */}
+      {bookingModalOpen && bookingRule && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: "rgba(0,0,0,0.5)",
+          backdropFilter: "blur(4px)",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          zIndex: 1000,
+          padding: "20px"
+        }}>
+          <div style={{
+            backgroundColor: "#ffffff",
+            borderRadius: "16px",
+            padding: "24px",
+            maxWidth: "480px",
+            width: "100%",
+            boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04)",
+            display: "grid",
+            gap: "16px",
+            fontFamily: "Inter, system-ui, sans-serif"
+          }}>
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #f3f4f6", paddingBottom: "12px" }}>
+              <h3 style={{ fontSize: "18px", fontWeight: 700, color: "#111827", margin: 0 }}>
+                Schedule {bookingRule.serviceName}
+              </h3>
+              <button 
+                type="button"
+                onClick={() => setBookingModalOpen(false)}
+                style={{ background: "none", border: "none", cursor: "pointer", fontSize: "20px", color: "#9ca3af" }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Step 1: Select Certified Shop */}
+            {bookingStep === 1 && (
+              <div style={{ display: "grid", gap: "14px" }}>
+                <div style={{ fontSize: "14px", fontWeight: 700, color: "#374151" }}>
+                  Nearby Certified Shops
+                </div>
+                <div style={{ display: "grid", gap: "10px" }}>
+                  {getShops().map((shop) => (
+                    <label key={shop} style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      padding: "12px",
+                      border: `1px solid ${selectedShop === shop ? "#10b981" : "#d1d5db"}`,
+                      borderRadius: "8px",
+                      backgroundColor: selectedShop === shop ? "#f0fdf4" : "#ffffff",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      fontWeight: 500
+                    }}>
+                      <input 
+                        type="radio" 
+                        name="certifiedShop"
+                        checked={selectedShop === shop}
+                        onChange={() => setSelectedShop(shop)}
+                        style={{ accentColor: "#10b981" }}
+                      />
+                      <span>{shop}</span>
+                    </label>
+                  ))}
+                </div>
+                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "10px" }}>
+                  <button 
+                    type="button"
+                    onClick={() => setBookingStep(2)}
+                    style={{
+                      backgroundColor: "#111827",
+                      color: "#ffffff",
+                      border: "none",
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      cursor: "pointer"
+                    }}
+                  >
+                    Next: Choose Appointment
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Choose Appointment */}
+            {bookingStep === 2 && (
+              <div style={{ display: "grid", gap: "14px" }}>
+                <div style={{ display: "grid", gap: "6px" }}>
+                  <label style={{ fontSize: "13px", fontWeight: 600, color: "#4b5563" }}>Preferred Date</label>
+                  <input 
+                    type="date"
+                    value={preferredDate}
+                    onChange={(e) => setPreferredDate(e.target.value)}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      fontSize: "14px",
+                      outline: "none"
+                    }}
+                  />
+                </div>
+                <div style={{ display: "grid", gap: "6px" }}>
+                  <label style={{ fontSize: "13px", fontWeight: 600, color: "#4b5563" }}>Preferred Time</label>
+                  <select
+                    value={preferredTime}
+                    onChange={(e) => setPreferredTime(e.target.value)}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #d1d5db",
+                      fontSize: "14px",
+                      outline: "none",
+                      backgroundColor: "#ffffff"
+                    }}
+                  >
+                    <option value="08:00 AM">08:00 AM</option>
+                    <option value="09:00 AM">09:00 AM</option>
+                    <option value="10:00 AM">10:00 AM</option>
+                    <option value="11:00 AM">11:00 AM</option>
+                    <option value="12:00 PM">12:00 PM</option>
+                    <option value="01:00 PM">01:00 PM</option>
+                    <option value="02:00 PM">02:00 PM</option>
+                    <option value="03:00 PM">03:00 PM</option>
+                    <option value="04:00 PM">04:00 PM</option>
+                  </select>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "10px" }}>
+                  <button 
+                    type="button"
+                    onClick={() => setBookingStep(1)}
+                    style={{
+                      backgroundColor: "#ffffff",
+                      color: "#374151",
+                      border: "1px solid #d1d5db",
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      cursor: "pointer"
+                    }}
+                  >
+                    Back
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setBookingStep(3)}
+                    style={{
+                      backgroundColor: "#111827",
+                      color: "#ffffff",
+                      border: "none",
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      cursor: "pointer"
+                    }}
+                  >
+                    Next: Review
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Review */}
+            {bookingStep === 3 && (
+              <div style={{ display: "grid", gap: "14px" }}>
+                <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: "8px", padding: "14px", display: "grid", gap: "8px", fontSize: "14px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "#6b7280" }}>Vehicle:</span>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>{makeName}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "#6b7280" }}>VIN:</span>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>{vin}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "#6b7280" }}>Service:</span>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>{bookingRule.serviceName}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "#6b7280" }}>Certified Shop:</span>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>{selectedShop}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "#6b7280" }}>Time:</span>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>{preferredDate} &middot; {preferredTime}</span>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: "12px", color: "#6b7280", fontWeight: 600, textTransform: "uppercase" }}>Deposit Today</div>
+                    <div style={{ fontSize: "20px", fontWeight: 800, color: "#111827" }}>$100</div>
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#9ca3af", textAlign: "right", maxWidth: "200px" }}>
+                    Remaining balance paid directly to the shop after service.
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "10px" }}>
+                  <button 
+                    type="button"
+                    onClick={() => setBookingStep(2)}
+                    style={{
+                      backgroundColor: "#ffffff",
+                      color: "#374151",
+                      border: "1px solid #d1d5db",
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      cursor: "pointer"
+                    }}
+                  >
+                    Back
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setBookingStep(4)}
+                    style={{
+                      backgroundColor: "#10b981",
+                      color: "#ffffff",
+                      border: "none",
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      cursor: "pointer"
+                    }}
+                  >
+                    Submit Booking Request
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 4: Confirmation screen */}
+            {bookingStep === 4 && (
+              <div style={{ display: "grid", gap: "16px", textAlign: "center", padding: "10px 0" }}>
+                <span style={{ fontSize: "40px" }}>🎉</span>
+                <h4 style={{ fontSize: "18px", fontWeight: 700, color: "#065f46", margin: 0 }}>
+                  Booking request submitted.
+                </h4>
+                <p style={{ fontSize: "14px", color: "#374151", margin: 0, lineHeight: 1.5 }}>
+                  The selected certified shop (<strong>{selectedShop}</strong>) will review your request.
+                </p>
+                <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>
+                  You will receive confirmation once accepted.
+                </p>
+                <div style={{ display: "flex", justifyContent: "center", marginTop: "10px" }}>
+                  <button 
+                    type="button"
+                    onClick={() => setBookingModalOpen(false)}
+                    style={{
+                      backgroundColor: "#111827",
+                      color: "#ffffff",
+                      border: "none",
+                      padding: "8px 24px",
+                      borderRadius: "8px",
+                      fontSize: "13px",
+                      fontWeight: 600,
+                      cursor: "pointer"
+                    }}
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </section>

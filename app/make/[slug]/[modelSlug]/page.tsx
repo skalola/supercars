@@ -1,11 +1,22 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, @next/next/no-img-element */
 import Link from "next/link";
 import Image from "next/image";
 import { auth, signIn } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { toggleGarageItem } from "@/app/actions/garage";
+import { getMarketSummary } from "@/lib/market-intelligence";
+import { getVehicleHeroImage } from "@/lib/vehicle-images";
+import MarketPriceHistory from "@/components/market/MarketPriceHistory";
+import { isListingMatchForModel } from "@/lib/inventory/validate-listing-identity";
+
+
 
 function getHeroImage(images: Array<{ url: string; type: string | null; source: string | null }>) {
   return images.find((image) => image.type === "hero")?.url ?? images[0]?.url ?? null;
+}
+
+function getListingImage(listing: any) {
+  return getVehicleHeroImage(listing.vehicle);
 }
 
 type ModelPageProps = {
@@ -105,7 +116,7 @@ type ModelDetail = {
 
 export default async function ModelPage({ params }: ModelPageProps) {
   const { slug, modelSlug } = await params;
-  const session = await auth();
+  const session = (globalThis as any).mockSession !== undefined ? (globalThis as any).mockSession : await auth();
 
   const make = await prisma.make.findUnique({
     where: { slug },
@@ -140,7 +151,7 @@ export default async function ModelPage({ params }: ModelPageProps) {
     return <div style={{ padding: 40 }}>Model not found</div>;
   }
 
-  const [spec, modelImages] = await Promise.all([
+  const [spec, modelImages, market, rawListings] = await Promise.all([
     prisma.modelSpec.findUnique({
       where: { modelId: model.id },
     }),
@@ -148,7 +159,97 @@ export default async function ModelPage({ params }: ModelPageProps) {
       where: { modelId: model.id },
       orderBy: [{ type: "asc" }, { createdAt: "asc" }],
     }),
+    getMarketSummary(model.id),
+    // This protects market intelligence from invalid source pricing.
+    prisma.listing.findMany({
+      where: {
+        status: "ACTIVE",
+        modelId: model.id,
+        vehicleId: { not: null },
+        vehicle: {
+          is: {
+            // VALID and WARNING are safe to display publicly.
+            // NEEDS_REVIEW = confirmed identity conflict, hidden from public pages.
+            // REMOVED = duplicate/invalid VIN, permanently hidden.
+            inventoryStatus: { in: ["VALID", "WARNING"] }
+          }
+        },
+        validationStatus: "VALID",
+        priceStatus: { not: "PRICE_INVALID" },
+        OR: [
+          { price: null },
+          { price: { gte: 10000 } }
+        ],
+        AND: [
+          {
+            OR: [
+              { askingPrice: null },
+              { askingPrice: { gte: 10000 } }
+            ]
+          }
+        ]
+      },
+      include: {
+        vehicle: {
+          include: {
+            photos: {
+              orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }]
+            },
+            images: {
+              orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }]
+            },
+            model: {
+              include: {
+                images: true,
+                make: true,
+              }
+            }
+          }
+        }
+      },
+      orderBy: { createdAt: "desc" }
+    })
   ]);
+
+  // Validate and filter listings to ensure they match current make and model
+  const validListings = rawListings.filter((l) => isListingMatchForModel(l, model));
+
+  // Group active listings by vehicle VIN and choose the newest + lowest price
+  const groups = new Map<string, any[]>();
+  for (const l of validListings) {
+    const vin = l.vehicle?.vin;
+    if (!vin) continue;
+    if (!groups.has(vin)) {
+      groups.set(vin, []);
+    }
+    groups.get(vin)!.push(l);
+  }
+
+  const dedupedListings: any[] = [];
+  for (const [vin, list] of groups.entries()) {
+    list.sort((a, b) => {
+      const dateA = new Date(a.createdAt || 0).getTime();
+      const dateB = new Date(b.createdAt || 0).getTime();
+      if (dateB !== dateA) return dateB - dateA;
+      const priceA = a.askingPrice || a.price || Infinity;
+      const priceB = b.askingPrice || b.price || Infinity;
+      return priceA - priceB;
+    });
+    dedupedListings.push(list[0]);
+  }
+
+  const listings = dedupedListings.sort((a, b) => {
+    return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+  });
+
+  // Snapshots for the sparkline chart (separate query — needed as array with date)
+  const marketSnapshots = market.hasData
+    ? await prisma.marketSnapshot.findMany({
+        where: { modelId: model.id },
+        orderBy: { date: "asc" },
+        take: 12,
+      })
+    : [];
 
   const garageItem = session?.user ? await prisma.garageItem.findUnique({
     where: {
@@ -283,6 +384,25 @@ export default async function ModelPage({ params }: ModelPageProps) {
                 "Not Claimed"
               )}
             </div>
+            {claimedVehicle && (
+              <div style={{ marginTop: 8 }}>
+                <Link 
+                  href={`/vehicle/${claimedVehicle.vin}`}
+                  style={{ 
+                    display: "inline-block",
+                    padding: "6px 12px", 
+                    background: "#111827", 
+                    color: "#fff", 
+                    borderRadius: 8, 
+                    textDecoration: "none", 
+                    fontSize: 13, 
+                    fontWeight: 600 
+                  }}
+                >
+                  View Vehicle Passport &rarr;
+                </Link>
+              </div>
+            )}
           </div>
           {session?.user && garageItem && !claimedVehicle && (
             <Link 
@@ -410,6 +530,193 @@ export default async function ModelPage({ params }: ModelPageProps) {
         </section>
       ) : null}
 
+      {/* Available Inventory Section */}
+      <section style={{ marginTop: 40, marginBottom: 40 }}>
+        <h2 style={{ fontSize: 24, marginBottom: 20 }}>Available Inventory</h2>
+        {listings.length === 0 ? (
+          <p style={{ color: "#777", fontStyle: "italic" }}>No active listings for this model currently available.</p>
+        ) : (
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+            gap: 20
+          }}>
+            {listings.map((lst) => {
+              const image = getListingImage(lst);
+              const price = lst.askingPrice || lst.price || null;
+              return (
+                <div
+                  key={lst.id}
+                  style={{
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 16,
+                    overflow: "hidden",
+                    backgroundColor: "#fff",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between"
+                  }}
+                >
+                  <div>
+                    {image ? (
+                      <div style={{ position: "relative", width: "100%", paddingTop: "56.25%", backgroundColor: "#f3f4f6" }}>
+                        <img
+                          src={image}
+                          alt={`${lst.vehicle?.year ?? "Year"} ${lst.vehicle?.model?.make?.name ?? "Make"} ${lst.vehicle?.model?.name ?? "Model"}`}
+                          style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                      </div>
+                    ) : (
+                      <div style={{
+                        width: "100%",
+                        paddingTop: "56.25%",
+                        backgroundColor: "#f3f4f6",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "#9ca3af",
+                        fontSize: "14px",
+                        position: "relative"
+                      }}>
+                        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}>
+                          📷 No Image
+                        </div>
+                      </div>
+                    )}
+                    <div style={{ padding: 16 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+                        <span style={{
+                          backgroundColor: "#fef3c7",
+                          color: "#d97706",
+                          fontSize: "11px",
+                          fontWeight: "bold",
+                          padding: "2px 6px",
+                          borderRadius: 4,
+                          textTransform: "uppercase"
+                        }}>
+                          FOR SALE
+                        </span>
+                        {price !== null && (
+                          <span style={{ fontWeight: 800, color: "#10b981", fontSize: "16px" }}>
+                            ${price.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                      <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 6px 0", color: "#111827" }}>
+                        {lst.vehicle?.year ?? "Year"} {lst.vehicle?.model?.make?.name ?? "Make"} {lst.vehicle?.model?.name ?? "Model"}
+                      </h3>
+                      <div style={{ fontSize: 13, color: "#6b7280" }}>
+                        {lst.mileage !== null ? `${lst.mileage.toLocaleString()} miles` : "Mileage unavailable"}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ padding: 16, paddingTop: 0 }}>
+                    <Link
+                      href={`/vehicle/${lst.vehicle?.vin}`}
+                      style={{
+                        display: "block",
+                        textAlign: "center",
+                        backgroundColor: "#2563eb",
+                        color: "#ffffff",
+                        padding: "10px 16px",
+                        borderRadius: 8,
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        textDecoration: "none",
+                        transition: "background-color 0.2s"
+                      }}
+                    >
+                      View Vehicle
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section style={{ marginTop: 40 }}>
+        <h2 style={{ fontSize: 24, marginBottom: 20 }}>Market Intelligence</h2>
+
+        {market.hasData ? (
+          <>
+            {/* Stat Cards */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: 12,
+              marginBottom: 28,
+            }}>
+              {/* Market Range */}
+              {market.range && (
+                <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, background: "#fff" }}>
+                  <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Market Range</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "#111827" }}>
+                    ${market.range.lowestPrice.toLocaleString()} &ndash; ${market.range.highestPrice.toLocaleString()}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>Active listings</div>
+                </div>
+              )}
+
+              {/* Avg Asking */}
+              {market.range && (
+                <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, background: "#fff" }}>
+                  <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Avg Asking Price</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: "#111827" }}>${market.range.averageAskingPrice.toLocaleString()}</div>
+                  <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>Median ${market.range.medianAskingPrice.toLocaleString()}</div>
+                </div>
+              )}
+
+              {/* Supply */}
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, background: "#fff" }}>
+                <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Active Listings</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#111827" }}>{market.supply.activeListingCount}</div>
+                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>Currently on market</div>
+              </div>
+
+              {/* Recent Sales */}
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, background: "#fff" }}>
+                <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Recent Sales</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#111827" }}>{market.recentSales.salesCount}</div>
+                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>Last {market.recentSales.periodDays} days</div>
+              </div>
+
+              {/* Asking vs Sold */}
+              {market.askingVsSold.differencePercent !== null && (
+                <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, background: "#fff" }}>
+                  <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Asking vs Sold</div>
+                  <div style={{
+                    fontSize: 18,
+                    fontWeight: 800,
+                    color: market.askingVsSold.differencePercent < 0 ? "#059669" : "#dc2626",
+                  }}>
+                    {market.askingVsSold.differencePercent > 0 ? "+" : ""}{market.askingVsSold.differencePercent}%
+                  </div>
+                  <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>Sold vs asking</div>
+                </div>
+              )}
+
+            </div>
+          </>
+        ) : (
+          <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 20, background: "#fff" }}>
+            <div style={{ fontSize: 16, color: "#4b5563", fontStyle: "italic", marginBottom: 12 }}>
+              No market data available yet.
+            </div>
+            <div style={{ fontSize: 13, color: "#4b5563", marginTop: 12, borderTop: "1px solid #f3f4f6", paddingTop: 12 }}>
+              <strong>Monitored Sources:</strong> Bring a Trailer, RM Sotheby&apos;s, DuPont Registry, Ferrari Dealer Network, Lamborghini Dealer Network
+            </div>
+            <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>
+              Status: Active monitoring in progress. Data is updated daily as auctions close and dealer inventories refresh.
+            </div>
+          </div>
+        )}
+      </section>
+
+      <MarketPriceHistory modelId={model.id} />
+
       <section style={{ marginTop: 36 }}>
         <h2>Vehicles</h2>
 
@@ -426,27 +733,6 @@ export default async function ModelPage({ params }: ModelPageProps) {
         )}
       </section>
 
-      {claimedVehicle && claimedVehicle.status === "CLAIMED" && (
-        <section style={{ marginTop: 48, padding: 32, background: "#f8fafc", borderRadius: 24, border: "1px solid #e2e8f0" }}>
-          <h2 style={{ fontSize: 28, marginBottom: 24 }}>Owner Dashboard</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16 }}>
-            {[
-              "Market Price",
-              "Inspection Report",
-              "Service History",
-              "Upcoming Maintenance",
-              "Awards",
-              "List Vehicle For Sale",
-              "Book Service",
-            ].map((item) => (
-              <div key={item} style={{ padding: 20, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12 }}>
-                <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>{item}</div>
-                <div style={{ color: "#94a3b8", fontSize: 14 }}>Coming Soon</div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
     </main>
   );
 }

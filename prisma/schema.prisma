@@ -36,6 +36,9 @@ model Model {
   variants            ModelVariant[]
   garageItems         GarageItem[]
   maintenanceRules    MaintenanceRule[]
+  listings            Listing[]
+  marketSales         MarketSale[]
+  marketSnapshots     MarketSnapshot[]
 
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
@@ -164,6 +167,16 @@ model Vehicle {
   awards       VehicleAward[]
   photos       VehiclePhoto[]
   documents    VehicleDocument[]
+  listings     Listing[]
+  vinDiscovery VinDiscovery?
+  insuranceRequests InsuranceRequest[]
+  deliveryRequests  DeliveryRequest[]
+
+  mileageStatus         String?  @default("COMPLETE")
+  vinIdentityStatus     String?  @default("VALID")
+  vinIdentityClassification String? // VALID | MODEL_NAMING_VARIATION | TRIM_VARIATION | TRUE_IDENTITY_CONFLICT | YEAR_CONFLICT | MAKE_CONFLICT
+  imageValidationStatus String?  @default("VALID_IMAGE")
+  inventoryStatus       String?  @default("ACTIVE")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -175,6 +188,7 @@ model VehicleImage {
   url         String
   alt         String?
   isPrimary   Boolean  @default(false)
+  validationStatus String @default("VALID")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -193,6 +207,10 @@ model User {
   sessions      Session[]
   garageItems   GarageItem[]
   vehicles      Vehicle[]
+  listings      Listing[]
+  purchases         Purchase[]
+  insuranceRequests InsuranceRequest[]
+  deliveryRequests  DeliveryRequest[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -327,4 +345,181 @@ model MaintenanceRule {
   updatedAt      DateTime @updatedAt
 
   model          Model?   @relation(fields: [modelId], references: [id], onDelete: Cascade)
+}
+
+// ──────────────────────────────────────────────
+// Market Intelligence
+// ──────────────────────────────────────────────
+
+model MarketSource {
+  id        String   @id @default(uuid())
+  /// Type of source: AUCTION | DEALER | MARKETPLACE
+  name      String   @unique
+  type      String
+  website   String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listings  Listing[]
+  sales     MarketSale[]
+  vinDiscoverySources VinDiscoverySource[]
+}
+
+model Listing {
+  id                String   @id @default(uuid())
+  modelId           String
+  sourceId          String?
+  externalListingId String?
+  year              Int
+  price             Float?
+  mileage           Int?
+  color             String?
+  location          String?
+  dealerName        String?
+  url               String?
+  vinVerified       Boolean  @default(false)
+  validationStatus  String   @default("VALID")
+  /// Status: ACTIVE | SOLD | REMOVED
+  status            String   @default("ACTIVE")
+  firstSeen         DateTime @default(now())
+  lastSeen          DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  model       Model         @relation(fields: [modelId], references: [id])
+  source      MarketSource? @relation(fields: [sourceId], references: [id])
+
+  // Local marketplace fields
+  vehicleId   String?
+  sellerId    String?
+  askingPrice Float?
+
+  vehicle     Vehicle?      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  seller      User?         @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  purchases   Purchase[]
+
+  priceStatus      String?   @default("VALID_PRICE")
+  freshnessStatus  String?   @default("ACTIVE")
+  sourceConfidence String?   @default("MEDIUM")
+
+  @@unique([sourceId, externalListingId])
+}
+
+model VinDiscovery {
+  id              String   @id @default(uuid())
+  vin             String   @unique
+  vehicleId       String?  @unique
+  firstDiscovered DateTime @default(now())
+  lastSeen        DateTime @default(now())
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  vehicle         Vehicle?             @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  sources         VinDiscoverySource[]
+}
+
+model VinDiscoverySource {
+  id              String   @id @default(uuid())
+  discoveryId     String
+  sourceId        String?
+  sourceName      String
+  sourceKey       String
+  url             String?
+  externalListingId String?
+  firstDiscovered DateTime @default(now())
+  lastSeen        DateTime @default(now())
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  discovery       VinDiscovery @relation(fields: [discoveryId], references: [id], onDelete: Cascade)
+  source          MarketSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  @@unique([discoveryId, sourceKey])
+  @@index([sourceName, active])
+}
+
+model MarketSale {
+  id        String   @id @default(uuid())
+  modelId   String
+  sourceId  String
+  saleDate  DateTime
+  salePrice Float
+  year      Int
+  mileage   Int?
+  color     String?
+  location  String?
+  url       String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  model     Model        @relation(fields: [modelId], references: [id])
+  source    MarketSource @relation(fields: [sourceId], references: [id])
+}
+
+model MarketSnapshot {
+  id                 String   @id @default(uuid())
+  modelId            String
+  date               DateTime
+  activeListingCount Int      @default(0)
+  averagePrice       Float?
+  medianPrice        Float?
+  lowestPrice        Float?
+  highestPrice       Float?
+  salesCount         Int      @default(0)
+  averageMileage     Float?
+  createdAt          DateTime @default(now())
+
+  model              Model    @relation(fields: [modelId], references: [id])
+}
+
+model Purchase {
+  id               String            @id @default(uuid())
+  listingId        String
+  buyerId          String
+  amount           Float
+  status           String            @default("PENDING") // PENDING, COMPLETED, CANCELLED
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  listing          Listing           @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyer            User              @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  insuranceRequest InsuranceRequest?
+  deliveryRequest  DeliveryRequest?
+}
+
+model InsuranceRequest {
+  id          String   @id @default(uuid())
+  purchaseId  String   @unique
+  userId      String
+  vehicleId   String
+  status      String   @default("NOT_STARTED") // NOT_STARTED, REQUESTED, QUOTE_STARTED, COMPLETED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  purchase    Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+}
+
+model DeliveryRequest {
+  id              String   @id @default(uuid())
+  purchaseId      String   @unique
+  userId          String
+  vehicleId       String
+  status          String   @default("NOT_STARTED") // NOT_STARTED, REQUESTED, SCHEDULED, IN_TRANSIT, DELIVERED
+  street          String
+  city            String
+  state           String
+  postalCode      String
+  deliveryDate    String?
+  transportMethod String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  purchase        Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle         Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 }
