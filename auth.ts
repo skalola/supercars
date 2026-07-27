@@ -21,7 +21,7 @@ export const { handlers: { GET, POST }, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         const email = String(credentials?.email || "").trim().toLowerCase();
         const password = String(credentials?.password || "");
-        const expectedEmail = process.env.ADMIN_TEST_EMAIL || "admin@supercars.test";
+        const expectedEmail = (process.env.ADMIN_TEST_EMAIL || "admin@supercars.test").toLowerCase();
         const expectedPassword = process.env.ADMIN_TEST_PASSWORD || "supercars-admin";
 
         if (email !== expectedEmail || password !== expectedPassword) {
@@ -47,6 +47,45 @@ export const { handlers: { GET, POST }, auth, signIn, signOut } = NextAuth({
           name: user.name,
           image: user.image,
           role: user.role || "ADMIN",
+        };
+      },
+    }),
+    Credentials({
+      id: "user-test",
+      name: "Regular Test Login",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        const email = String(credentials?.email || "").trim().toLowerCase();
+        const password = String(credentials?.password || "");
+        const expectedEmail = (process.env.USER_TEST_EMAIL || "user@supercars.test").toLowerCase();
+        const expectedPassword = process.env.USER_TEST_PASSWORD || "supercars-user";
+
+        if (email !== expectedEmail || password !== expectedPassword) {
+          return null;
+        }
+
+        const user = await prisma.user.upsert({
+          where: { email },
+          update: {
+            name: "SUPERCARS Test User",
+            role: "USER",
+          },
+          create: {
+            email,
+            name: "SUPERCARS Test User",
+            role: "USER",
+          },
+        });
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          image: user.image,
+          role: user.role || "USER",
         };
       },
     }),

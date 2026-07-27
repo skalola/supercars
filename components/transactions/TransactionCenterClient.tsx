@@ -134,15 +134,15 @@ export function TransactionCenterClient({ userId, transactions }: TransactionCen
   }
 
   return (
-    <main style={styles.container}>
-      <section style={styles.header}>
+    <main className="page-shell">
+      <section className="page-header" style={styles.header}>
         <div>
-          <div style={styles.eyebrow}>Transactions</div>
-          <h1 style={styles.title}>Your SUPERCARS Requests</h1>
-          <p style={styles.subtitle}>Purchases, service bookings, insurance quotes, and transport requests in one place.</p>
+          <div className="eyebrow">Transactions</div>
+          <h1 className="page-title compact" style={styles.title}>Your SUPERCARS Requests</h1>
+          <p className="page-copy" style={styles.subtitle}>Purchases, service bookings, insurance quotes, and transport requests in one place.</p>
         </div>
         {!userId && (
-          <Link href="/login" style={styles.primaryAction}>
+          <Link href="/login" className="site-button" style={styles.primaryAction}>
             Sign in
           </Link>
         )}
@@ -155,7 +155,7 @@ export function TransactionCenterClient({ userId, transactions }: TransactionCen
         <SummaryStat label="Captured" value={`$${summary.captured.toLocaleString()}`} tone="green" />
       </section>
 
-      <section style={styles.toolbar}>
+      <section className="transaction-toolbar" style={styles.toolbar}>
         <div style={styles.tabContainer}>
           {tabs.map((tab) => {
             const active = activeTab === tab.id;
@@ -226,7 +226,7 @@ function TransactionRow({ tx }: { tx: TransactionCenterItem }) {
   const status = statusPresentation(tx.status);
 
   return (
-    <article style={styles.row}>
+    <article className="transaction-row" style={styles.row}>
       <div style={styles.vehicleBlock}>
         {tx.vehicle?.image ? (
           <Image src={tx.vehicle.image} alt={title} width={72} height={54} unoptimized style={styles.thumbnail} />
@@ -244,7 +244,7 @@ function TransactionRow({ tx }: { tx: TransactionCenterItem }) {
         </div>
       </div>
 
-      <div style={styles.middleGrid}>
+      <div className="transaction-middle-grid" style={styles.middleGrid}>
         <InfoCell label="Request" value={typeLabel(tx.requestType)} subValue={tx.isOwnerView ? "Owner view" : "Buyer view"} />
         <InfoCell label="Partner" value={partner?.name || "Pending"} subValue={partner ? partnerLabel(partner.partyType) : "Awaiting assignment"} />
         <div>
@@ -264,7 +264,7 @@ function TransactionRow({ tx }: { tx: TransactionCenterItem }) {
         />
       </div>
 
-      <Link href={detailHref} style={styles.rowAction}>
+      <Link href={detailHref} className="transaction-row-action" style={styles.rowAction}>
         View
       </Link>
     </article>
@@ -363,9 +363,6 @@ function toneColor(tone?: "blue" | "green" | "red"): string {
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    maxWidth: "1180px",
-    margin: "0 auto",
-    padding: "32px 24px 48px",
   },
   header: {
     display: "flex",
@@ -382,16 +379,10 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: "0.06em",
   },
   title: {
-    fontSize: "30px",
     lineHeight: 1.1,
-    fontWeight: 850,
-    color: "#0F172A",
-    margin: "4px 0 8px",
   },
   subtitle: {
     fontSize: "14px",
-    color: "#475569",
-    margin: 0,
   },
   primaryAction: {
     backgroundColor: "#0F172A",

@@ -12,11 +12,15 @@ export default async function MarketPriceHistory({ modelId }: MarketPriceHistory
     return (
       <div style={{
         border: "1px solid #e5e7eb",
-        borderRadius: "12px",
+        borderRadius: "8px",
         padding: "24px",
         background: "#ffffff",
         marginTop: "24px",
         fontFamily: "Inter, system-ui, sans-serif",
+        boxSizing: "border-box",
+        maxWidth: "100%",
+        minWidth: 0,
+        overflow: "hidden",
       }}>
         <h3 style={{ fontSize: "18px", fontWeight: 700, color: "#111827", marginBottom: "12px" }}>
           Market Price History
@@ -49,8 +53,6 @@ export default async function MarketPriceHistory({ modelId }: MarketPriceHistory
   };
 
   const firstMonth = salesCount > 0 ? formatDate(sales[0].saleDate) : "";
-  const lastMonth = salesCount > 0 ? formatDate(sales[salesCount - 1].saleDate) : "";
-  const dateRangeLabel = salesCount === 1 ? firstMonth : `${firstMonth} – ${lastMonth}`;
 
   // SVG Chart variables
   const prices = history.map((h) => h.averageSalePrice);
@@ -85,11 +87,15 @@ export default async function MarketPriceHistory({ modelId }: MarketPriceHistory
   return (
     <div style={{
       border: "1px solid #e5e7eb",
-      borderRadius: "12px",
+      borderRadius: "8px",
       padding: "24px",
       background: "#ffffff",
       marginTop: "24px",
       fontFamily: "Inter, system-ui, sans-serif",
+      boxSizing: "border-box",
+      maxWidth: "100%",
+      minWidth: 0,
+      overflow: "hidden",
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "20px", flexWrap: "wrap", gap: "8px" }}>
         <div>
@@ -107,7 +113,7 @@ export default async function MarketPriceHistory({ modelId }: MarketPriceHistory
 
       {/* Render chart only if we have at least 2 points for a line chart */}
       {history.length >= 2 ? (
-        <div style={{ overflowX: "auto", marginBottom: "24px" }}>
+        <div style={{ overflowX: "auto", marginBottom: "24px", maxWidth: "100%", minWidth: 0 }}>
           <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", minWidth: "500px", display: "block" }}>
             {/* Grid Lines & Y Axis Labels */}
             {[0, 0.5, 1].map((t) => {
@@ -158,7 +164,6 @@ export default async function MarketPriceHistory({ modelId }: MarketPriceHistory
           textAlign: "center",
           marginBottom: "24px",
         }}>
-          <span style={{ fontSize: "24px" }}>📈</span>
           <div style={{ fontSize: "14px", fontWeight: 600, color: "#374151", marginTop: "8px" }}>
             Single Month Data Point: {firstMonth}
           </div>

@@ -741,8 +741,9 @@ export async function getUserFulfillmentTransactions(userId: string) {
  * Roles:
  * - BUYER: sees buyer info, vehicle specs, package status, fees, deposit hold, and next steps timeline.
  * - SELLER / OWNER: sees vehicle specs, buyer request summary, and transaction status (excludes buyer profile history and partner decision tokens).
+ * - ADMIN: sees the buyer-style transaction view for operations QA/review.
  */
-export async function getFulfillmentByIdForUser(idOrToken: string, userId?: string) {
+export async function getFulfillmentByIdForUser(idOrToken: string, userId?: string, userRole?: string | null) {
   const req = await prisma.fulfillmentRequest.findFirst({
     where: {
       OR: [{ id: idOrToken }, { publicTransactionToken: idOrToken }],
@@ -774,6 +775,8 @@ export async function getFulfillmentByIdForUser(idOrToken: string, userId?: stri
     return { error: "UNAUTHORIZED", message: "Please sign in to view this transaction." };
   }
 
+  const isAdmin = userRole === "ADMIN";
+
   // Determine user role (BUYER vs SELLER/OWNER)
   const isSellerOrOwner =
     req.vehicle?.ownerId === userId ||
@@ -784,11 +787,11 @@ export async function getFulfillmentByIdForUser(idOrToken: string, userId?: stri
     req.buyerId === userId ||
     req.parties.some((p) => p.userId === userId && p.partyType === "BUYER");
 
-  if (!isBuyer && !isSellerOrOwner) {
+  if (!isAdmin && !isBuyer && !isSellerOrOwner) {
     return { error: "FORBIDDEN", message: "You do not have access to this transaction." };
   }
 
-  const role: "BUYER" | "SELLER" = isSellerOrOwner ? "SELLER" : "BUYER";
+  const role: "BUYER" | "SELLER" | "ADMIN" = isAdmin ? "ADMIN" : isSellerOrOwner ? "SELLER" : "BUYER";
 
   // Parse package scope
   const primaryPackage = req.packages[0];
@@ -853,11 +856,11 @@ export async function getFulfillmentByIdForUser(idOrToken: string, userId?: stri
     };
   }
 
-  // Buyer Scoped View:
+  // Buyer/Admin Scoped View:
   // Includes full buyer info, vehicle specs, package status, fees, deposit hold, and timeline next steps.
   return {
     success: true,
-    role: "BUYER" as const,
+    role,
     request: {
       id: req.id,
       publicTransactionToken: req.publicTransactionToken,

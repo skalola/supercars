@@ -55,9 +55,9 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
 
   if (!vehicle || vehicle.inventoryStatus === "REMOVED" || vehicle.inventoryStatus === "NEEDS_REVIEW") {
     return (
-      <div style={{ padding: 40 }}>
+      <main className="page-shell">
         <h1>Vehicle not found</h1>
-      </div>
+      </main>
     );
   }
 
@@ -256,7 +256,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
   const isForSale = !!activeListing;
   const askingPrice = activeListing?.askingPrice || activeListing?.price || null;
   return (
-    <div style={{ padding: 40, fontFamily: "system-ui", maxWidth: 800, margin: "0 auto" }}>
+    <main className="page-shell" style={{ maxWidth: 900 }}>
       {/* Upgraded Hero block: Displays Year Make Model, FOR SALE badge, Asking Price, Verified Owner badge */}
       <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: 32 }}>
         <h1 style={{ fontSize: 42, margin: 0 }}>
@@ -610,7 +610,6 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
                   )}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "12px" }}>
-                  <span style={{ fontSize: "14px" }}>📊</span>
                   <span style={{ fontSize: "11px", fontWeight: 600, color: "#4b5563" }}>{market.supply.activeListingCount} active listing{market.supply.activeListingCount !== 1 ? "s" : ""}</span>
                 </div>
               </div>
@@ -969,22 +968,25 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
       {/* Market Intelligence Section (visible to everyone) */}
       <section style={{
         border: "1px solid #e5e7eb",
-        borderRadius: "16px",
+        borderRadius: "8px",
         padding: "24px",
         backgroundColor: "#ffffff",
         display: "grid",
         gap: "16px",
         marginTop: "32px",
-        marginBottom: "32px"
+        marginBottom: "32px",
+        boxSizing: "border-box",
+        maxWidth: "100%",
+        minWidth: 0,
+        overflow: "hidden",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-          <span style={{ fontSize: "18px" }}>📊</span>
           <span style={{ fontWeight: 700, color: "#111827", fontSize: "16px" }}>Market Intelligence</span>
         </div>
 
         {market.hasData ? (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))", gap: "12px", minWidth: 0 }}>
               {market.range && (
                 <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 12, background: "#f9fafb" }}>
                   <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 600, textTransform: "uppercase" }}>Average Asking Price</div>
@@ -1010,7 +1012,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
             </div>
             
             {vehicle.modelId && (
-              <div style={{ marginTop: "8px" }}>
+              <div style={{ marginTop: "8px", minWidth: 0, maxWidth: "100%" }}>
                 <MarketPriceHistory modelId={vehicle.modelId} />
               </div>
             )}
@@ -1036,6 +1038,6 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
         serviceRecords={vehicle.serviceRecords}
         makeName={vehicle.model.make.name}
       />
-    </div>
+    </main>
   );
 }

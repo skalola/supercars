@@ -93,18 +93,18 @@ export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
   };
 
   return (
-    <div style={styles.container}>
+    <div className="page-shell wide">
       {/* Header */}
-      <div style={styles.header}>
+      <div className="page-header" style={styles.header}>
         <div>
-          <div style={styles.badgeLabel}>SUPERCARS PARTNER ROUTING REGISTRY</div>
-          <h1 style={styles.title}>Partner Contact & Email Resolution Hub</h1>
-          <p style={styles.subtitle}>
+          <div className="eyebrow" style={styles.badgeLabel}>SUPERCARS PARTNER ROUTING REGISTRY</div>
+          <h1 className="page-title compact" style={styles.title}>Partner Contact & Email Resolution Hub</h1>
+          <p className="page-copy" style={styles.subtitle}>
             Audit imported dealer listings, resolve missing business emails, and enforce zero guessed emails across all partner outreach.
           </p>
         </div>
         <div style={styles.unresolvedAlert}>
-          ⚠️ {unresolvedCount} Unresolved Partner Email(s)
+          {unresolvedCount} unresolved partner email{unresolvedCount === 1 ? "" : "s"}
         </div>
       </div>
 
@@ -118,7 +118,7 @@ export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
               ...(filterTab === "UNRESOLVED" ? styles.activeTabBtn : {}),
             }}
           >
-            ⚠️ Pending Resolution ({unresolvedCount})
+            Pending Resolution ({unresolvedCount})
           </button>
           <button
             onClick={() => setFilterTab("ALL")}
@@ -141,7 +141,7 @@ export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
       </div>
 
       {/* Table Container */}
-      <div style={styles.tableContainer}>
+      <div className="mobile-scroll admin-table-shell" style={styles.tableContainer}>
         <table style={styles.table}>
           <thead>
             <tr style={styles.tableHeaderRow}>
@@ -157,7 +157,7 @@ export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
               <tr>
                 <td colSpan={5} style={{ padding: "40px", textAlign: "center", color: "#64748B" }}>
                   {filterTab === "UNRESOLVED"
-                    ? "🎉 All partner emails are fully resolved! Zero guessed emails."
+                    ? "All partner emails are fully resolved. Zero guessed emails."
                     : "No partner contacts match your filter."}
                 </td>
               </tr>
@@ -178,7 +178,7 @@ export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
                           <span style={styles.specBadge}>{c.makeSpecialization}</span>
                         )}
                       </div>
-                      {c.location && <div style={{ fontSize: "11px", color: "#64748B", marginTop: "4px" }}>📍 {c.location}</div>}
+                      {c.location && <div style={{ fontSize: "11px", color: "#64748B", marginTop: "4px" }}>{c.location}</div>}
                     </td>
 
                     {/* 2. Source & Domain */}
@@ -189,7 +189,7 @@ export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
                       {c.website && (
                         <div style={{ marginTop: "4px" }}>
                           <a href={c.website} target="_blank" rel="noopener noreferrer" style={styles.linkText}>
-                            🌐 {c.sourceDomain || c.website}
+                            {c.sourceDomain || c.website}
                           </a>
                         </div>
                       )}
@@ -211,7 +211,7 @@ export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
                         </div>
                       ) : (
                         <div style={{ fontSize: "11px", color: "#EF4444", fontWeight: 800, marginTop: "4px" }}>
-                          ⚠️ NO VALID EMAIL
+                          NO VALID EMAIL
                         </div>
                       )}
                     </td>
@@ -220,7 +220,7 @@ export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
                     <td style={styles.td}>
                       {c.heldRequestCount > 0 ? (
                         <span style={styles.heldCountBadge}>
-                          🛑 {c.heldRequestCount} Request(s) Held in DRAFT
+                          {c.heldRequestCount} request{c.heldRequestCount === 1 ? "" : "s"} held in DRAFT
                         </span>
                       ) : (
                         <span style={{ fontSize: "12px", color: "#94A3B8" }}>0 Held Requests</span>
@@ -329,17 +329,12 @@ function getConfidenceBadgeStyle(confidence: string): React.CSSProperties {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  container: {
-    maxWidth: "1400px",
-    margin: "0 auto",
-    padding: "32px 24px",
-  },
   header: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "flex-start",
     marginBottom: "24px",
-    borderBottom: "1px solid #E2E8F0",
+    borderBottom: "1px solid var(--line)",
     paddingBottom: "16px",
   },
   badgeLabel: {
@@ -350,15 +345,9 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: "uppercase",
   },
   title: {
-    fontSize: "28px",
-    fontWeight: 800,
-    color: "#0F172A",
-    margin: "4px 0 8px 0",
   },
   subtitle: {
     fontSize: "14px",
-    color: "#475569",
-    margin: 0,
   },
   unresolvedAlert: {
     backgroundColor: "#FEF2F2",
@@ -374,10 +363,12 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     gap: "16px",
     marginBottom: "20px",
+    flexWrap: "wrap",
   },
   tabGroup: {
     display: "flex",
     gap: "8px",
+    flexWrap: "wrap",
   },
   tabBtn: {
     padding: "8px 14px",
@@ -395,7 +386,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderColor: "#0F172A",
   },
   searchInput: {
-    width: "300px",
+    width: "min(100%, 320px)",
     padding: "8px 12px",
     borderRadius: "6px",
     border: "1px solid #CBD5E1",
@@ -410,6 +401,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   table: {
     width: "100%",
+    minWidth: "920px",
     borderCollapse: "collapse",
     textAlign: "left",
   },

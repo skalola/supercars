@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { getVehicleHeroImage } from "@/lib/vehicle-images";
 
 type MakeObj = {
@@ -89,13 +90,13 @@ export default function InventoryExplorer({
   };
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: "32px", padding: "40px", maxWidth: "1200px", margin: "0 auto", fontFamily: "Inter, system-ui, sans-serif" }}>
+    <div className="page-shell wide inventory-shell">
       {/* Filters Sidebar */}
-      <aside style={{
+      <aside className="inventory-filter-panel" style={{
         border: "1px solid #e5e7eb",
-        borderRadius: "16px",
+        borderRadius: "8px",
         padding: "24px",
-        backgroundColor: "#f9fafb",
+        backgroundColor: "#fff",
         height: "fit-content",
         display: "flex",
         flexDirection: "column",
@@ -192,7 +193,7 @@ export default function InventoryExplorer({
 
       {/* Main Content Listings Area */}
       <main>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+        <div className="inventory-results-header" style={{ marginBottom: "24px" }}>
           <h2 style={{ fontSize: "24px", fontWeight: 800, color: "#111827", margin: 0 }}>
             Available Vehicles
           </h2>
@@ -209,16 +210,11 @@ export default function InventoryExplorer({
             textAlign: "center",
             color: "#64748b"
           }}>
-            <div style={{ fontSize: "36px", marginBottom: "12px" }}>🔍</div>
             <h3 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 6px 0", color: "#1e293b" }}>No listings found</h3>
             <p style={{ fontSize: "14px", margin: 0 }}>Try adjusting your filters or search criteria.</p>
           </div>
         ) : (
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-            gap: "24px"
-          }}>
+          <div className="inventory-card-grid">
             {filteredListings.map((lst) => {
               const image = getListingImage(lst);
               const price = lst.askingPrice || lst.price || null;
@@ -227,7 +223,7 @@ export default function InventoryExplorer({
                   key={lst.id}
                   style={{
                     border: "1px solid #e5e7eb",
-                    borderRadius: "16px",
+                    borderRadius: "8px",
                     overflow: "hidden",
                     backgroundColor: "#fff",
                     boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
@@ -239,10 +235,13 @@ export default function InventoryExplorer({
                   <div>
                     {image ? (
                       <div style={{ position: "relative", width: "100%", paddingTop: "56.25%", backgroundColor: "#f3f4f6" }}>
-                        <img
+                        <Image
                           src={image}
                           alt={`${lst.year} ${lst.model.make.name} ${lst.model.name}`}
-                          style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                          fill
+                          sizes="(max-width: 720px) 100vw, (max-width: 1100px) 50vw, 33vw"
+                          style={{ objectFit: "cover" }}
+                          unoptimized
                         />
                       </div>
                     ) : (
@@ -258,7 +257,7 @@ export default function InventoryExplorer({
                         position: "relative"
                       }}>
                         <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}>
-                          📷 No Image
+                          No image
                         </div>
                       </div>
                     )}
@@ -298,7 +297,7 @@ export default function InventoryExplorer({
                         backgroundColor: "#2563eb",
                         color: "#ffffff",
                         padding: "10px 16px",
-                        borderRadius: "8px",
+                        borderRadius: "6px",
                         fontSize: "14px",
                         fontWeight: 600,
                         textDecoration: "none",

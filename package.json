@@ -21,6 +21,7 @@
     "crawl-dealer-inventory": "tsx --env-file .env scripts/crawl-dealer-inventory.ts",
     "seed-partner-registry": "tsx scripts/seed-partner-registry.ts",
     "seed-fulfillment-demo": "tsx --env-file .env scripts/seed-fulfillment-demo.ts",
+    "seed-test-transactions": "tsx --env-file .env scripts/seed-fulfillment-demo.ts",
     "process-fulfillment-expirations": "tsx --env-file .env scripts/process-fulfillment-expirations.ts",
     "qa:fulfillment": "tsx scratch/test_sprint7b_partner_registry.ts && tsx scratch/test_sprint7c_dealer_purchase_package.ts && tsx scratch/test_sprint7h_email_templates_and_audit.ts && tsx scratch/test_transaction_scoping.ts && tsx scratch/test_transaction_center.ts && tsx scratch/test_admin_ops_layer.ts && tsx scratch/test_sprint8a_real_email_delivery.ts && tsx scratch/test_sprint8b_payment_provider.ts && tsx scratch/test_sprint8c_end_to_end_fulfillment_qa.ts && tsx scratch/test_sprint8d_transaction_ux_scoping.ts && tsx scratch/test_sprint8e_expiration_operations.ts && tsx scratch/test_sprint8f_admin_financial_reconciliation.ts && tsx scratch/test_sprint8g_partner_package_scoping.ts && tsx scratch/test_sprint8h_partner_decision_confirmation.ts && tsx scratch/test_sprint8i_partner_decision_audit.ts"
   },

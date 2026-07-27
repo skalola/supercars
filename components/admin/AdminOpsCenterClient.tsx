@@ -191,14 +191,64 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
     });
   };
 
+  const filterCards: Array<{
+    id: AdminFilterTab;
+    label: string;
+    value: number | string;
+    sub: string;
+    tone?: "success" | "danger" | "warning";
+  }> = [
+    {
+      id: "ALL",
+      label: "Total Requests",
+      value: metrics.totalRequests,
+      sub: "All fulfillment activity",
+    },
+    {
+      id: "STUCK_EXPIRED",
+      label: "Stuck / Expired",
+      value: metrics.stuckOrExpiredCount,
+      sub: "Draft holds and token expirations",
+      tone: metrics.stuckOrExpiredCount > 0 ? "warning" : undefined,
+    },
+    {
+      id: "ACCEPTED",
+      label: "Accepted",
+      value: metrics.acceptedCount,
+      sub: "Partner-approved requests",
+      tone: "success",
+    },
+    {
+      id: "DECLINED",
+      label: "Declined",
+      value: metrics.declinedCount,
+      sub: "Partner-declined requests",
+      tone: metrics.declinedCount > 0 ? "danger" : undefined,
+    },
+    {
+      id: "PENDING_REFUNDS",
+      label: "Refunds / Settlement",
+      value: metrics.pendingRefundsCount,
+      sub: "Payment holds needing review",
+      tone: metrics.pendingRefundsCount > 0 ? "warning" : undefined,
+    },
+    {
+      id: "FAILED_EMAILS",
+      label: "Email Holds",
+      value: metrics.failedEmailsCount,
+      sub: "Blocked or unresolved sends",
+      tone: metrics.failedEmailsCount > 0 ? "danger" : undefined,
+    },
+  ];
+
   return (
-    <div style={styles.container}>
+    <div className="page-shell wide">
       {/* Header */}
-      <div style={styles.header}>
+      <div className="page-header" style={styles.header}>
         <div>
-          <div style={styles.badgeLabel}>SUPERCARS INTERNAL OPERATIONS</div>
-          <h1 style={styles.title}>Fulfillment Review & Control Center</h1>
-          <p style={styles.subtitle}>
+          <div className="eyebrow" style={styles.badgeLabel}>SUPERCARS INTERNAL OPERATIONS</div>
+          <h1 className="page-title compact" style={styles.title}>Fulfillment Review & Control Center</h1>
+          <p className="page-copy" style={styles.subtitle}>
             Enterprise administrative control layer for stuck requests, partner contact auditing, financial reconciliation, and manual overrides.
           </p>
         </div>
@@ -229,85 +279,40 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
         </div>
       )}
 
-      {/* KPI Metrics Dashboard Bar */}
+      {/* Filter Summary Grid */}
       <div style={styles.kpiGrid}>
-        <div style={styles.kpiCard}>
-          <div style={styles.kpiLabel}>TOTAL REQUESTS</div>
-          <div style={styles.kpiValue}>{metrics.totalRequests}</div>
-          <div style={styles.kpiSub}>All Time Volume</div>
-        </div>
-
-        <div style={styles.kpiCard}>
-          <div style={styles.kpiLabel}>ACCEPTED / DECLINED</div>
-          <div style={{ display: "flex", gap: "8px", alignItems: "baseline" }}>
-            <span style={{ fontSize: "20px", fontWeight: 800, color: "#10B981" }}>{metrics.acceptedCount}</span>
-            <span style={{ color: "#64748B" }}>/</span>
-            <span style={{ fontSize: "20px", fontWeight: 800, color: "#EF4444" }}>{metrics.declinedCount}</span>
-          </div>
-          <div style={styles.kpiSub}>Partner Decision Ratio</div>
-        </div>
-
-        <div style={{ ...styles.kpiCard, ...(metrics.stuckOrExpiredCount > 0 ? styles.kpiCardWarn : {}) }}>
-          <div style={styles.kpiLabel}>STUCK / EXPIRED</div>
-          <div style={{ fontSize: "22px", fontWeight: 800, color: metrics.stuckOrExpiredCount > 0 ? "#D97706" : "#0F172A" }}>
-            {metrics.stuckOrExpiredCount}
-          </div>
-          <div style={styles.kpiSub}>Draft Holds & Token Expirations</div>
-        </div>
-
-        <div style={{ ...styles.kpiCard, ...(metrics.failedEmailsCount > 0 ? styles.kpiCardDanger : {}) }}>
-          <div style={styles.kpiLabel}>FAILED / HELD EMAILS</div>
-          <div style={{ fontSize: "22px", fontWeight: 800, color: metrics.failedEmailsCount > 0 ? "#DC2626" : "#0F172A" }}>
-            {metrics.failedEmailsCount}
-          </div>
-          <div style={styles.kpiSub}>Zero Guessed Email Blocked Sends</div>
-        </div>
-
-        <div style={styles.kpiCard}>
-          <div style={styles.kpiLabel}>COLLECTED COMMISSION</div>
-          <div style={{ fontSize: "20px", fontWeight: 800, color: "#10B981" }}>
-            ${metrics.totalCommissionCollected.toLocaleString()}
-          </div>
-          <div style={styles.kpiSub}>Expected: ${metrics.totalCommissionExpected.toLocaleString()}</div>
-        </div>
-
-        <div style={styles.kpiCard}>
-          <div style={styles.kpiLabel}>PARTNER CONFIDENCE</div>
-          <div style={{ fontSize: "12px", color: "#334155", fontWeight: 700, marginTop: "4px" }}>
-            <span style={{ color: "#10B981" }}>{metrics.partnerConfidence.verified} Verified</span> &middot;{" "}
-            <span style={{ color: "#2563EB" }}>{metrics.partnerConfidence.publicSource} Public</span> &middot;{" "}
-            <span style={{ color: "#DC2626" }}>{metrics.partnerConfidence.unresolvedEmail} Unresolved</span>
-          </div>
-          <div style={styles.kpiSub}>Audited Partner Registry</div>
-        </div>
-      </div>
-
-      {/* Tab Filter Buttons */}
-      <div style={styles.tabContainer}>
-        {(
-          [
-            { id: "ALL", label: "All Requests", count: metrics.totalRequests },
-            { id: "STUCK_EXPIRED", label: "Stuck / Expired", count: metrics.stuckOrExpiredCount },
-            { id: "ACCEPTED", label: "Accepted", count: metrics.acceptedCount },
-            { id: "DECLINED", label: "Declined", count: metrics.declinedCount },
-            { id: "PENDING_REFUNDS", label: "Refunds & Settlement", count: metrics.pendingRefundsCount },
-            { id: "FAILED_EMAILS", label: "Email Holds / Failures", count: metrics.failedEmailsCount },
-          ] as Array<{ id: AdminFilterTab; label: string; count: number }>
-        ).map((tab) => {
-          const isActive = activeTab === tab.id;
+        {filterCards.map((card) => {
+          const isActive = activeTab === card.id;
           return (
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              key={card.id}
+              type="button"
+              onClick={() => setActiveTab(card.id)}
               style={{
-                ...styles.tabBtn,
-                ...(isActive ? styles.activeTabBtn : {}),
+                ...styles.kpiCard,
+                ...(card.tone === "warning" ? styles.kpiCardWarn : {}),
+                ...(card.tone === "danger" ? styles.kpiCardDanger : {}),
+                ...(isActive ? styles.activeKpiCard : {}),
               }}
+              aria-pressed={isActive}
             >
-              {tab.label}
-              <span style={{ ...styles.tabBadge, ...(isActive ? styles.activeTabBadge : {}) }}>
-                {tab.count}
-              </span>
+              <div style={{ ...styles.kpiLabel, ...(isActive ? styles.activeKpiLabel : {}) }}>
+                {card.label}
+              </div>
+              <div
+                style={{
+                  ...styles.kpiValue,
+                  ...(card.tone === "success" ? styles.kpiValueSuccess : {}),
+                  ...(card.tone === "warning" ? styles.kpiValueWarning : {}),
+                  ...(card.tone === "danger" ? styles.kpiValueDanger : {}),
+                  ...(isActive ? styles.activeKpiValue : {}),
+                }}
+              >
+                {card.value}
+              </div>
+              <div style={{ ...styles.kpiSub, ...(isActive ? styles.activeKpiSub : {}) }}>
+                {card.sub}
+              </div>
             </button>
           );
         })}
@@ -330,7 +335,7 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
       </div>
 
       {/* Operations Table */}
-      <div style={styles.tableContainer}>
+      <div className="mobile-scroll admin-table-shell" style={styles.tableContainer}>
         <table style={styles.table}>
           <thead>
             <tr style={styles.tableHeaderRow}>
@@ -481,8 +486,12 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
                           </button>
                         )}
 
-                        <Link href={`/transactions/${req.publicTransactionToken}`} style={styles.actionBtnHub}>
-                          View Hub
+                        <Link
+                          href={`/transactions/${req.publicTransactionToken}`}
+                          style={styles.actionBtnHub}
+                          title="Buyer/owner scoped transaction page. Admin access is intentionally limited unless the admin account is a transaction party."
+                        >
+                          Buyer / Owner Hub
                         </Link>
                       </div>
 
@@ -595,16 +604,13 @@ function getPaymentBadgeStyle(status: string): React.CSSProperties {
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    maxWidth: "1400px",
-    margin: "0 auto",
-    padding: "32px 24px",
   },
   header: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "flex-start",
     marginBottom: "24px",
-    borderBottom: "1px solid #E2E8F0",
+    borderBottom: "1px solid var(--line)",
     paddingBottom: "16px",
   },
   headerActions: {
@@ -654,15 +660,9 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: "uppercase",
   },
   title: {
-    fontSize: "28px",
-    fontWeight: 800,
-    color: "#0F172A",
-    margin: "4px 0 8px 0",
   },
   subtitle: {
     fontSize: "14px",
-    color: "#475569",
-    margin: 0,
   },
   adminBadge: {
     backgroundColor: "#0F172A",
@@ -682,9 +682,19 @@ const styles: Record<string, React.CSSProperties> = {
   kpiCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: "10px",
-    border: "1px solid #E2E8F0",
+    borderWidth: "1px",
+    borderStyle: "solid",
+    borderColor: "#E2E8F0",
     padding: "16px",
     boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+    cursor: "pointer",
+    textAlign: "left",
+    transition: "border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease",
+  },
+  activeKpiCard: {
+    borderColor: "#0F172A",
+    backgroundColor: "#0F172A",
+    boxShadow: "0 14px 32px rgba(15, 23, 42, 0.18)",
   },
   kpiCardWarn: {
     borderColor: "#F59E0B",
@@ -706,48 +716,27 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#0F172A",
     margin: "4px 0",
   },
+  kpiValueSuccess: {
+    color: "#10B981",
+  },
+  kpiValueWarning: {
+    color: "#D97706",
+  },
+  kpiValueDanger: {
+    color: "#DC2626",
+  },
   kpiSub: {
     fontSize: "11px",
     color: "#64748B",
   },
-  tabContainer: {
-    display: "flex",
-    gap: "8px",
-    overflowX: "auto",
-    paddingBottom: "8px",
-    marginBottom: "16px",
-    borderBottom: "1px solid #E2E8F0",
-  },
-  tabBtn: {
-    padding: "8px 14px",
-    borderRadius: "6px",
-    border: "1px solid #E2E8F0",
-    backgroundColor: "#FFFFFF",
-    color: "#475569",
-    fontWeight: 600,
-    fontSize: "13px",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-    whiteSpace: "nowrap",
-  },
-  activeTabBtn: {
-    backgroundColor: "#0F172A",
+  activeKpiLabel: {
     color: "#FFFFFF",
-    borderColor: "#0F172A",
   },
-  tabBadge: {
-    backgroundColor: "#F1F5F9",
-    color: "#475569",
-    fontSize: "11px",
-    fontWeight: 700,
-    padding: "2px 6px",
-    borderRadius: "999px",
-  },
-  activeTabBadge: {
-    backgroundColor: "#334155",
+  activeKpiValue: {
     color: "#FFFFFF",
+  },
+  activeKpiSub: {
+    color: "#CBD5E1",
   },
   searchBar: {
     display: "flex",

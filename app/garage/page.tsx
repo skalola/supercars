@@ -9,17 +9,20 @@ export default async function GaragePage() {
 
   if (!session?.user) {
     return (
-      <main style={{ maxWidth: 900, margin: "40px auto", padding: 24, fontFamily: "system-ui" }}>
-        <h1 style={{ fontSize: 32 }}>My Garage</h1>
-        <p style={{ color: "#666", marginTop: 12 }}>Sign in to create your collection.</p>
-        <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
-          <form action={async () => {
-            "use server";
-            await signIn("google", { redirectTo: "/garage" });
-          }}>
-            <button type="submit" style={{ padding: "10px 16px", borderRadius: 8, border: "1px solid #ddd", cursor: "pointer" }}>Login with Google</button>
-          </form>
-        </div>
+      <main className="page-shell" style={{ maxWidth: 900 }}>
+        <section className="surface-panel">
+          <div className="eyebrow">Garage</div>
+          <h1 className="page-title compact">My Garage</h1>
+          <p className="page-copy">Sign in to create your collection.</p>
+          <div style={{ display: "flex", gap: 12, marginTop: 24, flexWrap: "wrap" }}>
+            <form action={async () => {
+              "use server";
+              await signIn("google", { redirectTo: "/garage" });
+            }}>
+              <button type="submit" className="site-button secondary">Login with Google</button>
+            </form>
+          </div>
+        </section>
       </main>
     );
   }
@@ -53,17 +56,24 @@ export default async function GaragePage() {
   });
 
   return (
-    <main style={{ maxWidth: 900, margin: "40px auto", padding: 24, fontFamily: "system-ui" }}>
-      <h1 style={{ fontSize: 32, marginBottom: 24 }}>My Garage</h1>
+    <main className="page-shell" style={{ maxWidth: 900 }}>
+      <section className="page-header">
+        <div>
+          <div className="eyebrow">Garage</div>
+          <h1 className="page-title compact">My Garage</h1>
+        </div>
+      </section>
       {garageItems.length === 0 ? (
-        <p style={{ color: "#666" }}>Your saved models will appear here.</p>
+        <section className="surface-panel">
+          <p style={{ color: "var(--muted)", margin: 0 }}>Your saved models will appear here.</p>
+        </section>
       ) : (
         <div style={{ display: "grid", gap: 16 }}>
           {garageItems.map((item) => {
             const heroImage = item.model.images[0]?.url ?? null;
             const vehicle = item.model.vehicles[0] ?? null;
             return (
-              <Link key={item.id} href={`/make/${item.model.make.slug}/${item.model.slug}`} style={{ display: "flex", gap: 16, padding: 16, border: "1px solid #e5e7eb", borderRadius: 12, textDecoration: "none", color: "inherit" }}>
+              <Link key={item.id} href={`/make/${item.model.make.slug}/${item.model.slug}`} className="surface-card clean-link" style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
                 <div style={{ position: "relative", width: 140, height: 90, borderRadius: 10, overflow: "hidden", background: "#f8fafc" }}>
                   {heroImage ? (
                     <Image src={heroImage} alt={`${item.model.make.name} ${item.model.name}`} fill sizes="140px" style={{ objectFit: "cover" }} unoptimized />

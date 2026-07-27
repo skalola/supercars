@@ -59,14 +59,21 @@ export default async function TransactionDetailPage({ params }: TransactionPageP
   const { id } = await params;
   const session = await auth();
   const userId = session?.user?.id;
-  const data = await getFulfillmentByIdForUser(id, userId);
+  const data = await getFulfillmentByIdForUser(id, userId, session?.user?.role);
 
   if ("error" in data || !data.request) {
+    const errorCode = "error" in data ? data.error : "NOT_FOUND";
+    const title = errorCode === "FORBIDDEN"
+      ? "You do not have access to this transaction"
+      : errorCode === "UNAUTHORIZED"
+        ? "Sign in to view this transaction"
+        : "Transaction not found";
+
     return (
-      <main style={styles.container}>
-        <section style={styles.emptyPanel}>
+    <main className="page-shell" style={styles.container}>
+      <section style={styles.emptyPanel}>
           <div style={styles.errorBadge}>Unavailable</div>
-          <h1 style={styles.title}>Transaction not found</h1>
+          <h1 style={styles.title}>{title}</h1>
           <p style={styles.muted}>{data.message || "This transaction is unavailable for the current account."}</p>
           <Link href="/transactions" style={styles.primaryAction}>
             Back to transactions
@@ -78,18 +85,18 @@ export default async function TransactionDetailPage({ params }: TransactionPageP
 
   const { role, request: req } = data;
   const status = statusPresentation(req.status);
-  const partner = role === "BUYER"
+  const partner = role === "BUYER" || role === "ADMIN"
     ? req.parties?.find((party) => !["BUYER", "SELLER", "PLATFORM"].includes(party.partyType))
     : null;
 
   return (
-    <main style={styles.container}>
-      <section style={styles.header}>
+    <main className="page-shell" style={styles.container}>
+      <section className="transaction-detail-header" style={styles.header}>
         <div>
           <Link href="/transactions" style={styles.backLink}>
             Back to transactions
           </Link>
-          <div style={styles.eyebrow}>{role === "SELLER" ? "Owner view" : "Buyer view"}</div>
+          <div style={styles.eyebrow}>{role === "ADMIN" ? "Admin view" : role === "SELLER" ? "Owner view" : "Buyer view"}</div>
           <h1 style={styles.title}>{typeLabel(req.requestType)}</h1>
           <p style={styles.subtitle}>{req.vehicle ? `${req.vehicle.year} ${req.vehicle.make} ${req.vehicle.model}` : "SUPERCARS fulfillment request"}</p>
         </div>
@@ -99,7 +106,7 @@ export default async function TransactionDetailPage({ params }: TransactionPageP
         </div>
       </section>
 
-      <section style={styles.topGrid}>
+      <section className="transaction-detail-top-grid" style={styles.topGrid}>
         {req.vehicle && (
           <div style={styles.panel}>
             <div style={styles.panelLabel}>Vehicle</div>
@@ -126,7 +133,7 @@ export default async function TransactionDetailPage({ params }: TransactionPageP
         </div>
       </section>
 
-      <section style={styles.mainGrid}>
+      <section className="transaction-detail-main-grid" style={styles.mainGrid}>
         <div style={styles.leftStack}>
           {role === "SELLER" ? (
             <OwnerRequestPanel req={req} />
@@ -158,7 +165,7 @@ function OwnerRequestPanel({ req }: { req: SellerDisplayRequest }) {
       <div style={styles.panelLabel}>Request Summary</div>
       <h2 style={styles.panelTitle}>{req.requestSummary?.title || "Buyer request"}</h2>
       {req.requestSummary?.description && <p style={styles.muted}>{req.requestSummary.description}</p>}
-      <div style={styles.detailGrid}>
+      <div className="transaction-detail-card-grid" style={styles.detailGrid}>
         <DetailItem label="Buyer" value={req.requestSummary?.buyerName || "Verified buyer"} />
         <DetailItem label="Status" value={statusPresentation(req.status).label} />
         <DetailItem label="Request" value={typeLabel(req.requestType)} />
@@ -175,14 +182,14 @@ function BuyerPackagePanel({ req, partnerName }: { req: BuyerDisplayRequest; par
       <div style={styles.panelLabel}>Request Details</div>
       <h2 style={styles.panelTitle}>{req.package?.title || typeLabel(req.requestType)}</h2>
       {req.package?.description && <p style={styles.muted}>{req.package.description}</p>}
-      <div style={styles.detailGrid}>
+      <div className="transaction-detail-card-grid" style={styles.detailGrid}>
         <DetailItem label="Partner" value={partnerName || "Pending"} />
         <DetailItem label="Request" value={typeLabel(req.requestType)} />
         <DetailItem label="Submitted" value={formatDate(req.createdAt)} />
         <DetailItem label="Updated" value={formatDate(req.updatedAt)} />
       </div>
       {entries.length > 0 && (
-        <div style={styles.scopedList}>
+        <div className="transaction-detail-card-grid" style={styles.scopedList}>
           {entries.slice(0, 10).map(([key, value]) => (
             <DetailItem key={key} label={labelize(key)} value={formatScopedValue(value)} />
           ))}
@@ -322,7 +329,10 @@ function statusPresentation(status: string) {
   }
 }
 
-function nextStepCopy(status: string, requestType: string, role: "BUYER" | "SELLER") {
+function nextStepCopy(status: string, requestType: string, role: "BUYER" | "SELLER" | "ADMIN") {
+  if (role === "ADMIN") {
+    return "Review this fulfillment transaction as an operations administrator. Buyer, owner, and partner scopes remain enforced for non-admin accounts.";
+  }
   if (role === "SELLER") {
     if (status === "ACCEPTED") return "The partner accepted this request. SUPERCARS will continue transaction coordination.";
     if (status === "COMPLETED") return "This transaction has been marked complete.";
@@ -428,16 +438,9 @@ function formatDateTime(value: string | Date): string {
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    maxWidth: "1160px",
-    margin: "0 auto",
-    padding: "32px 24px 52px",
     color: "#0F172A",
   },
   header: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: "24px",
-    alignItems: "flex-start",
     marginBottom: "22px",
   },
   backLink: {
@@ -490,17 +493,9 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: "6px",
   },
   topGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "12px",
     marginBottom: "18px",
   },
-  mainGrid: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) 340px",
-    gap: "18px",
-    alignItems: "start",
-  },
+  mainGrid: {},
   leftStack: {
     display: "flex",
     flexDirection: "column",
@@ -576,15 +571,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 750,
   },
   detailGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "10px",
     marginTop: "14px",
   },
   scopedList: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "10px",
     marginTop: "14px",
     paddingTop: "14px",
     borderTop: "1px solid #E2E8F0",

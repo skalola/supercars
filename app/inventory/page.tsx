@@ -171,13 +171,5 @@ export default async function InventoryPage() {
     },
   }));
 
-  return (
-    <div style={{ minHeight: "100vh", backgroundColor: "#fff" }}>
-      <InventoryExplorer
-        listings={mappedListings}
-        makes={mappedMakes}
-        models={mappedModels}
-      />
-    </div>
-  );
+  return <InventoryExplorer listings={mappedListings} makes={mappedMakes} models={mappedModels} />;
 }

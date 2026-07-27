@@ -7,24 +7,33 @@ export default async function Home() {
   });
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-10">
-      <h1 className="text-3xl font-bold mb-6">Supercars</h1>
+    <main className="page-shell">
+      <section className="page-header">
+        <div>
+          <div className="eyebrow">SUPERCARS MARKETPLACE</div>
+          <h1 className="page-title">Supercars</h1>
+          <p className="page-copy">
+            VIN-backed Ferrari and Lamborghini inventory, ownership records, and fulfillment requests in one clean workspace.
+          </p>
+        </div>
+        <Link href="/inventory" className="site-button">
+          Browse inventory
+        </Link>
+      </section>
 
-      <p className="mb-6 text-gray-600">
-        Select a manufacturer
-      </p>
-
-      <div className="flex flex-col gap-3">
+      <section className="card-grid" aria-label="Manufacturers">
         {makes.map((make) => (
           <Link
             key={make.id}
             href={`/make/${make.slug}`}
-            className="text-blue-600 hover:underline"
+            className="surface-card clean-link"
           >
-            {make.name}
+            <div className="eyebrow">Manufacturer</div>
+            <h2 style={{ margin: "10px 0 6px", fontSize: 24, lineHeight: 1.1 }}>{make.name}</h2>
+            <p style={{ margin: 0, color: "var(--muted)", fontSize: 14 }}>View models and inventory</p>
           </Link>
         ))}
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

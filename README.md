@@ -62,6 +62,29 @@ The sweep marks elapsed partner tokens as `EXPIRED`, moves non-terminal requests
 
 See `docs/fulfillment-release-readiness.md` for the fulfillment checkpoint, QA command list, admin test login, and release gate.
 
+## Test Logins
+
+The local login page includes controlled credentials for testing both regular-user and admin flows:
+
+```bash
+USER_TEST_EMAIL="user@supercars.test"
+USER_TEST_PASSWORD="supercars-user"
+ADMIN_TEST_EMAIL="admin@supercars.test"
+ADMIN_TEST_PASSWORD="supercars-admin"
+```
+
+Regular users land in `/transactions`. Admins land in `/admin/fulfillment`. The global navigation reads the active session and exposes sign in, transactions, admin, garage, and logout controls based on role.
+
+Seed or reset local test transactions with:
+
+```bash
+npm run seed-test-transactions
+```
+
+This local-only command refuses to run with `NODE_ENV=production`, removes existing fulfillment request rows, preserves imported inventory data, and creates four tagged `SPRINT9B_TEST_FIXTURE` transactions for the regular user across dealer purchase, insurance, transport, and service flows.
+
+Admins can open transaction URLs for operations review. Regular users remain limited to transactions where they are the buyer, owner, seller, or linked party.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
