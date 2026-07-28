@@ -44,4 +44,7 @@ next-env.d.ts
 
 /app/generated/prisma
 
+# local migration reports
+/migration-reports/
+
 /app/generated/prisma

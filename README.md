@@ -50,6 +50,41 @@ STRIPE_WEBHOOK_SECRET="..."
 
 Stripe mode requires a real Stripe payment method id in fulfillment `depositIntent.paymentMethod`. The platform creates a manual-capture authorization first, captures only after partner acceptance, voids on partner decline/expiration/pre-accept cancellation, and refunds according to cancellation policy after acceptance.
 
+## Neon PostgreSQL Migration
+
+The application now uses Prisma against PostgreSQL/Neon via `DATABASE_URL`. The original local SQLite inventory database should remain untouched and can be read separately during one-time migration with:
+
+```bash
+SQLITE_DATABASE_URL="file:./prisma/dev.db"
+```
+
+Safe migration commands:
+
+```bash
+npm run migrate:neon:dry
+npm run migrate:neon
+npm run verify:neon
+```
+
+`migrate:neon:dry` performs no Neon writes. `migrate:neon` requires the explicit non-dry command and never deletes or resets data. Migration reports are written to `migration-reports/`.
+
+Required deployment environment variables:
+
+```bash
+DATABASE_URL="postgresql://..."
+AUTH_SECRET="..."
+NEXT_PUBLIC_APP_URL="https://..."
+GOOGLE_CLIENT_ID="..."          # if Google login is enabled
+GOOGLE_CLIENT_SECRET="..."      # if Google login is enabled
+MAIL_PROVIDER="log|resend"
+RESEND_API_KEY="..."            # if MAIL_PROVIDER=resend
+STRIPE_SECRET_KEY="..."         # if PAYMENT_PROVIDER=stripe
+STRIPE_WEBHOOK_SECRET="..."     # for Stripe webhook verification
+PAYMENT_PROVIDER="ledger|stripe"
+```
+
+Do not seed, reset, or recrawl inventory during Vercel builds. `postinstall` and `build` only generate Prisma Client and build Next.js.
+
 ## Fulfillment Expiration Operations
 
 Partner decision links can be ignored instead of accepted or declined. Admins can manually process expired links from `/admin/fulfillment`, or run the same lifecycle processor from the command line:
