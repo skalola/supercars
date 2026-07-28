@@ -55,7 +55,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   });
 
   if ("error" in result) {
-    return NextResponse.json(result, { status: 400 });
+    if (submittedVia === "JSON") {
+      return NextResponse.json(result, { status: 400 });
+    }
+    return confirmationResponse({
+      request,
+      token,
+      action: "ACCEPT",
+      title: "Accept Request",
+      status: 400,
+      error: result.message,
+    });
+  }
+
+  if (submittedVia !== "JSON") {
+    return NextResponse.redirect(new URL(`/fulfillment/${token}`, request.url), { status: 303 });
   }
 
   return NextResponse.json(result);

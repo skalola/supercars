@@ -108,8 +108,10 @@ async function main() {
   });
 
   console.log(`  ✓ POST accept status: ${acceptPostResponse.status}`);
+  console.log(`  ✓ POST accept redirect: ${acceptPostResponse.headers.get("location")}`);
   if (
-    acceptPostResponse.status !== 200 ||
+    acceptPostResponse.status !== 303 ||
+    !acceptPostResponse.headers.get("location")?.endsWith(`/fulfillment/${acceptToken}`) ||
     acceptedAfterPost?.status !== "ACCEPTED" ||
     acceptedAfterPost.partnerTokens[0]?.actionTaken !== "ACCEPTED" ||
     acceptedAfterPost.depositIntents[0]?.status !== "CAPTURED" ||
