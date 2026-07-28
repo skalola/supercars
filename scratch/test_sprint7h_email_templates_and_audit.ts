@@ -59,7 +59,7 @@ async function main() {
     console.log(`    - Subject: "${rendered.subject}"`);
     console.log(`    - HTML Length: ${rendered.html.length} chars | Text Length: ${rendered.text.length} chars`);
 
-    if (!rendered.subject || !rendered.html.includes("SUPERCARS") || !rendered.text || rendered.html.includes("<script>")) {
+    if (!rendered.subject || !rendered.html.includes("SUPERCAR DASH") || !rendered.text || rendered.html.includes("<script>")) {
       throw new Error(`Template generation failed for '${type}'!`);
     }
   }

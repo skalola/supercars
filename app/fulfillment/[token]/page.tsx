@@ -1,5 +1,4 @@
 import React from "react";
-import Link from "next/link";
 import { getPartnerFulfillmentPackage } from "@/lib/fulfillment/service";
 
 interface PartnerTokenPageProps {
@@ -51,7 +50,24 @@ export default async function PartnerTokenPage({ params }: PartnerTokenPageProps
                 <div key={key} style={styles.scopeItem}>
                   <div style={styles.scopeKey}>{camelToTitleCase(key)}</div>
                   <div style={styles.scopeValue}>
-                    {typeof val === "object" ? JSON.stringify(val, null, 2) : String(val)}
+                    {val === null || val === undefined ? (
+                      "Not provided"
+                    ) : typeof val === "object" ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                        {Object.entries(val).map(([subKey, subVal]) => (
+                          <div key={subKey} style={{ fontSize: "13px", lineHeight: "1.4" }}>
+                            <span style={{ color: "#94a3b8", fontWeight: 500 }}>
+                              {camelToTitleCase(subKey)}:
+                            </span>{" "}
+                            <span style={{ color: "#f8fafc" }}>
+                              {typeof subVal === "object" ? JSON.stringify(subVal) : String(subVal ?? "Not provided")}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      String(val)
+                    )}
                   </div>
                 </div>
               ))}
@@ -118,12 +134,12 @@ export default async function PartnerTokenPage({ params }: PartnerTokenPageProps
                 </p>
 
                 <div style={styles.buttonGroup}>
-                  <Link href={`/fulfillment/${token}/accept`} style={styles.acceptLink}>
+                  <a href={`/fulfillment/${token}/accept`} style={styles.acceptLink}>
                     ✓ Accept Request
-                  </Link>
-                  <Link href={`/fulfillment/${token}/decline`} style={styles.declineLink}>
+                  </a>
+                  <a href={`/fulfillment/${token}/decline`} style={styles.declineLink}>
                     ✗ Decline Request
-                  </Link>
+                  </a>
                 </div>
               </div>
             )}

@@ -51,7 +51,7 @@ function getAppBaseUrl(): string {
     process.env.APP_URL ||
     process.env.NEXTAUTH_URL ||
     process.env.AUTH_URL ||
-    "https://supercars.market"
+    "https://supercardash.vercel.app"
   ).replace(/\/$/, "");
 }
 
@@ -68,43 +68,43 @@ export function generateEmailTemplate(params: EmailTemplateParams): { subject: s
 
   switch (params.templateType) {
     case "DEALER_PURCHASE_REQUEST":
-      subject = `[SUPERCARS Offer] Purchase Request — ${params.vehicleSummary}`;
+      subject = `[SUPERCAR DASH Offer] Purchase Request — ${params.vehicleSummary}`;
       actionTitle = "New Buyer Purchase Offer";
       break;
     case "INSURANCE_QUOTE_REQUEST":
-      subject = `[SUPERCARS Quote Request] Agreed Value Policy — ${params.vehicleSummary}`;
+      subject = `[SUPERCAR DASH Quote Request] Agreed Value Policy — ${params.vehicleSummary}`;
       actionTitle = "Agreed Value Insurance Quote Request";
       break;
     case "TRANSPORT_REQUEST":
-      subject = `[SUPERCARS Transport] Enclosed Carrier Haul — ${params.vehicleSummary}`;
+      subject = `[SUPERCAR DASH Transport] Enclosed Carrier Haul — ${params.vehicleSummary}`;
       actionTitle = "Enclosed Vehicle Transport Request";
       break;
     case "SERVICE_BOOKING_REQUEST":
-      subject = `[SUPERCARS Service] Appointment Booking — ${params.vehicleSummary}`;
+      subject = `[SUPERCAR DASH Service] Appointment Booking — ${params.vehicleSummary}`;
       actionTitle = "Certified Service Appointment Request";
       break;
     case "BUYER_CONFIRMATION":
-      subject = `[SUPERCARS] Fulfillment Request Submitted — ${params.vehicleSummary}`;
+      subject = `[SUPERCAR DASH] Fulfillment Request Submitted — ${params.vehicleSummary}`;
       actionTitle = "Fulfillment Request Confirmation";
       break;
     case "SELLER_CONFIRMATION":
-      subject = `[SUPERCARS] Buyer Purchase Offer Submitted — ${params.vehicleSummary}`;
+      subject = `[SUPERCAR DASH] Buyer Purchase Offer Submitted — ${params.vehicleSummary}`;
       actionTitle = "Buyer Purchase Offer Summary";
       break;
     case "ACCEPTED_NOTIFICATION":
-      subject = `[SUPERCARS Confirmed] Request Accepted — ${params.vehicleSummary}`;
+      subject = `[SUPERCAR DASH Confirmed] Request Accepted — ${params.vehicleSummary}`;
       actionTitle = "Partner Decision Confirmed";
       break;
     case "DECLINED_NOTIFICATION":
-      subject = `[SUPERCARS Notice] Request Declined — ${params.vehicleSummary}`;
+      subject = `[SUPERCAR DASH Notice] Request Declined — ${params.vehicleSummary}`;
       actionTitle = "Partner Decision Declined";
       break;
     case "EXPIRED_NOTIFICATION":
-      subject = `[SUPERCARS Notice] Request Decision Link Expired — ${params.vehicleSummary}`;
+      subject = `[SUPERCAR DASH Notice] Request Decision Link Expired — ${params.vehicleSummary}`;
       actionTitle = "Request Expired";
       break;
     case "CANCELLATION_REFUND_NOTIFICATION":
-      subject = `[SUPERCARS Notice] Request Cancelled & Refunded — ${params.vehicleSummary}`;
+      subject = `[SUPERCAR DASH Notice] Request Cancelled & Refunded — ${params.vehicleSummary}`;
       actionTitle = "Order Cancellation & Settlement";
       break;
   }
@@ -150,9 +150,9 @@ export function generateEmailTemplate(params: EmailTemplateParams): { subject: s
 <body style="font-family: Inter, system-ui, -apple-system, sans-serif; background-color: #f8fafc; margin: 0; padding: 24px;">
   <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);">
     
-    <!-- SUPERCARS Header -->
+    <!-- SUPERCAR DASH Header -->
     <div style="background-color: #0f172a; padding: 20px 24px; text-align: center; border-bottom: 3px solid #ef4444;">
-      <span style="color: #ffffff; font-size: 20px; font-weight: 900; letter-spacing: 2px;">SUPERCARS MARKETPLACE</span>
+      <span style="color: #ffffff; font-size: 20px; font-weight: 900; letter-spacing: 2px;">SUPERCAR DASH</span>
     </div>
 
     <!-- Main Content Body -->
@@ -196,9 +196,9 @@ export function generateEmailTemplate(params: EmailTemplateParams): { subject: s
       </div>
     </div>
 
-    <!-- SUPERCARS Footer -->
+    <!-- SUPERCAR DASH Footer -->
     <div style="background-color: #f1f5f9; padding: 16px 24px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #64748b; text-align: center; line-height: 1.4;">
-      <div>SUPERCARS Marketplace &middot; Enterprise Vehicle Fulfillment & Passport Platform</div>
+      <div>SUPERCAR DASH &middot; Enterprise Vehicle Fulfillment & Passport Platform</div>
       <div>Questions or assistance? Contact support at <a href="mailto:support@supercars.market" style="color: #2563eb;">support@supercars.market</a></div>
       <div style="margin-top: 8px; color: #94a3b8;">This email is confidential and intended solely for ${escapeHtml(params.recipientEmail)}.</div>
     </div>
@@ -209,7 +209,7 @@ export function generateEmailTemplate(params: EmailTemplateParams): { subject: s
 
   const text = `
 ==================================================
-SUPERCARS MARKETPLACE — ${actionTitle.toUpperCase()}
+SUPERCAR DASH — ${actionTitle.toUpperCase()}
 ==================================================
 
 Hello ${params.recipientName},
@@ -222,7 +222,7 @@ ${amountText ? `AMOUNT / PRICE: ${amountText}\n` : ""}EXPIRATION: ${expirationTe
 Secure Review Link: ${fullReviewUrl}
 ${params.acceptUrl ? `Accept Link: ${fullAcceptUrl}\n` : ""}${params.declineUrl ? `Decline Link: ${fullDeclineUrl}\n` : ""}
 --------------------------------------------------
-SUPERCARS Marketplace — support@supercars.market
+SUPERCAR DASH — support@supercars.market
 Confidential notification for ${params.recipientEmail}
 `;
 

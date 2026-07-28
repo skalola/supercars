@@ -10,8 +10,8 @@ export default async function Home() {
     <main className="page-shell">
       <section className="page-header">
         <div>
-          <div className="eyebrow">SUPERCARS MARKETPLACE</div>
-          <h1 className="page-title">Supercars</h1>
+          <div className="eyebrow">SUPERCAR DASH</div>
+          <h1 className="page-title">Supercar Dash</h1>
           <p className="page-copy">
             VIN-backed Ferrari and Lamborghini inventory, ownership records, and fulfillment requests in one clean workspace.
           </p>

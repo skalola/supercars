@@ -17,7 +17,7 @@ export default async function RootLayout({
         <div className="site-shell">
           <header className="site-header">
             <Link href="/" className="site-brand">
-              SUPERCARS
+              SUPERCAR DASH
             </Link>
 
             <details className="site-mobile-menu">
