@@ -14,6 +14,7 @@ type MaintenanceIntelligenceProps = {
   sortedRules: any[];
   serviceRecords: any[];
   makeName: string;
+  serviceShopNames?: string[];
 };
 
 export default function MaintenanceIntelligence({
@@ -22,7 +23,8 @@ export default function MaintenanceIntelligence({
   currentMileage,
   sortedRules,
   serviceRecords,
-  makeName
+  makeName,
+  serviceShopNames = []
 }: MaintenanceIntelligenceProps) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
@@ -70,6 +72,10 @@ export default function MaintenanceIntelligence({
   }
 
   const getShops = () => {
+    if (serviceShopNames.length > 0) {
+      return serviceShopNames;
+    }
+
     const makeLower = makeName ? makeName.toLowerCase() : "";
     if (makeLower.includes("ferrari")) {
       return ["Ferrari of Houston", "Ferrari San Francisco", "Ferrari Palm Beach"];

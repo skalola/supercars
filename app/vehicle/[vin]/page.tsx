@@ -61,7 +61,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
     );
   }
 
-  const [maintenanceRules, market] = await Promise.all([
+  const [maintenanceRules, market, serviceShops] = await Promise.all([
     prisma.maintenanceRule.findMany({
       where: {
         OR: [
@@ -71,7 +71,26 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
       }
     }),
     getMarketSummary(vehicle.modelId),
+    prisma.partnerContact.findMany({
+      where: {
+        type: "SERVICE_SHOP",
+        active: true,
+        contactStatus: "RESOLVED",
+        email: { not: null },
+      },
+      orderBy: [{ confidence: "desc" }, { name: "asc" }],
+      select: { name: true, makeSpecialization: true },
+    }),
   ]);
+
+  const makeName = vehicle.model.make.name;
+  const serviceShopNames = serviceShops
+    .filter((shop) => {
+      const specialization = shop.makeSpecialization?.toLowerCase() || "all";
+      const make = makeName.toLowerCase();
+      return specialization === "all" || specialization.includes(make);
+    })
+    .map((shop) => shop.name);
 
   const priorityOrder: Record<string, number> = {
     REQUIRED: 1,
@@ -1036,7 +1055,8 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
         currentMileage={currentMileage ?? null}
         sortedRules={sortedRules}
         serviceRecords={vehicle.serviceRecords}
-        makeName={vehicle.model.make.name}
+        makeName={makeName}
+        serviceShopNames={serviceShopNames}
       />
     </main>
   );
