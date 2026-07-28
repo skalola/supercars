@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
+    "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",
     "lint:fulfillment": "eslint app/actions/admin.ts app/actions/admin-partner.ts app/admin app/api/payments app/fulfillment app/transactions components/admin components/transactions lib/admin.ts lib/admin lib/fulfillment lib/mail lib/payments scripts/process-fulfillment-expirations.ts scripts/seed-fulfillment-demo.ts scripts/seed-partner-registry.ts types/next-auth.d.ts scratch/test_sprint8a_real_email_delivery.ts scratch/test_sprint8b_payment_provider.ts scratch/test_sprint8c_end_to_end_fulfillment_qa.ts scratch/test_sprint8d_transaction_ux_scoping.ts scratch/test_sprint8e_expiration_operations.ts scratch/test_sprint8f_admin_financial_reconciliation.ts scratch/test_sprint8g_partner_package_scoping.ts scratch/test_sprint8h_partner_decision_confirmation.ts scratch/test_sprint8i_partner_decision_audit.ts",
@@ -22,6 +23,9 @@
     "seed-partner-registry": "tsx scripts/seed-partner-registry.ts",
     "seed-fulfillment-demo": "tsx --env-file .env scripts/seed-fulfillment-demo.ts",
     "seed-test-transactions": "tsx --env-file .env scripts/seed-fulfillment-demo.ts",
+    "migrate:neon:dry": "tsx --env-file .env scripts/migrate-sqlite-to-neon.ts",
+    "migrate:neon": "tsx --env-file .env scripts/migrate-sqlite-to-neon.ts --execute",
+    "verify:neon": "tsx --env-file .env scripts/verify-neon-migration.ts",
     "process-fulfillment-expirations": "tsx --env-file .env scripts/process-fulfillment-expirations.ts",
     "qa:fulfillment": "tsx scratch/test_sprint7b_partner_registry.ts && tsx scratch/test_sprint7c_dealer_purchase_package.ts && tsx scratch/test_sprint7h_email_templates_and_audit.ts && tsx scratch/test_transaction_scoping.ts && tsx scratch/test_transaction_center.ts && tsx scratch/test_admin_ops_layer.ts && tsx scratch/test_sprint8a_real_email_delivery.ts && tsx scratch/test_sprint8b_payment_provider.ts && tsx scratch/test_sprint8c_end_to_end_fulfillment_qa.ts && tsx scratch/test_sprint8d_transaction_ux_scoping.ts && tsx scratch/test_sprint8e_expiration_operations.ts && tsx scratch/test_sprint8f_admin_financial_reconciliation.ts && tsx scratch/test_sprint8g_partner_package_scoping.ts && tsx scratch/test_sprint8h_partner_decision_confirmation.ts && tsx scratch/test_sprint8i_partner_decision_audit.ts"
   },
