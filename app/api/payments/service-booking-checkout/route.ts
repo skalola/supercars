@@ -7,14 +7,16 @@ import {
 } from "@/lib/payments/payment-service";
 
 export async function POST(request: NextRequest) {
+  const formData = await request.formData();
+  const returnTo = String(formData.get("returnTo") || "/login");
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const session = (globalThis as any).mockSession !== undefined ? (globalThis as any).mockSession : await auth();
   const userId = session?.user?.id;
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.redirect(new URL(`/login?returnTo=${encodeURIComponent(returnTo)}`, request.url), { status: 303 });
   }
 
-  const formData = await request.formData();
   const fulfillmentRequestId = String(formData.get("fulfillmentRequestId") || "");
   if (!fulfillmentRequestId) {
     return NextResponse.json({ error: "Missing service booking id." }, { status: 400 });

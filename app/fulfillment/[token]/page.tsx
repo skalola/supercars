@@ -1,5 +1,7 @@
 import React from "react";
-import { getPartnerFulfillmentPackage } from "@/lib/fulfillment/service";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { getPartnerFulfillmentPackage, submitPartnerDecision } from "@/lib/fulfillment/service";
 
 interface PartnerTokenPageProps {
   params: Promise<{
@@ -26,6 +28,29 @@ export default async function PartnerTokenPage({ params }: PartnerTokenPageProps
   }
 
   const { request, actionTaken, actionTakenAt } = data;
+
+  async function handlePartnerDecision(formData: FormData) {
+    "use server";
+    const decision = formData.get("decision") as "ACCEPTED" | "DECLINED";
+    if (decision !== "ACCEPTED" && decision !== "DECLINED") {
+      return;
+    }
+
+    await submitPartnerDecision({
+      token,
+      decision,
+      note: decision === "ACCEPTED"
+        ? "Partner accepted from review page."
+        : "Partner declined from review page.",
+      auditContext: {
+        routePath: `/fulfillment/${token}`,
+        submittedVia: "FORM",
+      },
+    });
+
+    revalidatePath(`/fulfillment/${token}`);
+    redirect(`/fulfillment/${token}`);
+  }
 
   return (
     <div style={styles.container}>
@@ -111,14 +136,14 @@ export default async function PartnerTokenPage({ params }: PartnerTokenPageProps
                   Select an action below to formally execute your fulfillment decision. Once submitted, this single-purpose link is finalized.
                 </p>
 
-                <div style={styles.buttonGroup}>
-                  <a href={`/fulfillment/${token}/accept`} style={styles.acceptLink}>
+                <form action={handlePartnerDecision} style={styles.buttonGroup}>
+                  <button type="submit" name="decision" value="ACCEPTED" style={styles.acceptButton}>
                     Accept Request
-                  </a>
-                  <a href={`/fulfillment/${token}/decline`} style={styles.declineLink}>
+                  </button>
+                  <button type="submit" name="decision" value="DECLINED" style={styles.declineButton}>
                     Decline Request
-                  </a>
-                </div>
+                  </button>
+                </form>
               </div>
             )}
           </div>
@@ -350,8 +375,10 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: "column",
     gap: "12px",
   },
-  acceptLink: {
+  acceptButton: {
     display: "block",
+    width: "100%",
+    border: 0,
     textAlign: "center",
     backgroundColor: "#10B981",
     color: "#FFFFFF",
@@ -359,10 +386,12 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "8px",
     fontWeight: 700,
     fontSize: "14px",
-    textDecoration: "none",
+    cursor: "pointer",
   },
-  declineLink: {
+  declineButton: {
     display: "block",
+    width: "100%",
+    border: 0,
     textAlign: "center",
     backgroundColor: "#EF4444",
     color: "#FFFFFF",
@@ -370,7 +399,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "8px",
     fontWeight: 700,
     fontSize: "14px",
-    textDecoration: "none",
+    cursor: "pointer",
   },
   decisionSummary: {
     display: "flex",

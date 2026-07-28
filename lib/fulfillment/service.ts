@@ -650,9 +650,22 @@ export async function submitPartnerDecision(input: PartnerDecisionInput) {
       templateType: input.decision === "ACCEPTED" ? "ACCEPTED_NOTIFICATION" : "DECLINED_NOTIFICATION",
       recipientName: buyerParty.name,
       recipientEmail: buyerParty.email,
-      packageTitle: `Request ${input.decision.toLowerCase()} by partner '${tokenRecord.partnerName || "Partner"}'`,
+      packageTitle:
+        input.decision === "ACCEPTED" && req.requestType === "SERVICE_BOOKING"
+          ? `Service booking accepted by '${tokenRecord.partnerName || "Service shop"}' — payment required`
+          : `Request ${input.decision.toLowerCase()} by partner '${tokenRecord.partnerName || "Partner"}'`,
       vehicleSummary,
-      reviewUrl: `/transactions/${req.publicTransactionToken}`,
+      reviewUrl:
+        input.decision === "ACCEPTED" && req.requestType === "SERVICE_BOOKING"
+          ? `/fulfillment/buyer/${req.publicTransactionToken}`
+          : `/transactions/${req.publicTransactionToken}`,
+      additionalDetails:
+        input.decision === "ACCEPTED" && req.requestType === "SERVICE_BOOKING"
+          ? {
+              "Next Step": "Pay the SUPERCAR DASH service-booking fee to confirm the appointment.",
+              "Payment Status": "PAYMENT_REQUIRED",
+            }
+          : undefined,
     });
   }
 

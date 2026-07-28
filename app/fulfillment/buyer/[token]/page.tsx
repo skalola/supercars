@@ -40,6 +40,34 @@ export default async function BuyerFulfillmentPage({ params }: BuyerPageProps) {
       <div style={styles.mainGrid}>
         {/* Left Column: Transaction Details & Event Audit Log */}
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          {req.requestType === "SERVICE_BOOKING" && req.status === "ACCEPTED_AWAITING_PAYMENT" && (
+            <div style={styles.paymentCard}>
+              <div style={styles.paymentTag}>Payment required</div>
+              <h2 style={styles.paymentTitle}>Confirm your service booking</h2>
+              <p style={styles.paymentCopy}>
+                The service shop accepted your request. Pay the SUPERCAR DASH booking fee to confirm the appointment.
+                Service or repair invoices are paid directly to the shop.
+              </p>
+              <form method="post" action="/api/payments/service-booking-checkout" style={styles.paymentForm}>
+                <input type="hidden" name="fulfillmentRequestId" value={req.id} />
+                <input type="hidden" name="returnTo" value={`/fulfillment/buyer/${token}`} />
+                <button type="submit" style={styles.payButton}>
+                  Pay booking fee
+                </button>
+              </form>
+            </div>
+          )}
+
+          {req.requestType === "SERVICE_BOOKING" && req.status === "CONFIRMED" && (
+            <div style={styles.confirmedCard}>
+              <div style={styles.paymentTag}>Booking confirmed</div>
+              <h2 style={styles.paymentTitle}>Payment received</h2>
+              <p style={styles.paymentCopy}>
+                Your SUPERCAR DASH booking fee is paid and the service booking is confirmed.
+              </p>
+            </div>
+          )}
+
           {req.vehicle && (
             <div style={styles.card}>
               <div style={styles.sectionTag}>VEHICLE DETAILS</div>
@@ -193,6 +221,54 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "12px",
     padding: "24px",
     border: "1px solid #1F2937",
+  },
+  paymentCard: {
+    backgroundColor: "#FEF3C7",
+    borderRadius: "12px",
+    padding: "24px",
+    border: "1px solid #F59E0B",
+    color: "#111827",
+  },
+  confirmedCard: {
+    backgroundColor: "#D1FAE5",
+    borderRadius: "12px",
+    padding: "24px",
+    border: "1px solid #10B981",
+    color: "#111827",
+  },
+  paymentTag: {
+    color: "#92400E",
+    fontSize: "11px",
+    fontWeight: 800,
+    letterSpacing: "1px",
+    textTransform: "uppercase",
+    marginBottom: "10px",
+  },
+  paymentTitle: {
+    color: "#111827",
+    fontSize: "22px",
+    fontWeight: 850,
+    margin: "0 0 8px",
+  },
+  paymentCopy: {
+    color: "#374151",
+    fontSize: "14px",
+    lineHeight: 1.55,
+    margin: 0,
+  },
+  paymentForm: {
+    marginTop: "16px",
+  },
+  payButton: {
+    width: "100%",
+    border: 0,
+    borderRadius: "8px",
+    backgroundColor: "#111827",
+    color: "#FFFFFF",
+    padding: "13px 16px",
+    fontSize: "14px",
+    fontWeight: 850,
+    cursor: "pointer",
   },
   sectionTag: {
     fontSize: "11px",

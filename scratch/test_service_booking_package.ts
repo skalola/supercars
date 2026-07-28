@@ -91,7 +91,7 @@ async function main() {
   const owner = await prisma.user.create({
     data: {
       name: "Enzo Ferrari",
-      email: `enzo.servicepkg.${runId}@example.com`,
+      email: `enzo.servicepkg.${runId}@gmail.com`,
       username: `enzo_servicepkg_${runId}`,
     },
   });
@@ -214,7 +214,11 @@ async function main() {
   console.log(`  ✓ Payment Status: ${buyerTx.request.paymentStatus} (Expected: PAYMENT_REQUIRED)`);
   console.log(`  ✓ Latest Event Note: "${buyerTx.request.events.at(-1)?.note}"`);
 
-  if (buyerTx.request.status !== "ACCEPTED_AWAITING_PAYMENT" || buyerTx.request.paymentStatus !== "PAYMENT_REQUIRED") {
+  if (
+    buyerTx.request.status !== "ACCEPTED_AWAITING_PAYMENT" ||
+    buyerTx.request.paymentStatus !== "PAYMENT_REQUIRED" ||
+    !buyerTx.request.events.some((event) => event.note?.includes(owner.email || ""))
+  ) {
     throw new Error("Service booking failed to move into accepted-awaiting-payment flow!");
   }
 
