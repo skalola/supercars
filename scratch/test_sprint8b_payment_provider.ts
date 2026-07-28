@@ -163,7 +163,19 @@ async function main() {
       throw new Error("Stripe capture endpoint was not called on partner acceptance.");
     }
 
-    console.log("\n5. Verifying failed Stripe capture does not finalize partner decision...");
+    console.log("\n5. Verifying placeholder holds stay on ledger while Stripe is configured...");
+    const callCountBeforePlaceholder = stripeCalls.length;
+    const placeholderReq = await createPaymentTestRequest("CREDIT_CARD_HOLD");
+    const placeholderDeposit = placeholderReq.depositIntents[0];
+    console.log(`  ✓ Placeholder Transaction Ref: ${placeholderDeposit?.transactionRef}`);
+    if (!placeholderDeposit?.transactionRef?.startsWith("ledger:auth_")) {
+      throw new Error("Placeholder authorization should use the internal ledger instead of Stripe.");
+    }
+    if (stripeCalls.length !== callCountBeforePlaceholder) {
+      throw new Error("Placeholder authorization made an external Stripe request.");
+    }
+
+    console.log("\n6. Verifying failed Stripe capture does not finalize partner decision...");
     globalThis.fetch = (async (input) => {
       const url = String(input);
       if (url.endsWith("/payment_intents")) {
@@ -191,7 +203,7 @@ async function main() {
       throw new Error("Failed capture finalized request or consumed partner token.");
     }
 
-    console.log("\n6. Verifying Stripe webhook audit and failure state update...");
+    console.log("\n7. Verifying Stripe webhook audit and failure state update...");
     delete process.env.STRIPE_WEBHOOK_SECRET;
     const webhookResult = await processStripeWebhookPayload(JSON.stringify({
       type: "payment_intent.payment_failed",
@@ -207,7 +219,8 @@ async function main() {
       include: { events: { orderBy: { createdAt: "desc" } } },
     });
     console.log(`  ✓ Webhook Event Type: ${webhookResult.eventType}`);
-    if (webhookAfter?.paymentStatus !== "FAILED" || !webhookAfter.events[0]?.note?.includes("Stripe webhook received")) {
+    const hasWebhookAudit = webhookAfter?.events.some((event) => event.note?.includes("Stripe webhook received"));
+    if (webhookAfter?.paymentStatus !== "FAILED" || !hasWebhookAudit) {
       throw new Error("Stripe webhook did not audit event or update failed payment state.");
     }
 

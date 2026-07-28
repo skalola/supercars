@@ -92,17 +92,23 @@ async function stripeRequest<T>(path: string, body: URLSearchParams): Promise<T>
 
 function assertStripePaymentMethod(paymentMethod: string | undefined): string {
   const method = paymentMethod?.trim();
-  if (!method || method === "CREDIT_CARD_HOLD") {
+  if (!method || isInternalLedgerHold(paymentMethod)) {
     throw new Error("A real Stripe payment method id is required for payment authorization.");
   }
   return method;
 }
 
+function isInternalLedgerHold(paymentMethod: string | undefined): boolean {
+  const method = paymentMethod?.trim().toUpperCase();
+  if (!method) return true;
+  return method === "CREDIT_CARD_HOLD" || method.includes("LEDGER_AUTH");
+}
+
 export async function authorizeDeposit(input: AuthorizeDepositInput): Promise<PaymentOperationResult> {
   const provider = getPaymentProvider();
-  if (provider === "ledger") {
+  if (provider === "ledger" || isInternalLedgerHold(input.paymentMethod)) {
     return {
-      provider,
+      provider: "ledger",
       transactionRef: `ledger:auth_${crypto.randomUUID()}`,
     };
   }
@@ -207,15 +213,15 @@ export async function processStripeWebhookPayload(payload: string): Promise<Paym
   const fulfillmentRequestId = object?.metadata?.fulfillmentRequestId;
   const publicTransactionToken = object?.metadata?.publicTransactionToken;
 
-  const request = await prisma.fulfillmentRequest.findFirst({
-    where: {
-      OR: [
-        ...(fulfillmentRequestId ? [{ id: fulfillmentRequestId }] : []),
-        ...(publicTransactionToken ? [{ publicTransactionToken }] : []),
-        ...(object?.id ? [{ depositIntents: { some: { transactionRef: `stripe:${object.id}` } } }] : []),
-      ],
-    },
-  });
+  const request = fulfillmentRequestId
+    ? await prisma.fulfillmentRequest.findUnique({ where: { id: fulfillmentRequestId } })
+    : publicTransactionToken
+      ? await prisma.fulfillmentRequest.findUnique({ where: { publicTransactionToken } })
+      : object?.id
+        ? await prisma.fulfillmentRequest.findFirst({
+            where: { depositIntents: { some: { transactionRef: `stripe:${object.id}` } } },
+          })
+        : null;
 
   if (!request) {
     return { received: true, eventType, fulfillmentRequestId: null };
