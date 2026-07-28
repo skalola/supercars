@@ -60,7 +60,7 @@ function getMailProvider(): MailProviderName {
 }
 
 function getFromAddress(): string {
-  return process.env.MAIL_FROM || "SUPERCARS <no-reply@supercars.market>";
+  return process.env.MAIL_FROM || "SUPERCAR DASH <no-reply@supercars.market>";
 }
 
 async function postJson(

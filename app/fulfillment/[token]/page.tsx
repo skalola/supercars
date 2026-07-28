@@ -30,7 +30,7 @@ export default async function PartnerTokenPage({ params }: PartnerTokenPageProps
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <div style={styles.headerTitle}>PARTNER SCOPED FULFILLMENT PORTAL</div>
+        <div style={styles.headerTitle}>SUPERCAR DASH FULFILLMENT PORTAL</div>
         <div style={styles.statusBadge}>{request.status}</div>
       </div>
 
@@ -44,32 +44,10 @@ export default async function PartnerTokenPage({ params }: PartnerTokenPageProps
           )}
 
           <div style={styles.scopeBox}>
-            <div style={styles.scopeHeader}>Package Payload (Authorized Scope Only)</div>
+            <div style={styles.scopeHeader}>Authorized Scope Only</div>
             <div style={styles.scopeGrid}>
               {Object.entries(request.package.scopedData).map(([key, val]) => (
-                <div key={key} style={styles.scopeItem}>
-                  <div style={styles.scopeKey}>{camelToTitleCase(key)}</div>
-                  <div style={styles.scopeValue}>
-                    {val === null || val === undefined ? (
-                      "Not provided"
-                    ) : typeof val === "object" ? (
-                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                        {Object.entries(val).map(([subKey, subVal]) => (
-                          <div key={subKey} style={{ fontSize: "13px", lineHeight: "1.4" }}>
-                            <span style={{ color: "#94a3b8", fontWeight: 500 }}>
-                              {camelToTitleCase(subKey)}:
-                            </span>{" "}
-                            <span style={{ color: "#f8fafc" }}>
-                              {typeof subVal === "object" ? JSON.stringify(subVal) : String(subVal ?? "Not provided")}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      String(val)
-                    )}
-                  </div>
-                </div>
+                <ScopeField key={key} label={camelToTitleCase(key)} value={val} />
               ))}
             </div>
           </div>
@@ -124,7 +102,7 @@ export default async function PartnerTokenPage({ params }: PartnerTokenPageProps
                   {actionTakenAt ? new Date(actionTakenAt).toLocaleString() : "record"}
                 </div>
                 <div style={styles.singlePurposeNote}>
-                  🔒 This single-purpose token has been finalized and cannot be reused.
+                  This single-purpose token has been finalized and cannot be reused.
                 </div>
               </div>
             ) : (
@@ -135,10 +113,10 @@ export default async function PartnerTokenPage({ params }: PartnerTokenPageProps
 
                 <div style={styles.buttonGroup}>
                   <a href={`/fulfillment/${token}/accept`} style={styles.acceptLink}>
-                    ✓ Accept Request
+                    Accept Request
                   </a>
                   <a href={`/fulfillment/${token}/decline`} style={styles.declineLink}>
-                    ✗ Decline Request
+                    Decline Request
                   </a>
                 </div>
               </div>
@@ -153,7 +131,43 @@ export default async function PartnerTokenPage({ params }: PartnerTokenPageProps
 function camelToTitleCase(str: string): string {
   return str
     .replace(/([A-Z])/g, " $1")
+    .replace(/_/g, " ")
     .replace(/^./, (s) => s.toUpperCase());
+}
+
+function ScopeField({ label, value }: { label: string; value: unknown }) {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return (
+      <section style={styles.scopeSection}>
+        <h3 style={styles.scopeSectionTitle}>{label}</h3>
+        <div style={styles.scopeNestedGrid}>
+          {Object.entries(value as Record<string, unknown>).map(([key, nestedValue]) => (
+            <ScopeField key={key} label={camelToTitleCase(key)} value={nestedValue} />
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <div style={styles.scopeItem}>
+      <div style={styles.scopeKey}>{label}</div>
+      <div style={styles.scopeValue}>{formatScopeValue(value)}</div>
+    </div>
+  );
+}
+
+function formatScopeValue(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "Not provided";
+  if (Array.isArray(value)) {
+    return value.length > 0 ? value.map(formatScopeValue).join(", ") : "None";
+  }
+  if (typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([key, nestedValue]) => `${camelToTitleCase(key)}: ${formatScopeValue(nestedValue)}`)
+      .join("; ");
+  }
+  return String(value);
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -162,7 +176,7 @@ const styles: Record<string, React.CSSProperties> = {
     backgroundColor: "#0F172A",
     color: "#F8FAFC",
     fontFamily: "Inter, system-ui, -apple-system, sans-serif",
-    padding: "32px 24px",
+    padding: "clamp(18px, 4vw, 32px)",
     maxWidth: "1150px",
     margin: "0 auto",
   },
@@ -170,6 +184,8 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: "16px",
+    flexWrap: "wrap",
     marginBottom: "32px",
     paddingBottom: "16px",
     borderBottom: "1px solid #1E293B",
@@ -190,13 +206,14 @@ const styles: Record<string, React.CSSProperties> = {
   },
   mainGrid: {
     display: "grid",
-    gridTemplateColumns: "1fr 380px",
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
     gap: "24px",
+    alignItems: "start",
   },
   card: {
     backgroundColor: "#1E293B",
     borderRadius: "12px",
-    padding: "24px",
+    padding: "clamp(18px, 3vw, 24px)",
     border: "1px solid #334155",
   },
   sectionTag: {
@@ -220,34 +237,59 @@ const styles: Record<string, React.CSSProperties> = {
   scopeBox: {
     backgroundColor: "#0F172A",
     borderRadius: "8px",
-    padding: "16px",
+    padding: "clamp(14px, 3vw, 18px)",
     border: "1px solid #334155",
   },
   scopeHeader: {
     fontSize: "12px",
-    fontWeight: 600,
-    color: "#64748B",
-    marginBottom: "12px",
+    fontWeight: 800,
+    color: "#CBD5E1",
+    marginBottom: "14px",
+    letterSpacing: "0",
   },
   scopeGrid: {
-    display: "flex",
-    flexDirection: "column",
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))",
+    gap: "12px",
+  },
+  scopeSection: {
+    gridColumn: "1 / -1",
+    backgroundColor: "#111C2E",
+    border: "1px solid #26364D",
+    borderRadius: "8px",
+    padding: "14px",
+  },
+  scopeSectionTitle: {
+    color: "#F8FAFC",
+    fontSize: "15px",
+    fontWeight: 800,
+    margin: "0 0 12px",
+  },
+  scopeNestedGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 190px), 1fr))",
     gap: "10px",
   },
   scopeItem: {
-    display: "flex",
-    justifyContent: "space-between",
-    padding: "8px 0",
-    borderBottom: "1px solid #1E293B",
+    minWidth: 0,
+    backgroundColor: "#172236",
+    border: "1px solid #26364D",
+    borderRadius: "8px",
+    padding: "12px",
   },
   scopeKey: {
-    fontSize: "13px",
+    fontSize: "11px",
     color: "#94A3B8",
+    fontWeight: 800,
+    textTransform: "uppercase",
+    marginBottom: "6px",
   },
   scopeValue: {
     fontSize: "14px",
     color: "#F8FAFC",
     fontWeight: 600,
+    lineHeight: 1.45,
+    overflowWrap: "anywhere",
   },
   vehicleTitle: {
     fontSize: "20px",

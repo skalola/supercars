@@ -137,7 +137,7 @@ function confirmationResponse(params: {
     <main>
       <section>
         <h1>${heading}</h1>
-        <p>${params.error ? "" : `Confirming will formally accept this SUPERCARS fulfillment request for ${summary}.`}</p>
+        <p>${params.error ? "" : `Confirming will formally accept this SUPERCAR DASH fulfillment request for ${summary}.`}</p>
         ${
           params.error
             ? `<p>${escapeHtml(params.error)}</p><a href="${returnUrl}">Return to package</a>`
