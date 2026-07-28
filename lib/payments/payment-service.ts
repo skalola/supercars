@@ -30,6 +30,17 @@ export interface PaymentWebhookResult {
   received: boolean;
   eventType?: string;
   fulfillmentRequestId?: string | null;
+  alreadyProcessed?: boolean;
+}
+
+export interface CreateServiceBookingCheckoutInput {
+  fulfillmentRequestId: string;
+  vehicleId: string;
+  vin: string;
+  ownerUserId: string;
+  publicTransactionToken: string;
+  amountCents: number;
+  currency?: string;
 }
 
 function getPaymentProvider(): PaymentProviderName {
@@ -42,6 +53,26 @@ function normalizeCurrency(currency: string | undefined): string {
 
 function toMinorUnits(amount: number): number {
   return Math.round(amount * 100);
+}
+
+function appBaseUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.APP_URL ||
+    process.env.NEXTAUTH_URL ||
+    process.env.AUTH_URL ||
+    "http://localhost:3000"
+  ).replace(/\/$/, "");
+}
+
+export function getServiceBookingFeeCents(): number {
+  const cents = Number(process.env.SERVICE_BOOKING_FEE_CENTS);
+  if (Number.isFinite(cents) && cents > 0) return Math.round(cents);
+
+  const dollars = Number(process.env.SERVICE_BOOKING_FEE_DOLLARS);
+  if (Number.isFinite(dollars) && dollars > 0) return toMinorUnits(dollars);
+
+  return 10000;
 }
 
 function parseProviderRef(transactionRef: string | null | undefined): { provider: PaymentProviderName; id: string } {
@@ -88,6 +119,44 @@ async function stripeRequest<T>(path: string, body: URLSearchParams): Promise<T>
   }
 
   return parsed as T;
+}
+
+export async function createServiceBookingCheckoutSession(
+  input: CreateServiceBookingCheckoutInput
+): Promise<{ id: string; url: string; amountCents: number; currency: string }> {
+  if (getPaymentProvider() !== "stripe") {
+    throw new Error("PAYMENT_PROVIDER=stripe is required to create Stripe Checkout Sessions.");
+  }
+
+  const amountCents = input.amountCents;
+  if (!Number.isFinite(amountCents) || amountCents <= 0) {
+    throw new Error("A valid service-booking fee amount is required.");
+  }
+
+  const currency = normalizeCurrency(input.currency);
+  const baseUrl = appBaseUrl();
+  const body = new URLSearchParams();
+  body.set("mode", "payment");
+  body.set("success_url", `${baseUrl}/transactions/${input.publicTransactionToken}?payment=success`);
+  body.set("cancel_url", `${baseUrl}/transactions/${input.publicTransactionToken}?payment=cancelled`);
+  body.set("line_items[0][quantity]", "1");
+  body.set("line_items[0][price_data][currency]", currency);
+  body.set("line_items[0][price_data][unit_amount]", String(amountCents));
+  body.set("line_items[0][price_data][product_data][name]", "SUPERCAR DASH service booking fee");
+  body.set("metadata[serviceBookingId]", input.fulfillmentRequestId);
+  body.set("metadata[fulfillmentRequestId]", input.fulfillmentRequestId);
+  body.set("metadata[vehicleId]", input.vehicleId);
+  body.set("metadata[vin]", input.vin);
+  body.set("metadata[ownerUserId]", input.ownerUserId);
+  body.set("metadata[feeType]", "SERVICE_BOOKING");
+  body.set("payment_intent_data[metadata][serviceBookingId]", input.fulfillmentRequestId);
+  body.set("payment_intent_data[metadata][fulfillmentRequestId]", input.fulfillmentRequestId);
+  body.set("payment_intent_data[metadata][feeType]", "SERVICE_BOOKING");
+
+  const session = await stripeRequest<{ id: string; url?: string }>("/checkout/sessions", body);
+  if (!session.url) throw new Error("Stripe Checkout Session did not return a redirect URL.");
+
+  return { id: session.id, url: session.url, amountCents, currency };
 }
 
 function assertStripePaymentMethod(paymentMethod: string | undefined): string {
@@ -194,24 +263,202 @@ export function verifyStripeWebhookSignature(payload: string, signatureHeader: s
   }
 }
 
+function stripeEventAlreadyProcessed(eventId: string | undefined) {
+  if (!eventId) return Promise.resolve(false);
+  return prisma.fulfillmentEvent
+    .findFirst({
+      where: {
+        note: "Stripe webhook processed",
+        metadata: { contains: `"stripeEventId":"${eventId}"` },
+      },
+      select: { id: true },
+    })
+    .then(Boolean);
+}
+
+async function sendServiceBookingPaymentConfirmations(fulfillmentRequestId: string) {
+  const req = await prisma.fulfillmentRequest.findUnique({
+    where: { id: fulfillmentRequestId },
+    include: {
+      parties: true,
+      partnerTokens: true,
+      vehicle: { include: { model: { include: { make: true } } } },
+    },
+  });
+  if (!req) return;
+
+  const vehicleSummary = req.vehicle
+    ? `${req.vehicle.year} ${req.vehicle.model.make.name} ${req.vehicle.model.name} (VIN: ${req.vehicle.vin})`
+    : "Service Booking";
+  const owner = req.parties.find((party) => party.partyType === "BUYER");
+  const shop = req.parties.find((party) => party.partyType === "SERVICE_CENTER");
+
+  const { sendFulfillmentEmail } = await import("@/lib/mail/mail-service");
+  if (owner?.email) {
+    await sendFulfillmentEmail({
+      fulfillmentRequestId,
+      templateType: "ACCEPTED_NOTIFICATION",
+      recipientName: owner.name,
+      recipientEmail: owner.email,
+      packageTitle: "Service booking confirmed",
+      vehicleSummary,
+      reviewUrl: `/transactions/${req.publicTransactionToken}`,
+    });
+  }
+
+  if (shop?.email) {
+    await sendFulfillmentEmail({
+      fulfillmentRequestId,
+      templateType: "ACCEPTED_NOTIFICATION",
+      recipientName: shop.name,
+      recipientEmail: shop.email,
+      packageTitle: "Owner payment received for service booking",
+      vehicleSummary,
+      reviewUrl: `/fulfillment/${req.partnerTokens?.[0]?.token || req.publicTransactionToken}`,
+    });
+  }
+}
+
 export async function processStripeWebhookPayload(payload: string): Promise<PaymentWebhookResult> {
   const event = JSON.parse(payload) as {
+    id?: string;
     type?: string;
     data?: {
       object?: {
         id?: string;
+        amount_total?: number;
+        amount?: number;
+        payment_intent?: string;
         metadata?: {
+          serviceBookingId?: string;
           fulfillmentRequestId?: string;
           publicTransactionToken?: string;
+          feeType?: string;
         };
       };
     };
   };
 
+  if (await stripeEventAlreadyProcessed(event.id)) {
+    return { received: true, eventType: event.type || "unknown", fulfillmentRequestId: null, alreadyProcessed: true };
+  }
+
   const eventType = event.type || "unknown";
   const object = event.data?.object;
-  const fulfillmentRequestId = object?.metadata?.fulfillmentRequestId;
+  const fulfillmentRequestId = object?.metadata?.serviceBookingId || object?.metadata?.fulfillmentRequestId;
   const publicTransactionToken = object?.metadata?.publicTransactionToken;
+
+  if (
+    eventType === "checkout.session.completed" ||
+    eventType === "checkout.session.async_payment_succeeded"
+  ) {
+    if (object?.metadata?.feeType !== "SERVICE_BOOKING" || !fulfillmentRequestId) {
+      return { received: true, eventType, fulfillmentRequestId: null };
+    }
+
+    const expectedCents = getServiceBookingFeeCents();
+    if (object.amount_total !== expectedCents) {
+      throw new Error("Stripe Checkout amount did not match configured service-booking fee.");
+    }
+
+    const req = await prisma.fulfillmentRequest.findUnique({
+      where: { id: fulfillmentRequestId },
+      include: { fees: true, depositIntents: true },
+    });
+    if (!req || req.requestType !== "SERVICE_BOOKING") {
+      return { received: true, eventType, fulfillmentRequestId: null };
+    }
+
+    const metadata = JSON.stringify({
+      stripeEventId: event.id || null,
+      stripeSessionId: object.id,
+      stripePaymentIntentId: typeof object.payment_intent === "string" ? object.payment_intent : null,
+      amountCents: object.amount_total,
+    });
+
+    if (req.status === "CONFIRMED" || req.paymentStatus === "PAID") {
+      await prisma.fulfillmentEvent.create({
+        data: {
+          fulfillmentRequestId: req.id,
+          previousStatus: req.status,
+          newStatus: req.status,
+          actorType: "SYSTEM",
+          note: "Stripe webhook processed",
+          metadata,
+        },
+      });
+      return { received: true, eventType, fulfillmentRequestId: req.id, alreadyProcessed: true };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.fulfillmentRequest.update({
+        where: { id: req.id },
+        data: {
+          status: "CONFIRMED",
+          paymentStatus: "PAID",
+          collectedAmount: expectedCents / 100,
+          payoutStatus: "UNSETTLED",
+        },
+      });
+
+      for (const fee of req.fees.filter((fee) => fee.feeType === "SERVICE_FEE")) {
+        await tx.fulfillmentFee.update({
+          where: { id: fee.id },
+          data: { status: "CAPTURED" },
+        });
+      }
+
+      const checkoutIntent = req.depositIntents.find((deposit) => deposit.transactionRef === `stripe_checkout:${object.id}`);
+      if (checkoutIntent) {
+        await tx.depositIntent.update({
+          where: { id: checkoutIntent.id },
+          data: {
+            status: "CAPTURED",
+            capturedAt: new Date(),
+            transactionRef: `stripe_checkout:${object.id};payment_intent:${object.payment_intent || "unknown"}`,
+          },
+        });
+      }
+
+      await tx.fulfillmentEvent.create({
+        data: {
+          fulfillmentRequestId: req.id,
+          previousStatus: req.status,
+          newStatus: "CONFIRMED",
+          actorType: "SYSTEM",
+          note: "Stripe webhook processed",
+          metadata,
+        },
+      });
+    });
+
+    await sendServiceBookingPaymentConfirmations(req.id);
+    return { received: true, eventType, fulfillmentRequestId: req.id };
+  }
+
+  if (
+    eventType === "checkout.session.async_payment_failed" ||
+    eventType === "payment_intent.payment_failed"
+  ) {
+    const requestId = fulfillmentRequestId;
+    if (requestId) {
+      await prisma.fulfillmentRequest.updateMany({
+        where: { id: requestId, requestType: "SERVICE_BOOKING", status: { in: ["PAYMENT_PROCESSING", "ACCEPTED_AWAITING_PAYMENT"] } },
+        data: { paymentStatus: "FAILED", status: "ACCEPTED_AWAITING_PAYMENT" },
+      });
+      await prisma.fulfillmentEvent.create({
+        data: {
+          fulfillmentRequestId: requestId,
+          previousStatus: "PAYMENT_PROCESSING",
+          newStatus: "ACCEPTED_AWAITING_PAYMENT",
+          actorType: "SYSTEM",
+          note: "Stripe webhook processed",
+          metadata: JSON.stringify({ stripeEventId: event.id || null, eventType, stripeObjectId: object?.id || null }),
+        },
+      });
+      return { received: true, eventType, fulfillmentRequestId: requestId };
+    }
+  }
 
   const request = fulfillmentRequestId
     ? await prisma.fulfillmentRequest.findUnique({ where: { id: fulfillmentRequestId } })

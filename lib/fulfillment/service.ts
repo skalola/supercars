@@ -28,10 +28,13 @@ import type {
 
 const TERMINAL_FULFILLMENT_STATUSES = new Set([
   "ACCEPTED",
+  "CONFIRMED",
   "DECLINED",
   "EXPIRED",
   "CANCELLED",
   "COMPLETED",
+  "SERVICE_COMPLETED",
+  "REFUNDED",
 ]);
 
 function getDefaultPartnerTtlDays(requestType: FulfillmentRequestType): number {
@@ -470,12 +473,17 @@ export async function submitPartnerDecision(input: PartnerDecisionInput) {
   }
 
   const previousStatus = req.status;
-  const newStatus: FulfillmentStatus = input.decision === "ACCEPTED" ? "ACCEPTED" : "DECLINED";
+  const newStatus: FulfillmentStatus =
+    input.decision === "ACCEPTED"
+      ? req.requestType === "SERVICE_BOOKING"
+        ? "ACCEPTED_AWAITING_PAYMENT"
+        : "ACCEPTED"
+      : "DECLINED";
   const eligibleDeposits = req.depositIntents.filter((deposit) => deposit.status === "AUTHORIZED" || deposit.status === "HELD");
   let totalCaptured = 0;
 
   try {
-    if (input.decision === "ACCEPTED") {
+    if (input.decision === "ACCEPTED" && req.requestType !== "SERVICE_BOOKING") {
       for (const deposit of eligibleDeposits) {
         await captureDeposit(deposit.transactionRef || "", deposit.amount);
         totalCaptured += deposit.amount;
@@ -541,7 +549,26 @@ export async function submitPartnerDecision(input: PartnerDecisionInput) {
     });
 
     // Handle Payment Hold / DepositIntent capture/release rules
-    if (input.decision === "ACCEPTED") {
+    if (input.decision === "ACCEPTED" && req.requestType === "SERVICE_BOOKING") {
+      for (const fee of req.fees) {
+        if (fee.feeType === "SERVICE_FEE" && fee.status === "ESTIMATED") {
+          await tx.fulfillmentFee.update({
+            where: { id: fee.id },
+            data: { status: "AUTHORIZED" },
+          });
+        }
+      }
+
+      await tx.fulfillmentRequest.update({
+        where: { id: req.id },
+        data: {
+          status: "ACCEPTED_AWAITING_PAYMENT",
+          paymentStatus: "PAYMENT_REQUIRED",
+          partnerAcceptedAt: new Date(),
+          payoutStatus: "UNSETTLED",
+        },
+      });
+    } else if (input.decision === "ACCEPTED") {
       for (const deposit of req.depositIntents) {
         if (deposit.status === "AUTHORIZED" || deposit.status === "HELD") {
           await tx.depositIntent.update({

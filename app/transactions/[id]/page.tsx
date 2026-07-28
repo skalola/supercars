@@ -130,6 +130,14 @@ export default async function TransactionDetailPage({ params }: TransactionPageP
           <div style={styles.panelLabel}>Payment</div>
           <h2 style={styles.panelTitle}>{paymentHeadline(req)}</h2>
           <p style={styles.muted}>{paymentCopy(req)}</p>
+          {role === "BUYER" && req.requestType === "SERVICE_BOOKING" && req.status === "ACCEPTED_AWAITING_PAYMENT" && (
+            <form method="post" action="/api/payments/service-booking-checkout" style={styles.paymentForm}>
+              <input type="hidden" name="fulfillmentRequestId" value={req.id} />
+              <button type="submit" style={styles.payButton}>
+                Pay booking fee
+              </button>
+            </form>
+          )}
         </div>
       </section>
 
@@ -316,6 +324,12 @@ function statusPresentation(status: string) {
       return { label: "Viewed", caption: "Partner opened the request", stepTitle: "Partner review", background: "#E0F2FE", color: "#0369A1" };
     case "ACCEPTED":
       return { label: "Accepted", caption: "Partner confirmed", stepTitle: "Accepted by partner", background: "#D1FAE5", color: "#047857" };
+    case "ACCEPTED_AWAITING_PAYMENT":
+      return { label: "Payment due", caption: "Shop accepted", stepTitle: "Pay booking fee", background: "#FEF3C7", color: "#92400E" };
+    case "PAYMENT_PROCESSING":
+      return { label: "Payment processing", caption: "Awaiting Stripe confirmation", stepTitle: "Payment processing", background: "#E0F2FE", color: "#0369A1" };
+    case "CONFIRMED":
+      return { label: "Confirmed", caption: "Payment received", stepTitle: "Booking confirmed", background: "#D1FAE5", color: "#047857" };
     case "DECLINED":
       return { label: "Declined", caption: "No charge captured", stepTitle: "Request declined", background: "#FEE2E2", color: "#B91C1C" };
     case "EXPIRED":
@@ -334,12 +348,15 @@ function nextStepCopy(status: string, requestType: string, role: "BUYER" | "SELL
     return "Review this fulfillment transaction as an operations administrator. Buyer, owner, and partner scopes remain enforced for non-admin accounts.";
   }
   if (role === "SELLER") {
-    if (status === "ACCEPTED") return "The partner accepted this request. SUPERCARS will continue transaction coordination.";
+    if (status === "ACCEPTED" || status === "ACCEPTED_AWAITING_PAYMENT" || status === "CONFIRMED") return "The partner accepted this request. SUPERCAR DASH will continue transaction coordination.";
     if (status === "COMPLETED") return "This transaction has been marked complete.";
     return "Track the request status here as the buyer and fulfillment partner move through the workflow.";
   }
   if (status === "SENT" || status === "VIEWED" || status === "READY_TO_SEND") return "The request is with the fulfillment partner for review.";
   if (status === "ACCEPTED" && requestType === "INSURANCE_QUOTE") return "The insurance partner accepted the quote request. Policy binding is completed directly with the carrier.";
+  if (status === "ACCEPTED_AWAITING_PAYMENT" && requestType === "SERVICE_BOOKING") return "The shop accepted your appointment. Pay the SUPERCAR DASH booking fee to confirm the booking.";
+  if (status === "PAYMENT_PROCESSING" && requestType === "SERVICE_BOOKING") return "Stripe is processing the booking fee. This page will show confirmed once the webhook verifies payment.";
+  if (status === "CONFIRMED" && requestType === "SERVICE_BOOKING") return "Your booking fee is paid and the appointment is confirmed. Service invoices are paid directly to the shop.";
   if (status === "ACCEPTED") return "The partner accepted the request. Any authorized deposit is now captured according to the request terms.";
   if (status === "DECLINED") return "The partner declined the request. Any authorization hold has been released.";
   if (status === "EXPIRED") return "The partner link expired without a decision. Any authorization hold has been released.";
@@ -350,6 +367,9 @@ function nextStepCopy(status: string, requestType: string, role: "BUYER" | "SELL
 
 function paymentHeadline(req: { paymentStatus: string; collectedAmount?: number; refundableAmount?: number }) {
   if (req.paymentStatus === "NOT_REQUIRED") return "No payment required";
+  if (req.paymentStatus === "PAYMENT_REQUIRED") return "Booking fee due";
+  if (req.paymentStatus === "PROCESSING") return "Payment processing";
+  if (req.paymentStatus === "PAID") return `$${(req.collectedAmount || 0).toLocaleString()} paid`;
   if (req.paymentStatus === "AUTHORIZED") return "Authorization active";
   if (req.paymentStatus === "CAPTURED") return `$${(req.collectedAmount || 0).toLocaleString()} captured`;
   if (req.paymentStatus === "REFUNDED") return "Refund processed";
@@ -359,12 +379,15 @@ function paymentHeadline(req: { paymentStatus: string; collectedAmount?: number;
 }
 
 function paymentCopy(req: { paymentStatus: string; refundableAmount?: number }) {
+  if (req.paymentStatus === "PAYMENT_REQUIRED") return "The shop accepted. Pay the SUPERCAR DASH platform booking fee to confirm.";
+  if (req.paymentStatus === "PROCESSING") return "Checkout was started. Payment is confirmed only after Stripe sends a verified webhook.";
+  if (req.paymentStatus === "PAID") return "The platform booking fee has been paid. Repair invoices are paid directly to the service shop.";
   if (req.paymentStatus === "AUTHORIZED") return "Funds are authorized only. Capture happens after partner acceptance.";
   if (req.paymentStatus === "CAPTURED") return "Funds were captured after partner acceptance.";
   if (req.paymentStatus === "REFUNDED") return "A refund has been applied according to the cancellation policy.";
   if (req.paymentStatus === "VOIDED") return "The authorization was released before capture.";
   if (req.paymentStatus === "NOT_REQUIRED") return "This request does not require a buyer deposit.";
-  if (req.paymentStatus === "FAILED") return "SUPERCARS will review this payment state before the request can proceed.";
+  if (req.paymentStatus === "FAILED") return "Payment failed or was declined. You can retry checkout while the shop acceptance remains active.";
   return "Payment status will update as the request moves forward.";
 }
 
@@ -377,7 +400,7 @@ function depositCopy(status: string) {
 }
 
 function shouldShowTimelineEvent(status: string) {
-  return ["DRAFT", "READY_TO_SEND", "SENT", "VIEWED", "ACCEPTED", "DECLINED", "EXPIRED", "CANCELLED", "COMPLETED"].includes(status);
+  return ["DRAFT", "READY_TO_SEND", "SENT", "VIEWED", "ACCEPTED", "ACCEPTED_AWAITING_PAYMENT", "PAYMENT_PROCESSING", "CONFIRMED", "DECLINED", "EXPIRED", "CANCELLED", "COMPLETED"].includes(status);
 }
 
 function actorLabel(actorType: string) {
@@ -686,5 +709,19 @@ const styles: Record<string, React.CSSProperties> = {
     textDecoration: "none",
     fontSize: "13px",
     fontWeight: 850,
+  },
+  paymentForm: {
+    marginTop: "14px",
+  },
+  payButton: {
+    width: "100%",
+    border: 0,
+    borderRadius: "6px",
+    backgroundColor: "#111827",
+    color: "#FFFFFF",
+    padding: "11px 14px",
+    fontSize: "13px",
+    fontWeight: 850,
+    cursor: "pointer",
   },
 };

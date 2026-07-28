@@ -3,7 +3,7 @@
  *
  * Sprint 8H verification:
  * 1. GET /fulfillment/[token]/accept and /decline render confirmation pages only.
- * 2. GET requests do not consume single-purpose tokens, capture deposits, or finalize status.
+ * 2. GET requests do not consume single-purpose tokens or finalize status.
  * 3. POST form submission executes accept.
  * 4. POST JSON submission executes decline.
  */
@@ -41,14 +41,10 @@ async function createDecisionRouteFixture(suffix: string) {
       {
         feeType: "SERVICE_FEE",
         amount: 125,
-        status: "AUTHORIZED",
+        status: "ESTIMATED",
         description: "Sprint 8H service booking fee.",
       },
     ],
-    depositIntent: {
-      amount: 125,
-      paymentMethod: "SPRINT_8H_LEDGER_AUTH",
-    },
   });
 }
 
@@ -80,9 +76,9 @@ async function main() {
     throw new Error("GET accept did not render a confirmation page.");
   }
   if (
-    afterAcceptGet?.status === "ACCEPTED" ||
+    afterAcceptGet?.status === "ACCEPTED_AWAITING_PAYMENT" ||
     afterAcceptGet?.partnerTokens[0]?.actionTaken ||
-    afterAcceptGet?.depositIntents[0]?.status !== "AUTHORIZED"
+    afterAcceptGet?.depositIntents.length !== 0
   ) {
     throw new Error("GET accept finalized token or moved payment state.");
   }
@@ -112,9 +108,10 @@ async function main() {
   if (
     acceptPostResponse.status !== 303 ||
     !acceptPostResponse.headers.get("location")?.endsWith(`/fulfillment/${acceptToken}`) ||
-    acceptedAfterPost?.status !== "ACCEPTED" ||
+    acceptedAfterPost?.status !== "ACCEPTED_AWAITING_PAYMENT" ||
+    acceptedAfterPost.paymentStatus !== "PAYMENT_REQUIRED" ||
     acceptedAfterPost.partnerTokens[0]?.actionTaken !== "ACCEPTED" ||
-    acceptedAfterPost.depositIntents[0]?.status !== "CAPTURED" ||
+    acceptedAfterPost.depositIntents.length !== 0 ||
     !acceptedAfterPost.events.some((event) => event.note?.includes("Sprint 8H form accept confirmation"))
   ) {
     throw new Error("POST form accept did not execute and audit the partner decision.");
@@ -141,7 +138,7 @@ async function main() {
   if (
     afterDeclineGet?.status === "DECLINED" ||
     afterDeclineGet?.partnerTokens[0]?.actionTaken ||
-    afterDeclineGet?.depositIntents[0]?.status !== "AUTHORIZED"
+    afterDeclineGet?.depositIntents.length !== 0
   ) {
     throw new Error("GET decline finalized token or moved payment state.");
   }
@@ -169,7 +166,7 @@ async function main() {
     declinePostResponse.status !== 200 ||
     declinedAfterPost?.status !== "DECLINED" ||
     declinedAfterPost.partnerTokens[0]?.actionTaken !== "DECLINED" ||
-    declinedAfterPost.depositIntents[0]?.status !== "RELEASED" ||
+    declinedAfterPost.depositIntents.length !== 0 ||
     !declinedAfterPost.events.some((event) => event.note?.includes("Sprint 8H JSON decline confirmation"))
   ) {
     throw new Error("POST JSON decline did not execute and audit the partner decision.");

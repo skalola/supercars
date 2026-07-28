@@ -7,10 +7,12 @@
  * 2. createServiceBookingPackage Action execution
  * 3. All 8 required service booking package fields present in scoped payload
  * 4. Resolution of certified service shop PartnerContact (Ferrari of Beverly Hills Service)
- * 5. REFUNDABLE BOOKING AUTHORIZATION HOLD (Deposit status: AUTHORIZED)
- * 6. Partner ACCEPTED decision -> deposit hold captured (CAPTURED) and request status ACCEPTED
+ * 5. No upfront deposit hold before shop acceptance
+ * 6. Partner ACCEPTED decision -> ACCEPTED_AWAITING_PAYMENT
+ * 7. Stripe Checkout webhook -> CONFIRMED / PAID
  */
 
+import { NextRequest } from "next/server";
 import { prisma } from "../lib/prisma";
 import { createServiceBookingPackage } from "../app/actions/passport";
 import {
@@ -18,6 +20,8 @@ import {
   getBuyerFulfillmentTransaction,
   submitPartnerDecision,
 } from "../lib/fulfillment/service";
+import { POST as checkoutPost } from "../app/api/payments/service-booking-checkout/route";
+import { getServiceBookingFeeCents, processStripeWebhookPayload } from "../lib/payments/payment-service";
 
 const testGlobal = globalThis as typeof globalThis & {
   mockSession?: {
@@ -29,6 +33,11 @@ const testGlobal = globalThis as typeof globalThis & {
   };
 };
 
+let originalPaymentProvider: string | undefined;
+let originalStripeKey: string | undefined;
+let originalServiceFee: string | undefined;
+let originalFetch: typeof fetch = globalThis.fetch;
+
 async function main() {
   console.log("==================================================");
   console.log("  Testing Sprint 7.6 Service Booking Package      ");
@@ -36,6 +45,27 @@ async function main() {
 
   const runId = Date.now();
   const shopName = `Ferrari Beverly Hills Service Sprint 7F ${runId}`;
+  originalPaymentProvider = process.env.PAYMENT_PROVIDER;
+  originalStripeKey = process.env.STRIPE_SECRET_KEY;
+  originalServiceFee = process.env.SERVICE_BOOKING_FEE_CENTS;
+  originalFetch = globalThis.fetch;
+
+  process.env.PAYMENT_PROVIDER = "stripe";
+  process.env.STRIPE_SECRET_KEY = "sk_test_service_booking";
+  process.env.SERVICE_BOOKING_FEE_CENTS = "10000";
+  const stripeCalls: Array<{ url: string; body: string }> = [];
+  globalThis.fetch = (async (input, init) => {
+    const url = String(input);
+    const body = String(init?.body);
+    stripeCalls.push({ url, body });
+    if (url.endsWith("/checkout/sessions")) {
+      return Response.json({
+        id: `cs_test_service_${runId}`,
+        url: `https://checkout.stripe.test/pay/cs_test_service_${runId}`,
+      });
+    }
+    return Response.json({ id: "ok_service_booking" });
+  }) as typeof fetch;
 
   await prisma.partnerContact.create({
     data: {
@@ -99,15 +129,14 @@ async function main() {
     preferredTime: "09:00 AM",
     notes: "Requesting factory original fluids and 101-point certified inspection.",
     customerPhone: "310-555-0133",
-    depositAmount: 125,
   });
 
   console.log(`  ✓ Fulfillment Request ID: ${bookingResult.fulfillmentRequestId}`);
   console.log(`  ✓ Public Transaction Token: ${bookingResult.publicTransactionToken}`);
   console.log(`  ✓ Initial Request Status: ${bookingResult.status}`);
 
-  // ── 2. Verify Deposit Authorization Hold Rule ───────────────────────────
-  console.log("\n2. Verifying Deposit Authorization Hold Rules...");
+  // ── 2. Verify No Upfront Deposit Hold Rule ──────────────────────────────
+  console.log("\n2. Verifying no upfront deposit authorization...");
   const dbFulfillment = await prisma.fulfillmentRequest.findUnique({
     where: { id: bookingResult.fulfillmentRequestId },
     include: {
@@ -118,10 +147,9 @@ async function main() {
     },
   });
 
-  const depositIntent = dbFulfillment?.depositIntents[0];
-  console.log(`  ✓ Deposit Hold Amount: $${depositIntent?.amount} | Status: ${depositIntent?.status}`);
-  if (!depositIntent || depositIntent.amount !== 125 || depositIntent.status !== "AUTHORIZED") {
-    throw new Error("Deposit rule violated! Deposit status must be AUTHORIZED (not CAPTURED) prior to shop acceptance.");
+  console.log(`  ✓ Deposit Intents Before Acceptance: ${dbFulfillment?.depositIntents.length}`);
+  if (dbFulfillment?.depositIntents.length !== 0) {
+    throw new Error("Service bookings must not authorize a deposit before shop acceptance.");
   }
 
   // ── 3. Verify All 8 Service Booking Package Fields ──────────────────────
@@ -145,7 +173,7 @@ async function main() {
   console.log(`  ✓ Service Requested: ${payload.serviceRequested}`);
   console.log(`  ✓ Preferred Schedule: ${payload.preferredSchedule.preferredDate} at ${payload.preferredSchedule.preferredTime}`);
   console.log(`  ✓ Shop Name: ${payload.shop.name}`);
-  console.log(`  ✓ Booking Deposit: $${payload.depositFeeRules.depositAmount}`);
+  console.log(`  ✓ Platform Booking Fee: $${payload.depositFeeRules.depositAmount}`);
   console.log(`  ✓ Fee Rule: ${payload.depositFeeRules.rule}`);
 
   for (const field of requiredFields) {
@@ -153,12 +181,12 @@ async function main() {
       throw new Error(`Required service booking field '${field}' missing from package!`);
     }
   }
-  if (payload.vehicle.vin !== sampleVehicle.vin || payload.depositFeeRules.depositAmount !== 125) {
-    throw new Error("Service booking package did not preserve the VIN-backed vehicle or booking deposit.");
+  if (payload.vehicle.vin !== sampleVehicle.vin || payload.depositFeeRules.depositAmount !== getServiceBookingFeeCents() / 100) {
+    throw new Error("Service booking package did not preserve the VIN-backed vehicle or configured platform fee.");
   }
   const serviceFee = dbFulfillment.fees.find((fee) => fee.feeType === "SERVICE_FEE");
   console.log(`  ✓ Service Fee Record: $${serviceFee?.amount} (${serviceFee?.status})`);
-  if (!serviceFee || serviceFee.amount !== 125 || serviceFee.status !== "AUTHORIZED") {
+  if (!serviceFee || serviceFee.amount !== getServiceBookingFeeCents() / 100 || serviceFee.status !== "ESTIMATED") {
     throw new Error("Service booking fee tracking is invalid before shop acceptance.");
   }
   console.log(`  ✓ All ${requiredFields.length} required fields verified in service booking package payload.`);
@@ -182,12 +210,95 @@ async function main() {
   const buyerTx = await getBuyerFulfillmentTransaction(bookingResult.publicTransactionToken);
   if ("error" in buyerTx || !buyerTx.request) throw new Error("Failed to fetch buyer transaction.");
 
-  console.log(`  ✓ Buyer Transaction Status: ${buyerTx.request.status} (Expected: ACCEPTED)`);
-  console.log(`  ✓ Deposit Hold Status: ${buyerTx.request.depositIntents[0]?.status} (Expected: CAPTURED)`);
+  console.log(`  ✓ Buyer Transaction Status: ${buyerTx.request.status} (Expected: ACCEPTED_AWAITING_PAYMENT)`);
+  console.log(`  ✓ Payment Status: ${buyerTx.request.paymentStatus} (Expected: PAYMENT_REQUIRED)`);
   console.log(`  ✓ Latest Event Note: "${buyerTx.request.events.at(-1)?.note}"`);
 
-  if (buyerTx.request.status !== "ACCEPTED" || buyerTx.request.depositIntents[0]?.status !== "CAPTURED") {
-    throw new Error("Service booking failed to complete acceptance/capture flow!");
+  if (buyerTx.request.status !== "ACCEPTED_AWAITING_PAYMENT" || buyerTx.request.paymentStatus !== "PAYMENT_REQUIRED") {
+    throw new Error("Service booking failed to move into accepted-awaiting-payment flow!");
+  }
+
+  console.log("\n6. Creating Stripe Checkout Session for owner payment...");
+  const checkoutBody = new FormData();
+  checkoutBody.set("fulfillmentRequestId", bookingResult.fulfillmentRequestId);
+  const checkoutResponse = await checkoutPost(
+    new NextRequest("https://supercars.test/api/payments/service-booking-checkout", {
+      method: "POST",
+      body: checkoutBody,
+    })
+  );
+  const checkoutAfter = await prisma.fulfillmentRequest.findUnique({
+    where: { id: bookingResult.fulfillmentRequestId },
+    include: { depositIntents: true, fees: true },
+  });
+
+  console.log(`  ✓ Checkout Response Status: ${checkoutResponse.status}`);
+  console.log(`  ✓ Checkout Redirect: ${checkoutResponse.headers.get("location")}`);
+  if (
+    checkoutResponse.status !== 303 ||
+    !checkoutResponse.headers.get("location")?.includes("checkout.stripe.test") ||
+    checkoutAfter?.status !== "PAYMENT_PROCESSING" ||
+    checkoutAfter.paymentStatus !== "PROCESSING" ||
+    !checkoutAfter.depositIntents[0]?.transactionRef?.startsWith("stripe_checkout:cs_test_service_")
+  ) {
+    throw new Error("Stripe Checkout session was not created and stored correctly.");
+  }
+
+  console.log("\n7. Processing Stripe Checkout completion webhook...");
+  const webhookResult = await processStripeWebhookPayload(JSON.stringify({
+    id: `evt_service_${runId}`,
+    type: "checkout.session.completed",
+    data: {
+      object: {
+        id: `cs_test_service_${runId}`,
+        amount_total: getServiceBookingFeeCents(),
+        payment_intent: `pi_service_${runId}`,
+        metadata: {
+          serviceBookingId: bookingResult.fulfillmentRequestId,
+          fulfillmentRequestId: bookingResult.fulfillmentRequestId,
+          vehicleId: sampleVehicle.id,
+          vin: sampleVehicle.vin,
+          ownerUserId: owner.id,
+          feeType: "SERVICE_BOOKING",
+        },
+      },
+    },
+  }));
+  const confirmedAfter = await prisma.fulfillmentRequest.findUnique({
+    where: { id: bookingResult.fulfillmentRequestId },
+    include: { depositIntents: true, fees: true, events: true },
+  });
+
+  console.log(`  ✓ Webhook Event Type: ${webhookResult.eventType}`);
+  console.log(`  ✓ Final Booking Status: ${confirmedAfter?.status}`);
+  if (
+    confirmedAfter?.status !== "CONFIRMED" ||
+    confirmedAfter.paymentStatus !== "PAID" ||
+    confirmedAfter.fees.find((fee) => fee.feeType === "SERVICE_FEE")?.status !== "CAPTURED" ||
+    confirmedAfter.depositIntents[0]?.status !== "CAPTURED"
+  ) {
+    throw new Error("Stripe webhook did not confirm service booking payment.");
+  }
+
+  console.log("\n8. Verifying webhook replay is idempotent...");
+  const replayResult = await processStripeWebhookPayload(JSON.stringify({
+    id: `evt_service_${runId}`,
+    type: "checkout.session.completed",
+    data: {
+      object: {
+        id: `cs_test_service_${runId}`,
+        amount_total: getServiceBookingFeeCents(),
+        payment_intent: `pi_service_${runId}`,
+        metadata: {
+          serviceBookingId: bookingResult.fulfillmentRequestId,
+          feeType: "SERVICE_BOOKING",
+        },
+      },
+    },
+  }));
+  console.log(`  ✓ Replay Already Processed: ${replayResult.alreadyProcessed}`);
+  if (!replayResult.alreadyProcessed) {
+    throw new Error("Stripe webhook replay was not idempotent.");
   }
 
   console.log("\n==================================================");
@@ -202,5 +313,12 @@ main()
   })
   .finally(async () => {
     delete testGlobal.mockSession;
+    if (originalPaymentProvider === undefined) delete process.env.PAYMENT_PROVIDER;
+    else process.env.PAYMENT_PROVIDER = originalPaymentProvider;
+    if (originalStripeKey === undefined) delete process.env.STRIPE_SECRET_KEY;
+    else process.env.STRIPE_SECRET_KEY = originalStripeKey;
+    if (originalServiceFee === undefined) delete process.env.SERVICE_BOOKING_FEE_CENTS;
+    else process.env.SERVICE_BOOKING_FEE_CENTS = originalServiceFee;
+    globalThis.fetch = originalFetch;
     await prisma.$disconnect();
   });

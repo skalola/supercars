@@ -16,10 +16,15 @@ export type FulfillmentStatus =
   | "SENT"
   | "VIEWED"
   | "ACCEPTED"
+  | "ACCEPTED_AWAITING_PAYMENT"
+  | "PAYMENT_PROCESSING"
+  | "CONFIRMED"
   | "DECLINED"
   | "EXPIRED"
   | "CANCELLED"
-  | "COMPLETED";
+  | "COMPLETED"
+  | "SERVICE_COMPLETED"
+  | "REFUNDED";
 
 export type FulfillmentPartyType =
   | "BUYER"
@@ -50,6 +55,9 @@ export type PaymentStatus =
   | "AUTHORIZED"
   | "CAPTURE_PENDING"
   | "CAPTURED"
+  | "PAYMENT_REQUIRED"
+  | "PROCESSING"
+  | "PAID"
   | "REFUNDED"
   | "VOIDED"
   | "FAILED"

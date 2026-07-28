@@ -10,6 +10,7 @@ import {
   generateServiceBookingPackagePayload,
   dispatchServiceBookingEmail,
 } from "@/lib/fulfillment/service-booking-package";
+import { getServiceBookingFeeCents } from "@/lib/payments/payment-service";
 
 function safeRevalidatePath(vin: string) {
   try {
@@ -266,7 +267,7 @@ export async function createServiceBookingPackage(input: CreateServiceBookingInp
   if (!customerEmail) {
     throw new Error("Customer email is required to create a service booking package.");
   }
-  const depositAmount = input.depositAmount || 100;
+  const depositAmount = getServiceBookingFeeCents() / 100;
 
   // 2. Construct Standardized Service Booking Scoped Payload
   const bookingPayload = generateServiceBookingPackagePayload({
@@ -289,7 +290,8 @@ export async function createServiceBookingPackage(input: CreateServiceBookingInp
     depositAmount,
   });
 
-  // 3. Create Fulfillment Request (SERVICE_BOOKING) with Deposit Authorization Hold
+  // 3. Create Fulfillment Request (SERVICE_BOOKING) for shop review.
+  // Payment is requested only after the shop accepts the appointment.
   const fulfillmentRequest = await createFulfillmentRequest({
     requestType: "SERVICE_BOOKING",
     vehicleId: vehicle.id,
@@ -316,16 +318,12 @@ export async function createServiceBookingPackage(input: CreateServiceBookingInp
         roleDescription: "Certified Service Center",
       },
     ],
-    depositIntent: {
-      amount: depositAmount, // Refundable booking authorization hold
-      paymentMethod: "CREDIT_CARD_HOLD",
-    },
     fees: [
       {
         feeType: "SERVICE_FEE",
         amount: depositAmount,
-        status: "AUTHORIZED",
-        description: "Refundable Service Appointment Booking Deposit (Hold)",
+        status: "ESTIMATED",
+        description: "SUPERCAR DASH service-booking platform fee, payable after shop acceptance",
       },
     ],
   });
