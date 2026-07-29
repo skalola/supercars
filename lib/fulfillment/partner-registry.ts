@@ -41,6 +41,7 @@ export interface UpsertPartnerContactInput {
   confidence?: PartnerConfidence;
   contactSource?: ContactSource;
   marketSourceId?: string | null;
+  coverage?: "LOCAL" | "NATIONAL";
 }
 
 /**
@@ -62,7 +63,17 @@ export function isValidEmail(email?: string | null): boolean {
     return false;
   }
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(trimmed);
+  if (!emailRegex.test(trimmed)) return false;
+
+  const domain = trimmed.split("@")[1] || "";
+  const labels = domain.split(".");
+  const topLevelDomain = labels[labels.length - 1] || "";
+
+  if (labels.length < 2) return false;
+  if (!/^[a-z]{2,24}$/.test(topLevelDomain)) return false;
+  if (labels.some((label) => !label || label.startsWith("-") || label.endsWith("-"))) return false;
+
+  return true;
 }
 
 /**
@@ -133,6 +144,7 @@ export async function upsertPartnerContact(input: UpsertPartnerContactInput) {
         contactSource,
         confidence: finalConfidence,
         contactStatus: finalStatus,
+        coverage: input.coverage || existing.coverage,
         lastVerifiedAt: new Date(),
         marketSourceId: input.marketSourceId || existing.marketSourceId,
       },
@@ -160,6 +172,7 @@ export async function upsertPartnerContact(input: UpsertPartnerContactInput) {
       contactSource,
       confidence,
       contactStatus,
+      coverage: input.coverage || "LOCAL",
       lastVerifiedAt: new Date(),
       marketSourceId: input.marketSourceId || null,
     },

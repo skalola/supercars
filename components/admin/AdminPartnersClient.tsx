@@ -990,7 +990,7 @@ const styles: Record<string, React.CSSProperties> = {
   activeTabBtn: {
     backgroundColor: "#0F172A",
     color: "#FFFFFF",
-    borderColor: "#0F172A",
+    border: "1px solid #0F172A",
   },
   searchInput: {
     width: "min(100%, 320px)",

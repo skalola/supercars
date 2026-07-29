@@ -2,7 +2,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { completeMaintenanceItem, createServiceBookingPackage } from "@/app/actions/passport";
@@ -14,7 +14,17 @@ type MaintenanceIntelligenceProps = {
   sortedRules: any[];
   serviceRecords: any[];
   makeName: string;
-  serviceShopNames?: string[];
+  serviceShops?: ServiceShop[];
+};
+
+type ServiceShop = {
+  id: string;
+  name: string;
+  email: string;
+  city: string | null;
+  state: string | null;
+  latitude: number;
+  longitude: number;
 };
 
 export default function MaintenanceIntelligence({
@@ -24,7 +34,7 @@ export default function MaintenanceIntelligence({
   sortedRules,
   serviceRecords,
   makeName,
-  serviceShopNames = []
+  serviceShops = []
 }: MaintenanceIntelligenceProps) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
@@ -45,10 +55,34 @@ export default function MaintenanceIntelligence({
   const [bookingRule, setBookingRule] = useState<any | null>(null);
   const [bookingStep, setBookingStep] = useState(1);
   const [selectedShop, setSelectedShop] = useState("");
+  const [userCoordinates, setUserCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationStatus, setLocationStatus] = useState("");
   const [preferredDate, setPreferredDate] = useState("");
   const [preferredTime, setPreferredTime] = useState("10:00 AM");
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
   const [bookingTxToken, setBookingTxToken] = useState<string | null>(null);
+  const nearbyServiceShops = useMemo(() => {
+    if (!userCoordinates) return [];
+
+    return serviceShops
+      .map((shop) => ({
+        ...shop,
+        distanceMiles: calculateDistanceMiles(
+          userCoordinates.latitude,
+          userCoordinates.longitude,
+          shop.latitude,
+          shop.longitude,
+        ),
+      }))
+      .filter((shop) => shop.distanceMiles <= 100)
+      .sort((a, b) => a.distanceMiles - b.distanceMiles);
+  }, [serviceShops, userCoordinates]);
+
+  useEffect(() => {
+    if (!selectedShop && nearbyServiceShops.length > 0) {
+      setSelectedShop(nearbyServiceShops[0].name);
+    }
+  }, [nearbyServiceShops, selectedShop]);
 
   async function handleSubmitBooking() {
     if (!bookingRule) return;
@@ -71,32 +105,38 @@ export default function MaintenanceIntelligence({
     }
   }
 
-  const getShops = () => {
-    if (serviceShopNames.length > 0) {
-      return serviceShopNames;
+  const requestServiceLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationStatus("Location is unavailable in this browser, so nearby service booking cannot be shown.");
+      return;
     }
 
-    const makeLower = makeName ? makeName.toLowerCase() : "";
-    if (makeLower.includes("ferrari")) {
-      return ["Ferrari of Houston", "Ferrari San Francisco", "Ferrari Palm Beach"];
-    } else if (makeLower.includes("lamborghini")) {
-      return ["Lamborghini Houston", "Lamborghini Dallas", "Lamborghini Newport Beach"];
-    } else {
-      const parts = [`${makeName} of Houston`, `${makeName} San Francisco`, `${makeName} Palm Beach`].filter(Boolean);
-      return parts.length > 0 ? parts : ["Certified Supercar Service Houston", "Certified Supercar Service Dallas", "Certified Supercar Service Newport Beach"];
-    }
+    setLocationStatus("Checking your location for shops within 100 miles...");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserCoordinates({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+        setLocationStatus("Showing verified shops within 100 miles.");
+      },
+      () => {
+        setLocationStatus("Location permission is required to show service shops within 100 miles.");
+      },
+      { enableHighAccuracy: false, timeout: 8000 },
+    );
   };
 
   const openBookingFlow = (rule: any) => {
     setBookingRule(rule);
     setBookingStep(1);
-    const shops = getShops();
-    setSelectedShop(shops[0] || "");
+    setSelectedShop("");
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     setPreferredDate(tomorrow.toISOString().split("T")[0]);
     setPreferredTime("10:00 AM");
     setBookingModalOpen(true);
+    if (!userCoordinates) requestServiceLocation();
   };
 
   // Prefill helper when opening the modal
@@ -582,16 +622,47 @@ export default function MaintenanceIntelligence({
                 <div style={{ fontSize: "14px", fontWeight: 700, color: "#374151" }}>
                   Nearby Certified Shops
                 </div>
+                <p style={{ margin: 0, color: "#6b7280", fontSize: "13px", lineHeight: 1.45 }}>
+                  Service booking only shows verified shops with an email on file within 100 miles of you.
+                </p>
+                {!userCoordinates ? (
+                  <button
+                    type="button"
+                    onClick={requestServiceLocation}
+                    style={{
+                      backgroundColor: "#111827",
+                      color: "#ffffff",
+                      border: "none",
+                      padding: "9px 14px",
+                      borderRadius: "8px",
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Use my location
+                  </button>
+                ) : null}
+                {locationStatus ? (
+                  <div style={{ color: "#6b7280", fontSize: "12px", lineHeight: 1.4 }}>
+                    {locationStatus}
+                  </div>
+                ) : null}
                 <div style={{ display: "grid", gap: "10px" }}>
-                  {getShops().map((shop) => (
-                    <label key={shop} style={{
+                  {userCoordinates && nearbyServiceShops.length === 0 ? (
+                    <div style={{ padding: "14px", border: "1px solid #e5e7eb", borderRadius: "8px", color: "#6b7280", fontSize: "13px", lineHeight: 1.45 }}>
+                      No verified service shops with email are available within 100 miles.
+                    </div>
+                  ) : null}
+                  {nearbyServiceShops.map((shop) => (
+                    <label key={shop.id} style={{
                       display: "flex",
                       alignItems: "center",
                       gap: "10px",
                       padding: "12px",
-                      border: `1px solid ${selectedShop === shop ? "#10b981" : "#d1d5db"}`,
+                      border: `1px solid ${selectedShop === shop.name ? "#10b981" : "#d1d5db"}`,
                       borderRadius: "8px",
-                      backgroundColor: selectedShop === shop ? "#f0fdf4" : "#ffffff",
+                      backgroundColor: selectedShop === shop.name ? "#f0fdf4" : "#ffffff",
                       cursor: "pointer",
                       fontSize: "14px",
                       fontWeight: 500
@@ -599,11 +670,16 @@ export default function MaintenanceIntelligence({
                       <input 
                         type="radio" 
                         name="certifiedShop"
-                        checked={selectedShop === shop}
-                        onChange={() => setSelectedShop(shop)}
+                        checked={selectedShop === shop.name}
+                        onChange={() => setSelectedShop(shop.name)}
                         style={{ accentColor: "#10b981" }}
                       />
-                      <span>{shop}</span>
+                      <span style={{ display: "grid", gap: "2px" }}>
+                        <strong>{shop.name}</strong>
+                        <span style={{ color: "#6b7280", fontSize: "12px", fontWeight: 500 }}>
+                          {[shop.city, shop.state].filter(Boolean).join(", ")} · {Math.round(shop.distanceMiles).toLocaleString()} miles away
+                        </span>
+                      </span>
                     </label>
                   ))}
                 </div>
@@ -611,15 +687,16 @@ export default function MaintenanceIntelligence({
                   <button 
                     type="button"
                     onClick={() => setBookingStep(2)}
+                    disabled={!selectedShop}
                     style={{
-                      backgroundColor: "#111827",
+                      backgroundColor: selectedShop ? "#111827" : "#9ca3af",
                       color: "#ffffff",
                       border: "none",
                       padding: "8px 16px",
                       borderRadius: "8px",
                       fontSize: "13px",
                       fontWeight: 600,
-                      cursor: "pointer"
+                      cursor: selectedShop ? "pointer" : "not-allowed"
                     }}
                   >
                     Next: Choose Appointment
@@ -830,4 +907,19 @@ export default function MaintenanceIntelligence({
       )}
     </section>
   );
+}
+
+function calculateDistanceMiles(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const earthRadiusMiles = 3958.8;
+  const dLat = toRadians(lat2 - lat1);
+  const dLon = toRadians(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(dLon / 2) ** 2;
+
+  return 2 * earthRadiusMiles * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function toRadians(value: number) {
+  return (value * Math.PI) / 180;
 }

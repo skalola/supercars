@@ -9,6 +9,7 @@ import MarketPriceHistory from "@/components/market/MarketPriceHistory";
 import PurchaseWizard from "@/components/market/PurchaseWizard";
 import OwnerSaleControls from "@/components/market/OwnerSaleControls";
 import { getVehicleHeroImage } from "@/lib/vehicle-images";
+import { isValidEmail } from "@/lib/fulfillment/partner-registry";
 
 type VehiclePageProps = {
   params: Promise<{ vin: string }>;
@@ -77,20 +78,43 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
         active: true,
         contactStatus: "RESOLVED",
         email: { not: null },
+        latitude: { not: null },
+        longitude: { not: null },
+        NOT: {
+          email: "",
+        },
       },
       orderBy: [{ confidence: "desc" }, { name: "asc" }],
-      select: { name: true, makeSpecialization: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        city: true,
+        state: true,
+        latitude: true,
+        longitude: true,
+        makeSpecialization: true,
+      },
     }),
   ]);
 
   const makeName = vehicle.model.make.name;
   const serviceShopNames = serviceShops
+    .filter((shop) => isValidEmail(shop.email))
     .filter((shop) => {
       const specialization = shop.makeSpecialization?.toLowerCase() || "all";
       const make = makeName.toLowerCase();
       return specialization === "all" || specialization.includes(make);
     })
-    .map((shop) => shop.name);
+    .map((shop) => ({
+      id: shop.id,
+      name: shop.name,
+      email: shop.email!,
+      city: shop.city,
+      state: shop.state,
+      latitude: shop.latitude!,
+      longitude: shop.longitude!,
+    }));
 
   const priorityOrder: Record<string, number> = {
     REQUIRED: 1,
@@ -1056,7 +1080,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
         sortedRules={sortedRules}
         serviceRecords={vehicle.serviceRecords}
         makeName={makeName}
-        serviceShopNames={serviceShopNames}
+        serviceShops={serviceShopNames}
       />
     </main>
   );

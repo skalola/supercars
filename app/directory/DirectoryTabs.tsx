@@ -96,7 +96,22 @@ export default function DirectoryTabs({ vendors }: DirectoryTabsProps) {
     return tabs.reduce<Record<DirectoryVendorType, number>>((acc, tab) => {
       acc[tab.id] = vendors.filter((vendor) => {
         if (vendor.type !== tab.id) return false;
-        return makeMatches(vendor, makeFilter);
+        if (!makeMatches(vendor, makeFilter)) return false;
+
+        if (normalizedLocationFilter && !typedLocation && !isLikelyLocationQuery(locationFilter)) {
+          const match = [vendor.address, vendor.state, vendor.name]
+            .filter(Boolean)
+            .some((value) => normalize(String(value)).includes(normalizedLocationFilter));
+          if (!match) return false;
+        }
+
+        if (sortLocation) {
+          if (vendor.latitude === null || vendor.longitude === null) return false;
+          const distanceMiles = calculateDistanceMiles(sortLocation.latitude, sortLocation.longitude, vendor.latitude, vendor.longitude);
+          if (distanceMiles > 100) return false;
+        }
+
+        return true;
       }).length;
       return acc;
     }, {
@@ -105,7 +120,7 @@ export default function DirectoryTabs({ vendors }: DirectoryTabsProps) {
       TRANSPORTER: 0,
       INSURER: 0,
     });
-  }, [makeFilter, vendors]);
+  }, [makeFilter, vendors, normalizedLocationFilter, typedLocation, locationFilter, sortLocation]);
 
   const visibleVendors = vendors
     .filter((vendor) => {

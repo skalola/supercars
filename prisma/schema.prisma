@@ -769,6 +769,7 @@ model PartnerContact {
   confidence          String   @default("PUBLIC_SOURCE")
   /// ContactStatus: RESOLVED | UNRESOLVED_EMAIL
   contactStatus       String   @default("RESOLVED")
+  coverage            String   @default("LOCAL") // LOCAL | NATIONAL
   lastVerifiedAt      DateTime?
 
   marketSourceId      String?  @unique

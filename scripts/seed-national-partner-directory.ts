@@ -127,6 +127,7 @@ async function main() {
       confidence: "PUBLIC_SOURCE",
       contactSource: "PUBLIC_WEBSITE",
       sourceDomain: getDomain(transporter.website),
+      coverage: "NATIONAL",
     });
     count++;
   }
@@ -140,6 +141,7 @@ async function main() {
       confidence: "PUBLIC_SOURCE",
       contactSource: "PUBLIC_WEBSITE",
       sourceDomain: getDomain(insurer.website),
+      coverage: "NATIONAL",
     });
     count++;
   }

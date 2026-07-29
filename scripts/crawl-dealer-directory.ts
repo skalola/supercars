@@ -1,22 +1,19 @@
 /**
  * scripts/crawl-dealer-directory.ts
  *
- * Crawls public official Ferrari and Lamborghini dealer locator pages and
+ * Crawls public official dealer locator pages and
  * upserts national Dealer + Service Shop contacts into PartnerContact.
  *
- * This is directory acquisition only. It does not crawl VIN inventory and it
- * never guesses emails: if a public locator/detail page does not expose an
- * email, the contact remains UNRESOLVED_EMAIL.
- *
  * Usage:
- *   npm run crawl-dealer-directory
+ *   npx ts-node scripts/crawl-dealer-directory.ts --make=Ferrari
+ *   npx ts-node scripts/crawl-dealer-directory.ts --make=all
  */
 
 import https from "node:https";
 import { prisma } from "../lib/prisma";
 import { upsertPartnerContact } from "../lib/fulfillment/partner-registry";
 
-type Brand = "Ferrari" | "Lamborghini";
+type Brand = "Ferrari" | "Lamborghini" | string;
 type PartnerType = "DEALER" | "SERVICE_SHOP";
 
 type CrawledContact = {
@@ -45,17 +42,52 @@ type ZipDetails = {
 
 const USER_AGENT = "Mozilla/5.0 (compatible; SUPERCARDASHDirectoryCrawler/0.1; +https://supercardash.vercel.app)";
 
+type BrandCrawler = () => Promise<CrawledContact[]>;
+
+const CRAWLERS: Record<string, BrandCrawler> = {
+  Ferrari: crawlFerrariDealers,
+  Lamborghini: crawlLamborghiniDealers,
+  // Add new brands here in the future (e.g. McLaren: crawlMcLarenDealers)
+};
+
 async function main() {
   console.log("==================================================");
   console.log("  SUPERCAR DASH Dealer Directory Crawl");
   console.log("==================================================\n");
 
-  const [ferrariContacts, lamborghiniContacts] = await Promise.all([
-    crawlFerrariDealers(),
-    crawlLamborghiniDealers(),
-  ]);
+  const args = process.argv.slice(2);
+  const makeArg = args.find(a => a.startsWith("--make="))?.split("=")[1];
 
-  const contacts = dedupeContacts([...ferrariContacts, ...lamborghiniContacts]);
+  if (!makeArg) {
+    console.error("❌ Missing required argument: --make");
+    console.error("Usage: npx ts-node scripts/crawl-dealer-directory.ts --make=Ferrari (or --make=all)");
+    process.exit(1);
+  }
+
+  let contactsToProcess: CrawledContact[] = [];
+
+  if (makeArg.toLowerCase() === "all") {
+    console.log("Crawling ALL configured brands...");
+    for (const [brand, crawler] of Object.entries(CRAWLERS)) {
+      const brandContacts = await crawler();
+      contactsToProcess.push(...brandContacts);
+    }
+  } else {
+    // Find case-insensitive match
+    const brandKey = Object.keys(CRAWLERS).find(k => k.toLowerCase() === makeArg.toLowerCase());
+    
+    if (!brandKey) {
+      console.error(`❌ Unsupported make: ${makeArg}`);
+      console.error(`Currently supported makes: ${Object.keys(CRAWLERS).join(", ")}`);
+      console.error(`To add a new make, implement its crawler function and add it to the CRAWLERS map.`);
+      process.exit(1);
+    }
+
+    console.log(`Crawling ${brandKey} official dealer locator...`);
+    contactsToProcess = await CRAWLERS[brandKey]();
+  }
+
+  const contacts = dedupeContacts(contactsToProcess);
   let upserted = 0;
 
   console.log(`\nUpserting ${contacts.length} deduped contacts...`);
@@ -84,8 +116,6 @@ async function main() {
   }
 
   console.log("\n==================================================");
-  console.log(`  Ferrari contacts:       ${ferrariContacts.length}`);
-  console.log(`  Lamborghini contacts:   ${lamborghiniContacts.length}`);
   console.log(`  Deduped upserts:        ${upserted}`);
   console.log("==================================================");
 }
@@ -316,13 +346,16 @@ function dedupeContacts(contacts: CrawledContact[]) {
   const seen = new Map<string, CrawledContact>();
 
   for (const contact of contacts) {
+    // Rely on geospatial match if present, otherwise normalize address components
+    const locKey = (contact.latitude && contact.longitude)
+      ? `${contact.latitude.toFixed(4)},${contact.longitude.toFixed(4)}`
+      : `${normalize(contact.streetAddress || "")}|${normalize(contact.city || "")}|${normalize(contact.state || "")}`;
+
     const key = [
       contact.brand,
       contact.type,
-      normalize(contact.name),
-      normalize(contact.streetAddress || ""),
-      normalize(contact.city || ""),
-      normalize(contact.state || ""),
+      normalizeName(contact.name),
+      locKey,
     ].join("|");
 
     const existing = seen.get(key);
@@ -457,6 +490,12 @@ function domainFromUrl(value?: string | null) {
   } catch {
     return null;
   }
+}
+
+function normalizeName(value: string) {
+  return value.toLowerCase()
+    .replace(/\b(of|the|inc|llc|corp|co|dealership|auto|motors)\b/g, "")
+    .replace(/[^a-z0-9]+/g, "");
 }
 
 function normalize(value: string) {

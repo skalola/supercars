@@ -1,6 +1,7 @@
 import DirectoryTabs, { DirectoryVendor, DirectoryVendorType } from "./DirectoryTabs";
 import { prisma } from "@/lib/prisma";
 import { formatCityState, normalizePartnerLocation, normalizePhoneNumber } from "@/lib/directory/partner-contact-format";
+import { isValidEmail } from "@/lib/fulfillment/partner-registry";
 
 const allowedTypes = new Set<DirectoryVendorType>([
   "DEALER",
@@ -13,12 +14,18 @@ export default async function DirectoryPage() {
   const contacts = await prisma.partnerContact.findMany({
     where: {
       active: true,
+      email: {
+        not: null,
+      },
       phone: { not: null },
       website: { not: null },
       city: { not: null },
       state: { not: null },
       type: {
         in: Array.from(allowedTypes),
+      },
+      NOT: {
+        email: "",
       },
     },
     orderBy: [
@@ -28,7 +35,7 @@ export default async function DirectoryPage() {
   });
 
   const vendors = dedupeVendors(
-    contacts.map((contact) => {
+    contacts.filter((contact) => isValidEmail(contact.email)).map((contact) => {
       const location = normalizePartnerLocation(contact);
 
       return {

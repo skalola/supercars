@@ -1,23 +1,17 @@
 import { prisma } from "../lib/prisma";
-import {
-  BaTInventoryConnector,
-  DuPontInventoryConnector,
-  FerrariDealerConnector,
-  LamborghiniDealerConnector,
-  NormalizedExternalListing,
-} from "../lib/market-sources/connectors/external-inventory";
+import { FerrariConnector } from "../lib/market-sources/connectors/ferrari.connector";
+import { LamborghiniConnector } from "../lib/market-sources/connectors/lamborghini.connector";
+import { NormalizedExternalListing } from "../lib/market-sources/connectors/external-inventory";
+import { isValidVin } from "./ingest-bat-inventory";
 
-// Enforce standard international 17-character VIN validation rules
-export function isValidVin(vin: string | null | undefined): boolean {
-  if (!vin) return false;
-  const cleanVin = vin.trim().toUpperCase();
-  if (cleanVin.length !== 17) return false;
-  // Alphanumeric excluding I, O, Q
-  const regex = /^[A-HJ-NPR-Z0-9]{17}$/;
-  return regex.test(cleanVin);
-}
+// Define the available connectors mapped by make
+const CONNECTORS: Record<string, any> = {
+  Ferrari: FerrariConnector,
+  Lamborghini: LamborghiniConnector,
+  // Future makes go here:
+  // McLaren: McLarenConnector,
+};
 
-// Fetch and decode VIN specs from the NHTSA API
 async function fetchAndDecodeVin(vin: string): Promise<Record<string, any>> {
   console.log(`- Fetching VIN details from NHTSA for: ${vin}`);
   try {
@@ -72,7 +66,6 @@ async function fetchAndDecodeVin(vin: string): Promise<Record<string, any>> {
   return {};
 }
 
-// Clean up invalid test vehicles (fake VINs, EXT-, and bad length/chars)
 async function cleanDatabase() {
   console.log("Starting database cleanup for invalid vehicle identifiers...");
   const vehicles = await prisma.vehicle.findMany({
@@ -90,7 +83,6 @@ async function cleanDatabase() {
     if (startsWithExt || isInvalid) {
       console.log(`- Removing invalid vehicle from DB: ${v.vin}`);
       
-      // Delete associated child relations first to bypass FK constraints
       if (v.listings && v.listings.length > 0) {
         await prisma.listing.deleteMany({ where: { vehicleId: v.id } });
         deletedListingsCount += v.listings.length;
@@ -115,7 +107,7 @@ async function cleanDatabase() {
   }
 }
 
-async function ingestExternalListings(listings: NormalizedExternalListing[]) {
+async function ingestListings(listings: NormalizedExternalListing[], make: string) {
   let createdVehicles = 0;
   let matchedVehicles = 0;
   let createdListings = 0;
@@ -123,7 +115,6 @@ async function ingestExternalListings(listings: NormalizedExternalListing[]) {
   let skippedListings = 0;
 
   for (const listing of listings) {
-    // 1. Enforce VIN-first inventory architecture rule
     if (!isValidVin(listing.vin)) {
       console.warn(`[Ingestion] Invalid or missing VIN "${listing.vin}" for listing ID "${listing.externalId}" — SKIPPING`);
       skippedListings++;
@@ -132,26 +123,18 @@ async function ingestExternalListings(listings: NormalizedExternalListing[]) {
 
     const cleanVin = listing.vin!.trim().toUpperCase();
 
-    // 2. Get or create MarketSource
     let sourceRecord = await prisma.marketSource.findUnique({
       where: { name: listing.source },
     });
     if (!sourceRecord) {
-      let sourceType = "MARKETPLACE";
-      if (listing.source.toLowerCase().includes("dealer")) {
-        sourceType = "DEALER";
-      } else if (listing.source.toLowerCase().includes("trailer")) {
-        sourceType = "AUCTION";
-      }
       sourceRecord = await prisma.marketSource.create({
         data: {
           name: listing.source,
-          type: sourceType,
+          type: "MARKETPLACE",
         },
       });
     }
 
-    // 3. Resolve Model & Make in the DB
     const makeRecord = await prisma.make.findFirst({
       where: { name: listing.make },
     });
@@ -176,7 +159,6 @@ async function ingestExternalListings(listings: NormalizedExternalListing[]) {
       });
     }
     if (!modelRecord) {
-      // Substring model match check
       const allModels = await prisma.model.findMany({
         where: { makeId: makeRecord.id },
       });
@@ -193,7 +175,6 @@ async function ingestExternalListings(listings: NormalizedExternalListing[]) {
       continue;
     }
 
-    // 4. Match or Create Vehicle
     let vehicle = await prisma.vehicle.findUnique({
       where: { vin: cleanVin },
       include: { photos: true, images: true },
@@ -202,7 +183,6 @@ async function ingestExternalListings(listings: NormalizedExternalListing[]) {
     if (vehicle) {
       matchedVehicles++;
     } else {
-      // Decode VIN data using NHTSA API
       const decodedSpecs = await fetchAndDecodeVin(cleanVin);
 
       vehicle = await prisma.vehicle.create({
@@ -220,7 +200,6 @@ async function ingestExternalListings(listings: NormalizedExternalListing[]) {
       createdVehicles++;
     }
 
-    // 5. Ingest listing images into Vehicle if empty
     if (listing.images && listing.images.length > 0) {
       const hasImages = (vehicle.photos && vehicle.photos.length > 0) || (vehicle.images && vehicle.images.length > 0);
       if (!hasImages) {
@@ -236,7 +215,6 @@ async function ingestExternalListings(listings: NormalizedExternalListing[]) {
       }
     }
 
-    // 6. Enforce Deduplication Active Listings: same vehicle + same source
     const duplicateActive = await prisma.listing.findFirst({
       where: {
         vehicleId: vehicle.id,
@@ -246,14 +224,12 @@ async function ingestExternalListings(listings: NormalizedExternalListing[]) {
     });
 
     if (duplicateActive && duplicateActive.externalListingId !== listing.externalId) {
-      // Deactivate older duplicate active listings for the same vehicle and source
       await prisma.listing.update({
         where: { id: duplicateActive.id },
         data: { status: "REMOVED" },
       });
     }
 
-    // 7. Upsert current listing
     const existingListing = await prisma.listing.findUnique({
       where: {
         sourceId_externalListingId: {
@@ -298,7 +274,7 @@ async function ingestExternalListings(listings: NormalizedExternalListing[]) {
     }
   }
 
-  console.log(`\nIngestion Summary for processed listings:`);
+  console.log(`\n${make} Ingestion Summary:`);
   console.log(`- Listings Skipped (Invalid VIN):  ${skippedListings}`);
   console.log(`- Vehicles Matched:                ${matchedVehicles}`);
   console.log(`- Vehicles Created:                ${createdVehicles}`);
@@ -307,34 +283,54 @@ async function ingestExternalListings(listings: NormalizedExternalListing[]) {
 }
 
 async function main() {
-  console.log("Starting external inventory ingestion (VIN-First)...");
+  const args = process.argv.slice(2);
+  const makeArg = args.find(a => a.startsWith("--make="))?.split("=")[1];
 
-  // Run sanitation first
+  if (!makeArg) {
+    console.error("❌ Missing required argument: --make");
+    console.error("Usage: npx ts-node scripts/ingest-inventory.ts --make=Ferrari (or --make=all)");
+    process.exit(1);
+  }
+
+  let makesToProcess: string[] = [];
+
+  if (makeArg.toLowerCase() === "all") {
+    console.log("Ingesting inventory for ALL configured brands...");
+    makesToProcess = Object.keys(CONNECTORS);
+  } else {
+    const brandKey = Object.keys(CONNECTORS).find(k => k.toLowerCase() === makeArg.toLowerCase());
+    if (!brandKey) {
+      console.error(`❌ Unsupported make: ${makeArg}`);
+      console.error(`Currently supported makes: ${Object.keys(CONNECTORS).join(", ")}`);
+      process.exit(1);
+    }
+    makesToProcess.push(brandKey);
+  }
+
   await cleanDatabase();
 
-  const connectors = [
-    new BaTInventoryConnector(),
-    new DuPontInventoryConnector(),
-    new FerrariDealerConnector(),
-    new LamborghiniDealerConnector(),
-  ];
-
-  const allListings: NormalizedExternalListing[] = [];
-
-  for (const connector of connectors) {
+  for (const make of makesToProcess) {
+    console.log(`\nStarting ${make} inventory ingestion (VIN-First)...`);
+    
+    const ConnectorClass = CONNECTORS[make];
+    const connector = new ConnectorClass();
+    
     console.log(`Fetching from source: ${connector.sourceName}...`);
+    
     try {
       const listings = await connector.fetchListings();
       console.log(`- Fetched ${listings.length} listings`);
-      allListings.push(...listings);
+      await ingestListings(listings, make);
     } catch (e: any) {
-      console.error(`- Error fetching from ${connector.sourceName}:`, e.message);
+      console.error(`- Error processing ${make} connector:`, e.message);
+      // Don't exit if we're processing multiple makes, just continue
+      if (makesToProcess.length === 1) {
+        process.exit(1);
+      }
     }
+    
+    console.log(`${make} Ingestion finished successfully.`);
   }
-
-  console.log(`Total listings to process: ${allListings.length}`);
-  await ingestExternalListings(allListings);
-  console.log("Ingestion finished successfully.");
 }
 
 main()
