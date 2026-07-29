@@ -10,12 +10,14 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   resendEmailAction,
   adminCancelAction,
   adminCompleteAction,
   adminProcessExpiredAction,
   adminReleaseRefundAction,
+  adminDeleteFulfillmentAction,
 } from "@/app/actions/admin";
 import { AdminFulfillmentMetrics, AdminFilterTab } from "@/lib/admin/fulfillment-ops";
 
@@ -86,22 +88,28 @@ interface AdminOpsCenterClientProps {
 }
 
 export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClientProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<AdminFilterTab>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [requestTypeFilter, setRequestTypeFilter] = useState("");
   const [actionMessage, setActionMessage] = useState<{ id: string; msg: string; type: "success" | "error" } | null>(null);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [isProcessingExpired, setIsProcessingExpired] = useState(false);
+  const requestTypeOptions = Array.from(new Set(requests.map((req) => req.requestType))).sort();
 
   // Client-side filtering
   const filteredRequests = requests.filter((req) => {
+    if (requestTypeFilter && req.requestType !== requestTypeFilter) return false;
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const idMatch = req.id.toLowerCase().includes(q);
+      const typeMatch = formatRequestType(req.requestType).toLowerCase().includes(q);
       const vinMatch = req.vehicle?.vin.toLowerCase().includes(q);
       const makeMatch = req.vehicle?.make.toLowerCase().includes(q);
       const modelMatch = req.vehicle?.model.toLowerCase().includes(q);
       const partyMatch = req.parties?.some((p) => p.name.toLowerCase().includes(q) || p.email?.toLowerCase().includes(q));
-      if (!idMatch && !vinMatch && !makeMatch && !modelMatch && !partyMatch) return false;
+      if (!idMatch && !typeMatch && !vinMatch && !makeMatch && !modelMatch && !partyMatch) return false;
     }
 
     switch (activeTab) {
@@ -135,48 +143,75 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
   };
 
   const handleCancelAndRefund = async (requestId: string) => {
-    const reason = prompt("Enter admin cancellation reason:", "Administrative manual cancellation & refund.");
-    if (reason === null) return;
+    const confirmed = window.confirm(
+      "Cancel this fulfillment request and release/refund any eligible payment holds? This will notify the transaction record and cannot be silently undone."
+    );
+    if (!confirmed) return;
 
     setIsProcessing(requestId);
     setActionMessage(null);
-    const res = await adminCancelAction(requestId, reason);
+    const res = await adminCancelAction(requestId, "Admin confirmed cancellation and refund from fulfillment center.");
     setIsProcessing(null);
     setActionMessage({
       id: requestId,
       msg: res.message,
       type: res.success ? "success" : "error",
     });
+    if (res.success) router.refresh();
   };
 
   const handleMarkCompleted = async (requestId: string) => {
-    const note = prompt("Enter completion reconciliation note:", "Admin verified offline fulfillment completion.");
-    if (note === null) return;
+    const confirmed = window.confirm(
+      "Mark this accepted fulfillment request as completed and reconciled?"
+    );
+    if (!confirmed) return;
 
     setIsProcessing(requestId);
     setActionMessage(null);
-    const res = await adminCompleteAction(requestId, note);
+    const res = await adminCompleteAction(requestId, "Admin confirmed fulfillment completion from fulfillment center.");
     setIsProcessing(null);
     setActionMessage({
       id: requestId,
       msg: res.message,
       type: res.success ? "success" : "error",
     });
+    if (res.success) router.refresh();
   };
 
   const handleReleaseRefund = async (requestId: string) => {
-    const note = prompt("Enter release/refund reconciliation note:", "Admin reconciled outstanding payment hold or refund.");
-    if (note === null) return;
+    const confirmed = window.confirm(
+      "Release or refund outstanding payment holds for this transaction?"
+    );
+    if (!confirmed) return;
 
     setIsProcessing(requestId);
     setActionMessage(null);
-    const res = await adminReleaseRefundAction(requestId, note);
+    const res = await adminReleaseRefundAction(requestId, "Admin confirmed release/refund from fulfillment center.");
     setIsProcessing(null);
     setActionMessage({
       id: requestId,
       msg: res.message,
       type: res.success ? "success" : "error",
     });
+    if (res.success) router.refresh();
+  };
+
+  const handleDelete = async (requestId: string) => {
+    const confirmed = window.confirm(
+      "Permanently delete this fulfillment transaction from admin records? Use cancel/refund first if money is authorized or captured."
+    );
+    if (!confirmed) return;
+
+    setIsProcessing(requestId);
+    setActionMessage(null);
+    const res = await adminDeleteFulfillmentAction(requestId);
+    setIsProcessing(null);
+    setActionMessage({
+      id: requestId,
+      msg: res.message,
+      type: res.success ? "success" : "error",
+    });
+    if (res.success) router.refresh();
   };
 
   const handleProcessExpired = async () => {
@@ -327,6 +362,19 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
           onChange={(e) => setSearchQuery(e.target.value)}
           style={styles.searchInput}
         />
+        <select
+          aria-label="Filter by request type"
+          value={requestTypeFilter}
+          onChange={(e) => setRequestTypeFilter(e.target.value)}
+          style={styles.typeFilterSelect}
+        >
+          <option value="">All Request Types</option>
+          {requestTypeOptions.map((requestType) => (
+            <option key={requestType} value={requestType}>
+              {formatRequestType(requestType)}
+            </option>
+          ))}
+        </select>
         {searchQuery && (
           <button onClick={() => setSearchQuery("")} style={styles.clearBtn}>
             Clear
@@ -336,10 +384,19 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
 
       {/* Operations Table */}
       <div className="mobile-scroll admin-table-shell" style={styles.tableContainer}>
-        <table style={styles.table}>
+        <table className="admin-ops-table" style={styles.table}>
+          <colgroup>
+            <col className="admin-ops-request-col" />
+            <col className="admin-ops-vehicle-col" />
+            <col className="admin-ops-party-col" />
+            <col className="admin-ops-status-col" />
+            <col className="admin-ops-audit-col" />
+            <col className="admin-ops-financial-col" />
+            <col className="admin-ops-actions-col" />
+          </colgroup>
           <thead>
             <tr style={styles.tableHeaderRow}>
-              <th style={styles.th}>REQUEST ID / TYPE</th>
+              <th style={styles.th}>REQUEST TYPE</th>
               <th style={styles.th}>VEHICLE & VIN</th>
               <th style={styles.th}>PARTIES & PARTNER</th>
               <th style={styles.th}>STATUS & PAYMENT</th>
@@ -369,13 +426,10 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
 
                 return (
                   <tr key={req.id} style={styles.tableRow}>
-                    {/* 1. Request ID & Type */}
-                    <td style={styles.td}>
-                      <div style={{ fontFamily: "monospace", fontSize: "11px", fontWeight: 700, color: "#2563EB" }}>
-                        {req.id.slice(0, 13)}...
-                      </div>
-                      <span style={getTypeBadgeStyle(req.requestType)}>
-                        {req.requestType.replace("_", " ")}
+                    {/* 1. Request Type */}
+                    <td className="admin-ops-request-cell" style={styles.td}>
+                      <span className="admin-ops-type-badge" style={getTypeBadgeStyle(req.requestType)}>
+                        {formatRequestType(req.requestType)}
                       </span>
                     </td>
 
@@ -411,10 +465,10 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
                     </td>
 
                     {/* 4. Status & Payment */}
-                    <td style={styles.td}>
-                      <span style={getStatusBadgeStyle(req.status)}>{req.status}</span>
+                    <td className="admin-ops-status-cell" style={styles.td}>
+                      <span className="admin-ops-status-badge" style={getStatusBadgeStyle(req.status)}>{req.status}</span>
                       <div style={{ marginTop: "4px" }}>
-                        <span style={getPaymentBadgeStyle(req.paymentStatus)}>{req.paymentStatus}</span>
+                        <span className="admin-ops-payment-badge" style={getPaymentBadgeStyle(req.paymentStatus)}>{req.paymentStatus}</span>
                       </div>
                     </td>
 
@@ -427,7 +481,7 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
                         })}{" "}
                         ({new Date(latestEvent?.createdAt || req.updatedAt).toLocaleDateString()})
                       </div>
-                      <div style={{ fontSize: "11px", color: "#64748B", marginTop: "2px", maxWidth: "180px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      <div className="admin-ops-audit-note" style={{ fontSize: "11px", color: "#64748B", marginTop: "2px" }}>
                         {latestEvent?.note || latestEvent?.newStatus || "Request created"}
                       </div>
                       {latestAuditContext && (
@@ -447,7 +501,7 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
 
                     {/* 7. Admin Actions */}
                     <td style={styles.td}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "4px", minWidth: "120px" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "6px", minWidth: "132px" }}>
                         <button
                           disabled={isBusy}
                           onClick={() => handleResend(req.id)}
@@ -491,8 +545,17 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
                           style={styles.actionBtnHub}
                           title="Buyer/owner scoped transaction page. Admin access is intentionally limited unless the admin account is a transaction party."
                         >
-                          Buyer / Owner Hub
+                          View
                         </Link>
+
+                        <button
+                          disabled={isBusy}
+                          onClick={() => handleDelete(req.id)}
+                          style={styles.actionBtnDelete}
+                          title="Permanently remove this fulfillment transaction after money state is resolved."
+                        >
+                          Delete
+                        </button>
                       </div>
 
                       {msg && (
@@ -551,6 +614,10 @@ function getAuditContextSummary(metadata?: string | null) {
   } catch {
     return null;
   }
+}
+
+function formatRequestType(type: string) {
+  return type.replaceAll("_", " ");
 }
 
 // Styling Helper Functions
@@ -742,14 +809,26 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     gap: "8px",
     marginBottom: "20px",
+    flexWrap: "wrap",
   },
   searchInput: {
     flex: 1,
+    minWidth: "240px",
     padding: "10px 14px",
     borderRadius: "8px",
     border: "1px solid #CBD5E1",
     fontSize: "14px",
     outline: "none",
+  },
+  typeFilterSelect: {
+    minWidth: "190px",
+    padding: "10px 12px",
+    borderRadius: "8px",
+    border: "1px solid #CBD5E1",
+    backgroundColor: "#FFFFFF",
+    color: "#0F172A",
+    fontSize: "13px",
+    fontWeight: 700,
   },
   clearBtn: {
     padding: "10px 16px",
@@ -803,10 +882,8 @@ const styles: Record<string, React.CSSProperties> = {
     border: "1px solid #A7F3D0",
     borderRadius: "4px",
     padding: "3px 5px",
-    maxWidth: "180px",
-    whiteSpace: "nowrap",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
+    overflowWrap: "anywhere",
+    whiteSpace: "normal",
   },
   actionBtnResend: {
     backgroundColor: "#2563EB",
@@ -851,11 +928,21 @@ const styles: Record<string, React.CSSProperties> = {
   actionBtnHub: {
     backgroundColor: "#F1F5F9",
     color: "#334155",
-    padding: "4px 8px",
+    padding: "6px 10px",
     borderRadius: "4px",
     fontSize: "11px",
     fontWeight: 700,
     textDecoration: "none",
     textAlign: "center",
+  },
+  actionBtnDelete: {
+    backgroundColor: "#FFFFFF",
+    color: "#991B1B",
+    border: "1px solid #FCA5A5",
+    padding: "5px 10px",
+    borderRadius: "4px",
+    fontSize: "11px",
+    fontWeight: 800,
+    cursor: "pointer",
   },
 };

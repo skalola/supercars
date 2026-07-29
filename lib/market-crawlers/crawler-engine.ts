@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { resolveModel } from "@/lib/market-sources/model-matcher";
 import { upsertPartnerContact } from "@/lib/fulfillment/partner-registry";
+import { notifySavedCarNewListing, notifySavedCarPriceDrop } from "@/lib/garage/saved-car-alerts";
 import { defaultInventorySources } from "./sources";
 import type {
   CrawlerSourceResult,
@@ -145,11 +146,13 @@ export async function ingestCrawlerListings(
       where: { name: listing.sourceName },
       update: {
         type: listing.sourceType,
+        website: listing.dealerWebsite || undefined,
         active: true,
       },
       create: {
         name: listing.sourceName,
         type: listing.sourceType,
+        website: listing.dealerWebsite || undefined,
         active: true,
       },
     });
@@ -160,7 +163,7 @@ export async function ingestCrawlerListings(
     await upsertPartnerContact({
       name: listing.sourceName,
       type: listing.sourceType === "DEALER" ? "DEALER" : "DEALER",
-      website: listing.url || undefined,
+      website: listing.dealerWebsite || listing.url || undefined,
       location: listing.location || listing.dealerName || undefined,
       makeSpecialization: listing.make as "Ferrari" | "Lamborghini",
       marketSourceId: source.id,
@@ -215,7 +218,7 @@ export async function ingestCrawlerListings(
           externalListingId: listing.externalListingId,
         },
       },
-      select: { id: true },
+      select: { id: true, price: true, askingPrice: true },
     });
 
     if (!previousListing) {
@@ -229,7 +232,7 @@ export async function ingestCrawlerListings(
       });
     }
 
-    await prisma.listing.upsert({
+    const savedListing = await prisma.listing.upsert({
       where: {
         sourceId_externalListingId: {
           sourceId: source.id,
@@ -273,11 +276,35 @@ export async function ingestCrawlerListings(
       },
     });
 
-    if (previousListing) counters.updatedListings++;
-    else counters.createdListings++;
+    if (previousListing) {
+      counters.updatedListings++;
+      const previousPrice = previousListing.askingPrice ?? previousListing.price ?? null;
+      const currentPrice = listing.price ?? null;
+      if (previousPrice && currentPrice && currentPrice < previousPrice) {
+        await safelySendSavedCarAlert(() =>
+          notifySavedCarPriceDrop(savedListing.id, previousPrice, currentPrice)
+        );
+      }
+    } else {
+      counters.createdListings++;
+      await safelySendSavedCarAlert(() => notifySavedCarNewListing(savedListing.id));
+    }
   }
 
   return counters;
+}
+
+async function safelySendSavedCarAlert(send: () => Promise<{ sent: number; skipped?: string }>) {
+  try {
+    const result = await send();
+    if (result.sent > 0) {
+      console.log(`[Saved Car Alert] Sent ${result.sent} alert${result.sent === 1 ? "" : "s"}.`);
+    }
+  } catch (error) {
+    console.warn(
+      `[Saved Car Alert] Skipped alert dispatch: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
 }
 
 async function attachVehicleImages(vehicleId: string, images: string[], validationStatus: string) {

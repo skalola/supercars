@@ -16,6 +16,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "../lib/prisma";
 import { createServiceBookingPackage } from "../app/actions/passport";
 import {
+  cancelConfirmedServiceBookingByPartner,
   getPartnerFulfillmentPackage,
   getBuyerFulfillmentTransaction,
   submitPartnerDecision,
@@ -303,6 +304,25 @@ async function main() {
   console.log(`  ✓ Replay Already Processed: ${replayResult.alreadyProcessed}`);
   if (!replayResult.alreadyProcessed) {
     throw new Error("Stripe webhook replay was not idempotent.");
+  }
+
+  console.log("\n9. Verifying partner cancellation refunds confirmed service booking...");
+  const cancelResult = await cancelConfirmedServiceBookingByPartner(partnerToken);
+  const cancelledAfter = await prisma.fulfillmentRequest.findUnique({
+    where: { id: bookingResult.fulfillmentRequestId },
+    include: { depositIntents: true, fees: true, events: true },
+  });
+  console.log(`  ✓ Partner Cancel Result: ${cancelResult.message}`);
+  console.log(`  ✓ Cancelled Status: ${cancelledAfter?.status} / ${cancelledAfter?.paymentStatus}`);
+  if (
+    !cancelResult.success ||
+    cancelledAfter?.status !== "CANCELLED" ||
+    cancelledAfter.paymentStatus !== "REFUNDED" ||
+    cancelledAfter.cancelledByActor !== "PARTNER" ||
+    cancelledAfter.depositIntents[0]?.status !== "REFUNDED" ||
+    cancelledAfter.fees.find((fee) => fee.feeType === "SERVICE_FEE")?.status !== "REFUNDED"
+  ) {
+    throw new Error("Partner cancellation did not refund the confirmed service booking.");
   }
 
   console.log("\n==================================================");

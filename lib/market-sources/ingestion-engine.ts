@@ -15,6 +15,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { notifySavedCarNewListing, notifySavedCarPriceDrop } from "@/lib/garage/saved-car-alerts";
 import { batchResolveModels } from "./model-matcher";
 import type {
   MarketListingInput,
@@ -102,22 +103,23 @@ export async function ingestListings(
 
     try {
       if (input.url) {
+        const existingListing = await prisma.listing.findFirst({
+          where: { url: input.url, sourceId },
+          select: { id: true, price: true, askingPrice: true },
+        });
+
         // URL-keyed upsert: stable identity across refreshes
-        await prisma.listing.upsert({
+        const savedListing = await prisma.listing.upsert({
           where: {
             // We use a raw findFirst + create/update because Listing has no
             // unique constraint on url — it's nullable. A composite unique
             // would require a schema migration; we avoid that per sprint rules.
             // Instead: find by url + sourceId, update or create.
-            id: (
-              await prisma.listing.findFirst({
-                where: { url: input.url, sourceId },
-                select: { id: true },
-              })
-            )?.id ?? "__NOT_FOUND__",
+            id: existingListing?.id ?? "__NOT_FOUND__",
           },
           update: {
             price: input.price,
+            askingPrice: input.price,
             mileage: input.mileage,
             color: input.color,
             location: input.location,
@@ -130,6 +132,7 @@ export async function ingestListings(
             sourceId,
             year: input.year,
             price: input.price,
+            askingPrice: input.price,
             mileage: input.mileage,
             color: input.color,
             location: input.location,
@@ -140,6 +143,17 @@ export async function ingestListings(
             lastSeen: new Date(),
           },
         });
+
+        if (existingListing) {
+          const previousPrice = existingListing.askingPrice ?? existingListing.price ?? null;
+          if (previousPrice && input.price && input.price < previousPrice) {
+            await safelySendSavedCarAlert(() =>
+              notifySavedCarPriceDrop(savedListing.id, previousPrice, input.price!)
+            );
+          }
+        } else {
+          await safelySendSavedCarAlert(() => notifySavedCarNewListing(savedListing.id));
+        }
       } else {
         // No URL — create only if no identical record exists this run
         const existing = await prisma.listing.findFirst({
@@ -152,12 +166,13 @@ export async function ingestListings(
           },
         });
         if (!existing) {
-          await prisma.listing.create({
+          const savedListing = await prisma.listing.create({
             data: {
               modelId: match.modelId,
               sourceId,
               year: input.year,
               price: input.price,
+              askingPrice: input.price,
               mileage: input.mileage,
               color: input.color,
               location: input.location,
@@ -168,6 +183,7 @@ export async function ingestListings(
               lastSeen: new Date(),
             },
           });
+          await safelySendSavedCarAlert(() => notifySavedCarNewListing(savedListing.id));
         }
       }
 
@@ -179,6 +195,19 @@ export async function ingestListings(
   }
 
   return { upserted, unresolved };
+}
+
+async function safelySendSavedCarAlert(send: () => Promise<{ sent: number; skipped?: string }>) {
+  try {
+    const result = await send();
+    if (result.sent > 0) {
+      console.log(`[Saved Car Alert] Sent ${result.sent} alert${result.sent === 1 ? "" : "s"}.`);
+    }
+  } catch (error) {
+    console.warn(
+      `[Saved Car Alert] Skipped alert dispatch: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
 }
 
 // ─── Ingest Sales ─────────────────────────────────────────────────────────────

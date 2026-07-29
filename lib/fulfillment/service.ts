@@ -1262,6 +1262,139 @@ export async function cancelFulfillmentRequest(params: CancelFulfillmentRequestP
   };
 }
 
+export async function cancelConfirmedServiceBookingByPartner(token: string) {
+  const tokenRecord = await prisma.partnerDecisionToken.findUnique({
+    where: { token },
+    include: {
+      fulfillmentRequest: {
+        include: {
+          depositIntents: true,
+          fees: true,
+          parties: true,
+          vehicle: {
+            include: {
+              model: { include: { make: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!tokenRecord) {
+    return { success: false, message: "Fulfillment token not found." };
+  }
+
+  const req = tokenRecord.fulfillmentRequest;
+  if (req.requestType !== "SERVICE_BOOKING") {
+    return { success: false, message: "Only service bookings can be cancelled from this partner flow." };
+  }
+
+  if (tokenRecord.actionTaken !== "ACCEPTED") {
+    return { success: false, message: "Only the accepting service partner can cancel this appointment." };
+  }
+
+  if (req.status === "CANCELLED" || req.paymentStatus === "REFUNDED") {
+    return { success: true, message: "Service booking is already cancelled and refunded." };
+  }
+
+  if (req.status !== "CONFIRMED" || req.paymentStatus !== "PAID") {
+    return { success: false, message: "Service booking can only be refunded after payment is confirmed." };
+  }
+
+  const capturedDeposits = req.depositIntents.filter((deposit) => deposit.status === "CAPTURED");
+  try {
+    for (const deposit of capturedDeposits) {
+      await refundDeposit(deposit.transactionRef || "", deposit.amount);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Refund failed.";
+    await prisma.fulfillmentEvent.create({
+      data: {
+        fulfillmentRequestId: req.id,
+        previousStatus: req.status,
+        newStatus: req.status,
+        actorType: "PARTNER",
+        actorId: tokenRecord.partnerName || "PARTNER",
+        note: `Partner cancellation refund failed before finalization: ${message}`,
+      },
+    });
+    return { success: false, message: `Refund failed: ${message}` };
+  }
+
+  const refundedAmount = capturedDeposits.reduce((sum, deposit) => sum + deposit.amount, 0);
+  const cancellationReason = `Service partner '${tokenRecord.partnerName || "Service partner"}' cancelled confirmed appointment and refunded the booking fee.`;
+
+  await prisma.$transaction(async (tx) => {
+    for (const deposit of capturedDeposits) {
+      await tx.depositIntent.update({
+        where: { id: deposit.id },
+        data: { status: "REFUNDED", releasedAt: new Date() },
+      });
+    }
+
+    for (const fee of req.fees.filter((fee) => fee.feeType === "SERVICE_FEE")) {
+      await tx.fulfillmentFee.update({
+        where: { id: fee.id },
+        data: { status: "REFUNDED" },
+      });
+    }
+
+    await tx.fulfillmentRequest.update({
+      where: { id: req.id },
+      data: {
+        status: "CANCELLED",
+        paymentStatus: "REFUNDED",
+        refundableAmount: 0,
+        collectedAmount: 0,
+        cancellationReason,
+        cancelledByActor: "PARTNER",
+        payoutStatus: "UNSETTLED",
+      },
+    });
+
+    await tx.fulfillmentEvent.create({
+      data: {
+        fulfillmentRequestId: req.id,
+        previousStatus: req.status,
+        newStatus: "CANCELLED",
+        actorType: "PARTNER",
+        actorId: tokenRecord.partnerName || "PARTNER",
+        note: cancellationReason,
+        metadata: JSON.stringify({
+          tokenId: tokenRecord.id,
+          partnerEmail: tokenRecord.partnerEmail || null,
+          refundedAmount,
+        }),
+      },
+    });
+  });
+
+  const buyerParty = req.parties.find((party) => party.partyType === "BUYER");
+  if (buyerParty?.email) {
+    const vehicleSummary = req.vehicle
+      ? `${req.vehicle.year} ${req.vehicle.model.make.name} ${req.vehicle.model.name} (VIN: ${req.vehicle.vin})`
+      : "Service Booking";
+
+    await sendFulfillmentEmail({
+      fulfillmentRequestId: req.id,
+      templateType: "CANCELLATION_REFUND_NOTIFICATION",
+      recipientName: buyerParty.name,
+      recipientEmail: buyerParty.email,
+      packageTitle: "Service booking cancelled and refunded",
+      vehicleSummary,
+      priceOrAmount: refundedAmount,
+      reviewUrl: `/fulfillment/buyer/${req.publicTransactionToken}`,
+      additionalDetails: {
+        "Cancelled By": tokenRecord.partnerName || "Service partner",
+        "Refund Status": "REFUNDED",
+      },
+    });
+  }
+
+  return { success: true, message: "Service booking cancelled and refunded." };
+}
+
 /**
  * Scans and processes expired fulfillment requests.
  * Automatically transitions status to EXPIRED and voids deposit holds.

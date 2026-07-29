@@ -172,6 +172,7 @@ model Vehicle {
   insuranceRequests InsuranceRequest[]
   deliveryRequests  DeliveryRequest[]
   fulfillmentRequests FulfillmentRequest[]
+  trackerAlertDeliveries TrackerAlertDelivery[]
 
   mileageStatus         String?  @default("COMPLETE")
   vinIdentityStatus     String?  @default("VALID")
@@ -207,6 +208,8 @@ model User {
 
   accounts      Account[]
   sessions      Session[]
+  trackerPreference UserTrackerPreference?
+  trackerAlertDeliveries TrackerAlertDelivery[]
   garageItems   GarageItem[]
   vehicles      Vehicle[]
   listings      Listing[]
@@ -217,6 +220,36 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model UserTrackerPreference {
+  id                         String   @id @default(cuid())
+  userId                     String   @unique
+  listingTrackerEnabled      Boolean  @default(false)
+  priceTrackerEnabled        Boolean  @default(false)
+  maintenanceTrackerEnabled  Boolean  @default(false)
+  eventsTrackerEnabled       Boolean  @default(false)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  user                       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TrackerAlertDelivery {
+  id        String   @id @default(cuid())
+  userId    String
+  vehicleId String?
+  modelId   String?
+  alertType String
+  alertKey  String
+  sentAt    DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, alertType, alertKey])
+  @@index([vehicleId, alertType])
+  @@index([modelId, alertType])
 }
 
 model Account {
@@ -248,15 +281,23 @@ model Session {
 }
 
 model GarageItem {
-  id        String   @id @default(cuid())
-  userId    String
-  modelId   String
-  createdAt DateTime @default(now())
+  id                         String    @id @default(cuid())
+  userId                     String
+  modelId                    String
+  priceTrackerAlertsEnabled  Boolean   @default(false)
+  listingTrackerAlertsEnabled Boolean  @default(false)
+  priceTrackerBaseline       Float?
+  lastPriceAlertAt           DateTime?
+  lastListingAlertAt         DateTime?
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  model     Model    @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  user                       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  model                      Model     @relation(fields: [modelId], references: [id], onDelete: Cascade)
 
   @@unique([userId, modelId])
+  @@index([modelId, priceTrackerAlertsEnabled])
+  @@index([modelId, listingTrackerAlertsEnabled])
 }
 
 model VehicleProfile {
@@ -714,6 +755,13 @@ model PartnerContact {
   sourceDomain        String?
   makeSpecialization  String?  @default("ALL") // Ferrari | Lamborghini | ALL
   location            String?
+  streetAddress       String?
+  city                String?
+  state               String?
+  postalCode          String?
+  country             String?  @default("US")
+  latitude            Float?
+  longitude           Float?
   active              Boolean  @default(true)
   /// ContactSource: IMPORTED_LISTING | PUBLIC_WEBSITE | MANUALLY_VERIFIED
   contactSource       String   @default("PUBLIC_WEBSITE")
@@ -733,5 +781,25 @@ model PartnerContact {
 
   @@index([name])
   @@index([type, makeSpecialization])
+  @@index([state, city])
+  @@index([latitude, longitude])
   @@index([contactStatus])
+}
+
+// ──────────────────────────────────────────────
+// Admin Global Settings
+// ──────────────────────────────────────────────
+
+model GlobalSetting {
+  key         String   @id
+  label       String
+  description String?
+  enabled     Boolean  @default(false)
+  category    String   @default("GENERAL")
+  updatedBy   String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
 }

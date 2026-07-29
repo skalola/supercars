@@ -1,7 +1,11 @@
 import React from "react";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getPartnerFulfillmentPackage, submitPartnerDecision } from "@/lib/fulfillment/service";
+import {
+  cancelConfirmedServiceBookingByPartner,
+  getPartnerFulfillmentPackage,
+  submitPartnerDecision,
+} from "@/lib/fulfillment/service";
 
 interface PartnerTokenPageProps {
   params: Promise<{
@@ -48,6 +52,13 @@ export default async function PartnerTokenPage({ params }: PartnerTokenPageProps
       },
     });
 
+    revalidatePath(`/fulfillment/${token}`);
+    redirect(`/fulfillment/${token}`);
+  }
+
+  async function handlePartnerCancelRefund() {
+    "use server";
+    await cancelConfirmedServiceBookingByPartner(token);
     revalidatePath(`/fulfillment/${token}`);
     redirect(`/fulfillment/${token}`);
   }
@@ -129,6 +140,22 @@ export default async function PartnerTokenPage({ params }: PartnerTokenPageProps
                 <div style={styles.singlePurposeNote}>
                   This single-purpose token has been finalized and cannot be reused.
                 </div>
+                {request.requestType === "SERVICE_BOOKING" && request.status === "CONFIRMED" && request.paymentStatus === "PAID" && (
+                  <details style={styles.cancelPrompt}>
+                    <summary style={styles.cancelSummary}>Cancel appointment</summary>
+                    <div style={styles.cancelBody}>
+                      <strong>Confirm cancellation and refund</strong>
+                      <p style={styles.cancelCopy}>
+                        This will cancel the confirmed appointment, refund the SUPERCAR DASH booking fee, and notify the owner.
+                      </p>
+                      <form action={handlePartnerCancelRefund}>
+                        <button type="submit" style={styles.refundButton}>
+                          Confirm cancel and refund
+                        </button>
+                      </form>
+                    </div>
+                  </details>
+                )}
               </div>
             ) : (
               <div style={styles.actionBlock}>
@@ -428,6 +455,47 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: "11px",
     color: "#64748B",
     marginTop: "8px",
+  },
+  cancelPrompt: {
+    width: "100%",
+    marginTop: "14px",
+    textAlign: "left",
+  },
+  cancelSummary: {
+    cursor: "pointer",
+    border: "1px solid #7F1D1D",
+    backgroundColor: "#1F2937",
+    color: "#FCA5A5",
+    borderRadius: "8px",
+    padding: "12px 14px",
+    fontSize: "13px",
+    fontWeight: 800,
+    textAlign: "center",
+  },
+  cancelBody: {
+    marginTop: "12px",
+    border: "1px solid #7F1D1D",
+    borderRadius: "8px",
+    padding: "14px",
+    backgroundColor: "#450A0A",
+    color: "#FEE2E2",
+  },
+  cancelCopy: {
+    color: "#FECACA",
+    fontSize: "12px",
+    lineHeight: 1.5,
+    margin: "8px 0 12px",
+  },
+  refundButton: {
+    width: "100%",
+    border: 0,
+    borderRadius: "8px",
+    backgroundColor: "#DC2626",
+    color: "#FFFFFF",
+    padding: "12px 14px",
+    fontSize: "13px",
+    fontWeight: 850,
+    cursor: "pointer",
   },
   badgeError: {
     display: "inline-block",

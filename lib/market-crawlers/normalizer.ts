@@ -128,6 +128,7 @@ export function normalizeListing(raw: RawCrawlerListing): NormalizedCrawlerListi
     color: raw.color,
     location: raw.location,
     dealerName: raw.dealerName,
+    dealerWebsite: absolutizeUrl(raw.dealerWebsite, raw.pageUrl),
     url,
     images: raw.images,
   };

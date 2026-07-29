@@ -14,6 +14,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { normalizePartnerLocation, normalizePhoneNumber } from "@/lib/directory/partner-contact-format";
 
 export type PartnerType = "DEALER" | "INSURER" | "TRANSPORTER" | "SERVICE_SHOP";
 export type PartnerConfidence = "VERIFIED" | "PUBLIC_SOURCE" | "MANUAL_REVIEW" | "UNRESOLVED_EMAIL";
@@ -27,8 +28,15 @@ export interface UpsertPartnerContactInput {
   phone?: string | null;
   website?: string | null;
   sourceDomain?: string | null;
-  makeSpecialization?: "Ferrari" | "Lamborghini" | "ALL";
+  makeSpecialization?: string;
   location?: string | null;
+  streetAddress?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   active?: boolean;
   confidence?: PartnerConfidence;
   contactSource?: ContactSource;
@@ -65,6 +73,8 @@ export function isValidEmail(email?: string | null): boolean {
 export async function upsertPartnerContact(input: UpsertPartnerContactInput) {
   const emailValid = isValidEmail(input.email);
   const cleanEmail = emailValid ? input.email!.trim().toLowerCase() : null;
+  const cleanPhone = normalizePhoneNumber(input.phone);
+  const location = normalizePartnerLocation(input);
   const contactStatus: ContactStatus = cleanEmail ? "RESOLVED" : "UNRESOLVED_EMAIL";
   const confidence: PartnerConfidence = cleanEmail
     ? input.confidence || "PUBLIC_SOURCE"
@@ -84,6 +94,7 @@ export async function upsertPartnerContact(input: UpsertPartnerContactInput) {
 
   const existing = await prisma.partnerContact.findFirst({
     where: {
+      type: input.type,
       OR: [
         { name: input.name },
         ...(sourceDomain ? [{ sourceDomain }] : []),
@@ -106,11 +117,18 @@ export async function upsertPartnerContact(input: UpsertPartnerContactInput) {
         name: input.name,
         type: input.type,
         email: finalEmail,
-        phone: input.phone || existing.phone,
+        phone: cleanPhone || existing.phone,
         website: input.website || existing.website,
         sourceDomain: sourceDomain || existing.sourceDomain,
         makeSpecialization: input.makeSpecialization || existing.makeSpecialization,
-        location: input.location || existing.location,
+        location: location.location || existing.location,
+        streetAddress: location.streetAddress || existing.streetAddress,
+        city: location.city || existing.city,
+        state: location.state || existing.state,
+        postalCode: location.postalCode || existing.postalCode,
+        country: input.country || existing.country || "US",
+        latitude: input.latitude ?? existing.latitude,
+        longitude: input.longitude ?? existing.longitude,
         active: input.active !== undefined ? input.active : existing.active,
         contactSource,
         confidence: finalConfidence,
@@ -126,11 +144,18 @@ export async function upsertPartnerContact(input: UpsertPartnerContactInput) {
       name: input.name,
       type: input.type,
       email: cleanEmail,
-      phone: input.phone || null,
+      phone: cleanPhone,
       website: input.website || null,
       sourceDomain,
       makeSpecialization: input.makeSpecialization || "ALL",
-      location: input.location || null,
+      location: location.location,
+      streetAddress: location.streetAddress,
+      city: location.city,
+      state: location.state,
+      postalCode: location.postalCode,
+      country: input.country || "US",
+      latitude: input.latitude ?? null,
+      longitude: input.longitude ?? null,
       active: input.active !== undefined ? input.active : true,
       contactSource,
       confidence,

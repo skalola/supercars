@@ -524,3 +524,49 @@ export async function adminReleaseRefund(requestId: string, note?: string) {
         : "No releasable or refundable payment holds were found.",
   };
 }
+
+/**
+ * Admin Action: Permanently deletes a fulfillment transaction row and all
+ * dependent fulfillment records. Use for cleanup of test, duplicate, or
+ * invalid transactions after any required payment cancellation/refund is done.
+ */
+export async function adminDeleteFulfillmentRequest(requestId: string) {
+  const req = await prisma.fulfillmentRequest.findUnique({
+    where: { id: requestId },
+    select: {
+      id: true,
+      paymentStatus: true,
+      status: true,
+      collectedAmount: true,
+      refundableAmount: true,
+      depositIntents: {
+        select: {
+          status: true,
+        },
+      },
+    },
+  });
+
+  if (!req) {
+    throw new Error(`FulfillmentRequest not found: ${requestId}`);
+  }
+
+  const hasOpenMoneyState =
+    req.collectedAmount > 0 ||
+    req.refundableAmount > 0 ||
+    ["AUTHORIZED", "CAPTURE_PENDING", "CAPTURED"].includes(req.paymentStatus) ||
+    req.depositIntents.some((deposit) => ["AUTHORIZED", "HELD", "CAPTURED"].includes(deposit.status));
+
+  if (hasOpenMoneyState && !["REFUNDED", "VOIDED", "CANCELLED", "NOT_REQUIRED"].includes(req.paymentStatus)) {
+    throw new Error("Cancel/refund or release/refund this transaction before deleting it.");
+  }
+
+  await prisma.fulfillmentRequest.delete({
+    where: { id: requestId },
+  });
+
+  return {
+    success: true,
+    message: "Fulfillment transaction permanently deleted.",
+  };
+}

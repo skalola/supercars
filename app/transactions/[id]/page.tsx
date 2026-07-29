@@ -133,6 +133,7 @@ export default async function TransactionDetailPage({ params }: TransactionPageP
           {role === "BUYER" && req.requestType === "SERVICE_BOOKING" && req.status === "ACCEPTED_AWAITING_PAYMENT" && (
             <form method="post" action="/api/payments/service-booking-checkout" style={styles.paymentForm}>
               <input type="hidden" name="fulfillmentRequestId" value={req.id} />
+              <input type="hidden" name="returnTo" value={`/transactions/${req.publicTransactionToken}`} />
               <button type="submit" style={styles.payButton}>
                 Pay booking fee
               </button>

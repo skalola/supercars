@@ -143,6 +143,7 @@ export class PublicPageSource implements PublicInventorySource {
         color: inferColorFromText(plainText),
         location: titleFromUrl.location,
         dealerName: null,
+        dealerWebsite: null,
         images: extractImageUrls(card, page.url),
       });
     }
@@ -177,6 +178,7 @@ export class PublicPageSource implements PublicInventorySource {
         color: inferColorFromText(context),
         location: titleFromUrl.location,
         dealerName: null,
+        dealerWebsite: null,
         images: [],
       });
     }
@@ -212,6 +214,7 @@ export class PublicPageSource implements PublicInventorySource {
       color: pickString(node, ["color", "vehicleInteriorColor", "vehicleExteriorColor"]),
       location: pickString(node, ["availableAtOrFrom", "areaServed"]),
       dealerName: pickString(seller, ["name"]),
+      dealerWebsite: pickString(seller, ["url", "sameAs", "@id"]) ?? pickString(node, ["sellerUrl", "dealerUrl"]),
       images: pickImages(node),
     };
   }

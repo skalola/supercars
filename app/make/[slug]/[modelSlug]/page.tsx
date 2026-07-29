@@ -530,113 +530,6 @@ export default async function ModelPage({ params }: ModelPageProps) {
         </section>
       ) : null}
 
-      {/* Available Inventory Section */}
-      <section style={{ marginTop: 40, marginBottom: 40 }}>
-        <h2 style={{ fontSize: 24, marginBottom: 20 }}>Available Inventory</h2>
-        {listings.length === 0 ? (
-          <p style={{ color: "#777", fontStyle: "italic" }}>No active listings for this model currently available.</p>
-        ) : (
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-            gap: 20
-          }}>
-            {listings.map((lst) => {
-              const image = getListingImage(lst);
-              const price = lst.askingPrice || lst.price || null;
-              return (
-                <div
-                  key={lst.id}
-                  style={{
-                    border: "1px solid #e5e7eb",
-                    borderRadius: 16,
-                    overflow: "hidden",
-                    backgroundColor: "#fff",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between"
-                  }}
-                >
-                  <div>
-                    {image ? (
-                      <div style={{ position: "relative", width: "100%", paddingTop: "56.25%", backgroundColor: "#f3f4f6" }}>
-                        <img
-                          src={image}
-                          alt={`${lst.vehicle?.year ?? "Year"} ${lst.vehicle?.model?.make?.name ?? "Make"} ${lst.vehicle?.model?.name ?? "Model"}`}
-                          style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }}
-                        />
-                      </div>
-                    ) : (
-                      <div style={{
-                        width: "100%",
-                        paddingTop: "56.25%",
-                        backgroundColor: "#f3f4f6",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "#9ca3af",
-                        fontSize: "14px",
-                        position: "relative"
-                      }}>
-                        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}>
-                          📷 No Image
-                        </div>
-                      </div>
-                    )}
-                    <div style={{ padding: 16 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
-                        <span style={{
-                          backgroundColor: "#fef3c7",
-                          color: "#d97706",
-                          fontSize: "11px",
-                          fontWeight: "bold",
-                          padding: "2px 6px",
-                          borderRadius: 4,
-                          textTransform: "uppercase"
-                        }}>
-                          FOR SALE
-                        </span>
-                        {price !== null && (
-                          <span style={{ fontWeight: 800, color: "#10b981", fontSize: "16px" }}>
-                            ${price.toLocaleString()}
-                          </span>
-                        )}
-                      </div>
-                      <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 6px 0", color: "#111827" }}>
-                        {lst.vehicle?.year ?? "Year"} {lst.vehicle?.model?.make?.name ?? "Make"} {lst.vehicle?.model?.name ?? "Model"}
-                      </h3>
-                      <div style={{ fontSize: 13, color: "#6b7280" }}>
-                        {lst.mileage !== null ? `${lst.mileage.toLocaleString()} miles` : "Mileage unavailable"}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ padding: 16, paddingTop: 0 }}>
-                    <Link
-                      href={`/vehicle/${lst.vehicle?.vin}`}
-                      style={{
-                        display: "block",
-                        textAlign: "center",
-                        backgroundColor: "#2563eb",
-                        color: "#ffffff",
-                        padding: "10px 16px",
-                        borderRadius: 8,
-                        fontSize: "14px",
-                        fontWeight: 600,
-                        textDecoration: "none",
-                        transition: "background-color 0.2s"
-                      }}
-                    >
-                      View Vehicle
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
       <section style={{ marginTop: 40 }}>
         <h2 style={{ fontSize: 24, marginBottom: 20 }}>Market Intelligence</h2>
 
@@ -717,19 +610,110 @@ export default async function ModelPage({ params }: ModelPageProps) {
 
       <MarketPriceHistory modelId={model.id} />
 
-      <section style={{ marginTop: 36 }}>
-        <h2>Vehicles</h2>
-
-        {model.vehicles.length > 0 ? (
-          model.vehicles.map((vehicle) => (
-            <div key={vehicle.id}>
-              <Link href={`/vehicle/${vehicle.vin}`}>
-                {vehicle.year} {vehicle.color} - {vehicle.vin}
-              </Link>
-            </div>
-          ))
+      {/* Available Inventory Section */}
+      <section style={{ marginTop: 40, marginBottom: 40 }}>
+        <h2 style={{ fontSize: 24, marginBottom: 20 }}>Available Inventory</h2>
+        {listings.length === 0 ? (
+          <p style={{ color: "#777", fontStyle: "italic" }}>No active listings for this model currently available.</p>
         ) : (
-          <p style={{ color: "#777" }}>No VIN-level vehicles recorded yet.</p>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+            gap: 20
+          }}>
+            {listings.map((lst) => {
+              const image = getListingImage(lst);
+              const price = lst.askingPrice || lst.price || null;
+              return (
+                <div
+                  key={lst.id}
+                  style={{
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 16,
+                    overflow: "hidden",
+                    backgroundColor: "#fff",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between"
+                  }}
+                >
+                  <div>
+                    {image ? (
+                      <div style={{ position: "relative", width: "100%", paddingTop: "56.25%", backgroundColor: "#f3f4f6" }}>
+                        <img
+                          src={image}
+                          alt={`${lst.vehicle?.year ?? "Year"} ${lst.vehicle?.model?.make?.name ?? "Make"} ${lst.vehicle?.model?.name ?? "Model"}`}
+                          style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }}
+                        />
+                      </div>
+                    ) : (
+                      <div style={{
+                        width: "100%",
+                        paddingTop: "56.25%",
+                        backgroundColor: "#f3f4f6",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "#9ca3af",
+                        fontSize: "14px",
+                        position: "relative"
+                      }}>
+                        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}>
+                          No Image
+                        </div>
+                      </div>
+                    )}
+                    <div style={{ padding: 16 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+                        <span style={{
+                          backgroundColor: "#fef3c7",
+                          color: "#d97706",
+                          fontSize: "11px",
+                          fontWeight: "bold",
+                          padding: "2px 6px",
+                          borderRadius: 4,
+                          textTransform: "uppercase"
+                        }}>
+                          FOR SALE
+                        </span>
+                        {price !== null && (
+                          <span style={{ fontWeight: 800, color: "#10b981", fontSize: "16px" }}>
+                            ${price.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                      <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 6px 0", color: "#111827" }}>
+                        {lst.vehicle?.year ?? "Year"} {lst.vehicle?.model?.make?.name ?? "Make"} {lst.vehicle?.model?.name ?? "Model"}
+                      </h3>
+                      <div style={{ fontSize: 13, color: "#6b7280" }}>
+                        {lst.mileage !== null ? `${lst.mileage.toLocaleString()} miles` : "Mileage unavailable"}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ padding: 16, paddingTop: 0 }}>
+                    <Link
+                      href={`/vehicle/${lst.vehicle?.vin}`}
+                      style={{
+                        display: "block",
+                        textAlign: "center",
+                        backgroundColor: "#2563eb",
+                        color: "#ffffff",
+                        padding: "10px 16px",
+                        borderRadius: 8,
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        textDecoration: "none",
+                        transition: "background-color 0.2s"
+                      }}
+                    >
+                      View Vehicle
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </section>
 

@@ -14,6 +14,7 @@ import {
   adminMarkCompleted,
   adminProcessExpiredPartnerRequests,
   adminReleaseRefund,
+  adminDeleteFulfillmentRequest,
 } from "@/lib/admin/fulfillment-ops";
 import { assertAdmin } from "@/lib/admin/auth";
 
@@ -74,6 +75,20 @@ export async function adminReleaseRefundAction(requestId: string, note?: string)
     return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to release or refund payment.";
+    return { success: false, message };
+  }
+}
+
+export async function adminDeleteFulfillmentAction(requestId: string) {
+  try {
+    await assertAdmin();
+    const result = await adminDeleteFulfillmentRequest(requestId);
+    revalidatePath("/admin/fulfillment");
+    revalidatePath("/admin/overview");
+    revalidatePath("/transactions");
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to delete fulfillment transaction.";
     return { success: false, message };
   }
 }

@@ -25,6 +25,7 @@ export type RawCrawlerListing = {
   color: string | null;
   location: string | null;
   dealerName: string | null;
+  dealerWebsite?: string | null;
   images: string[];
 };
 
@@ -43,6 +44,7 @@ export type NormalizedCrawlerListing = {
   color: string | null;
   location: string | null;
   dealerName: string | null;
+  dealerWebsite: string | null;
   url: string;
   images: string[];
 };

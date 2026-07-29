@@ -82,6 +82,15 @@ function parseProviderRef(transactionRef: string | null | undefined): { provider
   if (transactionRef.startsWith("stripe:")) {
     return { provider: "stripe", id: transactionRef.slice("stripe:".length) };
   }
+  if (transactionRef.startsWith("stripe_checkout:")) {
+    const paymentIntentId = transactionRef
+      .split(";")
+      .find((part) => part.startsWith("payment_intent:"))
+      ?.slice("payment_intent:".length);
+    if (paymentIntentId && paymentIntentId !== "unknown") {
+      return { provider: "stripe", id: paymentIntentId };
+    }
+  }
   if (transactionRef.startsWith("ledger:")) {
     return { provider: "ledger", id: transactionRef.slice("ledger:".length) };
   }

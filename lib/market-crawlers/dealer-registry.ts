@@ -50,9 +50,9 @@ export const FERRARI_DEALERS: DealerSource[] = [
     brand: "Ferrari",
     city: "Redwood City",
     state: "CA",
-    inventoryUrl: "https://www.ferrariofsilicionvalley.com/pre-owned-inventory/",
+    inventoryUrl: "https://www.ferrarisiliconvalley.com/searchall.aspx",
     additionalUrls: [
-      "https://www.ferrariofsilicionvalley.com/certified-pre-owned-ferrari/",
+      "https://www.ferrarisiliconvalley.com/searchall.aspx",
     ],
     sourceType: "DEALER",
     active: true,

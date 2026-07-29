@@ -1,6 +1,21 @@
 import { auth, signIn } from "@/auth";
 import Link from "next/link";
 
+async function credentialSignIn(formData: FormData) {
+  "use server";
+
+  const email = String(formData.get("email") || "").trim();
+  const password = String(formData.get("password") || "");
+  const adminEmail = (process.env.ADMIN_TEST_EMAIL || "admin@supercars.test").toLowerCase();
+  const provider = email.toLowerCase() === adminEmail ? "admin-test" : "user-test";
+
+  await signIn(provider, {
+    email,
+    password,
+    redirectTo: provider === "admin-test" ? "/admin/fulfillment" : "/transactions",
+  });
+}
+
 export default async function LoginPage() {
   const session = await auth();
   const isAdmin = session?.user?.role === "ADMIN";
@@ -21,42 +36,39 @@ export default async function LoginPage() {
           </div>
         )}
         <div style={{ display: "grid", gap: 12 }}>
+          <form action={credentialSignIn} style={{ display: "grid", gap: 10, padding: 16, border: "1px solid #e5e7eb", borderRadius: 10 }}>
+            <strong>Account login</strong>
+            <input
+              name="email"
+              type="email"
+              placeholder="Email"
+              autoComplete="off"
+              required
+              style={{ padding: 12, border: "1px solid #ddd", borderRadius: 8 }}
+            />
+            <input
+              name="password"
+              type="password"
+              placeholder="Password"
+              autoComplete="new-password"
+              required
+              style={{ padding: 12, border: "1px solid #ddd", borderRadius: 8 }}
+            />
+            <button type="submit" style={{ width: "100%", padding: "12px 16px", borderRadius: 8, border: "1px solid #111827", background: "#111827", color: "#fff", cursor: "pointer", fontWeight: 700 }}>
+              Sign in
+            </button>
+          </form>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 12, alignItems: "center", color: "#9ca3af", fontSize: 12 }}>
+            <span style={{ height: 1, background: "#e5e7eb" }} />
+            <span>or</span>
+            <span style={{ height: 1, background: "#e5e7eb" }} />
+          </div>
           <form action={async () => {
             "use server";
             await signIn("google", { redirectTo: "/garage" });
           }}>
-            <button type="submit" style={{ width: "100%", padding: "12px 16px", borderRadius: 8, border: "1px solid #ddd", cursor: "pointer" }}>
+            <button type="submit" style={{ width: "100%", padding: "12px 16px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", cursor: "pointer", fontWeight: 700 }}>
               Continue with Google
-            </button>
-          </form>
-          <form action={async (formData) => {
-            "use server";
-            await signIn("admin-test", {
-              email: String(formData.get("email") || ""),
-              password: String(formData.get("password") || ""),
-              redirectTo: "/admin/fulfillment",
-            });
-          }} style={{ display: "grid", gap: 8, padding: 12, border: "1px solid #e5e7eb", borderRadius: 8 }}>
-            <strong>Admin test login</strong>
-            <input name="email" type="email" defaultValue="admin@supercars.test" style={{ padding: 10, border: "1px solid #ddd", borderRadius: 6 }} />
-            <input name="password" type="password" defaultValue="supercars-admin" style={{ padding: 10, border: "1px solid #ddd", borderRadius: 6 }} />
-            <button type="submit" style={{ width: "100%", padding: "12px 16px", borderRadius: 8, border: "1px solid #111827", background: "#111827", color: "#fff", cursor: "pointer" }}>
-              Continue as Admin
-            </button>
-          </form>
-          <form action={async (formData) => {
-            "use server";
-            await signIn("user-test", {
-              email: String(formData.get("email") || ""),
-              password: String(formData.get("password") || ""),
-              redirectTo: "/transactions",
-            });
-          }} style={{ display: "grid", gap: 8, padding: 12, border: "1px solid #e5e7eb", borderRadius: 8 }}>
-            <strong>Regular user test login</strong>
-            <input name="email" type="email" defaultValue="user@supercars.test" style={{ padding: 10, border: "1px solid #ddd", borderRadius: 6 }} />
-            <input name="password" type="password" defaultValue="supercars-user" style={{ padding: 10, border: "1px solid #ddd", borderRadius: 6 }} />
-            <button type="submit" style={{ width: "100%", padding: "12px 16px", borderRadius: 8, border: "1px solid #111827", background: "#fff", color: "#111827", cursor: "pointer", fontWeight: 700 }}>
-              Continue as User
             </button>
           </form>
           <Link href="/" style={{ color: "#2563eb", marginTop: 8 }}>Back to home</Link>
