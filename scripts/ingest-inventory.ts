@@ -8,8 +8,6 @@ import { isValidVin } from "./ingest-bat-inventory";
 const CONNECTORS: Record<string, any> = {
   Ferrari: FerrariConnector,
   Lamborghini: LamborghiniConnector,
-  // Future makes go here:
-  // McLaren: McLarenConnector,
 };
 
 async function fetchAndDecodeVin(vin: string): Promise<Record<string, any>> {

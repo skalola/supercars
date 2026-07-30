@@ -8,6 +8,7 @@ import { getMarketSummary } from "@/lib/market-intelligence";
 import { getVehicleHeroImage } from "@/lib/vehicle-images";
 import MarketPriceHistory from "@/components/market/MarketPriceHistory";
 import { isListingMatchForModel } from "@/lib/inventory/validate-listing-identity";
+import { SUPPORTED_MAKES } from "@/lib/supported-makes";
 
 
 
@@ -16,7 +17,14 @@ function getHeroImage(images: Array<{ url: string; type: string | null; source: 
 }
 
 function getListingImage(listing: any) {
-  return getVehicleHeroImage(listing.vehicle);
+  const hasOwnerPhotos = listing.vehicle?.photos && listing.vehicle.photos.length > 0;
+  if (!hasOwnerPhotos && listing.imageUrl) {
+    return listing.imageUrl;
+  }
+  const vehicleHero = getVehicleHeroImage(listing.vehicle);
+  if (vehicleHero && vehicleHero !== "/images/placeholder.jpg") return vehicleHero;
+  if (listing.imageUrl) return listing.imageUrl;
+  return "/images/placeholder.jpg";
 }
 
 type ModelPageProps = {
@@ -171,22 +179,23 @@ export default async function ModelPage({ params }: ModelPageProps) {
             // VALID and WARNING are safe to display publicly.
             // NEEDS_REVIEW = confirmed identity conflict, hidden from public pages.
             // REMOVED = duplicate/invalid VIN, permanently hidden.
-            inventoryStatus: { in: ["VALID", "WARNING"] }
+            inventoryStatus: { in: ["VALID", "WARNING"] },
+            model: {
+              make: {
+                name: { in: [...SUPPORTED_MAKES] },
+              },
+            },
           }
         },
         validationStatus: "VALID",
         priceStatus: { not: "PRICE_INVALID" },
         OR: [
-          { price: null },
+          { askingPrice: { gte: 10000 } },
           { price: { gte: 10000 } }
         ],
-        AND: [
-          {
-            OR: [
-              { askingPrice: null },
-              { askingPrice: { gte: 10000 } }
-            ]
-          }
+        NOT: [
+          { source: { is: { type: "AUCTION" } } },
+          { url: { contains: "bringatrailer.com", mode: "insensitive" } },
         ]
       },
       include: {
@@ -599,7 +608,7 @@ export default async function ModelPage({ params }: ModelPageProps) {
               No market data available yet.
             </div>
             <div style={{ fontSize: 13, color: "#4b5563", marginTop: 12, borderTop: "1px solid #f3f4f6", paddingTop: 12 }}>
-              <strong>Monitored Sources:</strong> Bring a Trailer, RM Sotheby&apos;s, DuPont Registry, Ferrari Dealer Network, Lamborghini Dealer Network
+              <strong>Monitored Sources:</strong> Bring a Trailer, RM Sotheby&apos;s, DuPont Registry, and supported dealer networks
             </div>
             <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>
               Status: Active monitoring in progress. Data is updated daily as auctions close and dealer inventories refresh.

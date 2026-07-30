@@ -11,6 +11,7 @@
 import React, { useEffect, useMemo, useState, useTransition } from "react";
 import { addVendorAction, removeVendorAction, resolvePartnerEmailAction } from "@/app/actions/admin-partner";
 import type { PartnerConfidence, PartnerType } from "@/lib/fulfillment/partner-registry";
+import { SUPPORTED_MAKES } from "@/lib/supported-makes";
 
 type VendorFormState = {
   name: string;
@@ -479,8 +480,9 @@ export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
                   style={styles.modalInput}
                 >
                   <option value="ALL">All</option>
-                  <option value="Ferrari">Ferrari</option>
-                  <option value="Lamborghini">Lamborghini</option>
+                  {SUPPORTED_MAKES.map((make) => (
+                    <option key={make} value={make}>{make}</option>
+                  ))}
                 </select>
               </label>
 

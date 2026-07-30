@@ -42,7 +42,7 @@ export class DuPontSitemapCrawler extends PublicPageSource {
   override extractListings(page: CrawlPage): RawCrawlerListing[] {
     const listings: RawCrawlerListing[] = [];
     const urls = page.html.match(/https:\/\/[^\s<>\"]+/g) || [];
-    const matches = urls.filter((u) => /dupontregistry\.com\/car\/(ferrari|lamborghini)\//i.test(u));
+    const matches = urls.filter((u) => /dupontregistry\.com\/car\/(ferrari|lamborghini|mclaren)\//i.test(u));
 
     for (const url of matches) {
       try {

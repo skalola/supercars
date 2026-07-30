@@ -1,4 +1,5 @@
 import https from "node:https";
+import { buildSalesEmailForWebsite, getHostname, isMarketplaceHostname } from "@/lib/directory/contact-domain-policy";
 import { normalizePartnerLocation, normalizePhoneNumber } from "@/lib/directory/partner-contact-format";
 import { isValidEmail } from "@/lib/fulfillment/partner-registry";
 
@@ -23,7 +24,12 @@ export type DealerContactDiscoveryResult = {
   state: string | null;
   postalCode: string | null;
   streetAddress: string | null;
-  reason: "VERIFIED_EMAIL_PHONE" | "MISSING_EMAIL" | "MISSING_PHONE" | "WEBSITE_UNREACHABLE";
+  reason:
+    | "VERIFIED_EMAIL_PHONE"
+    | "SALES_DOMAIN_FALLBACK"
+    | "MISSING_EMAIL"
+    | "MISSING_PHONE"
+    | "WEBSITE_UNREACHABLE";
 };
 
 const USER_AGENT = "Mozilla/5.0 (compatible; SUPERCARDASHDealerContactDiscovery/0.1; +https://supercardash.vercel.app)";
@@ -65,7 +71,10 @@ export async function discoverDealerContactFromInventory(
       }
     }
 
-    const extracted = extractDealerContact(loaded.html, input.dealerName);
+    const loadedDomain = getHostname(loaded.url || url);
+    const extracted = isMarketplaceHostname(loadedDomain)
+      ? { email: null, phone: null, streetAddress: null, city: null, state: null, postalCode: null }
+      : extractDealerContact(loaded.html, input.dealerName);
     const merged: DealerContactDiscoveryResult = {
       ...best,
       website: originFromUrl(loaded.url || url),
@@ -79,10 +88,15 @@ export async function discoverDealerContactFromInventory(
       location: null,
       reason: "WEBSITE_UNREACHABLE",
     };
+    if (!merged.email && merged.website) {
+      merged.email = buildSalesEmailForWebsite(merged.website);
+    }
     merged.location = normalizePartnerLocation(merged).location;
-    merged.verified = Boolean(merged.email && merged.phone && merged.website);
+    merged.verified = Boolean(merged.email && merged.website);
     merged.reason = merged.verified
-      ? "VERIFIED_EMAIL_PHONE"
+      ? merged.phone
+        ? "VERIFIED_EMAIL_PHONE"
+        : "SALES_DOMAIN_FALLBACK"
       : merged.phone
         ? "MISSING_EMAIL"
         : "MISSING_PHONE";
@@ -157,7 +171,7 @@ function extractDealerLinks(html: string, baseUrl: string, dealerName: string) {
   const baseDomain = domainFromUrl(baseUrl);
   const dealerTokens = dealerName
     .toLowerCase()
-    .replace(/\b(ferrari|lamborghini|of|the|inc|llc|dba|service|dealer)\b/g, " ")
+    .replace(/\b(ferrari|lamborghini|mclaren|mcclaren|of|the|inc|llc|dba|service|dealer)\b/g, " ")
     .split(/[^a-z0-9]+/)
     .filter((token) => token.length >= 4);
   const links = Array.from(html.matchAll(/href=["']([^"']+)["']/gi))
@@ -323,7 +337,7 @@ function absolutizeUrl(value: string, baseUrl: string) {
 }
 
 function isMarketplaceDomain(domain: string) {
-  return /(^|\.)dupontregistry\.com$|(^|\.)autotrader\.com$|(^|\.)cars\.com$|(^|\.)bringatrailer\.com$|(^|\.)ferrari\.com$|(^|\.)preowned\.ferrari\.com$/i.test(domain);
+  return /(^|\.)dupontregistry\.com$|(^|\.)autotrader\.com$|(^|\.)cars\.com$|(^|\.)bringatrailer\.com$|(^|\.)ferrari\.com$|(^|\.)preowned\.ferrari\.com$|(^|\.)lamborghini\.com$|(^|\.)preowned\.lamborghini\.com$|(^|\.)mclaren\.com$|(^|\.)preowned\.mclaren\.com$/i.test(domain);
 }
 
 function isGenericManufacturerContactUrl(value: string) {
@@ -334,6 +348,9 @@ function isGenericManufacturerContactUrl(value: string) {
       /\/contact-us\/?$/i.test(parsed.pathname)
     ) || (
       /(^|\.)ferrari\.com$/i.test(parsed.hostname) &&
+      /\/contact/i.test(parsed.pathname)
+    ) || (
+      /(^|\.)mclaren\.com$/i.test(parsed.hostname) &&
       /\/contact/i.test(parsed.pathname)
     );
   } catch {

@@ -1,5 +1,6 @@
 import { PublicPageSource } from "./public-page-source";
 import type { CrawlPage, RawCrawlerListing } from "../types";
+import { SUPPORTED_MAKES } from "@/lib/supported-makes";
 
 interface MarshallGoldmanApiVehicle {
   id: string;
@@ -74,7 +75,7 @@ export class MarshallGoldmanCrawler extends PublicPageSource {
         (v) =>
           v &&
           typeof v === "object" &&
-          ["Ferrari", "Lamborghini"].includes(v.make) &&
+          (SUPPORTED_MAKES as readonly string[]).includes(v.make) &&
           v.sold === "Available"
       );
 

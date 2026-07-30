@@ -1,17 +1,19 @@
 /**
  * lib/market-crawlers/dealer-registry.ts
  *
- * Authoritative registry of Ferrari and Lamborghini authorized dealerships.
+ * Authoritative registry of supported authorized dealerships.
  *
  * This file contains ONLY metadata — no crawling logic.
- * To add a new dealer: append an entry to FERRARI_DEALERS or LAMBORGHINI_DEALERS.
+ * To add a new dealer: append an entry to the matching brand array.
  * To disable a dealer: set active: false.
  *
  * The crawler factory in sources/authorized-dealers.ts reads this registry
  * and instantiates a PublicPageSource per active entry.
  */
 
-export type DealerBrand = "Ferrari" | "Lamborghini";
+import type { SupportedMake } from "@/lib/supported-makes";
+
+export type DealerBrand = SupportedMake;
 
 export interface DealerSource {
   /** Display name stored in DB as the MarketSource name */
@@ -33,6 +35,30 @@ export interface DealerSource {
 // ─── Ferrari Authorized Dealers ───────────────────────────────────────────────
 
 export const FERRARI_DEALERS: DealerSource[] = [
+  {
+    name: "Foreign Cars Italia Charlotte",
+    brand: "Ferrari",
+    city: "Charlotte",
+    state: "NC",
+    inventoryUrl: "https://charlotte.ferraridealers.com/en-US/r/used-ferrari/f",
+    additionalUrls: [
+      "https://charlotte.ferraridealers.com/en-US/ferrari-certified-pre-owned",
+    ],
+    sourceType: "DEALER",
+    active: true,
+  },
+  {
+    name: "Foreign Cars Italia Greensboro",
+    brand: "Ferrari",
+    city: "Greensboro",
+    state: "NC",
+    inventoryUrl: "https://greensboro.ferraridealers.com/en-US/r/used-ferrari/f",
+    additionalUrls: [
+      "https://greensboro.ferraridealers.com/en-US/ferrari-certified-pre-owned",
+    ],
+    sourceType: "DEALER",
+    active: true,
+  },
   {
     name: "Ferrari of Beverly Hills",
     brand: "Ferrari",
@@ -334,12 +360,158 @@ export const LAMBORGHINI_DEALERS: DealerSource[] = [
   },
 ];
 
+// ─── McLaren Authorized Dealers ──────────────────────────────────────────────
+
+export const MCLAREN_DEALERS: DealerSource[] = [
+  {
+    name: "McLaren Charlotte",
+    brand: "McLaren",
+    city: "Charlotte",
+    state: "NC",
+    inventoryUrl: "https://www.mclarencharlotte.com/used-vehicles/",
+    additionalUrls: ["https://www.mclarencharlotte.com/new-vehicles/"],
+    sourceType: "DEALER",
+    active: true,
+  },
+  {
+    name: "McLaren Philadelphia",
+    brand: "McLaren",
+    city: "West Chester",
+    state: "PA",
+    inventoryUrl: "https://www.mclarenphl.com/used-inventory/index.htm",
+    additionalUrls: ["https://www.mclarenphl.com/new-inventory/index.htm"],
+    sourceType: "DEALER",
+    active: true,
+  },
+  {
+    name: "McLaren Beverly Hills",
+    brand: "McLaren",
+    city: "Beverly Hills",
+    state: "CA",
+    inventoryUrl: "https://www.mclarenbeverlyhills.com/used-vehicles/",
+    additionalUrls: ["https://www.mclarenbeverlyhills.com/new-vehicles/"],
+    sourceType: "DEALER",
+    active: true,
+  },
+  {
+    name: "McLaren Newport Beach",
+    brand: "McLaren",
+    city: "Newport Beach",
+    state: "CA",
+    inventoryUrl: "https://www.mclarennewportbeach.com/used-vehicles/",
+    additionalUrls: ["https://www.mclarennewportbeach.com/new-vehicles/"],
+    sourceType: "DEALER",
+    active: true,
+  },
+  {
+    name: "McLaren San Francisco",
+    brand: "McLaren",
+    city: "San Francisco",
+    state: "CA",
+    inventoryUrl: "https://www.mclarensanfrancisco.com/used-vehicles/",
+    additionalUrls: ["https://www.mclarensanfrancisco.com/new-vehicles/"],
+    sourceType: "DEALER",
+    active: true,
+  },
+  {
+    name: "McLaren Dallas",
+    brand: "McLaren",
+    city: "Dallas",
+    state: "TX",
+    inventoryUrl: "https://www.mclarendallas.com/used-vehicles/",
+    additionalUrls: ["https://www.mclarendallas.com/new-vehicles/"],
+    sourceType: "DEALER",
+    active: true,
+  },
+  {
+    name: "McLaren Houston",
+    brand: "McLaren",
+    city: "Houston",
+    state: "TX",
+    inventoryUrl: "https://www.mclarenhouston.com/used-vehicles/",
+    additionalUrls: ["https://www.mclarenhouston.com/new-vehicles/"],
+    sourceType: "DEALER",
+    active: true,
+  },
+  {
+    name: "McLaren Scottsdale",
+    brand: "McLaren",
+    city: "Scottsdale",
+    state: "AZ",
+    inventoryUrl: "https://www.mclarenscottsdale.com/used-vehicles/",
+    additionalUrls: ["https://www.mclarenscottsdale.com/new-vehicles/"],
+    sourceType: "DEALER",
+    active: true,
+  },
+  {
+    name: "McLaren Chicago",
+    brand: "McLaren",
+    city: "Chicago",
+    state: "IL",
+    inventoryUrl: "https://www.mclarenchicago.com/used-vehicles/",
+    additionalUrls: ["https://www.mclarenchicago.com/new-vehicles/"],
+    sourceType: "DEALER",
+    active: true,
+  },
+  {
+    name: "McLaren Boston",
+    brand: "McLaren",
+    city: "Norwell",
+    state: "MA",
+    inventoryUrl: "https://www.mclarenboston.com/used-vehicles/",
+    additionalUrls: ["https://www.mclarenboston.com/new-vehicles/"],
+    sourceType: "DEALER",
+    active: true,
+  },
+  {
+    name: "McLaren Tampa Bay",
+    brand: "McLaren",
+    city: "Clearwater",
+    state: "FL",
+    inventoryUrl: "https://www.mclarentampabay.com/used-vehicles/",
+    additionalUrls: ["https://www.mclarentampabay.com/new-vehicles/"],
+    sourceType: "DEALER",
+    active: true,
+  },
+  {
+    name: "McLaren Miami",
+    brand: "McLaren",
+    city: "Miami",
+    state: "FL",
+    inventoryUrl: "https://www.mclarenmiami.com/used-vehicles/",
+    additionalUrls: ["https://www.mclarenmiami.com/new-vehicles/"],
+    sourceType: "DEALER",
+    active: true,
+  },
+  {
+    name: "McLaren North Jersey",
+    brand: "McLaren",
+    city: "Ramsey",
+    state: "NJ",
+    inventoryUrl: "https://www.mclarennorthjersey.com/used-vehicles/",
+    additionalUrls: ["https://www.mclarennorthjersey.com/new-vehicles/"],
+    sourceType: "DEALER",
+    active: true,
+  },
+  {
+    name: "McLaren Denver",
+    brand: "McLaren",
+    city: "Highlands Ranch",
+    state: "CO",
+    inventoryUrl: "https://www.mclarendenver.com/used-vehicles/",
+    additionalUrls: ["https://www.mclarendenver.com/new-vehicles/"],
+    sourceType: "DEALER",
+    active: true,
+  },
+];
+
 // ─── Combined registry ─────────────────────────────────────────────────────
 
-/** All active authorized dealers across both brands */
+/** All active authorized dealers across supported brands */
 export const ALL_AUTHORIZED_DEALERS: DealerSource[] = [
   ...FERRARI_DEALERS,
   ...LAMBORGHINI_DEALERS,
+  ...MCLAREN_DEALERS,
 ].filter((d) => d.active);
 
 /** Active dealers for a specific brand */

@@ -3,6 +3,7 @@ import React from "react";
 import { prisma } from "@/lib/prisma";
 import InventoryExplorer from "@/components/market/InventoryExplorer";
 import { isModelMatch } from "@/lib/data-quality/inventory-validator";
+import { SUPPORTED_MAKES } from "@/lib/supported-makes";
 
 export default async function InventoryPage() {
   // ── Diagnostic logging ──────────────────────────────────────────────────
@@ -28,23 +29,24 @@ export default async function InventoryPage() {
       status: "ACTIVE",
       vehicle: {
         is: {
-          inventoryStatus: { in: ["VALID", "WARNING"] }
+          inventoryStatus: { in: ["VALID", "WARNING"] },
+          model: {
+            make: {
+              name: { in: [...SUPPORTED_MAKES] },
+            },
+          },
         }
       },
       validationStatus: "VALID",
       priceStatus: { not: "PRICE_INVALID" },
       OR: [
-        { price: null },
+        { askingPrice: { gte: 10000 } },
         { price: { gte: 10000 } }
       ],
-      AND: [
-        {
-          OR: [
-            { askingPrice: null },
-            { askingPrice: { gte: 10000 } }
-          ]
-        }
-      ]
+      NOT: [
+        { source: { is: { type: "AUCTION" } } },
+        { url: { contains: "bringatrailer.com", mode: "insensitive" } },
+      ],
     },
     include: {
       vehicle: {
@@ -112,9 +114,15 @@ export default async function InventoryPage() {
   // Fetch makes and models for filters selection options
   const [makes, models] = await Promise.all([
     prisma.make.findMany({
+      where: { name: { in: [...SUPPORTED_MAKES] } },
       orderBy: { name: "asc" },
     }),
     prisma.model.findMany({
+      where: {
+        make: {
+          name: { in: [...SUPPORTED_MAKES] },
+        },
+      },
       include: {
         make: true,
       },
@@ -126,6 +134,7 @@ export default async function InventoryPage() {
   const mappedListings = listings.map((l: any) => ({
     id: l.id,
     modelId: l.vehicle.modelId,
+    imageUrl: l.imageUrl,
     year: l.vehicle.year,
     price: l.price,
     mileage: l.mileage,

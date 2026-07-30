@@ -3,7 +3,7 @@ import { PublicPageSource } from "./public-page-source";
 export class HighYieldSpecialistCrawler extends PublicPageSource {
   constructor() {
     super({
-      sourceName: "High-yield Ferrari/Lamborghini specialist dealers",
+      sourceName: "High-yield supported supercar specialist dealers",
       sourceType: "DEALER",
       urls: [
         "https://www.lamborghiniparamus.com/cars-for-sale-paramus-nj",
@@ -11,6 +11,10 @@ export class HighYieldSpecialistCrawler extends PublicPageSource {
         "https://www.lamborghiniwashington.com/pre-owned-lamborghini-for-sale-sterling-va.html",
         "https://ferrariofcentralnj.com/pre-owned-inventory/",
         "https://ferrariofhouston.com/pre-owned-inventory/",
+        "https://www.mclarencharlotte.com/used-vehicles/",
+        "https://www.mclarenphl.com/used-inventory/index.htm",
+        "https://www.mclarenbeverlyhills.com/used-vehicles/",
+        "https://www.mclarennewportbeach.com/used-vehicles/",
       ],
       discoverDetailLinks: true,
       maxDetailPages: 800,

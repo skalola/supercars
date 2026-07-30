@@ -11,8 +11,12 @@ export function isValidVin(value: string | null | undefined): value is string {
   const cleaned = value.trim().toUpperCase();
   if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(cleaned)) return false;
 
-  // Enforce Ferrari (ZFF, ZFA) and Lamborghini (ZHW) WMI prefixes
-  const isExoticWmi = cleaned.startsWith("ZFF") || cleaned.startsWith("ZHW") || cleaned.startsWith("ZFA");
+  // Enforce supported supercar WMI prefixes: Ferrari (ZFF, ZFA), Lamborghini (ZHW), McLaren (SBM).
+  const isExoticWmi =
+    cleaned.startsWith("ZFF") ||
+    cleaned.startsWith("ZFA") ||
+    cleaned.startsWith("ZHW") ||
+    cleaned.startsWith("SBM");
   if (!isExoticWmi) return false;
 
   // Safeguard against common layout element words that match length/charset by coincidence

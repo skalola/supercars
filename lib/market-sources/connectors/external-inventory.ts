@@ -25,58 +25,12 @@ export interface IExternalInventoryConnector {
 export class BaTInventoryConnector implements IExternalInventoryConnector {
   readonly sourceName = "Bring a Trailer";
 
-  // Dummy raw data simulation
-  private rawItems = [
-    {
-      id: "bat-lst-001",
-      vin: "ZHWUF4ZFXLLA13558", // Match existing Huracan
-      year: 2020,
-      make: "Lamborghini",
-      model: "Huracan EVO",
-      price: 235000,
-      mileage: 14200,
-      seller: "Private Seller",
-      url: "https://bringatrailer.com/listing/2020-lamborghini-huracan-evo-1",
-      images: ["https://images.unsplash.com/photo-1544829099-b9a0c07fad1a"],
-    },
-    {
-      id: "bat-lst-002",
-      vin: "ZFF68AHA6E0209999", // New Ferrari 458 VIN
-      year: 2014,
-      make: "Ferrari",
-      model: "458 Italia",
-      price: 215000,
-      mileage: 18500,
-      seller: "Ferrari Los Angeles",
-      url: "https://bringatrailer.com/listing/2014-ferrari-458-italia-1",
-      images: ["https://images.unsplash.com/photo-1583121274602-3e2820c69888"],
-    },
-  ];
-
   async fetchListings(): Promise<NormalizedExternalListing[]> {
-    const results: NormalizedExternalListing[] = [];
-    for (const raw of this.rawItems) {
-      const normalized = this.normalizeListing(raw);
-      if (normalized) results.push(normalized);
-    }
-    return results;
+    return [];
   }
 
   normalizeListing(raw: any): NormalizedExternalListing | null {
-    if (!raw.make || !raw.model || !raw.id) return null;
-    return {
-      source: this.sourceName,
-      externalId: raw.id,
-      vin: raw.vin || null,
-      year: raw.year,
-      make: raw.make,
-      model: raw.model,
-      price: raw.price || null,
-      mileage: raw.mileage || null,
-      seller: raw.seller || null,
-      url: raw.url || null,
-      images: raw.images || [],
-    };
+    return null;
   }
 }
 

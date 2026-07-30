@@ -17,8 +17,7 @@ type SiteHeaderProps = {
 const browseLinks = [
   { href: "/make/ferrari", label: "Ferrari" },
   { href: "/make/lamborghini", label: "Lamborghini" },
-  { href: "/inventory", label: "Inventory" },
-  { href: "/directory", label: "Directory" },
+  { href: "/make/mclaren", label: "McLaren" },
 ];
 
 export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, trackersHref, profileImageUrl }: SiteHeaderProps) {
@@ -104,8 +103,6 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, tracke
           <div
             ref={accountRef}
             className={`site-account-menu${isAccountOpen ? " is-open" : ""}`}
-            onMouseEnter={() => setIsAccountOpen(true)}
-            onMouseLeave={() => setIsAccountOpen(false)}
           >
             <Link href={profileHref} className="site-profile-button" onClick={closeMenus}>
               {profileImageUrl ? (

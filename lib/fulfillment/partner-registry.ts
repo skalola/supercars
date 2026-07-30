@@ -7,13 +7,19 @@
  * enforces confidence levels (VERIFIED, PUBLIC_SOURCE, MANUAL_REVIEW),
  * and handles admin resolution with automatic dispatch of held DRAFT requests.
  *
- * Zero-Guessed-Email Rule:
- *   If no valid email is known for a partner, contactStatus = UNRESOLVED_EMAIL.
- *   The fulfillment request is held as DRAFT until an admin resolves the email.
- *   No email is ever sent to a guessed or assumed address.
+ * Email routing rule:
+ *   Dealer-owned public domains may use the standard sales@domain inbox.
+ *   Marketplace/reseller domains never receive buyer orders directly; if the
+ *   actual holding dealer cannot be resolved, the request is held as DRAFT.
  */
 
 import { prisma } from "@/lib/prisma";
+import {
+  buildSalesEmailForWebsite,
+  emailMatchesWebsiteDomain,
+  getHostname,
+  isMarketplaceHostname,
+} from "@/lib/directory/contact-domain-policy";
 import { normalizePartnerLocation, normalizePhoneNumber } from "@/lib/directory/partner-contact-format";
 
 export type PartnerType = "DEALER" | "INSURER" | "TRANSPORTER" | "SERVICE_SHOP";
@@ -82,14 +88,8 @@ export function isValidEmail(email?: string | null): boolean {
  * Matches existing contacts by name, sourceDomain, or marketSourceId.
  */
 export async function upsertPartnerContact(input: UpsertPartnerContactInput) {
-  const emailValid = isValidEmail(input.email);
-  const cleanEmail = emailValid ? input.email!.trim().toLowerCase() : null;
   const cleanPhone = normalizePhoneNumber(input.phone);
   const location = normalizePartnerLocation(input);
-  const contactStatus: ContactStatus = cleanEmail ? "RESOLVED" : "UNRESOLVED_EMAIL";
-  const confidence: PartnerConfidence = cleanEmail
-    ? input.confidence || "PUBLIC_SOURCE"
-    : "UNRESOLVED_EMAIL";
   const contactSource: ContactSource =
     input.contactSource || (input.marketSourceId ? "IMPORTED_LISTING" : "PUBLIC_WEBSITE");
 
@@ -102,6 +102,14 @@ export async function upsertPartnerContact(input: UpsertPartnerContactInput) {
       // keep null
     }
   }
+
+  const candidateWebsite = input.website || sourceDomain || null;
+  const emailValid = isValidEmail(input.email) && emailMatchesWebsiteDomain(input.email, candidateWebsite);
+  const cleanEmail = emailValid ? input.email!.trim().toLowerCase() : null;
+  const contactStatus: ContactStatus = cleanEmail ? "RESOLVED" : "UNRESOLVED_EMAIL";
+  const confidence: PartnerConfidence = cleanEmail
+    ? input.confidence || "PUBLIC_SOURCE"
+    : "UNRESOLVED_EMAIL";
 
   const existing = await prisma.partnerContact.findFirst({
     where: {
@@ -116,7 +124,12 @@ export async function upsertPartnerContact(input: UpsertPartnerContactInput) {
 
   if (existing) {
     // Prefer new email if valid; otherwise preserve existing verified email
-    const finalEmail = cleanEmail || (existing.email && isValidEmail(existing.email) ? existing.email : null);
+    const finalWebsite = input.website || existing.website || sourceDomain || existing.sourceDomain || null;
+    const finalEmail =
+      cleanEmail ||
+      (existing.email && isValidEmail(existing.email) && emailMatchesWebsiteDomain(existing.email, finalWebsite)
+        ? existing.email
+        : null);
     const finalStatus: ContactStatus = finalEmail ? "RESOLVED" : "UNRESOLVED_EMAIL";
     const finalConfidence: PartnerConfidence = finalEmail
       ? input.confidence || (existing.confidence as PartnerConfidence) || "PUBLIC_SOURCE"
@@ -195,35 +208,70 @@ export async function resolvePartnerContact(params: {
   marketSourceId?: string;
   website?: string;
   type?: PartnerType;
+  allowDealerDomainFallback?: boolean;
 }) {
-  let domain: string | null = null;
-  if (params.website) {
-    try {
-      domain = new URL(params.website).hostname.replace(/^www\./, "");
-    } catch {
-      // keep null
-    }
-  }
+  const domain = getHostname(params.website);
+  const canUseWebsiteDomain =
+    Boolean(domain && !isMarketplaceHostname(domain)) && (!params.type || params.type === "DEALER");
 
   const typeFilter = params.type ? { type: params.type } : {};
 
-  // Build OR clauses only for non-null lookup fields
-  const orClauses: object[] = [];
-  if (params.marketSourceId) orClauses.push({ marketSourceId: params.marketSourceId });
-  if (domain) orClauses.push({ sourceDomain: domain });
-  if (params.name) orClauses.push({ name: params.name });
+  if (canUseWebsiteDomain) {
+    const contact = await prisma.partnerContact.findFirst({
+      where: {
+        active: true,
+        ...typeFilter,
+        OR: [
+          { sourceDomain: domain },
+          { website: { contains: domain!, mode: "insensitive" } },
+        ],
+      },
+      orderBy: [{ contactStatus: "asc" }, { updatedAt: "desc" }],
+    });
+    if (contact?.email) return contact;
 
-  if (orClauses.length === 0) return null;
+    if (params.allowDealerDomainFallback) {
+      const fallbackEmail = buildSalesEmailForWebsite(params.website);
+      if (fallbackEmail) {
+        return upsertPartnerContact({
+          name: params.name || domain!,
+          type: "DEALER",
+          email: fallbackEmail,
+          website: params.website,
+          sourceDomain: domain,
+          confidence: "PUBLIC_SOURCE",
+          contactSource: "PUBLIC_WEBSITE",
+          active: true,
+        });
+      }
+    }
 
-  const contact = await prisma.partnerContact.findFirst({
-    where: {
-      OR: orClauses,
-      active: true,
-      ...typeFilter,
-    },
-  });
+    if (contact) return contact;
+  }
 
-  return contact;
+  if (params.marketSourceId) {
+    const contact = await prisma.partnerContact.findFirst({
+      where: {
+        marketSourceId: params.marketSourceId,
+        active: true,
+        ...typeFilter,
+      },
+    });
+    if (contact) return contact;
+  }
+
+  if (params.name) {
+    const contact = await prisma.partnerContact.findFirst({
+      where: {
+        name: params.name,
+        active: true,
+        ...typeFilter,
+      },
+    });
+    if (contact) return contact;
+  }
+
+  return null;
 }
 
 /**

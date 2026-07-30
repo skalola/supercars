@@ -6,6 +6,7 @@ import type {
 } from "../types";
 import { normalizeListing } from "../normalizer";
 import { extractVINFromText, extractVINsFromText } from "../vin-extractor";
+import { normalizeSupportedMake, supportedMakePattern, SUPPORTED_MAKES } from "@/lib/supported-makes";
 
 type PublicPageSourceOptions = {
   sourceName: string;
@@ -23,6 +24,8 @@ const DEFAULT_HEADERS = {
   "referer": "https://www.google.com/",
 };
 
+const SUPPORTED_MAKE_PATTERN = supportedMakePattern();
+
 export class PublicPageSource implements PublicInventorySource {
   readonly sourceName: string;
   readonly sourceType: CrawlerSourceType;
@@ -39,6 +42,7 @@ export class PublicPageSource implements PublicInventorySource {
     this.detailLinkPatterns = options.detailLinkPatterns ?? [
       /ferrari/i,
       /lamborghini/i,
+      /mclaren|mcclaren/i,
       /vehicle-details/i,
       /\/inventory\/.+/i,
       /\/vehicles\/.+/i,
@@ -117,11 +121,13 @@ export class PublicPageSource implements PublicInventorySource {
 
     for (const card of cards) {
       const vin = extractVINFromText(card);
-      if (!vin || !/ferrari|lamborghini/i.test(card)) continue;
+      if (!vin || !SUPPORTED_MAKE_PATTERN.test(card)) continue;
 
       const href = pickAttribute(card, "href", /class=["'][^"']*\bjs-vehicle-item-link\b[^"']*["']/i)
+        ?? pickVehicleDetailHref(card, page.url)
         ?? pickFirstHref(card);
       const url = href ? absolutize(href, page.url) : null;
+      if (!isLikelyVehicleDetailUrl(url)) continue;
       const titleFromUrl = inferVehicleTitleFromUrl(url);
       const plainText = compactWhitespace(decodeHtml(stripTags(card)));
       const title = titleFromUrl.title ?? plainText.slice(0, 220);
@@ -154,18 +160,25 @@ export class PublicPageSource implements PublicInventorySource {
   private extractEmbeddedVinListings(page: CrawlPage): RawCrawlerListing[] {
     const listings: RawCrawlerListing[] = [];
     const vinMatches = extractVINsFromText(page.html);
+    const pageHeroImages = vinMatches.length === 1 ? extractPageHeroImages(page.html, page.url) : [];
 
     for (const vin of vinMatches) {
       const index = page.html.toUpperCase().indexOf(vin);
-      const context = decodeHtml(stripTags(page.html.slice(Math.max(0, index - 2500), index + 2500)));
-      const titleFromUrl = inferVehicleTitleFromUrl(page.url);
-      if (!/ferrari|lamborghini/i.test(context) && !titleFromUrl.make) continue;
+      const contextHtml = page.html.slice(Math.max(0, index - 6000), index + 6000);
+      const context = decodeHtml(stripTags(contextHtml));
+      const url = isLikelyVehicleDetailUrl(page.url)
+        ? page.url
+        : findClosestVehicleDetailHref(page.html, index, page.url);
+      if (!url) continue;
+
+      const titleFromUrl = inferVehicleTitleFromUrl(url);
+      if (!SUPPORTED_MAKE_PATTERN.test(context) && !titleFromUrl.make) continue;
 
       listings.push({
         sourceName: this.sourceName,
         sourceType: this.sourceType,
         pageUrl: page.url,
-        url: closestHref(page.html, index, page.url),
+        url,
         externalListingId: null,
         title: titleFromUrl.title ?? compactWhitespace(context.slice(0, 500)),
         vin,
@@ -179,7 +192,7 @@ export class PublicPageSource implements PublicInventorySource {
         location: titleFromUrl.location,
         dealerName: null,
         dealerWebsite: null,
-        images: [],
+        images: Array.from(new Set([...extractImageUrls(contextHtml, page.url), ...pageHeroImages])),
       });
     }
 
@@ -188,7 +201,7 @@ export class PublicPageSource implements PublicInventorySource {
 
   private rawFromJsonNode(node: Record<string, unknown>, pageUrl: string): RawCrawlerListing | null {
     const searchable = JSON.stringify(node);
-    if (!/ferrari|lamborghini/i.test(searchable)) return null;
+    if (!SUPPORTED_MAKE_PATTERN.test(searchable)) return null;
 
     const vin = pickString(node, ["vehicleIdentificationNumber", "vin", "serialNumber"]) ?? extractVINFromText(searchable);
     if (!vin) return null;
@@ -215,7 +228,7 @@ export class PublicPageSource implements PublicInventorySource {
       location: pickString(node, ["availableAtOrFrom", "areaServed"]),
       dealerName: pickString(seller, ["name"]),
       dealerWebsite: pickString(seller, ["url", "sameAs", "@id"]) ?? pickString(node, ["sellerUrl", "dealerUrl"]),
-      images: pickImages(node),
+      images: pickImages(node).map((image) => absolutize(image, pageUrl)).filter((image): image is string => Boolean(image)),
     };
   }
 
@@ -263,13 +276,20 @@ function flattenJsonLd(value: unknown): Array<Record<string, unknown>> {
   const record = asRecord(value);
   if (!record) return [];
 
-  const graph = record["@graph"];
-  const itemList = record.itemListElement;
+  const about = asRecord(record.about);
+  const offers = asRecord(record.offers);
+  const aboutOffers = asRecord(about?.offers);
+  const item = asRecord(record.item);
   return [
     record,
-    ...flattenJsonLd(graph),
-    ...flattenJsonLd(itemList),
-    ...flattenJsonLd(asRecord(record.item)?.item),
+    ...flattenJsonLd(record["@graph"]),
+    ...flattenJsonLd(record.itemListElement),
+    ...flattenJsonLd(record.itemOffered),
+    ...flattenJsonLd(offers?.itemOffered),
+    ...flattenJsonLd(about),
+    ...flattenJsonLd(aboutOffers),
+    ...flattenJsonLd(aboutOffers?.itemOffered),
+    ...flattenJsonLd(item?.item),
   ];
 }
 
@@ -388,6 +408,14 @@ function pickFirstHref(html: string): string | null {
   return match?.[1] ? decodeHtml(match[1]) : null;
 }
 
+function pickVehicleDetailHref(html: string, pageUrl: string): string | null {
+  for (const match of html.matchAll(/href=["']([^"']+)["']/gi)) {
+    const url = absolutize(decodeHtml(match[1]), pageUrl);
+    if (isLikelyVehicleDetailUrl(url)) return url;
+  }
+  return null;
+}
+
 function pickDataAttribute(html: string, name: string): string | null {
   const match = html.match(new RegExp(`data-${name}=["']([^"']+)["']`, "i"));
   return match?.[1] ? decodeHtml(match[1]) : null;
@@ -404,7 +432,39 @@ function absolutize(url: string | null, pageUrl: string): string | null {
 
 function idFromUrl(url: string | null): string | null {
   if (!url) return null;
-  return url.match(/(?:id-|id=)([A-Za-z0-9_-]+)/i)?.[1] ?? null;
+  return url.match(/(?:id-|id=)([A-Za-z0-9_-]+)/i)?.[1]
+    ?? url.match(/-([a-f0-9]{32})\.htm/i)?.[1]
+    ?? null;
+}
+
+function findClosestVehicleDetailHref(html: string, index: number, pageUrl: string): string | null {
+  const context = html.slice(Math.max(0, index - 10000), index + 10000);
+  const hrefs = Array.from(context.matchAll(/href=["']([^"']+)["']/gi))
+    .map((match) => absolutize(decodeHtml(match[1]), pageUrl))
+    .filter((url): url is string => Boolean(url && isLikelyVehicleDetailUrl(url)));
+
+  if (hrefs.length > 0) return hrefs.at(-1) ?? hrefs[0];
+
+  return pickVehicleDetailHref(html, pageUrl);
+}
+
+function isLikelyVehicleDetailUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname.toLowerCase();
+    if (/\/cars-for-sale\/vehicle\/\d+/i.test(path)) return true;
+    if (/\/vehicledetail\//i.test(path)) return true;
+    if (/\/car\/(?:ferrari|lamborghini|mclaren)\//i.test(path)) return true;
+    if (/\/(?:new|used|certified|pre-owned)\/(?:ferrari|lamborghini|mclaren)\//i.test(path)) return true;
+    if (/(?:ferrari|lamborghini|mclaren).+for-sale.+\.(?:htm|html)$/i.test(path)) return true;
+    if (/\/vehicle-details\/.+/i.test(path)) return true;
+    if (/\/inventory\/.+(?:vin|stock|vehicle|detail|listing)/i.test(path)) return true;
+    if (/\/(?:used|new)-.+\.(?:htm|html)$/i.test(path) && SUPPORTED_MAKE_PATTERN.test(path)) return true;
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 function extractImageUrls(html: string, pageUrl: string): string[] {
@@ -412,11 +472,26 @@ function extractImageUrls(html: string, pageUrl: string): string[] {
   for (const match of html.matchAll(/(?:src|data-src|srcset|data-srcset)=["']([^"']+)["']/gi)) {
     const candidates = match[1].split(",").map((part) => part.trim().split(/\s+/)[0]);
     for (const candidate of candidates) {
-      const absolute = absolutize(candidate, pageUrl);
-      if (absolute && /\.(?:jpe?g|png|webp)(?:\?|$)/i.test(absolute)) urls.add(absolute);
+      const absolute = absolutize(decodeHtml(candidate), pageUrl);
+      if (absolute && isUsefulVehicleImageUrl(absolute)) urls.add(absolute);
     }
   }
   return Array.from(urls);
+}
+
+function extractPageHeroImages(html: string, pageUrl: string): string[] {
+  const images = new Set<string>();
+  for (const match of html.matchAll(/<meta\b[^>]*(?:property|name)=["'](?:og:image|twitter:image)["'][^>]*>/gi)) {
+    const content = match[0].match(/\bcontent=["']([^"']+)["']/i)?.[1];
+    const absolute = absolutize(decodeHtml(content ?? ""), pageUrl);
+    if (absolute && isUsefulVehicleImageUrl(absolute)) images.add(absolute);
+  }
+  return Array.from(images);
+}
+
+function isUsefulVehicleImageUrl(value: string): boolean {
+  if (!/\.(?:jpe?g|png|webp)(?:[?#]|$)/i.test(value)) return false;
+  return !/placeholder|logo|icon|favicon|spinner|loading|avatar|profile|badge|sprite|transparent|blank/i.test(value);
 }
 
 function inferVehicleTitleFromUrl(url: string | null): {
@@ -460,10 +535,7 @@ function inferVehicleTitleFromUrl(url: string | null): {
 }
 
 function normalizeMakeToken(token: string | undefined): string | null {
-  if (!token) return null;
-  if (/ferrari/i.test(token)) return "Ferrari";
-  if (/lamborghini/i.test(token)) return "Lamborghini";
-  return null;
+  return normalizeSupportedMake(token);
 }
 
 function titleCase(value: string): string {
@@ -480,9 +552,7 @@ function inferYearFromText(text: string): number | null {
 }
 
 function inferMakeFromText(text: string): string | null {
-  if (/ferrari/i.test(text)) return "Ferrari";
-  if (/lamborghini/i.test(text)) return "Lamborghini";
-  return null;
+  return normalizeSupportedMake(text);
 }
 
 const KNOWN_MODELS = [
@@ -494,7 +564,11 @@ const KNOWN_MODELS = [
   // Ferrari
   "Roma", "Portofino", "California", "SF90 Stradale", "SF90", "296 GTB/GTS", "296", "812 Superfast", "812", "488 GTB", "488", "458 Italia", "458", "F8 Tributo", "F8", "F50", "F40", "LaFerrari", "Enzo", "Daytona SP3", "Daytona", 
   "Testarossa", "Purosangue", "12Cilindri", "GTC4Lusso", "GTC4", "550 Maranello", "550", "575M Maranello", "575", "512", "308 GTB/GTS", "308", "328 GTB/GTS", "328",
-  "F12berlinetta", "F12", "Berlinetta Boxer", "Berlinetta", "Mondial", "F80", "Monza SP1/SP2", "Monza", "348", "456", "360 Modena", "360", "Dino 246 GT/GTS", "Dino", "288 GTO", "288", "GTO", "166 Inter", "250 GT Series", "250 GTO", "275 GTB", "365 GTB/4 Daytona"
+  "F12berlinetta", "F12", "Berlinetta Boxer", "Berlinetta", "Mondial", "F80", "Monza SP1/SP2", "Monza", "348", "456", "360 Modena", "360", "Dino 246 GT/GTS", "Dino", "288 GTO", "288", "GTO", "166 Inter", "250 GT Series", "250 GTO", "275 GTB", "365 GTB/4 Daytona",
+  // McLaren
+  "Artura", "W1", "GTS", "GT", "750S Spider", "750S", "765LT Spider", "765LT", "720S Spider", "720S", "675LT Spider", "675LT",
+  "650S Spider", "650S", "625C", "600LT Spider", "600LT", "570S Spider", "570S", "570GT", "540C", "12C Spider", "MP4-12C", "12C",
+  "P1", "Senna", "Speedtail", "Elva", "Sabre", "Solus GT", "620R", "F1"
 ];
 
 const SORTED_MODELS = [...KNOWN_MODELS].sort((a, b) => b.length - a.length);
@@ -534,7 +608,8 @@ function inferModelText(text: string): string | null {
   }
 
   const compact = compactWhitespace(text);
-  const match = compact.match(/\b(?:Ferrari|Lamborghini)\s+([A-Z0-9][A-Za-z0-9 -]{1,40})/);
+  const makeAlternates = SUPPORTED_MAKES.join("|");
+  const match = compact.match(new RegExp(`\\b(?:${makeAlternates})\\s+([A-Z0-9][A-Za-z0-9 -]{1,40})`, "i"));
   return match ? match[1].trim() : null;
 }
 
@@ -557,16 +632,4 @@ function inferMileageFromText(text: string): number | null {
 function inferColorFromText(text: string): string | null {
   const match = text.match(/\b(?:exterior color|color)\s*:?\s*([A-Za-z ]{3,30})\b/i);
   return match ? compactWhitespace(match[1]) : null;
-}
-
-function closestHref(html: string, index: number, pageUrl: string): string | null {
-  const context = html.slice(Math.max(0, index - 3000), index + 500);
-  const hrefs = Array.from(context.matchAll(/href=["']([^"']+)["']/gi));
-  const last = hrefs.at(-1)?.[1];
-  if (!last) return null;
-  try {
-    return new URL(last, pageUrl).toString();
-  } catch {
-    return null;
-  }
 }

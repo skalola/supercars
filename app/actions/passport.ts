@@ -11,6 +11,7 @@ import {
   dispatchServiceBookingEmail,
 } from "@/lib/fulfillment/service-booking-package";
 import { getServiceBookingFeeCents } from "@/lib/payments/payment-service";
+import { isSupportedMake } from "@/lib/supported-makes";
 
 function safeRevalidatePath(vin: string) {
   try {
@@ -244,12 +245,12 @@ export async function createServiceBookingPackage(input: CreateServiceBookingInp
   }
 
   if (!isValidVin(vehicle.vin)) {
-    throw new Error("Service booking packages require a valid VIN-backed Ferrari or Lamborghini vehicle.");
+    throw new Error("Service booking packages require a valid VIN-backed supported supercar vehicle.");
   }
 
   const makeName = vehicle.model.make.name;
-  if (makeName !== "Ferrari" && makeName !== "Lamborghini") {
-    throw new Error("Service booking packages are only supported for Ferrari and Lamborghini vehicles.");
+  if (!isSupportedMake(makeName)) {
+    throw new Error("Service booking packages are only supported for supported supercar makes.");
   }
 
   if (!input.serviceName.trim() || !input.shopName.trim() || !input.preferredDate || !input.preferredTime) {

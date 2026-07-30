@@ -1,5 +1,6 @@
 import ferrariCatalog from "../data/ferrari.json";
 import lamborghiniCatalog from "../data/lamborghini.json";
+import mclarenCatalog from "../data/mclaren.json";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -48,7 +49,7 @@ type CatalogModel = {
   }[];
 };
 
-const catalogs = [ferrariCatalog, lamborghiniCatalog] satisfies Catalog[];
+const catalogs = [ferrariCatalog, lamborghiniCatalog, mclarenCatalog] satisfies Catalog[];
 
 function formatYears(model: CatalogModel) {
   if (!model.productionStartYear) {

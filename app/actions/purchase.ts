@@ -17,6 +17,7 @@ import {
   generateTransportPackagePayload,
   dispatchTransportPackageEmail,
 } from "@/lib/fulfillment/transport-package";
+import { isSupportedMake } from "@/lib/supported-makes";
 
 async function getAuthenticatedUser() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -59,6 +60,7 @@ export async function createDealerPurchasePackage(
       vehicle: {
         include: {
           model: { include: { make: true } },
+          owner: true,
         },
       },
       model: { include: { make: true } },
@@ -85,18 +87,8 @@ export async function createDealerPurchasePackage(
     },
   });
 
-  // 2. Resolve Dealer Partner Contact from listing source
-  // Priority: marketSourceId (strongest) → website domain → name
-  const dealerName = listing.dealerName || listing.source?.name || "Dealer Partner";
-  const resolvedDealer = await resolvePartnerContact({
-    name: dealerName,
-    marketSourceId: listing.source?.id || undefined,
-    website: listing.url || undefined,
-    type: "DEALER",
-  });
-
   if (!listing.vehicle || !isValidVin(listing.vehicle.vin)) {
-    throw new Error("Dealer purchase packages require a valid VIN-backed Ferrari or Lamborghini vehicle.");
+    throw new Error("Dealer purchase packages require a valid VIN-backed supported supercar vehicle.");
   }
 
   const vin = listing.vehicle.vin;
@@ -104,8 +96,8 @@ export async function createDealerPurchasePackage(
   const make = listing.vehicle.model.make.name;
   const model = listing.vehicle.model.name;
   const trim = listing.vehicle.trim || null;
-  if (make !== "Ferrari" && make !== "Lamborghini") {
-    throw new Error("Dealer purchase packages are only supported for Ferrari and Lamborghini vehicles.");
+  if (!isSupportedMake(make)) {
+    throw new Error("Dealer purchase packages are only supported for supported supercar makes.");
   }
 
   const buyerName = input.buyerName || buyer?.name || buyer?.username || "Verified Buyer";
@@ -114,6 +106,30 @@ export async function createDealerPurchasePackage(
     throw new Error("Buyer email is required to create a dealer purchase package.");
   }
 
+  const localSeller = listing.seller || listing.vehicle.owner || null;
+  const isSiteUserListing = !!listing.sellerId;
+  const localSellerName =
+    localSeller?.name || localSeller?.username || localSeller?.email || "SUPERCAR DASH owner";
+  const localSellerEmail = localSeller?.email || null;
+
+  // 2. Resolve recipient.
+  // Site-user listings route directly to the claimed owner/seller.
+  // Third-party inventory routes through the dealer directory resolver.
+  const dealerName = isSiteUserListing
+    ? localSellerName
+    : listing.dealerName || listing.source?.name || "Dealer Partner";
+  const resolvedDealer = isSiteUserListing
+    ? null
+    : await resolvePartnerContact({
+        name: dealerName,
+        marketSourceId: listing.source?.id || undefined,
+        website: listing.url || undefined,
+        type: "DEALER",
+        allowDealerDomainFallback: true,
+      });
+  const recipientName = isSiteUserListing ? localSellerName : resolvedDealer?.name || dealerName;
+  const recipientEmail = isSiteUserListing ? localSellerEmail : resolvedDealer?.email || null;
+
   // 3. Build Scoped Package Payload
   const packagePayload = generateDealerPurchasePackagePayload({
     vin,
@@ -121,8 +137,8 @@ export async function createDealerPurchasePackage(
     make,
     model,
     trim,
-    listingUrl: listing.url,
-    listingSourceName: listing.source?.name || null,
+    listingUrl: isSiteUserListing ? `/vehicle/${vin}` : listing.url,
+    listingSourceName: isSiteUserListing ? "SUPERCAR DASH Owner Listing" : listing.source?.name || null,
     externalListingId: listing.externalListingId || null,
     dealerName,
     askingPrice: input.amount || listing.askingPrice || listing.price || 0,
@@ -145,9 +161,10 @@ export async function createDealerPurchasePackage(
     packageDescription: `Official buyer purchase offer for ${year} ${make} ${model} (${vin})`,
     scopedPackageData: packagePayload,
     partnerName: resolvedDealer?.name || dealerName,
-    partnerEmail: resolvedDealer?.email || null, // Will use resolved audited email, or null if unresolved
+    partnerEmail: recipientEmail, // Site seller email or resolved audited dealer email; null holds as DRAFT.
     partnerType: "DEALER",
-    partnerMarketSourceId: listing.source?.id || null,
+    partnerMarketSourceId:
+      isSiteUserListing || resolvedDealer?.marketSourceId !== listing.source?.id ? null : listing.source?.id || null,
     status: "SENT",
     parties: [
       {
@@ -157,9 +174,10 @@ export async function createDealerPurchasePackage(
         email: buyerEmail,
       },
       {
-        partyType: "DEALER",
-        name: resolvedDealer?.name || dealerName,
-        email: resolvedDealer?.email || undefined,
+        partyType: isSiteUserListing ? "SELLER" : "DEALER",
+        userId: isSiteUserListing ? localSeller?.id : undefined,
+        name: recipientName,
+        email: recipientEmail || undefined,
       },
     ],
     depositIntent: {
@@ -198,8 +216,8 @@ export async function createDealerPurchasePackage(
   if (partnerToken) {
     await dispatchDealerPackageEmail({
       fulfillmentRequestId: fulfillmentRequest.id,
-      dealerName: resolvedDealer?.name || dealerName,
-      dealerEmail: resolvedDealer?.email || null,
+      dealerName: recipientName,
+      dealerEmail: recipientEmail,
       decisionTokenUrl,
       packageTitle: fulfillmentRequest.packages[0]?.title || "Dealer Purchase Package",
       vehicleSummary: `${year} ${make} ${model} (VIN: ${vin})`,
@@ -260,12 +278,12 @@ export async function createInsuranceQuotePackage(
   const listing = purchase.listing;
   const vehicle = listing.vehicle;
   if (!vehicle || !isValidVin(vehicle.vin)) {
-    throw new Error("Insurance quote packages require a valid VIN-backed Ferrari or Lamborghini vehicle.");
+    throw new Error("Insurance quote packages require a valid VIN-backed supported supercar vehicle.");
   }
 
   const insuranceMake = vehicle.model.make.name;
-  if (insuranceMake !== "Ferrari" && insuranceMake !== "Lamborghini") {
-    throw new Error("Insurance quote packages are only supported for Ferrari and Lamborghini vehicles.");
+  if (!isSupportedMake(insuranceMake)) {
+    throw new Error("Insurance quote packages are only supported for supported supercar makes.");
   }
 
   const statusVal = input.status || "QUOTE_STARTED";
@@ -427,12 +445,12 @@ export async function createTransportQuotePackage(
   const listing = purchase.listing;
   const vehicle = listing.vehicle;
   if (!vehicle || !isValidVin(vehicle.vin)) {
-    throw new Error("Transport quote packages require a valid VIN-backed Ferrari or Lamborghini vehicle.");
+    throw new Error("Transport quote packages require a valid VIN-backed supported supercar vehicle.");
   }
 
   const transportMake = vehicle.model.make.name;
-  if (transportMake !== "Ferrari" && transportMake !== "Lamborghini") {
-    throw new Error("Transport quote packages are only supported for Ferrari and Lamborghini vehicles.");
+  if (!isSupportedMake(transportMake)) {
+    throw new Error("Transport quote packages are only supported for supported supercar makes.");
   }
 
   const { streetAddress, city, state, postalCode } = input.address;

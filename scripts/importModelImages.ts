@@ -2,10 +2,22 @@ import { mkdir, writeFile, access, rm, copyFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { prisma } from "../lib/prisma";
+import { normalizeSupportedMake, SUPPORTED_MAKE_SLUGS } from "../lib/supported-makes";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
 const publicModelsRoot = path.join(projectRoot, "public", "images", "models");
+const makeArg = process.argv.find((arg) => arg.startsWith("--make="))?.split("=")[1];
+const targetMakeSlug = makeArg ? normalizeSupportedMake(makeArg)?.toLowerCase() : null;
+
+const catalogSources: Record<string, string[]> = {
+  ferrari: ["https://www.supercars.net/blog/all-brands/ferrari/ferrari-model-list/"],
+  lamborghini: ["https://www.lambocars.com/misc/lamborghini-data/lamborghini-models/"],
+  mclaren: [
+    "https://www.supercars.net/blog/all-brands/mclaren/mclaren-model-list/",
+    "https://cars.mclaren.com/us-en",
+  ],
+};
 
 const curatedAssets: Record<string, Record<string, Array<string>>> = {
   ferrari: {
@@ -161,9 +173,7 @@ async function importFromSources(model: { id: string; make: { slug: string }; sl
     `https://www.autoevolution.com/${makeSlug}/${modelSlug}/`,
     `https://www.autoevolution.com/${makeSlug}/${modelSlug}`,
     `https://www.autoevolution.com/${makeSlug}/`,
-    makeSlug === "ferrari"
-      ? "https://www.supercars.net/blog/all-brands/ferrari/ferrari-model-list/"
-      : "https://www.lambocars.com/misc/lamborghini-data/lamborghini-models/",
+    ...(catalogSources[makeSlug] ?? []),
   ];
 
   for (const sourceUrl of candidateUrls) {
@@ -221,7 +231,12 @@ async function main() {
     orderBy: [{ make: { name: "asc" } }, { name: "asc" }],
   });
 
-  const targetModels = models.filter((model) => ["ferrari", "lamborghini"].includes(model.make.slug));
+  const targetModels = models.filter((model) => {
+    if (!SUPPORTED_MAKE_SLUGS.includes(model.make.slug as (typeof SUPPORTED_MAKE_SLUGS)[number])) {
+      return false;
+    }
+    return targetMakeSlug ? model.make.slug === targetMakeSlug : true;
+  });
 
   for (const model of targetModels) {
     const existingImages = await prisma.modelImage.findMany({
@@ -251,7 +266,7 @@ async function main() {
     }
   }
 
-  console.log(`Processed ${targetModels.length} Ferrari/Lamborghini models.`);
+  console.log(`Processed ${targetModels.length} supported models${targetMakeSlug ? ` for ${targetMakeSlug}` : ""}.`);
 }
 
 main()

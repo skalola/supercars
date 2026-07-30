@@ -18,6 +18,9 @@ type PurchaseWizardProps = {
   mileage: number | null;
   color: string | null;
   listingId: string;
+  originalListingUrl?: string | null;
+  listedByLabel?: string | null;
+  listedByHref?: string | null;
 };
 
 export default function PurchaseWizard({
@@ -29,6 +32,9 @@ export default function PurchaseWizard({
   mileage,
   color,
   listingId,
+  originalListingUrl,
+  listedByLabel,
+  listedByHref,
 }: PurchaseWizardProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState(1);
@@ -146,6 +152,39 @@ export default function PurchaseWizard({
             <p style={{ fontSize: "13px", color: "#6b7280", margin: "2px 0 0 0" }}>
               {year} {make} {model} &bull; ${askingPrice.toLocaleString()}
             </p>
+            {listedByLabel && listedByHref ? (
+              <a
+                href={listedByHref}
+                style={{
+                  display: "inline-block",
+                  marginTop: "6px",
+                  color: "#2563eb",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  textDecoration: "underline",
+                  textUnderlineOffset: "3px",
+                }}
+              >
+                Listed by {listedByLabel}
+              </a>
+            ) : originalListingUrl ? (
+              <a
+                href={originalListingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "inline-block",
+                  marginTop: "6px",
+                  color: "#2563eb",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                  textDecoration: "underline",
+                  textUnderlineOffset: "3px",
+                }}
+              >
+                View original listing
+              </a>
+            ) : null}
           </div>
           <button
             onClick={resetWizard}

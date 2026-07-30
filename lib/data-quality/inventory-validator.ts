@@ -13,7 +13,7 @@ export function normalizeModelToMatchName(name: string): string {
   norm = norm.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
   // Remove brand prefixes
-  norm = norm.replace(/^(ferrari|lamborghini)\s+/gi, "");
+  norm = norm.replace(/^(ferrari|lamborghini|mclaren|mcclaren)\s+/gi, "");
 
   // Replace symbols/punctuation with spaces
   norm = norm.replace(/[^a-z0-9\s]/gi, " ");
@@ -50,6 +50,21 @@ export function normalizeModelToMatchName(name: string): string {
   if (norm.includes("f430")) return "f430";
   if (norm.includes("f355")) return "f355";
   if (norm.includes("360") || norm.includes("challenge stradale")) return "360";
+  if (norm.includes("mp4 12c") || norm.includes("12c")) return "mp4-12c";
+  if (norm.includes("570s")) return "570s";
+  if (norm.includes("570gt")) return "570gt";
+  if (norm.includes("600lt")) return "600lt";
+  if (norm.includes("650s")) return "650s";
+  if (norm.includes("675lt")) return "675lt";
+  if (norm.includes("720s")) return "720s";
+  if (norm.includes("750s")) return "750s";
+  if (norm.includes("765lt")) return "765lt";
+  if (norm.includes("artura")) return "artura";
+  if (norm.includes("gts")) return "gts";
+  if (norm.includes("w1")) return "w1";
+  if (norm.includes("senna")) return "senna";
+  if (norm.includes("speedtail")) return "speedtail";
+  if (norm.includes("elva")) return "elva";
 
   // General slug representation
   return norm.replace(/\s+/g, "-");

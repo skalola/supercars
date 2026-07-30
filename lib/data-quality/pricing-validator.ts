@@ -11,7 +11,7 @@ export function validatePrice(price: number | null): {
     return { status: "PRICE_MISSING", reason: "Price is missing" };
   }
 
-  // Minimum threshold: $10,000 for Ferrari/Lamborghini
+  // Minimum threshold for supported supercar inventory.
   if (price < 10000) {
     return { status: "PRICE_INVALID", reason: `Price is below $10,000 minimum: $${price}` };
   }

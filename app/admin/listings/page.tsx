@@ -40,13 +40,14 @@ export default async function AdminListingsPage() {
 
     return [{
       id: listing.id,
+      imageUrl: listing.imageUrl,
       vehicleLabel,
       make: vehicle.model.make.name,
       model: vehicle.model.name,
       year: vehicle.year,
       vin: vehicle.vin,
       status: listing.status,
-      price: formatCurrency(listing.price || listing.askingPrice),
+      price: formatCurrency(listing.askingPrice || listing.price),
       mileage: formatMileage(listing.mileage),
       dealerName: listing.dealerName || "Unknown",
       location: listing.location || "Unknown",

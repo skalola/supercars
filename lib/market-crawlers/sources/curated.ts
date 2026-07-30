@@ -11,7 +11,7 @@ export class CuratedCrawler extends PublicPageSource {
         "https://www.wearecurated.com/inventory?c5ad846e_page=3",
       ],
       discoverDetailLinks: true,
-      detailLinkPatterns: [/\/inventory\/.+(?:ferrari|lamborghini)/i],
+      detailLinkPatterns: [/\/inventory\/.+(?:ferrari|lamborghini|mclaren)/i],
       maxDetailPages: 120,
     });
   }

@@ -7,6 +7,7 @@ import { CuratedCrawler } from "./curated";
 import { DuPontRegistryCrawler } from "./dupont";
 import { DuPontSitemapCrawler } from "./dupont-sitemap";
 import { EuropeanCollectiblesCrawler } from "./european-collectibles";
+import { HemmingsCrawler } from "./hemmings";
 import { HighYieldSpecialistCrawler } from "./high-yield-specialists";
 import { MarshallGoldmanCrawler } from "./marshall-goldman";
 import { SpecialistDealerCrawler } from "./specialist-dealers";
@@ -18,6 +19,7 @@ export function defaultInventorySources(): PublicInventorySource[] {
     new DuPontSitemapCrawler(),
     new AutoTraderCrawler(),
     new CarsDotComCrawler(),
+    new HemmingsCrawler(),
     new SpecialistDealerCrawler(),
     new CNCMotorsCrawler(),
     new MarshallGoldmanCrawler(),

@@ -1,0 +1,303 @@
+{
+  "make": {
+    "name": "McLaren",
+    "slug": "mclaren"
+  },
+  "models": [
+    {
+      "name": "F1",
+      "slug": "f1",
+      "productionStartYear": 1992,
+      "productionEndYear": 1998,
+      "category": "Hypercar",
+      "bodyStyle": "3-seat Coupe",
+      "productionCount": 106,
+      "description": "McLaren's landmark naturally aspirated V12 road car used a carbon-fiber monocoque, central driving position and uncompromising engineering focus.",
+      "spec": {
+        "engine": "6.1L V12",
+        "horsepower": "627 hp",
+        "transmission": "6-speed manual",
+        "drivetrain": "RWD",
+        "topSpeed": "240 mph"
+      }
+    },
+    {
+      "name": "MP4-12C",
+      "slug": "mp4-12c",
+      "productionStartYear": 2011,
+      "productionEndYear": 2014,
+      "category": "Supercar",
+      "bodyStyle": "Coupe / Spider",
+      "description": "The MP4-12C restarted McLaren series production with a carbon tub, hydraulic suspension and twin-turbo V8 power.",
+      "spec": {
+        "engine": "3.8L twin-turbo V8",
+        "horsepower": "592-616 hp",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "207 mph"
+      },
+      "variants": [
+        {
+          "name": "12C Spider",
+          "slug": "12c-spider",
+          "productionStartYear": 2012,
+          "productionEndYear": 2014
+        }
+      ]
+    },
+    {
+      "name": "P1",
+      "slug": "p1",
+      "productionStartYear": 2013,
+      "productionEndYear": 2015,
+      "category": "Hybrid Hypercar",
+      "bodyStyle": "Coupe",
+      "productionCount": 375,
+      "description": "The P1 combined twin-turbo V8 power, electric assistance and active aerodynamics as McLaren's first modern Ultimate Series road car.",
+      "spec": {
+        "engine": "3.8L twin-turbo hybrid V8",
+        "horsepower": "903 hp",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "217 mph"
+      }
+    },
+    {
+      "name": "650S",
+      "slug": "650s",
+      "productionStartYear": 2014,
+      "productionEndYear": 2017,
+      "category": "Supercar",
+      "bodyStyle": "Coupe / Spider",
+      "description": "The 650S evolved the 12C platform with P1-inspired design cues, sharper aero and a more powerful twin-turbo V8.",
+      "spec": {
+        "engine": "3.8L twin-turbo V8",
+        "horsepower": "641 hp",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "207 mph"
+      },
+      "variants": [
+        {
+          "name": "650S Spider",
+          "slug": "650s-spider",
+          "productionStartYear": 2014,
+          "productionEndYear": 2017
+        }
+      ]
+    },
+    {
+      "name": "675LT",
+      "slug": "675lt",
+      "productionStartYear": 2015,
+      "productionEndYear": 2017,
+      "category": "Longtail",
+      "bodyStyle": "Coupe / Spider",
+      "productionCount": 1000,
+      "description": "The 675LT revived the Longtail name with lighter construction, more focused dynamics and limited coupe and spider production.",
+      "spec": {
+        "engine": "3.8L twin-turbo V8",
+        "horsepower": "666 hp",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "205 mph"
+      }
+    },
+    {
+      "name": "570S",
+      "slug": "570s",
+      "productionStartYear": 2015,
+      "productionEndYear": 2021,
+      "category": "Sports Series",
+      "bodyStyle": "Coupe / Spider",
+      "description": "The 570S brought McLaren's carbon-fiber chassis and twin-turbo V8 formula into a more road-focused Sports Series package.",
+      "spec": {
+        "engine": "3.8L twin-turbo V8",
+        "horsepower": "562 hp",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "204 mph"
+      },
+      "variants": [
+        {
+          "name": "570GT",
+          "slug": "570gt",
+          "productionStartYear": 2016,
+          "productionEndYear": 2020
+        }
+      ]
+    },
+    {
+      "name": "600LT",
+      "slug": "600lt",
+      "productionStartYear": 2018,
+      "productionEndYear": 2020,
+      "category": "Longtail",
+      "bodyStyle": "Coupe / Spider",
+      "description": "The 600LT was the focused Longtail version of the Sports Series, pairing reduced weight with increased aero and distinctive top-exit exhausts.",
+      "spec": {
+        "engine": "3.8L twin-turbo V8",
+        "horsepower": "592 hp",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "204 mph"
+      }
+    },
+    {
+      "name": "720S",
+      "slug": "720s",
+      "productionStartYear": 2017,
+      "productionEndYear": 2023,
+      "category": "Super Series",
+      "bodyStyle": "Coupe / Spider",
+      "description": "The 720S introduced McLaren's second-generation Super Series architecture with a 4.0L twin-turbo V8 and dramatic aerodynamic bodywork.",
+      "spec": {
+        "engine": "4.0L twin-turbo V8",
+        "horsepower": "710 hp",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "212 mph"
+      }
+    },
+    {
+      "name": "765LT",
+      "slug": "765lt",
+      "productionStartYear": 2020,
+      "productionEndYear": 2023,
+      "category": "Longtail",
+      "bodyStyle": "Coupe / Spider",
+      "productionCount": 1530,
+      "description": "The 765LT sharpened the 720S into a limited Longtail model with more power, less weight and more aggressive aerodynamic tuning.",
+      "spec": {
+        "engine": "4.0L twin-turbo V8",
+        "horsepower": "755 hp",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "205 mph"
+      }
+    },
+    {
+      "name": "GT",
+      "slug": "gt",
+      "productionStartYear": 2019,
+      "productionEndYear": 2023,
+      "category": "Grand Tourer",
+      "bodyStyle": "Coupe",
+      "description": "The McLaren GT tuned the carbon-chassis formula for longer-distance usability with more luggage space and a calmer grand touring character.",
+      "spec": {
+        "engine": "4.0L twin-turbo V8",
+        "horsepower": "612 hp",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "203 mph"
+      }
+    },
+    {
+      "name": "GTS",
+      "slug": "gts",
+      "productionStartYear": 2024,
+      "category": "Grand Tourer",
+      "bodyStyle": "Coupe",
+      "description": "The GTS succeeded the McLaren GT with more power, reduced weight and sharper chassis tuning while retaining the grand touring brief.",
+      "spec": {
+        "engine": "4.0L twin-turbo V8",
+        "horsepower": "626 hp",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "203 mph"
+      }
+    },
+    {
+      "name": "Artura",
+      "slug": "artura",
+      "productionStartYear": 2021,
+      "category": "Hybrid Supercar",
+      "bodyStyle": "Coupe / Spider",
+      "description": "The Artura introduced McLaren's new lightweight hybrid architecture with a twin-turbo V6 and electric assistance.",
+      "spec": {
+        "engine": "3.0L twin-turbo hybrid V6",
+        "horsepower": "671-690 hp",
+        "transmission": "8-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "205 mph"
+      }
+    },
+    {
+      "name": "750S",
+      "slug": "750s",
+      "productionStartYear": 2023,
+      "category": "Super Series",
+      "bodyStyle": "Coupe / Spider",
+      "description": "The 750S succeeded the 720S with lighter components, revised suspension and more power from McLaren's twin-turbo V8.",
+      "spec": {
+        "engine": "4.0L twin-turbo V8",
+        "horsepower": "740 hp",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "206 mph"
+      }
+    },
+    {
+      "name": "Senna",
+      "slug": "senna",
+      "productionStartYear": 2018,
+      "productionEndYear": 2019,
+      "category": "Ultimate Series",
+      "bodyStyle": "Coupe",
+      "productionCount": 500,
+      "description": "The Senna was built around track performance, high downforce and minimal compromise as an Ultimate Series road car.",
+      "spec": {
+        "engine": "4.0L twin-turbo V8",
+        "horsepower": "789 hp",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "208 mph"
+      }
+    },
+    {
+      "name": "Speedtail",
+      "slug": "speedtail",
+      "productionStartYear": 2019,
+      "productionEndYear": 2020,
+      "category": "Ultimate Series",
+      "bodyStyle": "3-seat Coupe",
+      "productionCount": 106,
+      "description": "The Speedtail reinterpreted the central-seat McLaren formula as a streamlined hybrid hyper-GT focused on extreme top-speed efficiency.",
+      "spec": {
+        "engine": "4.0L twin-turbo hybrid V8",
+        "horsepower": "1035 hp",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD",
+        "topSpeed": "250 mph"
+      }
+    },
+    {
+      "name": "Elva",
+      "slug": "elva",
+      "productionStartYear": 2020,
+      "productionEndYear": 2022,
+      "category": "Ultimate Series",
+      "bodyStyle": "Open Speedster",
+      "description": "The Elva is an open-cockpit Ultimate Series speedster inspired by McLaren's 1960s sports racers.",
+      "spec": {
+        "engine": "4.0L twin-turbo V8",
+        "horsepower": "804 hp",
+        "transmission": "7-speed dual-clutch",
+        "drivetrain": "RWD"
+      }
+    },
+    {
+      "name": "W1",
+      "slug": "w1",
+      "productionStartYear": 2026,
+      "category": "Hybrid Hypercar",
+      "bodyStyle": "Coupe",
+      "description": "The W1 is McLaren's next-generation Ultimate Series hybrid flagship, succeeding the F1 and P1 lineage.",
+      "spec": {
+        "engine": "Hybrid V8",
+        "transmission": "Dual-clutch",
+        "drivetrain": "RWD"
+      }
+    }
+  ]
+}

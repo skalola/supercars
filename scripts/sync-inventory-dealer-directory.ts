@@ -2,7 +2,7 @@
  * scripts/sync-inventory-dealer-directory.ts
  *
  * Builds/updates PartnerContact rows from real imported inventory dealers.
- * It groups active Ferrari/Lamborghini listings by dealer/source, crawls the
+ * It groups active supported-make listings by dealer/source, crawls the
  * dealer/listing/contact URLs, and upserts only verified dealer contact info.
  *
  * This is reusable for future makes: extend allowedMakes when the marketplace
@@ -16,14 +16,16 @@
 
 import { prisma } from "../lib/prisma";
 import { upsertPartnerContact } from "../lib/fulfillment/partner-registry";
+import { buildSalesEmailForWebsite, emailMatchesWebsiteDomain } from "../lib/directory/contact-domain-policy";
 import {
   discoverDealerContactFromInventory,
   isLikelyFakeUrl,
 } from "../lib/directory/dealer-contact-discovery";
+import { SUPPORTED_MAKES, type SupportedMake } from "../lib/supported-makes";
 
-type DirectoryMake = "Ferrari" | "Lamborghini";
+type DirectoryMake = SupportedMake;
 
-const allowedMakes = new Set((process.env.DIRECTORY_MAKES || "Ferrari,Lamborghini")
+const allowedMakes = new Set((process.env.DIRECTORY_MAKES || SUPPORTED_MAKES.join(","))
   .split(",")
   .map((make) => make.trim())
   .filter(Boolean));
@@ -52,20 +54,53 @@ async function main() {
       location: candidate.location || trusted?.location,
     });
 
+    const fallbackEmail = buildSalesEmailForWebsite(candidate.listingUrl);
+    if (!discovered.verified && fallbackEmail) {
+      upserted++;
+      console.log(`UPDT ${candidate.make} | ${candidate.dealerName} | ${fallbackEmail} | ${discovered.phone} | ${candidate.listingUrl}`);
+
+      if (!dryRun) {
+        await upsertPartnerContact({
+          name: candidate.dealerName,
+          type: "DEALER",
+          email: fallbackEmail,
+          phone: discovered.phone,
+          website: originFromUrl(candidate.listingUrl),
+          sourceDomain: domainFromUrl(candidate.listingUrl),
+          makeSpecialization: candidate.make,
+          location: discovered.location || candidate.location,
+          streetAddress: discovered.streetAddress,
+          city: discovered.city,
+          state: discovered.state,
+          postalCode: discovered.postalCode,
+          country: "US",
+          marketSourceId: candidate.marketSourceId,
+          confidence: "PUBLIC_SOURCE",
+          contactSource: "PUBLIC_WEBSITE",
+          active: true,
+        });
+      }
+      continue;
+    }
+
     if (!discovered.verified) {
       skipped++;
       console.log(`SKIP ${candidate.make} | ${candidate.dealerName} | ${discovered.reason} | ${discovered.sourceUrl || candidate.sourceWebsite || candidate.listingUrl}`);
       continue;
     }
 
+    const emailForDirectory = emailMatchesWebsiteDomain(discovered.email, discovered.website)
+      ? discovered.email
+      : buildSalesEmailForWebsite(discovered.website);
+
     upserted++;
-    console.log(`UPDT ${candidate.make} | ${candidate.dealerName} | ${discovered.email} | ${discovered.phone} | ${discovered.sourceUrl}`);
+    console.log(`UPDT ${candidate.make} | ${candidate.dealerName} | ${emailForDirectory} | ${discovered.phone} | ${discovered.sourceUrl}`);
 
     if (!dryRun) {
       await upsertPartnerContact({
         name: candidate.dealerName,
         type: "DEALER",
-        email: discovered.email,
+        email: emailForDirectory,
         phone: discovered.phone,
         website: discovered.website,
         sourceDomain: domainFromUrl(discovered.website),
@@ -94,7 +129,6 @@ async function loadDealerCandidates() {
   const listings = await prisma.listing.findMany({
     where: {
       status: "ACTIVE",
-      dealerName: { not: null },
       url: { not: null },
       model: {
         make: {
@@ -127,21 +161,38 @@ async function loadDealerCandidates() {
   for (const listing of listings) {
     const make = listing.model.make.name;
     if (!allowedMakes.has(make)) continue;
-    if (!listing.dealerName || !listing.url || isLikelyFakeUrl(listing.url) || isLikelyFakeUrl(listing.source?.website)) continue;
-    if (isLikelyFakeName(listing.dealerName) || isLikelyFakeName(listing.source?.name)) continue;
+    const listingDomain = domainFromUrl(listing.url);
+    const rawDealerName = listing.dealerName || listing.source?.name || null;
+    const displayDealerName = !rawDealerName || isGenericCrawlerDealerName(rawDealerName)
+      ? nameFromDomain(listingDomain) || listing.dealerName
+      : rawDealerName;
+    if (
+      !displayDealerName ||
+      !listing.url ||
+      isLikelyFakeUrl(listing.url) ||
+      (listing.source?.website ? isLikelyFakeUrl(listing.source.website) : false)
+    ) {
+      continue;
+    }
+    if (isLikelyFakeName(displayDealerName) || isLikelyFakeName(listing.source?.name)) continue;
 
     const key = [
       make,
-      normalizeName(listing.dealerName),
+      normalizeName(displayDealerName),
       domainFromUrl(listing.source?.website || listing.url),
     ].join("|");
     const candidate = {
-      dealerName: listing.dealerName,
+      dealerName: displayDealerName,
       make: make as DirectoryMake,
       listingUrl: listing.url,
       sourceWebsite: listing.source?.website || null,
       location: listing.location,
-      marketSourceId: listing.sourceId,
+      marketSourceId:
+        listing.source?.type === "DEALER" &&
+        listing.source?.name &&
+        normalizeName(listing.source.name) === normalizeName(displayDealerName)
+          ? listing.sourceId
+          : null,
       updatedAt: listing.updatedAt,
     };
 
@@ -163,6 +214,36 @@ function parseLimit(args: string[]) {
 function isLikelyFakeName(value?: string | null) {
   if (!value) return false;
   return /\b(test|demo|dummy|sprint|admin ops|transaction center|supercars 9b|financial settlement)\b/i.test(value);
+}
+
+function isGenericCrawlerDealerName(value?: string | null) {
+  if (!value) return false;
+  return /\b(high-yield|specialist dealers|dealer inventory|dealer network|autotrader|dupont registry|cars\.com)\b/i.test(value);
+}
+
+function nameFromDomain(domain?: string | null) {
+  if (!domain) return null;
+  const base = domain
+    .replace(/^www\./, "")
+    .split(".")[0]
+    .replace(/\bnj\b/i, "NJ")
+    .replace(/\bny\b/i, "NY")
+    .replace(/\bdc\b/i, "DC")
+    .replace(/\bfl\b/i, "FL")
+    .replace(/\bca\b/i, "CA")
+    .replace(/\btx\b/i, "TX");
+  const words = base
+    .replace(/ferrariof/i, "ferrari of ")
+    .replace(/lamborghiniof/i, "lamborghini of ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .split(/[^a-zA-Z0-9]+/)
+    .filter(Boolean);
+
+  return words.map((word) => {
+    if (/^(NJ|NY|DC|FL|CA|TX)$/i.test(word)) return word.toUpperCase();
+    if (/^of$/i.test(word)) return "of";
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  }).join(" ");
 }
 
 function normalizeName(value: string) {
@@ -205,6 +286,15 @@ function domainFromUrl(value?: string | null) {
   if (!value) return null;
   try {
     return new URL(value).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+function originFromUrl(value?: string | null) {
+  if (!value) return null;
+  try {
+    return new URL(value).origin;
   } catch {
     return null;
   }

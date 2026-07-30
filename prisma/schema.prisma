@@ -423,6 +423,7 @@ model Listing {
   location          String?
   dealerName        String?
   url               String?
+  imageUrl          String?
   vinVerified       Boolean  @default(false)
   validationStatus  String   @default("VALID")
   /// Status: ACTIVE | SOLD | REMOVED

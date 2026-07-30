@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { resolveModel } from "@/lib/market-sources/model-matcher";
 import { upsertPartnerContact } from "@/lib/fulfillment/partner-registry";
+import { buildSalesEmailForWebsite } from "@/lib/directory/contact-domain-policy";
 import { notifySavedCarNewListing, notifySavedCarPriceDrop } from "@/lib/garage/saved-car-alerts";
+import { normalizeSupportedMake, type SupportedMake } from "@/lib/supported-makes";
 import { defaultInventorySources } from "./sources";
 import type {
   CrawlerSourceResult,
@@ -123,10 +125,16 @@ export async function ingestCrawlerListings(
       const yearMatch = decodedYear === listingYear;
 
       if (!makeMatch || !modelMatchCheck || !yearMatch) {
-        validationStatus = "MODEL_MISMATCH";
+        const decodedSupportedMake = normalizeSupportedMake(decoded.make);
+        if (!decodedSupportedMake) {
+          validationStatus = "MODEL_MISMATCH";
+        }
 
-        // Override listing details with VIN decoded values
-        listing.make = (decoded.make.charAt(0).toUpperCase() + decoded.make.slice(1).toLowerCase()) as any;
+        // VIN decode is the source of truth when public page card/context text is noisy.
+        listing.make = (
+          decodedSupportedMake ??
+          (decoded.make.charAt(0).toUpperCase() + decoded.make.slice(1).toLowerCase())
+        ) as any;
         listing.model = decoded.model as string;
         listing.year = decodedYear;
 
@@ -142,34 +150,37 @@ export async function ingestCrawlerListings(
       continue;
     }
 
+    const sourceWebsite = getCrawlerSourceWebsite(listing);
     const source = await prisma.marketSource.upsert({
       where: { name: listing.sourceName },
       update: {
         type: listing.sourceType,
-        website: listing.dealerWebsite || undefined,
+        website: sourceWebsite || undefined,
         active: true,
       },
       create: {
         name: listing.sourceName,
         type: listing.sourceType,
-        website: listing.dealerWebsite || undefined,
+        website: sourceWebsite || undefined,
         active: true,
       },
     });
 
-    // Enforce Sprint 7.2 Partner Contact Registry:
-    // Auto-register partner contact. If email is not present from crawler, set email = null and contactStatus = UNRESOLVED_EMAIL.
-    // NEVER guess emails.
-    await upsertPartnerContact({
-      name: listing.sourceName,
-      type: listing.sourceType === "DEALER" ? "DEALER" : "DEALER",
-      website: listing.dealerWebsite || listing.url || undefined,
-      location: listing.location || listing.dealerName || undefined,
-      makeSpecialization: listing.make as "Ferrari" | "Lamborghini",
-      marketSourceId: source.id,
-      confidence: "PUBLIC_SOURCE",
-      email: null, // Crawler listing has no published email -> UNRESOLVED_EMAIL (do not guess!)
-    });
+    // Register partner contact. Dealer-owned domains may use the standard sales@domain inbox.
+    // Marketplace/reseller pages must remain unresolved until the actual holding dealer is extracted.
+    const fallbackDealerEmail = buildSalesEmailForWebsite(listing.dealerWebsite || listing.url);
+    if (listing.sourceType === "DEALER" || listing.dealerWebsite || fallbackDealerEmail) {
+      await upsertPartnerContact({
+        name: listing.dealerName || listing.sourceName,
+        type: "DEALER",
+        website: listing.dealerWebsite || listing.url || undefined,
+        location: listing.location || listing.dealerName || undefined,
+        makeSpecialization: listing.make as SupportedMake,
+        marketSourceId: listing.sourceType === "DEALER" ? source.id : null,
+        confidence: "PUBLIC_SOURCE",
+        email: fallbackDealerEmail,
+      });
+    }
 
     const existingVehicle = await prisma.vehicle.findUnique({
       where: { vin: listing.vin },
@@ -232,6 +243,11 @@ export async function ingestCrawlerListings(
       });
     }
 
+    const hasUsablePrice = listing.price !== null && listing.price > 0;
+    const listingStatus = hasUsablePrice ? "ACTIVE" : "INACTIVE";
+    const priceStatus = hasUsablePrice ? "VALID_PRICE" : "PRICE_MISSING";
+    const listingImageUrl = listing.images[0] || null;
+
     const savedListing = await prisma.listing.upsert({
       where: {
         sourceId_externalListingId: {
@@ -249,11 +265,13 @@ export async function ingestCrawlerListings(
         location: listing.location,
         dealerName: listing.dealerName,
         url: listing.url,
+        imageUrl: listingImageUrl,
         vehicleId: vehicle.id,
-        status: "ACTIVE",
+        status: listingStatus,
         lastSeen: new Date(),
         vinVerified: decoded.make ? true : false,
         validationStatus,
+        priceStatus,
       },
       create: {
         modelId: modelMatch.modelId,
@@ -267,12 +285,14 @@ export async function ingestCrawlerListings(
         location: listing.location,
         dealerName: listing.dealerName,
         url: listing.url,
+        imageUrl: listingImageUrl,
         vehicleId: vehicle.id,
-        status: "ACTIVE",
+        status: listingStatus,
         firstSeen: new Date(),
         lastSeen: new Date(),
         vinVerified: decoded.make ? true : false,
         validationStatus,
+        priceStatus,
       },
     });
 
@@ -292,6 +312,14 @@ export async function ingestCrawlerListings(
   }
 
   return counters;
+}
+
+function getCrawlerSourceWebsite(listing: NormalizedCrawlerListing) {
+  if (listing.sourceType === "DEALER") return listing.dealerWebsite || listing.url;
+  if (/autotrader/i.test(listing.sourceName)) return "https://www.autotrader.com";
+  if (/cars\.com|cars/i.test(listing.sourceName)) return "https://www.cars.com";
+  if (/dupont/i.test(listing.sourceName)) return "https://www.dupontregistry.com";
+  return null;
 }
 
 async function safelySendSavedCarAlert(send: () => Promise<{ sent: number; skipped?: string }>) {

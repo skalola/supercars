@@ -1,7 +1,7 @@
 /**
  * scripts/crawl-dealer-inventory.ts
  *
- * Inventory Expansion Engine — Authorized Ferrari & Lamborghini Dealers
+ * Inventory Expansion Engine — Authorized Supported-Make Dealers
  *
  * Crawls all active dealers from the dealer registry, ingests new vehicles
  * and listings through the existing validation pipeline, and prints a
@@ -23,6 +23,7 @@ import { prisma } from "../lib/prisma";
 import { crawlInventory } from "../lib/market-crawlers/crawler-engine";
 import { createAuthorizedDealerSources } from "../lib/market-crawlers/sources/authorized-dealers";
 import { ALL_AUTHORIZED_DEALERS } from "../lib/market-crawlers/dealer-registry";
+import { SUPPORTED_MAKES } from "../lib/supported-makes";
 
 function hr(char = "═", length = 58): string {
   return char.repeat(length);
@@ -34,19 +35,18 @@ function pad(label: string, width = 30): string {
 
 async function main() {
   const startedAt = Date.now();
+  const dealerArg = process.argv.find((arg) => arg.startsWith("--dealer="))?.split("=").slice(1).join("=").trim();
 
   console.log("\n" + hr());
   console.log("  Inventory Expansion Engine");
-  console.log("  Ferrari + Lamborghini Authorized Dealers");
+  console.log("  Supported Authorized Dealers");
   console.log(hr());
 
   // ── Dealer registry summary ────────────────────────────────────────────
-  const ferrariCount = ALL_AUTHORIZED_DEALERS.filter((d) => d.brand === "Ferrari").length;
-  const lamborghiniCount = ALL_AUTHORIZED_DEALERS.filter((d) => d.brand === "Lamborghini").length;
-
   console.log(`\n  Dealer registry loaded:`);
-  console.log(`    Ferrari dealers:      ${ferrariCount}`);
-  console.log(`    Lamborghini dealers:  ${lamborghiniCount}`);
+  for (const make of SUPPORTED_MAKES) {
+    console.log(`    ${make} dealers: ${ALL_AUTHORIZED_DEALERS.filter((d) => d.brand === make).length}`);
+  }
   console.log(`    Total active:         ${ALL_AUTHORIZED_DEALERS.length}`);
   console.log(`\n  Starting crawl...\n`);
 
@@ -57,7 +57,13 @@ async function main() {
   ]);
 
   // ── Run the crawl ──────────────────────────────────────────────────────
-  const sources = createAuthorizedDealerSources();
+  const sources = createAuthorizedDealerSources().filter((source) => {
+    if (!dealerArg) return true;
+    return source.sourceName.toLowerCase().includes(dealerArg.toLowerCase());
+  });
+  if (dealerArg && sources.length === 0) {
+    throw new Error(`No authorized dealer source matched "${dealerArg}".`);
+  }
   const result = await crawlInventory(sources);
 
   // ── Post-crawl counts ──────────────────────────────────────────────────

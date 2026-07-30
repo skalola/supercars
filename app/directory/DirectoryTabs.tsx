@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { SUPPORTED_MAKES } from "@/lib/supported-makes";
 
 export type DirectoryVendorType = "DEALER" | "SERVICE_SHOP" | "TRANSPORTER" | "INSURER";
 
@@ -199,8 +200,9 @@ export default function DirectoryTabs({ vendors }: DirectoryTabsProps) {
           <span>Make</span>
           <select value={makeFilter} onChange={(event) => setMakeFilter(event.target.value)}>
             <option value="ALL">All makes</option>
-            <option value="Ferrari">Ferrari</option>
-            <option value="Lamborghini">Lamborghini</option>
+            {SUPPORTED_MAKES.map((make) => (
+              <option key={make} value={make}>{make}</option>
+            ))}
           </select>
         </label>
         <label>

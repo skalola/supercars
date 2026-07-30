@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { getInventoryDashboardListings } from "@/lib/admin/listing-filters";
+import { getLiveInventoryListingStats } from "@/lib/admin/listing-filters";
 import { realFulfillmentWhere, withRealFulfillmentWhere } from "@/lib/admin/fulfillment-filters";
+import { emailMatchesWebsiteDomain } from "@/lib/directory/contact-domain-policy";
+import { isValidEmail } from "@/lib/fulfillment/partner-registry";
 import { prisma } from "@/lib/prisma";
 
 const RECENT_TRANSACTION_WINDOW_DAYS = 30;
@@ -43,10 +45,6 @@ function getWindowStart(window: "month" | "year" | "lifetime", now: Date) {
   return null;
 }
 
-function getListingPrice(listing: Awaited<ReturnType<typeof getInventoryDashboardListings>>[number]) {
-  return listing.askingPrice ?? listing.price ?? 0;
-}
-
 export default async function AdminOverviewPage({
   searchParams,
 }: {
@@ -66,18 +64,16 @@ export default async function AdminOverviewPage({
 
   const [
     activeSessions,
-    inventoryListings,
-    activeVendorCount,
+    liveInventoryStats,
+    partnerContacts,
     recentTransactions,
     recentVolume,
     previousVolume,
     pendingFulfillmentCount,
     acceptedOpenCount,
-    unresolvedVendorCount,
     fulfillmentByStatus,
     fulfillmentByType,
     fulfillmentVolumeByType,
-    vendorsByType,
     salesRequestStats,
     completedSalesStats,
   ] = await Promise.all([
@@ -86,9 +82,18 @@ export default async function AdminOverviewPage({
         distinct: ["userId"],
         select: { userId: true },
       }),
-      getInventoryDashboardListings(),
-      prisma.partnerContact.count({
+      getLiveInventoryListingStats(),
+      prisma.partnerContact.findMany({
         where: { active: true },
+        select: {
+          type: true,
+          email: true,
+          website: true,
+          phone: true,
+          city: true,
+          state: true,
+          contactStatus: true,
+        },
       }),
       prisma.fulfillmentRequest.count({
         where: withRealFulfillmentWhere({ createdAt: { gte: recentWindowStart } }),
@@ -109,12 +114,6 @@ export default async function AdminOverviewPage({
       prisma.fulfillmentRequest.count({
         where: withRealFulfillmentWhere({ status: "ACCEPTED" }),
       }),
-      prisma.partnerContact.count({
-        where: {
-          active: true,
-          OR: [{ contactStatus: "UNRESOLVED_EMAIL" }, { email: null }],
-        },
-      }),
       prisma.fulfillmentRequest.groupBy({
         by: ["status"],
         where: realFulfillmentWhere,
@@ -134,11 +133,6 @@ export default async function AdminOverviewPage({
           expectedPlatformFee: true,
           expectedPartnerCommission: true,
         },
-      }),
-      prisma.partnerContact.groupBy({
-        by: ["type"],
-        where: { active: true },
-        _count: { id: true },
       }),
       prisma.fulfillmentRequest.aggregate({
         where: withRealFulfillmentWhere({
@@ -175,15 +169,25 @@ export default async function AdminOverviewPage({
       }),
     ]);
 
-  const activeListingCount = inventoryListings.length;
+  const inventoryListings = liveInventoryStats.listings;
+  const activeListingCount = liveInventoryStats.liveListingCount;
   const recentTransactionAmount = recentVolume._sum.collectedAmount || 0;
   const previousTransactionAmount = previousVolume._sum.collectedAmount || 0;
   const volumeDelta = recentTransactionAmount - previousTransactionAmount;
-  const listingPrices = inventoryListings.map(getListingPrice).filter((price) => price > 0);
-  const totalInventoryValue = listingPrices.reduce((sum, price) => sum + price, 0);
-  const pricedListingCount = listingPrices.length;
-  const avgListingPrice = totalInventoryValue / Math.max(pricedListingCount, 1);
+  const totalInventoryValue = liveInventoryStats.totalLiveListingValue;
+  const pricedListingCount = liveInventoryStats.pricedListingCount;
+  const avgListingPrice = liveInventoryStats.averageLiveListingPrice;
   const listingsWithoutPrice = activeListingCount - pricedListingCount;
+  const publicEligiblePartners = partnerContacts.filter(
+    (partner) =>
+      isValidEmail(partner.email) &&
+      emailMatchesWebsiteDomain(partner.email, partner.website) &&
+      Boolean(partner.phone) &&
+      Boolean(partner.website) &&
+      Boolean(partner.city) &&
+      Boolean(partner.state)
+  );
+  const unresolvedVendorCount = partnerContacts.length - publicEligiblePartners.length;
 
   const listingsByMake = Array.from(
     inventoryListings.reduce((map, listing) => {
@@ -226,7 +230,6 @@ export default async function AdminOverviewPage({
     }))
     .sort((a, b) => b.value - a.value);
   const requestVolumeTotal = requestVolumeRows.reduce((sum, row) => sum + row.value, 0);
-  const totalExpectedPlatformFees = requestVolumeRows.reduce((sum, row) => sum + row.platformFee, 0);
   const salesRequestCount = salesRequestStats._count.id;
   const completedSalesCount = completedSalesStats._count.id;
   const completedSalesVolume = completedSalesStats._sum.collectedAmount || 0;
@@ -298,8 +301,13 @@ export default async function AdminOverviewPage({
     },
   ];
 
-  const vendorRows = vendorsByType
-    .map((row) => ({ label: labelPartnerType(row.type), value: row._count.id }))
+  const vendorRows = Array.from(
+    publicEligiblePartners.reduce((map, partner) => {
+      map.set(partner.type, (map.get(partner.type) || 0) + 1);
+      return map;
+    }, new Map<string, number>())
+  )
+    .map(([type, value]) => ({ label: labelPartnerType(type), value }))
     .sort((a, b) => b.value - a.value);
   const vendorTotal = vendorRows.reduce((sum, row) => sum + row.value, 0);
 
@@ -317,7 +325,7 @@ export default async function AdminOverviewPage({
     {
       label: "Vendor email gaps",
       value: unresolvedVendorCount,
-      detail: "Active vendors that cannot receive automated requests yet.",
+      detail: "Admin-only vendors missing valid, domain-matched contact data.",
     },
     {
       label: "Listings missing price",
@@ -328,9 +336,15 @@ export default async function AdminOverviewPage({
 
   const metrics = [
     {
-      label: "Inventory Listing Value",
+      label: "Active Sessions",
+      value: activeSessions.length.toLocaleString(),
+      detail: "Currently valid logged-in sessions",
+      percent: getPercent(activeSessions.length, Math.max(activeSessions.length + 1, 1)),
+    },
+    {
+      label: "Live Listing Value",
       value: formatCurrency(totalInventoryValue),
-      detail: `${pricedListingCount.toLocaleString()} visible listings with listing price`,
+      detail: `${pricedListingCount.toLocaleString()} live visible listings`,
       percent: getPercent(pricedListingCount, activeListingCount),
     },
     {
@@ -340,10 +354,10 @@ export default async function AdminOverviewPage({
       percent: getPercent(activeListingCount, Math.max(activeListingCount + listingsWithoutPrice, 1)),
     },
     {
-      label: "Platform Fees",
-      value: formatCurrency(totalExpectedPlatformFees),
-      detail: "Expected fees across fulfillment requests",
-      percent: getPercent(totalExpectedPlatformFees, Math.max(totalExpectedPlatformFees + recentTransactionAmount, 1)),
+      label: "Partner Portal",
+      value: vendorTotal.toLocaleString(),
+      detail: `${unresolvedVendorCount.toLocaleString()} admin-only partner gaps`,
+      percent: getPercent(vendorTotal, partnerContacts.length),
     },
     {
       label: "30-Day Volume",
@@ -514,12 +528,12 @@ export default async function AdminOverviewPage({
         <div className="surface-panel admin-analytics-panel">
           <div className="admin-analytics-panel-header">
             <div>
-              <span>Partner Coverage</span>
+              <span>Partner Portal Coverage</span>
               <strong>{vendorTotal.toLocaleString()}</strong>
             </div>
             <em>{unresolvedVendorCount.toLocaleString()} gaps</em>
           </div>
-          <p>Active fulfillment partners by service type.</p>
+          <p>Public-ready partners with valid domain-matched email, website, phone, city, and state.</p>
           <div className="admin-bar-list">
             {vendorRows.map((row) => (
               <div key={row.label} className="admin-bar-row">

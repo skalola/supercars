@@ -4,15 +4,12 @@ import type {
   RawCrawlerListing,
 } from "./types";
 import { cleanVin } from "./vin-extractor";
+import { makeFromVinPrefix, normalizeSupportedMake, SUPPORTED_MAKES } from "@/lib/supported-makes";
 
-const ALLOWED_MAKES: AllowedCrawlerMake[] = ["Ferrari", "Lamborghini"];
+const ALLOWED_MAKES: AllowedCrawlerMake[] = [...SUPPORTED_MAKES];
 
 export function normalizeAllowedMake(value: string | null | undefined): AllowedCrawlerMake | null {
-  if (!value) return null;
-  const text = value.toLowerCase();
-  if (text.includes("ferrari")) return "Ferrari";
-  if (text.includes("lamborghini")) return "Lamborghini";
-  return null;
+  return normalizeSupportedMake(value);
 }
 
 export function inferYear(text: string | null | undefined): number | null {
@@ -84,15 +81,8 @@ export function normalizeListing(raw: RawCrawlerListing): NormalizedCrawlerListi
   
   let make = normalizeAllowedMake(raw.make) ?? normalizeAllowedMake(raw.title) ?? normalizeAllowedMake(title);
   
-  // Override make based on VIN prefix to prevent false make identification on mixed lists/footers
-  if (vin) {
-    const upperVin = vin.toUpperCase();
-    if (upperVin.startsWith("ZFF") || upperVin.startsWith("ZFA")) {
-      make = "Ferrari";
-    } else if (upperVin.startsWith("ZHW")) {
-      make = "Lamborghini";
-    }
-  }
+  // Override make based on VIN prefix to prevent false make identification on mixed lists/footers.
+  make = makeFromVinPrefix(vin) ?? make;
 
   if (!make || !ALLOWED_MAKES.includes(make)) return null;
 
@@ -102,8 +92,12 @@ export function normalizeListing(raw: RawCrawlerListing): NormalizedCrawlerListi
   // Clean up any occurrences of the other make from the raw model name
   let rawModel = raw.model;
   if (rawModel) {
-    const wrongMake = make === "Ferrari" ? "Lamborghini" : "Ferrari";
-    rawModel = rawModel.replace(new RegExp(wrongMake, "gi"), "").replace(/\s+/g, " ").trim();
+    for (const supportedMake of ALLOWED_MAKES) {
+      if (supportedMake !== make) {
+        rawModel = rawModel.replace(new RegExp(supportedMake, "gi"), "");
+      }
+    }
+    rawModel = rawModel.replace(/\s+/g, " ").trim();
   }
 
   const model = inferModel(make, rawModel, raw.title);

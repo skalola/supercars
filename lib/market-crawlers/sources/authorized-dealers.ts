@@ -1,7 +1,7 @@
 /**
  * lib/market-crawlers/sources/authorized-dealers.ts
  *
- * Crawler factory for authorized Ferrari and Lamborghini dealerships.
+ * Crawler factory for authorized supported-make dealerships.
  *
  * Reads the dealer registry and creates one PublicPageSource per active dealer.
  * No scraping logic lives here — all extraction is handled by PublicPageSource.
@@ -12,6 +12,7 @@
 import { ALL_AUTHORIZED_DEALERS, type DealerSource } from "../dealer-registry";
 import { PublicPageSource } from "./public-page-source";
 import type { PublicInventorySource } from "../types";
+import type { SupportedMake } from "@/lib/supported-makes";
 
 /**
  * Pattern used by detail-link discovery.
@@ -20,12 +21,15 @@ import type { PublicInventorySource } from "../types";
 const DEALER_DETAIL_LINK_PATTERNS: RegExp[] = [
   /ferrari/i,
   /lamborghini/i,
+  /mclaren|mcclaren/i,
   /\/inventory\/.+/i,
   /\/vehicles?\/.+/i,
   /\/vehicle-details\/.+/i,
   /\/pre-owned\/.+/i,
   /\/used\/.+/i,
+  /\/new\/.+/i,
   /\/certified\/.+/i,
+  /for-sale.*\.(?:htm|html)$/i,
   /\/listing\/.+/i,
   /\/detail\/.+/i,
   /\/car\/.+/i,
@@ -60,7 +64,7 @@ export function createAuthorizedDealerSources(): PublicInventorySource[] {
  * Returns sources for a specific brand only.
  */
 export function createAuthorizedDealerSourcesByBrand(
-  brand: "Ferrari" | "Lamborghini"
+  brand: SupportedMake
 ): PublicInventorySource[] {
   return ALL_AUTHORIZED_DEALERS
     .filter((d) => d.brand === brand)

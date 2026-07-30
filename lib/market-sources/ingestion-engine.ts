@@ -295,19 +295,11 @@ export async function generateSnapshot(modelId: string): Promise<void> {
         modelId,
         status: "ACTIVE",
         OR: [
-          { price: null },
+          { askingPrice: { gte: 10000 } },
           { price: { gte: 10000 } }
         ],
-        AND: [
-          {
-            OR: [
-              { askingPrice: null },
-              { askingPrice: { gte: 10000 } }
-            ]
-          }
-        ]
       },
-      select: { price: true, mileage: true },
+      select: { price: true, askingPrice: true, mileage: true },
     }),
     prisma.marketSale.findMany({
       where: {
@@ -320,7 +312,7 @@ export async function generateSnapshot(modelId: string): Promise<void> {
   ]);
 
   const prices = listings
-    .map((l) => l.price)
+    .map((l) => l.askingPrice ?? l.price)
     .filter((p): p is number => p !== null && p >= 10000 && p <= 20000000);
   const mileages = [
     ...listings.map((l) => l.mileage),

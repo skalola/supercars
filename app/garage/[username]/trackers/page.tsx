@@ -94,7 +94,7 @@ export default async function ProfileTrackersPage({ params }: { params: Promise<
       signal:
         savedModelNames.length > 0
           ? savedModelNames.join(", ")
-          : "Save Ferrari or Lamborghini models to activate listing matching.",
+          : "Save supported supercar models to activate listing matching.",
       countLabel: `${user.garageItems.length} saved model${user.garageItems.length === 1 ? "" : "s"}`,
     },
     {

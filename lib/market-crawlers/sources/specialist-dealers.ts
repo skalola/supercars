@@ -15,13 +15,16 @@ function specialistUrls(): string[] {
     "https://www.lamborghinipalmbeach.com/inventory",
     "https://www.lamborghinisandiego.com/used-inventory/",
     "https://www.ogaracoach.com/used-inventory/",
+    "https://www.mclarencharlotte.com/used-vehicles/",
+    "https://www.mclarenphl.com/used-inventory/index.htm",
+    "https://www.mclarenhouston.com/used-vehicles/",
   ];
 }
 
 export class SpecialistDealerCrawler extends PublicPageSource {
   constructor() {
     super({
-      sourceName: "Ferrari/Lamborghini specialist dealers",
+      sourceName: "Supported supercar specialist dealers",
       sourceType: "DEALER",
       discoverDetailLinks: true,
       maxDetailPages: 500,

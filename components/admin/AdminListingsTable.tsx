@@ -5,6 +5,7 @@ import { removeListingAction, unpublishListingAction } from "@/app/actions/admin
 
 export type AdminListingRow = {
   id: string;
+  imageUrl: string | null;
   vehicleLabel: string;
   make: string;
   model: string;

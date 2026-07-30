@@ -11,6 +11,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { SUPPORTED_MAKES } from "@/lib/supported-makes";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -96,27 +97,28 @@ export async function getMarketRange(modelId: string): Promise<MarketRange | nul
       priceStatus: { not: "PRICE_INVALID" },
       vehicle: {
         is: {
-          inventoryStatus: { in: ["VALID", "WARNING"] }
+          inventoryStatus: { in: ["VALID", "WARNING"] },
+          model: {
+            make: {
+              name: { in: [...SUPPORTED_MAKES] },
+            },
+          },
         }
       },
       OR: [
-        { price: null },
+        { askingPrice: { gte: 10000 } },
         { price: { gte: 10000 } }
       ],
-      AND: [
-        {
-          OR: [
-            { askingPrice: null },
-            { askingPrice: { gte: 10000 } }
-          ]
-        }
+      NOT: [
+        { source: { is: { type: "AUCTION" } } },
+        { url: { contains: "bringatrailer.com", mode: "insensitive" } },
       ]
     },
-    select: { price: true },
+    select: { price: true, askingPrice: true },
   });
 
   const prices = listings
-    .map((l) => l.price)
+    .map((l) => l.askingPrice ?? l.price)
     .filter((p): p is number => p !== null);
 
   if (prices.length === 0) return null;
@@ -142,20 +144,21 @@ export async function getMarketSupply(modelId: string): Promise<MarketSupply> {
       priceStatus: { not: "PRICE_INVALID" },
       vehicle: {
         is: {
-          inventoryStatus: { in: ["VALID", "WARNING"] }
+          inventoryStatus: { in: ["VALID", "WARNING"] },
+          model: {
+            make: {
+              name: { in: [...SUPPORTED_MAKES] },
+            },
+          },
         }
       },
       OR: [
-        { price: null },
+        { askingPrice: { gte: 10000 } },
         { price: { gte: 10000 } }
       ],
-      AND: [
-        {
-          OR: [
-            { askingPrice: null },
-            { askingPrice: { gte: 10000 } }
-          ]
-        }
+      NOT: [
+        { source: { is: { type: "AUCTION" } } },
+        { url: { contains: "bringatrailer.com", mode: "insensitive" } },
       ]
     },
   });
@@ -285,44 +288,109 @@ export async function getMarketSummary(modelId: string): Promise<MarketSummary> 
 
 export type MarketPriceHistoryItem = {
   month: string; // Format: "YYYY-MM"
-  averageSalePrice: number;
+  averageSalePrice: number | null;
+  averageListingPrice: number | null;
   salesCount: number;
+  listingCount: number;
 };
 
 export async function getMarketPriceHistory(modelId: string): Promise<MarketPriceHistoryItem[]> {
-  // This protects market intelligence from invalid source pricing.
-  const sales = await prisma.marketSale.findMany({
-    where: {
-      modelId,
-      salePrice: { gte: 10000 },
-    },
-    select: { saleDate: true, salePrice: true },
-    orderBy: { saleDate: "asc" },
-  });
+  const [sales, listings] = await Promise.all([
+    prisma.marketSale.findMany({
+      where: {
+        modelId,
+        salePrice: { gte: 10000, lte: 20000000 },
+      },
+      select: { saleDate: true, salePrice: true },
+      orderBy: { saleDate: "asc" },
+    }),
+    prisma.listing.findMany({
+      where: {
+        modelId,
+        status: "ACTIVE",
+        validationStatus: "VALID",
+        priceStatus: { not: "PRICE_INVALID" },
+        vehicleId: { not: null },
+        vehicle: {
+          is: {
+            inventoryStatus: { in: ["VALID", "WARNING"] },
+            model: {
+              make: {
+                name: { in: [...SUPPORTED_MAKES] },
+              },
+            },
+          },
+        },
+        OR: [
+          { askingPrice: { gte: 10000, lte: 20000000 } },
+          { price: { gte: 10000, lte: 20000000 } },
+        ],
+        NOT: [
+          { source: { is: { type: "AUCTION" } } },
+          { url: { contains: "bringatrailer.com", mode: "insensitive" } },
+        ],
+      },
+      select: { firstSeen: true, createdAt: true, askingPrice: true, price: true },
+      orderBy: { firstSeen: "asc" },
+    }),
+  ]);
 
-  if (sales.length === 0) return [];
+  if (sales.length === 0 && listings.length === 0) return [];
 
-  const groups: { [key: string]: { sum: number; count: number } } = {};
+  const groups: Record<string, {
+    saleSum: number;
+    saleCount: number;
+    listingSum: number;
+    listingCount: number;
+  }> = {};
+
   for (const sale of sales) {
-    const d = new Date(sale.saleDate);
-    if (isNaN(d.getTime())) continue;
-    const year = d.getUTCFullYear();
-    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-    const key = `${year}-${month}`;
+    const key = monthKey(sale.saleDate);
+    if (!key) continue;
 
     if (!groups[key]) {
-      groups[key] = { sum: 0, count: 0 };
+      groups[key] = emptyHistoryGroup();
     }
-    groups[key].sum += sale.salePrice;
-    groups[key].count += 1;
+    groups[key].saleSum += sale.salePrice;
+    groups[key].saleCount += 1;
+  }
+
+  for (const listing of listings) {
+    const key = monthKey(listing.firstSeen || listing.createdAt);
+    const price = listing.askingPrice ?? listing.price;
+    if (!key || !price) continue;
+
+    if (!groups[key]) {
+      groups[key] = emptyHistoryGroup();
+    }
+    groups[key].listingSum += price;
+    groups[key].listingCount += 1;
   }
 
   return Object.keys(groups)
     .sort()
     .map((key) => ({
       month: key,
-      averageSalePrice: Math.round(groups[key].sum / groups[key].count),
-      salesCount: groups[key].count,
+      averageSalePrice: groups[key].saleCount > 0 ? Math.round(groups[key].saleSum / groups[key].saleCount) : null,
+      averageListingPrice: groups[key].listingCount > 0 ? Math.round(groups[key].listingSum / groups[key].listingCount) : null,
+      salesCount: groups[key].saleCount,
+      listingCount: groups[key].listingCount,
     }));
 }
 
+function emptyHistoryGroup() {
+  return {
+    saleSum: 0,
+    saleCount: 0,
+    listingSum: 0,
+    listingCount: 0,
+  };
+}
+
+function monthKey(value: Date | string) {
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return null;
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}

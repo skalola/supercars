@@ -22,6 +22,7 @@ type ModelObj = {
 type ListingObj = {
   id: string;
   modelId: string;
+  imageUrl?: string | null;
   year: number;
   price: number | null;
   mileage: number | null;
@@ -46,6 +47,7 @@ type InventoryExplorerProps = {
 };
 
 function getListingImage(listing: ListingObj) {
+  if (listing.imageUrl) return listing.imageUrl;
   return getVehicleHeroImage(listing.vehicle);
 }
 

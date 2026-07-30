@@ -10,6 +10,7 @@ import PurchaseWizard from "@/components/market/PurchaseWizard";
 import OwnerSaleControls from "@/components/market/OwnerSaleControls";
 import { getVehicleHeroImage } from "@/lib/vehicle-images";
 import { isValidEmail } from "@/lib/fulfillment/partner-registry";
+import { emailMatchesWebsiteDomain } from "@/lib/directory/contact-domain-policy";
 
 type VehiclePageProps = {
   params: Promise<{ vin: string }>;
@@ -50,6 +51,16 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
       },
       listings: {
         orderBy: { createdAt: "desc" },
+        include: {
+          seller: {
+            select: {
+              id: true,
+              name: true,
+              username: true,
+              email: true,
+            },
+          },
+        },
       },
     },
   });
@@ -89,6 +100,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
         id: true,
         name: true,
         email: true,
+        website: true,
         city: true,
         state: true,
         latitude: true,
@@ -100,7 +112,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
 
   const makeName = vehicle.model.make.name;
   const serviceShopNames = serviceShops
-    .filter((shop) => isValidEmail(shop.email))
+    .filter((shop) => isValidEmail(shop.email) && emailMatchesWebsiteDomain(shop.email, shop.website))
     .filter((shop) => {
       const specialization = shop.makeSpecialization?.toLowerCase() || "all";
       const make = makeName.toLowerCase();
@@ -292,12 +304,35 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
 
   const { success: successParam } = (await searchParams) || {};
   const isOwner = !!(session?.user?.id && vehicle.ownerId === session.user.id && vehicle.status === "CLAIMED");
-  const resolvedHeroImage = getVehicleHeroImage(vehicle);
+  let resolvedHeroImage = getVehicleHeroImage(vehicle);
   const heroPhoto = vehicle.photos?.find((p: any) => p.isHero) || vehicle.photos?.[0];
 
-  const activeListing = vehicle.listings.find((l) => l.status === "ACTIVE" && l.validationStatus === "VALID" && l.priceStatus !== "PRICE_INVALID");
+  const activeListing = [...vehicle.listings]
+    .filter((l) => {
+      const price = l.askingPrice ?? l.price ?? 0;
+      return l.status === "ACTIVE" && l.validationStatus === "VALID" && l.priceStatus !== "PRICE_INVALID" && price >= 10000;
+    })
+    .sort((a, b) => {
+      if (Boolean(b.url) !== Boolean(a.url)) return Boolean(b.url) ? 1 : -1;
+      const priceA = a.askingPrice ?? a.price ?? Infinity;
+      const priceB = b.askingPrice ?? b.price ?? Infinity;
+      if (priceA !== priceB) return priceA - priceB;
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    })[0];
+  
+  const hasOwnerPhotos = vehicle.photos && vehicle.photos.length > 0;
+  if (!hasOwnerPhotos && activeListing?.imageUrl) {
+    resolvedHeroImage = activeListing.imageUrl;
+  }
+  
   const isForSale = !!activeListing;
   const askingPrice = activeListing?.askingPrice || activeListing?.price || null;
+  const localSeller = activeListing?.seller || null;
+  const localSellerLabel = localSeller?.username || localSeller?.name || "SUPERCAR DASH owner";
+  const localSellerHref = localSeller?.username ? `/garage/${localSeller.username}` : "/garage";
+  const originalListingUrl = activeListing?.sellerId
+    ? null
+    : activeListing?.url || vehicle.listings.find((listing) => !listing.sellerId && listing.url)?.url || null;
   return (
     <main className="page-shell" style={{ maxWidth: 900 }}>
       {/* Upgraded Hero block: Displays Year Make Model, FOR SALE badge, Asking Price, Verified Owner badge */}
@@ -404,8 +439,41 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
               <p style={{ fontSize: "14px", color: "#3b82f6", margin: 0 }}>
                 List Price: <strong style={{ color: "#1e3a8a" }}>${askingPrice?.toLocaleString()}</strong>
               </p>
+              {localSeller ? (
+                <a
+                  href={localSellerHref}
+                  style={{
+                    display: "inline-block",
+                    marginTop: "6px",
+                    color: "#1d4ed8",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    textDecoration: "underline",
+                    textUnderlineOffset: "3px",
+                  }}
+                >
+                  Listed by {localSellerLabel}
+                </a>
+              ) : originalListingUrl ? (
+                <a
+                  href={originalListingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "inline-block",
+                    marginTop: "6px",
+                    color: "#1d4ed8",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    textDecoration: "underline",
+                    textUnderlineOffset: "3px",
+                  }}
+                >
+                  View original listing
+                </a>
+              ) : null}
             </div>
-            <div style={{ minWidth: "160px" }}>
+            <div style={{ minWidth: "160px", display: "grid", gap: "8px" }}>
               <PurchaseWizard
                 vin={vehicle.vin}
                 year={vehicle.year}
@@ -415,6 +483,9 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
                 mileage={vehicle.profile?.currentMileage || vehicle.mileage}
                 color={vehicle.profile?.exteriorColor || vehicle.color}
                 listingId={activeListing.id}
+                originalListingUrl={originalListingUrl}
+                listedByLabel={localSeller ? localSellerLabel : null}
+                listedByHref={localSeller ? localSellerHref : null}
               />
             </div>
           </div>
@@ -988,6 +1059,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
             if (typeof value === "string" && value.trim().toLowerCase() === "unknown") return false;
             return true;
           });
+
           if (visibleFields.length === 0) return null;
 
           return (
@@ -1066,7 +1138,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
               No market data available yet.
             </div>
             <div style={{ fontSize: "12px", color: "#4b5563", marginTop: "12px", borderTop: "1px solid #f3f4f6", paddingTop: "8px" }}>
-              <strong>Monitored Sources:</strong> Bring a Trailer, RM Sotheby&apos;s, DuPont Registry, Ferrari Dealer Network, Lamborghini Dealer Network
+              <strong>Monitored Sources:</strong> Bring a Trailer, RM Sotheby&apos;s, DuPont Registry, and supported dealer networks
             </div>
           </div>
         )}

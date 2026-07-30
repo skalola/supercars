@@ -1,4 +1,6 @@
-export type AllowedCrawlerMake = "Ferrari" | "Lamborghini";
+import type { SupportedMake } from "@/lib/supported-makes";
+
+export type AllowedCrawlerMake = SupportedMake;
 
 export type CrawlerSourceType = "DEALER" | "MARKETPLACE";
 

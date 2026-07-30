@@ -78,7 +78,7 @@ export default function GarageTabs({ claimedVehicles, savedVehicles }: GarageTab
           <p style={styles.emptyCopy}>
             {activeTab === "claimed"
               ? "Claim a VIN-backed vehicle passport to manage ownership, service, and selling workflows."
-              : "Save Ferrari and Lamborghini models from model pages to keep them in your garage."}
+              : "Save supported supercar models from model pages to keep them in your garage."}
           </p>
           <Link href="/inventory" style={styles.emptyLink}>
             Browse inventory
