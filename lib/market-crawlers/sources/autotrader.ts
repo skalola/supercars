@@ -27,10 +27,16 @@ export class AutoTraderCrawler extends PublicPageSource {
     if (!isAutoTraderVehicleDetailUrl(page.url)) return listings;
 
     const dealer = extractAutoTraderDealer(page.html, page.url);
-    const canonicalUrl = canonicalAutoTraderVehicleUrl(page.url);
+    
+    // Discard the listing if we couldn't find an external dealer website
+    if (!dealer.website) {
+      console.log(`[AutoTrader] Discarding listing ${page.url} - no external dealer website found.`);
+      return [];
+    }
+
     return listings.map((listing) => ({
       ...listing,
-      url: canonicalUrl,
+      url: dealer.website, // Use the dealer's website instead of AutoTrader
       externalListingId: listing.externalListingId || autoTraderIdFromUrl(page.url),
       dealerName: listing.dealerName || dealer.name,
       dealerWebsite: listing.dealerWebsite || dealer.website,

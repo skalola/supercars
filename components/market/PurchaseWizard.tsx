@@ -39,11 +39,18 @@ export default function PurchaseWizard({
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
-    name: "",
+    firstName: "",
+    lastName: "",
     email: "",
-    message: `Hi, I am interested in your ${year} ${make} ${model} listed for $${askingPrice.toLocaleString()}. Please let me know when we can discuss this vehicle.`,
+    phone: "",
+    address: "",
+    city: "",
+    state: "",
+    zipCode: ""
   });
-  const [isSent, setIsSent] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const platformFee = askingPrice < 200000 ? askingPrice * 0.015 : askingPrice * 0.02;
+  const platformFeePercent = askingPrice < 200000 ? "1.5%" : "2%";
   const [purchaseId, setPurchaseId] = useState<string | null>(null);
 
   const [insuranceSelected, setInsuranceSelected] = useState("");
@@ -64,7 +71,7 @@ export default function PurchaseWizard({
 
   const resetWizard = () => {
     setStep(1);
-    setIsSent(false);
+    setAgreedToTerms(false);
     setInsuranceSelected("");
     setPurchaseId(null);
     setDeliveryAddress({
@@ -211,7 +218,7 @@ export default function PurchaseWizard({
           alignItems: "center",
           flexWrap: "wrap"
         }}>
-          {[1, 2, 3, 4, 5, 6].map((s) => (
+          {[1, 2, 3, 4, 5].map((s) => (
             <React.Fragment key={s}>
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                 <div style={{
@@ -235,13 +242,12 @@ export default function PurchaseWizard({
                 }}>
                   {s === 1 && "Details"}
                   {s === 2 && "Contact"}
-                  {s === 3 && "Inspection"}
-                  {s === 4 && "Review"}
-                  {s === 5 && "Insurance"}
-                  {s === 6 && "Delivery"}
+                  {s === 3 && "Insurance"}
+                  {s === 4 && "Delivery"}
+                  {s === 5 && "Review"}
                 </span>
               </div>
-              {s < 6 && (
+              {s < 5 && (
                 <div style={{
                   flex: 1,
                   minWidth: "10px",
@@ -297,39 +303,39 @@ export default function PurchaseWizard({
           {step === 2 && (
             <div>
               <h4 style={{ fontSize: "16px", fontWeight: 700, color: "#111827", marginTop: 0, marginBottom: "12px" }}>
-                Step 2: Contact Seller
+                Step 2: Buyer Information & Consent
               </h4>
               <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: 1.5, marginBottom: "16px" }}>
-                Send a direct message to the verified owner of this vehicle. They will receive an email notification.
+                Please provide your contact details to proceed with this purchase request.
               </p>
-              {isSent ? (
-                <div style={{
-                  backgroundColor: "#ecfdf5",
-                  border: "1px solid #a7f3d0",
-                  padding: "16px",
-                  borderRadius: "8px",
-                  textAlign: "center",
-                  color: "#065f46"
-                }}>
-                  <div style={{ fontSize: "24px", marginBottom: "8px" }}>✉️</div>
-                  <div style={{ fontWeight: 700 }}>Message Sent!</div>
-                  <div style={{ fontSize: "13px", marginTop: "4px" }}>The seller has been notified and will contact you shortly.</div>
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                   <div>
-                    <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#4b5563", marginBottom: "4px" }}>Your Name</label>
+                    <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#4b5563", marginBottom: "4px" }}>First Name</label>
                     <input
                       type="text"
                       required
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      value={formData.firstName}
+                      onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                       style={{ width: "100%", padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "14px" }}
-                      placeholder="e.g. John Doe"
+                      placeholder="e.g. John"
                     />
                   </div>
                   <div>
-                    <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#4b5563", marginBottom: "4px" }}>Your Email</label>
+                    <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#4b5563", marginBottom: "4px" }}>Last Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.lastName}
+                      onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                      style={{ width: "100%", padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "14px" }}
+                      placeholder="e.g. Doe"
+                    />
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#4b5563", marginBottom: "4px" }}>Email</label>
                     <input
                       type="email"
                       required
@@ -340,75 +346,89 @@ export default function PurchaseWizard({
                     />
                   </div>
                   <div>
-                    <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#4b5563", marginBottom: "4px" }}>Message</label>
-                    <textarea
-                      rows={3}
-                      value={formData.message}
-                      onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                      style={{ width: "100%", padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "14px", resize: "none" }}
+                    <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#4b5563", marginBottom: "4px" }}>Phone</label>
+                    <input
+                      type="tel"
+                      required
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      style={{ width: "100%", padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "14px" }}
+                      placeholder="e.g. 555-123-4567"
                     />
                   </div>
-                  <button
-                    onClick={() => {
-                      if (formData.name && formData.email) {
-                        setIsSent(true);
-                      } else {
-                        alert("Please fill in your name and email.");
-                      }
-                    }}
-                    style={{
-                      backgroundColor: "#10b981",
-                      color: "#ffffff",
-                      border: "none",
-                      padding: "10px",
-                      borderRadius: "6px",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      fontSize: "14px"
-                    }}
-                  >
-                    Send Message
-                  </button>
                 </div>
-              )}
-            </div>
-          )}
+                <div>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#4b5563", marginBottom: "4px" }}>Street Address</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    style={{ width: "100%", padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "14px" }}
+                    placeholder="123 Main St"
+                  />
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+                  <div>
+                    <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#4b5563", marginBottom: "4px" }}>City</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      style={{ width: "100%", padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "14px" }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#4b5563", marginBottom: "4px" }}>State</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.state}
+                      onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                      style={{ width: "100%", padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "14px" }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#4b5563", marginBottom: "4px" }}>Zip Code</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.zipCode}
+                      onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
+                      style={{ width: "100%", padding: "8px 12px", border: "1px solid #cbd5e1", borderRadius: "6px", fontSize: "14px" }}
+                    />
+                  </div>
+                </div>
 
-          {step === 3 && (
-            <div>
-              <h4 style={{ fontSize: "16px", fontWeight: 700, color: "#111827", marginTop: 0, marginBottom: "12px" }}>
-                Step 3: Inspection / Verification
-              </h4>
-              <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: 1.5, marginBottom: "16px" }}>
-                For ultimate peace of mind, we recommend coordinating a Pre-Purchase Inspection (PPI) and matching the verified VIN passport records.
-              </p>
-              <div style={{ display: "grid", gap: "12px" }}>
-                <div style={{ display: "flex", gap: "12px", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px" }}>
-                  <div style={{ fontSize: "20px" }}>🛡️</div>
-                  <div>
-                    <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>Verified Identity & History</div>
-                    <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
-                      This vehicle passport has verified ownership structure, modification logs, and complete service histories.
-                    </div>
+                <div style={{ backgroundColor: "#f8fafc", padding: "16px", borderRadius: "8px", border: "1px solid #e2e8f0", marginTop: "8px" }}>
+                  <p style={{ fontSize: "12px", color: "#475569", lineHeight: 1.5, margin: 0, paddingBottom: "12px", borderBottom: "1px solid #cbd5e1" }}>
+                    <strong>Legal Disclaimer:</strong> This purchase request is contingent upon the selling dealer's final approval of the offer and vehicle availability. By proceeding, the buyer agrees to pay the total vehicle price upon approval. A platform service fee of <strong>{platformFeePercent}</strong> (${platformFee.toLocaleString()}) will be applied to this transaction. This fee is non-refundable once the dealer accepts the offer.
+                  </p>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginTop: "12px" }}>
+                    <input
+                      type="checkbox"
+                      id="legalConsent"
+                      checked={agreedToTerms}
+                      onChange={(e) => setAgreedToTerms(e.target.checked)}
+                      style={{ marginTop: "3px", width: "16px", height: "16px" }}
+                    />
+                    <label htmlFor="legalConsent" style={{ fontSize: "13px", color: "#334155", lineHeight: 1.4 }}>
+                      I acknowledge that I have read and agree to SUPERCAR DASH's <a href="/legal/terms" target="_blank" style={{ color: "#2563eb", textDecoration: "underline" }}>Terms of Use</a> and <a href="/legal/privacy" target="_blank" style={{ color: "#2563eb", textDecoration: "underline" }}>Privacy Policy</a>.
+                    </label>
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: "12px", padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px" }}>
-                  <div style={{ fontSize: "20px" }}>🔍</div>
-                  <div>
-                    <div style={{ fontSize: "14px", fontWeight: 600, color: "#0f172a" }}>Schedule Pre-Purchase Inspection</div>
-                    <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
-                      Schedule a third-party mechanic inspection to audit the vehicle condition before finalized payment.
-                    </div>
-                  </div>
-                </div>
+
               </div>
             </div>
           )}
 
-          {step === 4 && (
+
+
+          {step === 5 && (
             <div style={{ display: "grid", gap: "16px" }}>
               <h4 style={{ fontSize: "16px", fontWeight: 700, color: "#111827", marginTop: 0, marginBottom: "12px" }}>
-                Step 4: Review & Purchase
+                Step 5: Review & Purchase
               </h4>
               <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: 1.5, marginBottom: "12px" }}>
                 Please review your details and confirm purchase terms before proceeding to insurance.
@@ -432,25 +452,35 @@ export default function PurchaseWizard({
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #f1f5f9", paddingBottom: "6px" }}>
                   <span style={{ color: "#64748b" }}>Buyer Name</span>
-                  <span style={{ fontWeight: 600, color: "#0f172a" }}>{formData.name || "N/A"}</span>
+                  <span style={{ fontWeight: 600, color: "#0f172a" }}>{formData.firstName} {formData.lastName}</span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #f1f5f9", paddingBottom: "6px" }}>
                   <span style={{ color: "#64748b" }}>Buyer Email</span>
                   <span style={{ fontWeight: 600, color: "#0f172a" }}>{formData.email || "N/A"}</span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #f1f5f9", paddingBottom: "6px" }}>
-                  <span style={{ color: "#64748b" }}>Inspection</span>
-                  <span style={{ fontWeight: 600, color: "#10b981" }}>✓ Pre-Purchase Inspection Recommended</span>
+                  <span style={{ color: "#64748b" }}>Buyer Phone</span>
+                  <span style={{ fontWeight: 600, color: "#0f172a" }}>{formData.phone || "N/A"}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #f1f5f9", paddingBottom: "6px" }}>
+                  <span style={{ color: "#64748b" }}>Buyer Address</span>
+                  <span style={{ fontWeight: 600, color: "#0f172a", textAlign: "right" }}>
+                    {formData.address ? `${formData.address}, ${formData.city}, ${formData.state} ${formData.zipCode}` : "N/A"}
+                  </span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #f1f5f9", paddingBottom: "6px" }}>
+                  <span style={{ color: "#64748b" }}>Platform Service Fee ({platformFeePercent})</span>
+                  <span style={{ fontWeight: 600, color: "#10b981" }}>${platformFee.toLocaleString()}</span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, paddingTop: "4px" }}>
-                  <span style={{ color: "#0f172a" }}>Purchase Price</span>
-                  <span style={{ color: "#10b981" }}>${askingPrice.toLocaleString()}</span>
+                  <span style={{ color: "#0f172a" }}>Total Purchase Price (excluding taxes)</span>
+                  <span style={{ color: "#10b981" }}>${(askingPrice + platformFee).toLocaleString()}</span>
                 </div>
               </div>
             </div>
           )}
 
-          {step === 5 && (
+          {step === 3 && (
             <div style={{ display: "grid", gap: "16px" }}>
               <h4 style={{ fontSize: "16px", fontWeight: 700, color: "#111827", marginTop: 0, marginBottom: "12px" }}>
                 Protect Your Investment
@@ -509,13 +539,31 @@ export default function PurchaseWizard({
             </div>
           )}
 
-          {step === 6 && (
-            <div>
-              {!deliverySubmitted ? (
-                <div style={{ display: "grid", gap: "16px" }}>
-                  <h4 style={{ fontSize: "16px", fontWeight: 700, color: "#111827", marginTop: 0, marginBottom: "12px" }}>
-                    Schedule Delivery
-                  </h4>
+          {step === 4 && (
+            <div style={{ display: "grid", gap: "16px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                    <h4 style={{ fontSize: "16px", fontWeight: 700, color: "#111827", margin: 0 }}>
+                      Step 4: Schedule Delivery
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (formData.address) {
+                          setDeliveryAddress(prev => ({
+                            ...prev,
+                            streetAddress: formData.address,
+                            city: formData.city,
+                            state: formData.state,
+                            postalCode: formData.zipCode,
+                            formattedAddress: `${formData.address}, ${formData.city}, ${formData.state} ${formData.zipCode}`.trim().replace(/^,\s*|,\s*$/g, "")
+                          }));
+                        }
+                      }}
+                      style={{ fontSize: "13px", color: "#2563eb", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}
+                    >
+                      Use Billing Address
+                    </button>
+                  </div>
                   <div style={{ background: "#f8fafc", padding: "12px", borderRadius: "8px", border: "1px solid #e2e8f0", fontSize: "13px", display: "grid", gap: "6px", marginBottom: "4px" }}>
                     <div>🚗 <strong>Vehicle Info:</strong> {year} {make} {model} (VIN: {vin})</div>
                     {deliveryAddress.formattedAddress && (
@@ -663,65 +711,10 @@ export default function PurchaseWizard({
                       </div>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const { streetAddress, city, state, postalCode } = deliveryAddress;
-                      if (!streetAddress || !city || !state || !postalCode || !deliveryDate) {
-                        alert("Please fill in all address fields and the delivery date.");
-                        return;
-                      }
-
-                      if (purchaseId) {
-                        try {
-                          await createTransportQuotePackage({
-                            purchaseId,
-                            address: { streetAddress, city, state, postalCode },
-                            transportMethod: deliveryMethod,
-                            deliveryDate
-                          });
-                        } catch (error) {
-                          const message = error instanceof Error ? error.message : "Failed to submit delivery request.";
-                          alert(message);
-                          return;
-                        }
-                      }
-
-                      setDeliverySubmitted(true);
-                    }}
-                    style={{
-                      backgroundColor: "#10b981",
-                      color: "#ffffff",
-                      border: "none",
-                      padding: "12px",
-                      borderRadius: "8px",
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      fontSize: "14px",
-                      marginTop: "8px",
-                      textAlign: "center"
-                    }}
-                  >
-                    Submit Delivery Request
-                  </button>
-                </div>
-              ) : (
-                <div style={{ display: "grid", gap: "16px", textAlign: "center", padding: "10px 0" }}>
-                  <span style={{ fontSize: "40px" }}>🚚🎉</span>
-                  <h4 style={{ fontSize: "18px", fontWeight: 700, color: "#065f46", margin: 0 }}>
-                    Delivery request submitted.
-                  </h4>
-                  <p style={{ fontSize: "14px", color: "#374151", margin: 0, lineHeight: 1.5 }}>
-                    A transport partner will contact you to finalize scheduling.
-                  </p>
-                  <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>
-                    Address: <strong>{deliveryAddress.formattedAddress}</strong> &bull; Date: <strong>{deliveryDate}</strong>
-                  </p>
-                </div>
-              )}
             </div>
           )}
         </div>
+
 
         {/* Footer */}
         <div style={{
@@ -750,27 +743,32 @@ export default function PurchaseWizard({
             Back
           </button>
           
-          {step < 6 ? (
+          {step < 5 ? (
             <button
               onClick={async () => {
-                if (step === 2 && !isSent) {
-                  alert("Please contact the seller to proceed.");
-                } else if (step === 4) {
-                  try {
-                    const result = await createDealerPurchasePackage({
-                      listingId,
-                      amount: askingPrice,
-                      buyerName: formData.name,
-                      buyerEmail: formData.email,
-                      buyerMessage: `Interested in purchasing ${year} ${make} ${model} (${vin})`,
-                    });
-                    setPurchaseId(result.id);
-                    setStep(5);
-                  } catch (error) {
-                    const message = error instanceof Error ? error.message : "Failed to initialize purchase offer.";
-                    alert(message);
+                if (step === 2) {
+                  if (!agreedToTerms || !formData.firstName || !formData.lastName || !formData.email || !formData.phone) {
+                    alert("Please fill in all required fields and accept the terms.");
+                    return;
                   }
-                } else if (step === 5) {
+                  
+                  if (!purchaseId) {
+                    try {
+                      const result = await createDealerPurchasePackage({
+                        listingId,
+                        amount: askingPrice,
+                        buyerName: formData.firstName + " " + formData.lastName,
+                        buyerEmail: formData.email,
+                        buyerMessage: `Interested in purchasing ${year} ${make} ${model} (${vin})`,
+                      });
+                      setPurchaseId(result.id);
+                    } catch (error) {
+                      const message = error instanceof Error ? error.message : "Failed to initialize purchase offer.";
+                      alert(message);
+                      return;
+                    }
+                  }
+                } else if (step === 3) {
                   if (!insuranceSelected) {
                     alert("Please select an insurance option.");
                     return;
@@ -782,10 +780,30 @@ export default function PurchaseWizard({
                       console.error("Failed to update insurance request:", error);
                     }
                   }
-                  setStep(6);
-                } else {
-                  setStep(step + 1);
+                } else if (step === 4) {
+                  const { streetAddress, city, state, postalCode } = deliveryAddress;
+                  if (!streetAddress || !city || !state || !postalCode || !deliveryDate) {
+                    alert("Please fill in all address fields and the delivery date.");
+                    return;
+                  }
+
+                  if (purchaseId) {
+                    try {
+                      await createTransportQuotePackage({
+                        purchaseId,
+                        address: { streetAddress, city, state, postalCode },
+                        transportMethod: deliveryMethod,
+                        deliveryDate
+                      });
+                    } catch (error) {
+                      const message = error instanceof Error ? error.message : "Failed to submit delivery request.";
+                      alert(message);
+                      return;
+                    }
+                  }
                 }
+                
+                setStep(step + 1);
               }}
               style={{
                 padding: "8px 16px",
@@ -798,21 +816,23 @@ export default function PurchaseWizard({
                 cursor: "pointer"
               }}
             >
-              {step === 4 ? "Continue to Insurance" : "Continue"}
+              Continue
             </button>
           ) : (
             <button
-              onClick={resetWizard}
-              disabled={!deliverySubmitted}
+              onClick={() => {
+                alert("Purchase successfully submitted!");
+                resetWizard();
+              }}
               style={{
                 padding: "8px 16px",
                 borderRadius: "6px",
-                backgroundColor: deliverySubmitted ? "#10b981" : "#ffffff",
-                color: deliverySubmitted ? "#ffffff" : "#374151",
-                border: deliverySubmitted ? "none" : "1px solid #cbd5e1",
+                backgroundColor: "#10b981",
+                color: "#ffffff",
+                border: "none",
                 fontSize: "14px",
                 fontWeight: 600,
-                cursor: deliverySubmitted ? "pointer" : "not-allowed"
+                cursor: "pointer"
               }}
             >
               Finish

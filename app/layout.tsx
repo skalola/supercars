@@ -1,6 +1,7 @@
 import { Analytics } from "@vercel/analytics/next";
 import { auth } from "@/auth";
 import { SiteHeader } from "@/components/site/SiteHeader";
+import { SiteFooter } from "@/components/site/SiteFooter";
 import { prisma } from "@/lib/prisma";
 import "./globals.css";
 
@@ -35,6 +36,7 @@ export default async function RootLayout({
             profileImageUrl={profileImageUrl}
           />
           {children}
+          <SiteFooter />
         </div>
         <Analytics />
       </body>
