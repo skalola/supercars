@@ -4,6 +4,7 @@ import { SUPPORTED_MAKES } from "@/lib/supported-makes";
 
 export const inventoryDashboardListingWhere: Prisma.ListingWhereInput = {
   status: "ACTIVE",
+  validationStatus: "VALID",
   vehicleId: { not: null },
   imageUrl: { not: null },
   vehicle: {
@@ -51,6 +52,51 @@ export async function getInventoryDashboardListings() {
     orderBy: { createdAt: "desc" },
   });
   return rawListings;
+}
+
+export async function getAdminInventoryListings() {
+  return prisma.listing.findMany({
+    where: {
+      vehicleId: { not: null },
+      vehicle: {
+        is: {
+          model: {
+            make: {
+              name: { in: [...SUPPORTED_MAKES] },
+            },
+          },
+        },
+      },
+      NOT: [
+        { source: { is: { type: "AUCTION" } } },
+        { url: { contains: "bringatrailer.com", mode: "insensitive" } },
+      ],
+    },
+    include: {
+      model: {
+        include: {
+          make: true,
+        },
+      },
+      vehicle: {
+        include: {
+          model: {
+            include: {
+              make: true,
+            },
+          },
+        },
+      },
+      source: {
+        select: {
+          name: true,
+          website: true,
+          type: true,
+        },
+      },
+    },
+    orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
+  });
 }
 
 export async function getInventoryDashboardListingCount() {

@@ -24,6 +24,7 @@ export default async function InventoryPage() {
   const listings = await prisma.listing.findMany({
     where: {
       status: "ACTIVE",
+      validationStatus: "VALID",
       vehicleId: { not: null },
       imageUrl: { not: null },
       vehicle: {
@@ -103,6 +104,7 @@ export default async function InventoryPage() {
     mileage: l.mileage,
     color: l.color,
     askingPrice: l.askingPrice,
+    url: l.url,
     vehicleId: l.vehicleId,
     vehicle: l.vehicle
       ? {

@@ -114,6 +114,7 @@ export async function createAuthorizedDealerSourcesFromDirectory(): Promise<Publ
     if (!brand || !website) continue;
 
     const domain = domainFromUrl(website);
+    if (!domain || isGenericOrRedirectDomain(domain)) continue;
     const key = `${brand}:${shouldDedupeDirectoryDealerByDomain(brand, domain) ? domain : `${normalizeName(contact.name)}:${normalizeName(contact.city || "")}:${contact.state || ""}`}`;
     const score = scoreDirectoryDealer(contact);
     const existing = deduped.get(key);
@@ -200,6 +201,13 @@ function buildDealerInventoryUrls(dealer: DirectoryDealerSource) {
   if (dealer.brand === "Ferrari") {
     return uniqueUrls([
       ...hintedUrls,
+      `${base}/all-inventory/index.htm?make=Ferrari`,
+      `${base}/new-inventory/index.htm?make=Ferrari`,
+      `${base}/used-inventory/index.htm?make=Ferrari`,
+      `${base}/certified-inventory/index.htm?make=Ferrari`,
+      `${base}/inventory/`,
+      `${base}/inventory/page/2/`,
+      `${base}/inventory/page/3/`,
       `${base}/pre-owned-inventory/`,
       `${base}/pre-owned/`,
       `${base}/used-ferrari/`,
@@ -212,6 +220,10 @@ function buildDealerInventoryUrls(dealer: DirectoryDealerSource) {
   if (dealer.brand === "Lamborghini") {
     return uniqueUrls([
       ...hintedUrls,
+      `${base}/all-inventory/index.htm?make=Lamborghini`,
+      `${base}/new-inventory/index.htm?make=Lamborghini`,
+      `${base}/used-inventory/index.htm?make=Lamborghini`,
+      `${base}/certified-inventory/index.htm?make=Lamborghini`,
       `${base}/pre-owned/`,
       `${base}/pre-owned-lamborghini/`,
       `${base}/used-lamborghini/`,
@@ -223,6 +235,7 @@ function buildDealerInventoryUrls(dealer: DirectoryDealerSource) {
 
   return uniqueUrls([
     ...hintedUrls,
+    `${base}/all-inventory/index.htm`,
     `${base}/used-vehicles/`,
     `${base}/pre-owned-vehicles/`,
     `${base}/new-vehicles/`,

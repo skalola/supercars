@@ -16,7 +16,13 @@
 
 import { prisma } from "../lib/prisma";
 import { upsertPartnerContact } from "../lib/fulfillment/partner-registry";
-import { buildSalesEmailForWebsite, emailMatchesWebsiteDomain } from "../lib/directory/contact-domain-policy";
+import {
+  buildSalesEmailForWebsite,
+  emailMatchesWebsiteDomain,
+  getHostname,
+  isMarketplaceHostname,
+  isOfficialDealerMicrositeHostname,
+} from "../lib/directory/contact-domain-policy";
 import {
   discoverDealerContactFromInventory,
   isLikelyFakeUrl,
@@ -47,6 +53,13 @@ async function main() {
   let skipped = 0;
 
   for (const candidate of limited) {
+    const candidateDomain = domainFromUrl(candidate.sourceWebsite || candidate.listingUrl);
+    if (isUnsupportedRoutingDomain(candidateDomain)) {
+      skipped++;
+      console.log(`SKIP ${candidate.make} | ${candidate.dealerName} | UNSUPPORTED_ROUTING_DOMAIN | ${candidate.sourceWebsite || candidate.listingUrl}`);
+      continue;
+    }
+
     const trusted = await findTrustedDealerContact(candidate.dealerName, candidate.make);
     const discovered = await discoverDealerContactFromInventory({
       ...candidate,
@@ -89,7 +102,7 @@ async function main() {
       continue;
     }
 
-    const emailForDirectory = emailMatchesWebsiteDomain(discovered.email, discovered.website)
+    const emailForDirectory = pickDealerRoutingEmail(discovered.email, discovered.website)
       ? discovered.email
       : buildSalesEmailForWebsite(discovered.website);
 
@@ -123,6 +136,20 @@ async function main() {
   console.log(`  Upserted: ${upserted}`);
   console.log(`  Skipped:  ${skipped}`);
   console.log("==================================================");
+}
+
+function pickDealerRoutingEmail(email?: string | null, website?: string | null) {
+  if (!emailMatchesWebsiteDomain(email, website)) return null;
+  if (!email) return null;
+  return /(^sales@|^leads@|sales|internet|info|contact|general)/i.test(email) ? email : null;
+}
+
+function isUnsupportedRoutingDomain(domain?: string | null) {
+  if (!domain) return false;
+  const hostname = getHostname(domain);
+  if (!hostname) return false;
+  if (isMarketplaceHostname(hostname) || isOfficialDealerMicrositeHostname(hostname)) return true;
+  return /(^|\.)mdxprod\.io$/i.test(hostname);
 }
 
 async function loadDealerCandidates() {

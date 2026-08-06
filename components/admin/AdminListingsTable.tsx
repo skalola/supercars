@@ -12,11 +12,16 @@ export type AdminListingRow = {
   year: number;
   vin: string | null;
   status: string;
+  validationStatus: string;
+  priceStatus: string;
+  freshnessStatus: string;
   price: string;
   mileage: string;
   dealerName: string;
   location: string;
   sourceName: string;
+  sourceWebsite: string | null;
+  sourceType: string | null;
   externalListingId: string | null;
   url: string | null;
   updatedAt: string;
@@ -32,6 +37,7 @@ export function AdminListingsTable({ listings }: { listings: AdminListingRow[] }
   const [modelFilter, setModelFilter] = useState("");
   const [yearFilter, setYearFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [qualityFilter, setQualityFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
 
@@ -73,6 +79,11 @@ export function AdminListingsTable({ listings }: { listings: AdminListingRow[] }
       if (modelFilter && listing.model !== modelFilter) return false;
       if (yearFilter && listing.year.toString() !== yearFilter) return false;
       if (statusFilter && listing.status !== statusFilter) return false;
+      if (qualityFilter === "PUBLIC_READY" && !isPublicReady(listing)) return false;
+      if (qualityFilter === "REJECTED" && isPublicReady(listing)) return false;
+      if (qualityFilter === "NEEDS_PRICE" && listing.priceStatus !== "PRICE_MISSING") return false;
+      if (qualityFilter === "NEEDS_IMAGE" && listing.freshnessStatus !== "INACTIVE") return false;
+      if (qualityFilter === "VIN_MODEL_ISSUE" && !/MISMATCH|VIN|NEEDS_REVIEW/i.test(listing.validationStatus)) return false;
       if (sourceFilter && listing.sourceName !== sourceFilter) return false;
 
       if (maxAgeDays) {
@@ -98,7 +109,7 @@ export function AdminListingsTable({ listings }: { listings: AdminListingRow[] }
 
       return true;
     });
-  }, [dateFilter, listings, makeFilter, modelFilter, searchQuery, sourceFilter, statusFilter, yearFilter]);
+  }, [dateFilter, listings, makeFilter, modelFilter, qualityFilter, searchQuery, sourceFilter, statusFilter, yearFilter]);
 
   const resetFilters = () => {
     setSearchQuery("");
@@ -106,6 +117,7 @@ export function AdminListingsTable({ listings }: { listings: AdminListingRow[] }
     setModelFilter("");
     setYearFilter("");
     setStatusFilter("");
+    setQualityFilter("");
     setSourceFilter("");
     setDateFilter("");
   };
@@ -220,6 +232,18 @@ export function AdminListingsTable({ listings }: { listings: AdminListingRow[] }
         </label>
 
         <label>
+          <span>Quality</span>
+          <select value={qualityFilter} onChange={(event) => setQualityFilter(event.target.value)}>
+            <option value="">All Quality</option>
+            <option value="PUBLIC_READY">Public Ready</option>
+            <option value="REJECTED">Inactive / Rejected</option>
+            <option value="NEEDS_PRICE">Missing Price</option>
+            <option value="NEEDS_IMAGE">Missing Image</option>
+            <option value="VIN_MODEL_ISSUE">VIN / Model Issue</option>
+          </select>
+        </label>
+
+        <label>
           <span>Source</span>
           <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)}>
             <option value="">All Sources</option>
@@ -252,6 +276,7 @@ export function AdminListingsTable({ listings }: { listings: AdminListingRow[] }
             <tr>
               <th>Vehicle</th>
               <th>Status</th>
+              <th>Quality</th>
               <th>Price</th>
               <th>Mileage</th>
               <th>Dealer</th>
@@ -264,7 +289,7 @@ export function AdminListingsTable({ listings }: { listings: AdminListingRow[] }
           <tbody>
             {filteredListings.length === 0 ? (
               <tr>
-                <td colSpan={9} className="admin-management-empty">
+                <td colSpan={10} className="admin-management-empty">
                   No listings match the selected filters.
                 </td>
               </tr>
@@ -273,6 +298,8 @@ export function AdminListingsTable({ listings }: { listings: AdminListingRow[] }
                 const isUnpublishing = isPending && processingId === `unpublish:${listing.id}`;
                 const isRemoving = isPending && processingId === `remove:${listing.id}`;
                 const isRemoved = listing.status === "REMOVED";
+                const publicReady = isPublicReady(listing);
+                const qualityReason = getQualityReason(listing);
 
                 return (
                   <tr key={listing.id}>
@@ -284,6 +311,12 @@ export function AdminListingsTable({ listings }: { listings: AdminListingRow[] }
                       <span className={`admin-status-pill ${isRemoved ? "is-muted" : ""}`}>
                         {listing.status}
                       </span>
+                    </td>
+                    <td className="admin-listing-quality-cell" data-label="Quality">
+                      <span className={`admin-status-pill ${publicReady ? "" : "is-muted"}`}>
+                        {publicReady ? "PUBLIC READY" : "REJECTED"}
+                      </span>
+                      <span className="admin-listing-identifier">{qualityReason}</span>
                     </td>
                     <td className="admin-listing-money-cell" data-label="Price">{listing.price}</td>
                     <td className="admin-listing-compact-cell" data-label="Mileage">{listing.mileage}</td>
@@ -328,4 +361,27 @@ export function AdminListingsTable({ listings }: { listings: AdminListingRow[] }
       </div>
     </section>
   );
+}
+
+function isPublicReady(listing: AdminListingRow) {
+  return (
+    listing.status === "ACTIVE" &&
+    listing.validationStatus === "VALID" &&
+    listing.priceStatus !== "PRICE_INVALID" &&
+    listing.priceStatus !== "PRICE_MISSING" &&
+    listing.freshnessStatus !== "INACTIVE" &&
+    Boolean(listing.url)
+  );
+}
+
+function getQualityReason(listing: AdminListingRow) {
+  if (isPublicReady(listing)) return "VIN, price, image, and listing URL verified";
+  const reasons = [
+    listing.validationStatus !== "VALID" ? listing.validationStatus : null,
+    listing.priceStatus !== "VALID_PRICE" ? listing.priceStatus : null,
+    listing.freshnessStatus !== "ACTIVE" ? listing.freshnessStatus : null,
+    listing.status !== "ACTIVE" ? listing.status : null,
+    !listing.url ? "SOURCE_URL_MISSING" : null,
+  ].filter(Boolean);
+  return reasons.join(" / ") || "Not public-ready";
 }

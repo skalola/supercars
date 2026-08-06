@@ -232,7 +232,14 @@ export async function ingestCrawlerListings(
       select: { id: true, price: true, askingPrice: true },
     });
 
-    if (!previousListing) {
+    const listingImageUrl = listing.images[0] || null;
+    const hasUsablePrice = listing.price !== null && listing.price > 0;
+    const hasUsableImage = Boolean(listingImageUrl);
+    const listingStatus = hasUsablePrice && hasUsableImage ? "ACTIVE" : "INACTIVE";
+    const priceStatus = hasUsablePrice ? "VALID_PRICE" : "PRICE_MISSING";
+    const freshnessStatus = hasUsableImage ? "ACTIVE" : "INACTIVE";
+
+    if (!previousListing && listingStatus === "ACTIVE") {
       await prisma.listing.updateMany({
         where: {
           vehicleId: vehicle.id,
@@ -242,13 +249,6 @@ export async function ingestCrawlerListings(
         data: { status: "REMOVED" },
       });
     }
-
-    const listingImageUrl = listing.images[0] || null;
-    const hasUsablePrice = listing.price !== null && listing.price > 0;
-    const hasUsableImage = Boolean(listingImageUrl);
-    const listingStatus = hasUsablePrice && hasUsableImage ? "ACTIVE" : "INACTIVE";
-    const priceStatus = hasUsablePrice ? "VALID_PRICE" : "PRICE_MISSING";
-    const freshnessStatus = hasUsableImage ? "ACTIVE" : "INACTIVE";
 
     const savedListing = await prisma.listing.upsert({
       where: {
@@ -319,11 +319,23 @@ export async function ingestCrawlerListings(
 }
 
 function getCrawlerSourceWebsite(listing: NormalizedCrawlerListing) {
-  if (listing.sourceType === "DEALER") return listing.dealerWebsite || listing.url;
+  if (listing.sourceType === "DEALER") {
+    return listing.dealerWebsite || getUrlOrigin(listing.url);
+  }
   if (/autotrader/i.test(listing.sourceName)) return "https://www.autotrader.com";
   if (/cars\.com|cars/i.test(listing.sourceName)) return "https://www.cars.com";
   if (/dupont/i.test(listing.sourceName)) return "https://www.dupontregistry.com";
   return null;
+}
+
+function getUrlOrigin(value: string | null | undefined) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.origin;
+  } catch {
+    return null;
+  }
 }
 
 async function safelySendSavedCarAlert(send: () => Promise<{ sent: number; skipped?: string }>) {

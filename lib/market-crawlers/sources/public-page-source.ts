@@ -71,6 +71,7 @@ export class PublicPageSource implements PublicInventorySource {
       )
     )
       .filter((url) => !this.urls.includes(url))
+      .sort((a, b) => scoreDetailLink(b) - scoreDetailLink(a))
       .slice(0, this.maxDetailPages);
 
     for (const url of detailUrls) {
@@ -82,10 +83,14 @@ export class PublicPageSource implements PublicInventorySource {
   }
 
   extractListings(page: CrawlPage): RawCrawlerListing[] {
+    const jsonLdListings = this.extractJsonLdListings(page);
+    const hasStrongStructuredInventory = jsonLdListings.some(isStrongRawListing);
+
     return dedupeRawListings([
+      ...jsonLdListings,
+      ...this.extractWordPressInventoryListings(page),
       ...this.extractVehicleItemListings(page),
-      ...this.extractJsonLdListings(page),
-      ...this.extractEmbeddedVinListings(page),
+      ...(hasStrongStructuredInventory ? [] : this.extractEmbeddedVinListings(page)),
     ]);
   }
 
@@ -95,6 +100,76 @@ export class PublicPageSource implements PublicInventorySource {
 
   normalizeListing(raw: RawCrawlerListing) {
     return normalizeListing({ ...raw, vin: this.extractVIN(raw) });
+  }
+
+  private extractWordPressInventoryListings(page: CrawlPage): RawCrawlerListing[] {
+    const listings: RawCrawlerListing[] = [];
+    const pageUrlVin = extractVINFromText(page.url);
+    const canonicalUrl = pickCanonicalUrl(page.html, page.url) ?? page.url;
+
+    if (pageUrlVin && /\/inventory\//i.test(page.url)) {
+      const title = pickMetaContent(page.html, "og:title") ?? extractTitle(page.html);
+      const text = decodeHtml(stripTags(page.html));
+      listings.push({
+        sourceName: this.sourceName,
+        sourceType: this.sourceType,
+        pageUrl: page.url,
+        url: canonicalUrl,
+        externalListingId: idFromUrl(canonicalUrl) ?? pageUrlVin,
+        title,
+        vin: pageUrlVin,
+        year: inferYearFromText(text),
+        make: inferMakeFromText([title, text].filter(Boolean).join(" ")),
+        model: inferModelText([title, text].filter(Boolean).join(" ")),
+        trim: inferTrimFromText(text),
+        price: inferPriceFromText(text),
+        mileage: inferMileageFromText(text),
+        color: inferColorFromText(text),
+        location: null,
+        dealerName: null,
+        dealerWebsite: null,
+        images: Array.from(new Set([...extractPageHeroImages(page.html, page.url), ...extractImageUrls(page.html, page.url)])),
+      });
+    }
+
+    const articlePattern = /<article\b[^>]*class=["'][^"']*\bpost\b[^"']*["'][^>]*>[\s\S]*?<\/article>/gi;
+    for (const match of page.html.matchAll(articlePattern)) {
+      const article = match[0];
+      const vin = extractVINFromText(article);
+      if (!vin || !SUPPORTED_MAKE_PATTERN.test(article)) continue;
+
+      const href = pickVehicleDetailHref(article, page.url) ?? pickFirstHref(article);
+      const url = absolutize(href, page.url);
+      if (!url || !/\/inventory\//i.test(url)) continue;
+
+      const title = decodeHtml(stripTags(article.match(/<h[1-3]\b[^>]*>[\s\S]*?<\/h[1-3]>/i)?.[0] || "")).trim()
+        || inferVehicleTitleFromUrl(url).title
+        || null;
+      const text = decodeHtml(stripTags(article));
+
+      listings.push({
+        sourceName: this.sourceName,
+        sourceType: this.sourceType,
+        pageUrl: page.url,
+        url,
+        externalListingId: idFromUrl(url) ?? vin,
+        title,
+        vin,
+        year: inferYearFromText([title, text].filter(Boolean).join(" ")),
+        make: inferMakeFromText([title, text].filter(Boolean).join(" ")),
+        model: inferModelText([title, text].filter(Boolean).join(" ")),
+        trim: inferTrimFromText(text),
+        price: inferPriceFromText(text),
+        mileage: inferMileageFromText(text),
+        color: inferColorFromText(text),
+        location: null,
+        dealerName: null,
+        dealerWebsite: null,
+        images: extractImageUrls(article, page.url),
+      });
+    }
+
+    return listings;
   }
 
   private extractJsonLdListings(page: CrawlPage): RawCrawlerListing[] {
@@ -162,15 +237,18 @@ export class PublicPageSource implements PublicInventorySource {
     const listings: RawCrawlerListing[] = [];
     const vinMatches = extractVINsFromText(page.html);
     const pageHeroImages = vinMatches.length === 1 ? extractPageHeroImages(page.html, page.url) : [];
+    const isSingleVinPage = vinMatches.length === 1;
 
     for (const vin of vinMatches) {
       const index = page.html.toUpperCase().indexOf(vin);
       const contextHtml = page.html.slice(Math.max(0, index - 6000), index + 6000);
       const context = decodeHtml(stripTags(contextHtml));
-      const url = isLikelyVehicleDetailUrl(page.url)
+      const contextDetailUrl = findClosestVehicleDetailHref(contextHtml, Math.min(6000, index), page.url);
+      const url = isSingleVinPage && isLikelyVehicleDetailUrl(page.url)
         ? page.url
-        : findClosestVehicleDetailHref(page.html, index, page.url);
+        : contextDetailUrl;
       if (!url) continue;
+      if (extractVINsFromText(url).length > 0 && !extractVINsFromText(url).includes(vin)) continue;
 
       const titleFromUrl = inferVehicleTitleFromUrl(url);
       if (!SUPPORTED_MAKE_PATTERN.test(context) && !titleFromUrl.make) continue;
@@ -211,11 +289,16 @@ export class PublicPageSource implements PublicInventorySource {
     const brand = asRecord(node.brand);
     const seller = asRecord(offers?.seller) ?? asRecord(node.seller);
 
+    const listingUrl = repairDealerDetailUrl(
+      pickString(node, ["url", "@id"]) ?? pickString(offers, ["url"]),
+      pageUrl,
+    );
+
     return {
       sourceName: this.sourceName,
       sourceType: this.sourceType,
       pageUrl,
-      url: pickString(node, ["url", "@id"]) ?? pickString(offers, ["url"]),
+      url: listingUrl,
       externalListingId: pickString(node, ["sku", "productID", "identifier", "@id"]),
       title: pickString(node, ["name", "headline", "description"]),
       vin,
@@ -340,13 +423,48 @@ function flattenJsonLd(value: unknown): Array<Record<string, unknown>> {
 }
 
 function dedupeRawListings(listings: RawCrawlerListing[]): RawCrawlerListing[] {
-  const seen = new Set<string>();
-  return listings.filter((listing) => {
-    const key = [listing.vin, listing.url ?? listing.externalListingId ?? listing.title].filter(Boolean).join(":");
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  const bestByVin = new Map<string, RawCrawlerListing>();
+  const passthrough: RawCrawlerListing[] = [];
+
+  for (const listing of listings) {
+    const vin = extractVINFromText([listing.vin, listing.title, listing.url].filter(Boolean).join(" "));
+    if (!vin) {
+      passthrough.push(listing);
+      continue;
+    }
+
+    const existing = bestByVin.get(vin);
+    if (!existing || scoreRawListing(listing) > scoreRawListing(existing)) {
+      bestByVin.set(vin, listing);
+    }
+  }
+
+  return [...bestByVin.values(), ...passthrough];
+}
+
+function scoreRawListing(listing: RawCrawlerListing) {
+  let score = 0;
+  if (listing.price && listing.price >= 10000) score += 50;
+  if (listing.images.length > 0) score += 30;
+  if (listing.url && isLikelyVehicleDetailUrl(listing.url)) score += 25;
+  if (listing.url && extractVINFromText(listing.url)) score += 10;
+  if (listing.externalListingId) score += 5;
+  if (listing.mileage !== null) score += 3;
+  if (listing.url && /\/(?:new|used|certified)\/(?:ferrari|lamborghini|mclaren)\//i.test(listing.url)) score += 15;
+  if (listing.url && /\/(?:new|used|certified|all)-inventory\//i.test(listing.url)) score -= 25;
+  if (listing.url && isInvalidStructuredUrlHost(listing.url)) score -= 100;
+  return score;
+}
+
+function isStrongRawListing(listing: RawCrawlerListing) {
+  return Boolean(
+    listing.vin &&
+    listing.price &&
+    listing.price >= 10000 &&
+    listing.images.length > 0 &&
+    listing.url &&
+    isLikelyVehicleDetailUrl(listing.url)
+  );
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -406,6 +524,34 @@ function pickImages(record: Record<string, unknown>): string[] {
   return [];
 }
 
+function repairDealerDetailUrl(value: string | null, pageUrl: string): string | null {
+  const absolute = absolutize(value, pageUrl);
+  if (!absolute) return null;
+
+  try {
+    const parsed = new URL(absolute);
+    if (!isInvalidStructuredUrlHost(parsed.toString())) return parsed.toString();
+
+    const page = new URL(pageUrl);
+    if (isLikelyVehicleDetailUrl(`${page.origin}${parsed.pathname}${parsed.search}`)) {
+      return `${page.origin}${parsed.pathname}${parsed.search}`;
+    }
+  } catch {
+    return null;
+  }
+
+  return absolute;
+}
+
+function isInvalidStructuredUrlHost(value: string) {
+  try {
+    const host = new URL(value).hostname.replace(/^www\./, "").toLowerCase();
+    return ["google.com", "goo.gl", "maps.app.goo.gl"].includes(host);
+  } catch {
+    return true;
+  }
+}
+
 function stripTags(value: string): string {
   return value.replace(/<[^>]*>/g, " ");
 }
@@ -438,6 +584,18 @@ function extractPageLinks(html: string, pageUrl: string): string[] {
     });
 }
 
+function scoreDetailLink(url: string) {
+  let score = 0;
+  if (extractVINFromText(url)) score += 100;
+  if (/\/inventory\/(?:ferrari|lamborghini|mclaren)-/i.test(url)) score += 50;
+  if (/(?:ferrari|lamborghini|mclaren).+\.(?:htm|html)$/i.test(url)) score += 40;
+  if (/\/(?:new|used|certified)\/(?:ferrari|lamborghini|mclaren)\//i.test(url)) score += 40;
+  if (/\/(?:category\/)?inventory\/page\/\d+/i.test(url)) score += 10;
+  if (/\/(?:pre-owned|used|new)-inventory\/?$/i.test(url)) score -= 20;
+  if (/#$/.test(url)) score -= 50;
+  return score;
+}
+
 function pickAttribute(html: string, attribute: string, tagNeedle: RegExp): string | null {
   const tagPattern = /<a\b[^>]*>/gi;
   for (const match of html.matchAll(tagPattern)) {
@@ -452,6 +610,27 @@ function pickAttribute(html: string, attribute: string, tagNeedle: RegExp): stri
 function pickFirstHref(html: string): string | null {
   const match = html.match(/href=["']([^"']+)["']/i);
   return match?.[1] ? decodeHtml(match[1]) : null;
+}
+
+function pickCanonicalUrl(html: string, pageUrl: string): string | null {
+  const href = html.match(/<link\b[^>]*rel=["']canonical["'][^>]*>/i)?.[0]?.match(/\bhref=["']([^"']+)["']/i)?.[1];
+  return absolutize(decodeHtml(href || ""), pageUrl);
+}
+
+function pickMetaContent(html: string, property: string): string | null {
+  for (const match of html.matchAll(/<meta\b[^>]*>/gi)) {
+    const tag = match[0];
+    const name = tag.match(/\b(?:property|name)=["']([^"']+)["']/i)?.[1];
+    if (name !== property) continue;
+    const content = tag.match(/\bcontent=["']([^"']+)["']/i)?.[1];
+    if (content) return decodeHtml(content);
+  }
+  return null;
+}
+
+function extractTitle(html: string): string | null {
+  const title = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1];
+  return title ? compactWhitespace(decodeHtml(stripTags(title))) : null;
 }
 
 function pickVehicleDetailHref(html: string, pageUrl: string): string | null {
@@ -491,7 +670,7 @@ function findClosestVehicleDetailHref(html: string, index: number, pageUrl: stri
 
   if (hrefs.length > 0) return hrefs.at(-1) ?? hrefs[0];
 
-  return pickVehicleDetailHref(html, pageUrl);
+  return null;
 }
 
 function isLikelyVehicleDetailUrl(url: string | null | undefined): boolean {

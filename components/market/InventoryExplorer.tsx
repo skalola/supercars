@@ -28,6 +28,7 @@ type ListingObj = {
   mileage: number | null;
   color: string | null;
   askingPrice: number | null;
+  url?: string | null;
   vehicleId: string | null;
   vehicle: {
     vin: string;
@@ -291,6 +292,24 @@ export default function InventoryExplorer({
                     </div>
                   </div>
                   <div style={{ padding: "16px", paddingTop: 0 }}>
+                    {lst.url ? (
+                      <a
+                        href={lst.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          display: "inline-block",
+                          marginBottom: "10px",
+                          color: "#1d4ed8",
+                          fontSize: "12px",
+                          fontWeight: 700,
+                          textDecoration: "underline",
+                          textUnderlineOffset: "3px",
+                        }}
+                      >
+                        View original listing
+                      </a>
+                    ) : null}
                     <Link
                       href={`/vehicle/${lst.vehicle?.vin}`}
                       style={{

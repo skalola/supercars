@@ -7,6 +7,7 @@ import { cleanVin } from "./vin-extractor";
 import { makeFromVinPrefix, normalizeSupportedMake, SUPPORTED_MAKES } from "@/lib/supported-makes";
 
 const ALLOWED_MAKES: AllowedCrawlerMake[] = [...SUPPORTED_MAKES];
+const VIN_RE = /\b[A-HJ-NPR-Z0-9]{17}\b/g;
 
 export function normalizeAllowedMake(value: string | null | undefined): AllowedCrawlerMake | null {
   return normalizeSupportedMake(value);
@@ -105,7 +106,17 @@ export function normalizeListing(raw: RawCrawlerListing): NormalizedCrawlerListi
   const trim = inferTrim(model, raw.trim, raw.title);
 
   const url = absolutizeUrl(raw.url, raw.pageUrl) ?? raw.pageUrl;
+  if (isInvalidSourceHost(url)) return null;
+  const urlVins = extractVins(url);
+  if (urlVins.length > 0 && !urlVins.includes(vin)) return null;
+
   const externalListingId = raw.externalListingId ?? `${raw.sourceName}:${vin}:${url}`;
+  const images = raw.images
+    .filter((image) => !isNonVehicleImage(image))
+    .filter((image) => {
+      const imageVins = extractVins(image);
+      return imageVins.length === 0 || imageVins.includes(vin);
+    });
 
   return {
     sourceName: raw.sourceName,
@@ -124,6 +135,23 @@ export function normalizeListing(raw: RawCrawlerListing): NormalizedCrawlerListi
     dealerName: raw.dealerName,
     dealerWebsite: absolutizeUrl(raw.dealerWebsite, raw.pageUrl),
     url,
-    images: raw.images,
+    images,
   };
+}
+
+function extractVins(value: string | null | undefined) {
+  return Array.from(new Set((value?.toUpperCase().match(VIN_RE) || [])));
+}
+
+function isNonVehicleImage(value: string) {
+  return /placeholder|logo|icon|favicon|spinner|loading|avatar|profile|badge|sprite|transparent|blank|autocheck/i.test(value);
+}
+
+function isInvalidSourceHost(value: string) {
+  try {
+    const host = new URL(value).hostname.replace(/^www\./, "").toLowerCase();
+    return ["google.com", "goo.gl", "maps.app.goo.gl"].includes(host);
+  } catch {
+    return true;
+  }
 }

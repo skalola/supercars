@@ -38,6 +38,11 @@ const steps: Step[] = [
     args: ["run", "backfill-listing-images-from-pages", "--", "--limit=500"],
   },
   {
+    label: "Polish public inventory quality gate",
+    command: "npm",
+    args: ["run", "polish-inventory-quality", "--", "--execute", "--limit=1000"],
+  },
+  {
     label: "Remove stale/dead live listing links",
     command: "npm",
     args: ["run", "verify-live-listings", "--", "--execute", "--limit=500"],
