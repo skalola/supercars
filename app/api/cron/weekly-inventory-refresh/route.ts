@@ -8,7 +8,10 @@ export const maxDuration = 300;
 export async function GET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
   const authorization = request.headers.get("authorization") || "";
-  const isVercelCron = request.headers.get("x-vercel-cron") === "1";
+  const userAgent = request.headers.get("user-agent") || "";
+  const isVercelCron =
+    request.headers.get("x-vercel-cron") === "1" ||
+    /vercel-cron/i.test(userAgent);
 
   if (secret && authorization !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized cron request." }, { status: 401 });
