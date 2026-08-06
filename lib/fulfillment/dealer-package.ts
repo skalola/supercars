@@ -55,7 +55,7 @@ export function generateDealerPurchasePackagePayload(params: GenerateDealerPacka
       tradeInVin: params.requestedTerms?.tradeInVin || "None",
     },
     platformFee,
-    depositStatus: "AUTHORIZED",
+    depositStatus: "DUE_AT_CHECKOUT",
     decisionTokenUrl: params.decisionTokenUrl,
   };
 }

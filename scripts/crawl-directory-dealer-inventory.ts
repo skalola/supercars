@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { crawlInventory } from "@/lib/market-crawlers/crawler-engine";
 import { PublicPageSource } from "@/lib/market-crawlers/sources/public-page-source";
-import { buildSalesEmailForWebsite, isDealerOwnedWebsite } from "@/lib/directory/contact-domain-policy";
+import { isDealerOwnedWebsite } from "@/lib/directory/contact-domain-policy";
 import { SUPPORTED_MAKES } from "@/lib/supported-makes";
 
 const allowedMakes = new Set(
@@ -19,10 +19,6 @@ async function main() {
       type: "DEALER",
       active: true,
       website: { not: null },
-      OR: [
-        { email: { not: null } },
-        { contactStatus: "RESOLVED" },
-      ],
     },
     select: {
       id: true,
@@ -42,7 +38,6 @@ async function main() {
       const specialization = contact.makeSpecialization || "ALL";
       return specialization === "ALL" || Array.from(allowedMakes).some((make) => specialization.includes(make));
     })
-    .filter((contact) => contact.email || buildSalesEmailForWebsite(contact.website))
     .slice(0, limit || undefined);
 
   const sources = eligible.map(

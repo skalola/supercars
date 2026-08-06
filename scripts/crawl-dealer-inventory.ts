@@ -21,7 +21,10 @@
 
 import { prisma } from "../lib/prisma";
 import { crawlInventory } from "../lib/market-crawlers/crawler-engine";
-import { createAuthorizedDealerSources } from "../lib/market-crawlers/sources/authorized-dealers";
+import {
+  createAuthorizedDealerSources,
+  createAuthorizedDealerSourcesFromDirectory,
+} from "../lib/market-crawlers/sources/authorized-dealers";
 import { ALL_AUTHORIZED_DEALERS } from "../lib/market-crawlers/dealer-registry";
 import { SUPPORTED_MAKES } from "../lib/supported-makes";
 
@@ -36,6 +39,7 @@ function pad(label: string, width = 30): string {
 async function main() {
   const startedAt = Date.now();
   const dealerArg = process.argv.find((arg) => arg.startsWith("--dealer="))?.split("=").slice(1).join("=").trim();
+  const useStaticRegistry = process.argv.includes("--static-registry");
 
   console.log("\n" + hr());
   console.log("  Inventory Expansion Engine");
@@ -48,6 +52,7 @@ async function main() {
     console.log(`    ${make} dealers: ${ALL_AUTHORIZED_DEALERS.filter((d) => d.brand === make).length}`);
   }
   console.log(`    Total active:         ${ALL_AUTHORIZED_DEALERS.length}`);
+  console.log(`\n  Source mode: ${useStaticRegistry ? "static registry fallback" : "cleaned official partner directory"}`);
   console.log(`\n  Starting crawl...\n`);
 
   // ── Baseline counts before crawl ───────────────────────────────────────
@@ -57,7 +62,11 @@ async function main() {
   ]);
 
   // ── Run the crawl ──────────────────────────────────────────────────────
-  const sources = createAuthorizedDealerSources().filter((source) => {
+  const baseSources = useStaticRegistry
+    ? createAuthorizedDealerSources()
+    : await createAuthorizedDealerSourcesFromDirectory();
+
+  const sources = baseSources.filter((source) => {
     if (!dealerArg) return true;
     return source.sourceName.toLowerCase().includes(dealerArg.toLowerCase());
   });

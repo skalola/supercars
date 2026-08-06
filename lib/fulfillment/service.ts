@@ -480,21 +480,31 @@ export async function submitPartnerDecision(input: PartnerDecisionInput) {
         : "ACCEPTED"
       : "DECLINED";
   const eligibleDeposits = req.depositIntents.filter((deposit) => deposit.status === "AUTHORIZED" || deposit.status === "HELD");
+  const refundableDealerDeposits = req.depositIntents.filter((deposit) => deposit.status === "CAPTURED");
   let totalCaptured = 0;
 
   try {
-    if (input.decision === "ACCEPTED" && req.requestType !== "SERVICE_BOOKING") {
+    if (
+      input.decision === "ACCEPTED" &&
+      req.requestType !== "SERVICE_BOOKING" &&
+      req.requestType !== "DEALER_PURCHASE"
+    ) {
       for (const deposit of eligibleDeposits) {
         await captureDeposit(deposit.transactionRef || "", deposit.amount);
         totalCaptured += deposit.amount;
       }
-    } else {
+    } else if (input.decision === "DECLINED") {
       for (const deposit of eligibleDeposits) {
         await voidDeposit(deposit.transactionRef || "");
       }
+      if (req.requestType === "DEALER_PURCHASE") {
+        for (const deposit of refundableDealerDeposits) {
+          await refundDeposit(deposit.transactionRef || "", deposit.amount);
+        }
+      }
     }
   } catch (error) {
-    const operation = input.decision === "ACCEPTED" ? "capture" : "void";
+    const operation = input.decision === "ACCEPTED" ? "capture" : "void/refund";
     const message = error instanceof Error ? error.message : `Payment ${operation} failed.`;
     await prisma.fulfillmentEvent.create({
       data: {
@@ -570,7 +580,7 @@ export async function submitPartnerDecision(input: PartnerDecisionInput) {
       });
     } else if (input.decision === "ACCEPTED") {
       for (const deposit of req.depositIntents) {
-        if (deposit.status === "AUTHORIZED" || deposit.status === "HELD") {
+        if (req.requestType !== "DEALER_PURCHASE" && (deposit.status === "AUTHORIZED" || deposit.status === "HELD")) {
           await tx.depositIntent.update({
             where: { id: deposit.id },
             data: {
@@ -580,7 +590,7 @@ export async function submitPartnerDecision(input: PartnerDecisionInput) {
           });
         }
       }
-      const shouldCaptureFeesOnAccept = req.requestType !== "INSURANCE_QUOTE";
+      const shouldCaptureFeesOnAccept = req.requestType !== "INSURANCE_QUOTE" && req.requestType !== "DEALER_PURCHASE";
       for (const fee of req.fees) {
         if (shouldCaptureFeesOnAccept && (fee.status === "AUTHORIZED" || fee.status === "ESTIMATED")) {
           await tx.fulfillmentFee.update({
@@ -590,7 +600,7 @@ export async function submitPartnerDecision(input: PartnerDecisionInput) {
         }
       }
 
-      const paymentStatus = req.requestType === "INSURANCE_QUOTE"
+      const paymentStatus = req.requestType === "INSURANCE_QUOTE" || req.requestType === "DEALER_PURCHASE"
         ? req.paymentStatus
         : "CAPTURED";
 
@@ -605,13 +615,21 @@ export async function submitPartnerDecision(input: PartnerDecisionInput) {
         },
       });
     } else if (input.decision === "DECLINED") {
-      // Release deposit hold immediately if declined
+      // Release pending holds and refund already-paid dealer purchase deposits if declined.
       for (const deposit of req.depositIntents) {
         if (deposit.status === "AUTHORIZED" || deposit.status === "HELD") {
           await tx.depositIntent.update({
             where: { id: deposit.id },
             data: {
               status: "RELEASED",
+              releasedAt: new Date(),
+            },
+          });
+        } else if (req.requestType === "DEALER_PURCHASE" && deposit.status === "CAPTURED") {
+          await tx.depositIntent.update({
+            where: { id: deposit.id },
+            data: {
+              status: "REFUNDED",
               releasedAt: new Date(),
             },
           });
@@ -630,7 +648,7 @@ export async function submitPartnerDecision(input: PartnerDecisionInput) {
         where: { id: req.id },
         data: {
           status: newStatus,
-          paymentStatus: "VOIDED",
+          paymentStatus: req.requestType === "DEALER_PURCHASE" && refundableDealerDeposits.length > 0 ? "REFUNDED" : "VOIDED",
           refundableAmount: 0,
           payoutStatus: "UNSETTLED",
         },

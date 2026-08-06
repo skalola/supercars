@@ -1,9 +1,7 @@
 import DirectoryTabs, { DirectoryVendor, DirectoryVendorType } from "@/app/directory/DirectoryTabs";
 import { AdminDirectoryActions } from "@/components/admin/AdminDirectoryActions";
 import { requireAdmin } from "@/lib/admin/auth";
-import { emailMatchesWebsiteDomain } from "@/lib/directory/contact-domain-policy";
 import { formatCityState, normalizePartnerLocation, normalizePhoneNumber } from "@/lib/directory/partner-contact-format";
-import { isValidEmail } from "@/lib/fulfillment/partner-registry";
 import { prisma } from "@/lib/prisma";
 
 const allowedTypes = new Set<DirectoryVendorType>([
@@ -19,17 +17,11 @@ export default async function AdminPartnersPage() {
   const contacts = await prisma.partnerContact.findMany({
     where: {
       active: true,
-      email: {
-        not: null,
-      },
       website: { not: null },
       city: { not: null },
       state: { not: null },
       type: {
         in: Array.from(allowedTypes),
-      },
-      NOT: {
-        email: "",
       },
     },
     orderBy: [
@@ -40,7 +32,6 @@ export default async function AdminPartnersPage() {
 
   const vendors = dedupeVendors(
     contacts
-      .filter((contact) => isValidEmail(contact.email) && emailMatchesWebsiteDomain(contact.email, contact.website))
       .map((contact) => {
         const location = normalizePartnerLocation(contact);
 

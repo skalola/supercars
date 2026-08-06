@@ -4,6 +4,7 @@ import type {
   PublicInventorySource,
   RawCrawlerListing,
 } from "../types";
+import https from "node:https";
 import { normalizeListing } from "../normalizer";
 import { extractVINFromText, extractVINsFromText } from "../vin-extractor";
 import { normalizeSupportedMake, supportedMakePattern, SUPPORTED_MAKES } from "@/lib/supported-makes";
@@ -255,11 +256,56 @@ export class PublicPageSource implements PublicInventorySource {
         fetchedAt: new Date(),
       };
     } catch (error) {
-      console.warn(`[${this.sourceName}] Failed to fetch ${url}:`, error instanceof Error ? error.message : error);
-      return null;
+      try {
+        return await this.fetchPageWithInsecureTlsFallback(url);
+      } catch {
+        console.warn(`[${this.sourceName}] Failed to fetch ${url}:`, error instanceof Error ? error.message : error);
+        return null;
+      }
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  private async fetchPageWithInsecureTlsFallback(url: string, redirectCount = 0): Promise<CrawlPage | null> {
+    if (redirectCount > 3) return null;
+
+    return new Promise((resolve, reject) => {
+      const request = https.get(url, {
+        headers: DEFAULT_HEADERS,
+        rejectUnauthorized: false,
+      }, (response) => {
+        const statusCode = response.statusCode || 0;
+        const location = response.headers.location;
+        if (statusCode >= 300 && statusCode < 400 && location) {
+          response.resume();
+          const redirectedUrl = new URL(location, url).toString();
+          this.fetchPageWithInsecureTlsFallback(redirectedUrl, redirectCount + 1).then(resolve).catch(reject);
+          return;
+        }
+
+        const contentType = String(response.headers["content-type"] || "");
+        if (statusCode >= 400 || (!contentType.includes("text/html") && !contentType.includes("application/xhtml"))) {
+          response.resume();
+          resolve(null);
+          return;
+        }
+
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+        response.on("end", () => {
+          resolve({
+            url,
+            html: Buffer.concat(chunks).toString("utf8"),
+            fetchedAt: new Date(),
+          });
+        });
+      }).on("error", reject);
+
+      request.setTimeout(10000, () => {
+        request.destroy(new Error("TLS fallback request timed out"));
+      });
+    });
   }
 }
 

@@ -23,6 +23,21 @@ const steps: Step[] = [
     args: ["run", "crawl-directory-dealer-inventory"],
   },
   {
+    label: "Crawl official dealer inventory sources",
+    command: "npm",
+    args: ["run", "crawl-dealer-inventory"],
+  },
+  {
+    label: "Backfill listing images from vehicle image records",
+    command: "npm",
+    args: ["run", "backfill-listing-images"],
+  },
+  {
+    label: "Backfill listing images from live listing pages",
+    command: "npm",
+    args: ["run", "backfill-listing-images-from-pages", "--", "--limit=500"],
+  },
+  {
     label: "Remove stale/dead live listing links",
     command: "npm",
     args: ["run", "verify-live-listings", "--", "--execute", "--limit=500"],

@@ -2,7 +2,6 @@
 import React from "react";
 import { prisma } from "@/lib/prisma";
 import InventoryExplorer from "@/components/market/InventoryExplorer";
-import { isModelMatch } from "@/lib/data-quality/inventory-validator";
 import { SUPPORTED_MAKES } from "@/lib/supported-makes";
 
 export default async function InventoryPage() {
@@ -20,16 +19,16 @@ export default async function InventoryPage() {
     console.log(`  ${s.inventoryStatus ?? "null"}: ${s._count.id}`)
   );
 
-  // Fetch active listings — only vehicles with VALID or WARNING status are shown.
-  // WARNING = minor issues (trim variation, missing mileage, missing image) — safe to display.
-  // NEEDS_REVIEW = confirmed identity conflict — hidden from public inventory.
-  // REMOVED = duplicate or invalid VIN — permanently hidden.
-  const rawListings = await prisma.listing.findMany({
+  // Public inventory is listing-first: every row must have VIN, price, and listing image.
+  // VIN decode owns the displayed make/model, so crawler text mismatches stay backend quality signals.
+  const listings = await prisma.listing.findMany({
     where: {
       status: "ACTIVE",
+      vehicleId: { not: null },
+      imageUrl: { not: null },
       vehicle: {
         is: {
-          inventoryStatus: { in: ["VALID", "WARNING"] },
+          inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
           model: {
             make: {
               name: { in: [...SUPPORTED_MAKES] },
@@ -37,7 +36,6 @@ export default async function InventoryPage() {
           },
         }
       },
-      validationStatus: "VALID",
       priceStatus: { not: "PRICE_INVALID" },
       OR: [
         { askingPrice: { gte: 10000 } },
@@ -74,42 +72,7 @@ export default async function InventoryPage() {
     orderBy: { createdAt: "desc" },
   });
 
-  console.log("[Inventory Page] Raw listings after status filter:", rawListings.length);
-
-  // Group active listings by vehicle VIN and choose the newest + lowest price
-  const groups = new Map<string, any[]>();
-  for (const l of rawListings) {
-    if (!l.vehicle || !l.vehicle.model || !l.vehicle.model.make) continue;
-    const makeMatch = l.vehicle.model.make.name.toLowerCase().trim() === l.model.make.name.toLowerCase().trim();
-    const modelMatch = isModelMatch(l.model.name, l.model.slug, l.vehicle.model.name);
-    if (!makeMatch || !modelMatch) continue;
-
-    const vin = l.vehicle?.vin;
-    if (!vin) continue;
-    if (!groups.has(vin)) {
-      groups.set(vin, []);
-    }
-    groups.get(vin)!.push(l);
-  }
-
-  const dedupedListings: any[] = [];
-  for (const [vin, list] of groups.entries()) {
-    list.sort((a, b) => {
-      const dateA = new Date(a.createdAt || 0).getTime();
-      const dateB = new Date(b.createdAt || 0).getTime();
-      if (dateB !== dateA) return dateB - dateA;
-      const priceA = a.askingPrice || a.price || Infinity;
-      const priceB = b.askingPrice || b.price || Infinity;
-      return priceA - priceB;
-    });
-    dedupedListings.push(list[0]);
-  }
-
-  const listings = dedupedListings.sort((a, b) => {
-    return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-  });
-
-  console.log("[Inventory Page] Deduplicated listings to display:", listings.length);
+  console.log("[Inventory Page] Public VIN/price/image listings to display:", listings.length);
 
   // Fetch makes and models for filters selection options
   const [makes, models] = await Promise.all([

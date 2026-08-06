@@ -176,10 +176,11 @@ export default async function ModelPage({ params }: ModelPageProps) {
         vehicleId: { not: null },
         vehicle: {
           is: {
+            // ACTIVE covers older VIN-backed rows created before the VALID/WARNING quality pass existed.
             // VALID and WARNING are safe to display publicly.
             // NEEDS_REVIEW = confirmed identity conflict, hidden from public pages.
             // REMOVED = duplicate/invalid VIN, permanently hidden.
-            inventoryStatus: { in: ["VALID", "WARNING"] },
+            inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
             model: {
               make: {
                 name: { in: [...SUPPORTED_MAKES] },

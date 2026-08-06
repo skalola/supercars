@@ -64,7 +64,6 @@ const BLOCKED_NON_TARGET_MAKE_SIGNALS = [
   "land-rover",
   "lexus",
   "maserati",
-  "mclaren",
   "mercedes-benz",
   "porsche",
   "range-rover",

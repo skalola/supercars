@@ -7,7 +7,6 @@ import { createFulfillmentRequest } from "@/lib/fulfillment/service";
 import { resolvePartnerContact } from "@/lib/fulfillment/partner-registry";
 import {
   generateDealerPurchasePackagePayload,
-  dispatchDealerPackageEmail,
 } from "@/lib/fulfillment/dealer-package";
 import {
   generateInsuranceQuotePackagePayload,
@@ -165,7 +164,7 @@ export async function createDealerPurchasePackage(
     partnerType: "DEALER",
     partnerMarketSourceId:
       isSiteUserListing || resolvedDealer?.marketSourceId !== listing.source?.id ? null : listing.source?.id || null,
-    status: "SENT",
+    status: "READY_TO_SEND",
     parties: [
       {
         partyType: "BUYER",
@@ -180,16 +179,12 @@ export async function createDealerPurchasePackage(
         email: recipientEmail || undefined,
       },
     ],
-    depositIntent: {
-      amount: 5000, // Refundable authorization hold
-      paymentMethod: "CREDIT_CARD_HOLD",
-    },
     fees: [
       {
         feeType: "DEPOSIT",
         amount: 5000,
-        status: "AUTHORIZED",
-        description: "Refundable Purchase Authorization Hold",
+        status: "ESTIMATED",
+        description: "Refundable purchase deposit due at final buyer checkout",
       },
       {
         feeType: "COMMISSION",
@@ -209,22 +204,6 @@ export async function createDealerPurchasePackage(
     await prisma.fulfillmentPackage.update({
       where: { id: fulfillmentRequest.packages[0].id },
       data: { scope: JSON.stringify(packagePayload) },
-    });
-  }
-
-  // 5. Dispatch Email to Dealer (audits email or logs unresolved status)
-  if (partnerToken) {
-    await dispatchDealerPackageEmail({
-      fulfillmentRequestId: fulfillmentRequest.id,
-      dealerName: recipientName,
-      dealerEmail: recipientEmail,
-      decisionTokenUrl,
-      packageTitle: fulfillmentRequest.packages[0]?.title || "Dealer Purchase Package",
-      vehicleSummary: `${year} ${make} ${model} (VIN: ${vin})`,
-      askingPrice: packagePayload.askingPrice,
-      buyerName,
-      buyerPhone: input.buyerPhone,
-      platformFee: packagePayload.platformFee,
     });
   }
 

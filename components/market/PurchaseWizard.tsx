@@ -52,6 +52,7 @@ export default function PurchaseWizard({
   const platformFee = askingPrice < 200000 ? askingPrice * 0.015 : askingPrice * 0.02;
   const platformFeePercent = askingPrice < 200000 ? "1.5%" : "2%";
   const [purchaseId, setPurchaseId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [insuranceSelected, setInsuranceSelected] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState({
@@ -74,6 +75,7 @@ export default function PurchaseWizard({
     setAgreedToTerms(false);
     setInsuranceSelected("");
     setPurchaseId(null);
+    setIsSubmitting(false);
     setDeliveryAddress({
       streetAddress: "",
       city: "",
@@ -88,6 +90,73 @@ export default function PurchaseWizard({
     setDeliveryMethod("ENCLOSED");
     setDeliverySubmitted(false);
     setIsOpen(false);
+  };
+
+  const handleFinalSubmit = async () => {
+    const { streetAddress, city, state, postalCode } = deliveryAddress;
+    if (!agreedToTerms || !formData.firstName || !formData.lastName || !formData.email || !formData.phone) {
+      alert("Please fill in all required buyer fields and accept the terms.");
+      return;
+    }
+    if (!insuranceSelected) {
+      alert("Please select an insurance option.");
+      return;
+    }
+    if (!streetAddress || !city || !state || !postalCode || !deliveryDate) {
+      alert("Please fill in all delivery fields and the delivery date.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const dealerResult = await createDealerPurchasePackage({
+        listingId,
+        amount: askingPrice,
+        buyerName: formData.firstName + " " + formData.lastName,
+        buyerEmail: formData.email,
+        buyerPhone: formData.phone,
+        buyerMessage: `Interested in purchasing ${year} ${make} ${model} (${vin})`,
+        requestedTerms: {
+          requestedDeliveryDate: deliveryDate,
+        },
+      });
+      setPurchaseId(dealerResult.purchaseId);
+
+      if (insuranceSelected === "QUOTES") {
+        await createInsuranceQuotePackage({
+          purchaseId: dealerResult.purchaseId,
+          status: "QUOTE_STARTED",
+          garagingState: formData.state,
+          garagingZip: formData.zipCode,
+        });
+      }
+
+      await createTransportQuotePackage({
+        purchaseId: dealerResult.purchaseId,
+        address: { streetAddress, city, state, postalCode },
+        transportMethod: deliveryMethod,
+        deliveryDate,
+        buyerPhone: formData.phone,
+      });
+
+      const response = await fetch("/api/payments/dealer-purchase-deposit-checkout", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          fulfillmentRequestId: dealerResult.fulfillmentRequestId,
+          returnTo: `/vehicle/${vin}`,
+        }),
+      });
+      const checkout = await response.json();
+      if (!response.ok || !checkout.url) {
+        throw new Error(checkout.error || "Failed to start Stripe Checkout.");
+      }
+      window.location.href = checkout.url;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to submit purchase request.";
+      alert(message);
+      setIsSubmitting(false);
+    }
   };
 
   if (!isOpen) {
@@ -431,7 +500,7 @@ export default function PurchaseWizard({
                 Step 5: Review & Purchase
               </h4>
               <p style={{ fontSize: "14px", color: "#4b5563", lineHeight: 1.5, marginBottom: "12px" }}>
-                Please review your details and confirm purchase terms before proceeding to insurance.
+                Please review your details. Your purchase package is sent after the refundable request deposit is completed in Stripe Checkout.
               </p>
               <div style={{
                 display: "grid",
@@ -469,12 +538,16 @@ export default function PurchaseWizard({
                   </span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #f1f5f9", paddingBottom: "6px" }}>
-                  <span style={{ color: "#64748b" }}>Platform Service Fee ({platformFeePercent})</span>
+                  <span style={{ color: "#64748b" }}>Estimated Platform Service Fee ({platformFeePercent})</span>
                   <span style={{ fontWeight: 600, color: "#10b981" }}>${platformFee.toLocaleString()}</span>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, paddingTop: "4px" }}>
                   <span style={{ color: "#0f172a" }}>Total Purchase Price (excluding taxes)</span>
                   <span style={{ color: "#10b981" }}>${(askingPrice + platformFee).toLocaleString()}</span>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, paddingTop: "4px" }}>
+                  <span style={{ color: "#0f172a" }}>Deposit due now</span>
+                  <span style={{ color: "#2563eb" }}>$5,000</span>
                 </div>
               </div>
             </div>
@@ -751,55 +824,16 @@ export default function PurchaseWizard({
                     alert("Please fill in all required fields and accept the terms.");
                     return;
                   }
-                  
-                  if (!purchaseId) {
-                    try {
-                      const result = await createDealerPurchasePackage({
-                        listingId,
-                        amount: askingPrice,
-                        buyerName: formData.firstName + " " + formData.lastName,
-                        buyerEmail: formData.email,
-                        buyerMessage: `Interested in purchasing ${year} ${make} ${model} (${vin})`,
-                      });
-                      setPurchaseId(result.id);
-                    } catch (error) {
-                      const message = error instanceof Error ? error.message : "Failed to initialize purchase offer.";
-                      alert(message);
-                      return;
-                    }
-                  }
                 } else if (step === 3) {
                   if (!insuranceSelected) {
                     alert("Please select an insurance option.");
                     return;
-                  }
-                  if (purchaseId && insuranceSelected === "QUOTES") {
-                    try {
-                      await createInsuranceQuotePackage({ purchaseId, status: "QUOTE_STARTED" });
-                    } catch (error) {
-                      console.error("Failed to update insurance request:", error);
-                    }
                   }
                 } else if (step === 4) {
                   const { streetAddress, city, state, postalCode } = deliveryAddress;
                   if (!streetAddress || !city || !state || !postalCode || !deliveryDate) {
                     alert("Please fill in all address fields and the delivery date.");
                     return;
-                  }
-
-                  if (purchaseId) {
-                    try {
-                      await createTransportQuotePackage({
-                        purchaseId,
-                        address: { streetAddress, city, state, postalCode },
-                        transportMethod: deliveryMethod,
-                        deliveryDate
-                      });
-                    } catch (error) {
-                      const message = error instanceof Error ? error.message : "Failed to submit delivery request.";
-                      alert(message);
-                      return;
-                    }
                   }
                 }
                 
@@ -820,22 +854,20 @@ export default function PurchaseWizard({
             </button>
           ) : (
             <button
-              onClick={() => {
-                alert("Purchase successfully submitted!");
-                resetWizard();
-              }}
+              onClick={handleFinalSubmit}
+              disabled={isSubmitting}
               style={{
                 padding: "8px 16px",
                 borderRadius: "6px",
-                backgroundColor: "#10b981",
+                backgroundColor: isSubmitting ? "#94a3b8" : "#10b981",
                 color: "#ffffff",
                 border: "none",
                 fontSize: "14px",
                 fontWeight: 600,
-                cursor: "pointer"
+                cursor: isSubmitting ? "not-allowed" : "pointer"
               }}
             >
-              Finish
+              {isSubmitting ? "Opening Checkout..." : "Submit & Pay Deposit"}
             </button>
           )}
         </div>

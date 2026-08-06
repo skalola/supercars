@@ -45,8 +45,11 @@ export function isOfficialDealerMicrositeHostname(hostname?: string | null) {
 
   return [
     "ferraridealers.com",
+    "preowned.ferrari.com",
     "lamborghini.com",
+    "preowned.lamborghini.com",
     "mclaren.com",
+    "preowned.mclaren.com",
   ].some((domain) => normalized === domain || normalized.endsWith(`.${domain}`));
 }
 
@@ -60,12 +63,12 @@ export function isMarketplaceHostname(hostname?: string | null) {
     "dupontregistry.com",
     "bringatrailer.com",
     "hemmings.com",
+    "google.com",
+    "goo.gl",
+    "maps.app.goo.gl",
     "ferrari.com",
-    "preowned.ferrari.com",
     "lamborghini.com",
-    "preowned.lamborghini.com",
     "mclaren.com",
-    "preowned.mclaren.com",
   ].some((domain) => normalized === domain || normalized.endsWith(`.${domain}`));
 }
 
@@ -76,7 +79,7 @@ export function isDealerOwnedWebsite(value?: string | null) {
 
 export function buildSalesEmailForWebsite(value?: string | null) {
   const hostname = getHostname(value);
-  if (!hostname || isMarketplaceHostname(hostname)) return null;
+  if (!hostname || isMarketplaceHostname(hostname) || isOfficialDealerMicrositeHostname(hostname)) return null;
   const rootDomain = getRootDomain(hostname);
   return rootDomain ? `sales@${rootDomain}` : null;
 }

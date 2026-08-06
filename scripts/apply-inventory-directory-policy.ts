@@ -71,6 +71,59 @@ async function main() {
     },
   });
 
+  const activeListingsWithoutVehicles = await prisma.listing.findMany({
+    where: {
+      status: "ACTIVE",
+      vehicleId: null,
+    },
+    select: {
+      id: true,
+      _count: {
+        select: {
+          purchases: true,
+          fulfillmentRequests: true,
+        },
+      },
+    },
+  });
+  const removableNoVinListings = activeListingsWithoutVehicles.filter(
+    (listing) => listing._count.purchases === 0 && listing._count.fulfillmentRequests === 0,
+  );
+  const heldNoVinListings = activeListingsWithoutVehicles.filter(
+    (listing) => listing._count.purchases > 0 || listing._count.fulfillmentRequests > 0,
+  );
+  const removedNoVinListings = await prisma.listing.deleteMany({
+    where: {
+      id: { in: removableNoVinListings.map((listing) => listing.id) },
+    },
+  });
+  const heldInactiveNoVinListings = await prisma.listing.updateMany({
+    where: {
+      id: { in: heldNoVinListings.map((listing) => listing.id) },
+    },
+    data: {
+      status: "INACTIVE",
+      validationStatus: "VIN_MISSING",
+      freshnessStatus: "INACTIVE",
+    },
+  });
+
+  const inactiveNeedsReviewListings = await prisma.listing.updateMany({
+    where: {
+      status: "ACTIVE",
+      vehicle: {
+        is: {
+          inventoryStatus: "NEEDS_REVIEW",
+        },
+      },
+    },
+    data: {
+      status: "INACTIVE",
+      freshnessStatus: "INACTIVE",
+      validationStatus: "NEEDS_REVIEW",
+    },
+  });
+
   const activeVinListings = await prisma.listing.findMany({
     where: {
       status: "ACTIVE",
@@ -92,6 +145,44 @@ async function main() {
       status: "INACTIVE",
       priceStatus: "PRICE_MISSING",
       freshnessStatus: "INACTIVE",
+    },
+  });
+
+  const activeVinListingsWithoutImages = await prisma.listing.findMany({
+    where: {
+      status: "ACTIVE",
+      vehicleId: { not: null },
+      OR: [{ imageUrl: null }, { imageUrl: "" }],
+    },
+    select: {
+      id: true,
+      _count: {
+        select: {
+          purchases: true,
+          fulfillmentRequests: true,
+        },
+      },
+    },
+  });
+  const deletableNoImageListings = activeVinListingsWithoutImages.filter(
+    (listing) => listing._count.purchases === 0 && listing._count.fulfillmentRequests === 0,
+  );
+  const heldNoImageListings = activeVinListingsWithoutImages.filter(
+    (listing) => listing._count.purchases > 0 || listing._count.fulfillmentRequests > 0,
+  );
+  const removedVinNoImage = await prisma.listing.deleteMany({
+    where: {
+      id: { in: deletableNoImageListings.map((listing) => listing.id) },
+    },
+  });
+  const heldRemovedVinNoImage = await prisma.listing.updateMany({
+    where: {
+      id: { in: heldNoImageListings.map((listing) => listing.id) },
+    },
+    data: {
+      status: "REMOVED",
+      freshnessStatus: "REMOVED",
+      validationStatus: "IMAGE_MISSING",
     },
   });
 
@@ -189,7 +280,12 @@ async function main() {
         vendorsMarkedUnverifiedForMissingEmail: vendorUpdate.count,
         vendorsMarkedManualReviewForEmailWebsiteDomainMismatch: mismatchedVendorHeld.count,
         listingsRemovedNoVinNoPrice: removedNoVinNoPrice.count,
+        activeListingsRemovedForMissingVin: removedNoVinListings.count,
+        activeListingsHeldInactiveForMissingVin: heldInactiveNoVinListings.count,
+        activeListingsDeactivatedForVehicleReview: inactiveNeedsReviewListings.count,
         vinBackedListingsDeactivatedForMissingPrice: deactivatedVinNoPrice.count,
+        vinBackedListingsRemovedForMissingImage: removedVinNoImage.count,
+        vinBackedListingsHeldAsRemovedForMissingImage: heldRemovedVinNoImage.count,
         nonTargetMakeListingsRemoved: removedNonTargetListings.count,
         nonTargetMakeListingsHeldAsRemoved: heldRemovedNonTargetListings.count,
         auctionListingsRemovedFromInventory: removedAuctionListings.count,

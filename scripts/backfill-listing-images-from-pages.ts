@@ -28,7 +28,7 @@ async function main() {
       OR: [{ askingPrice: { gte: 10000 } }, { price: { gte: 10000 } }],
       vehicle: {
         is: {
-          inventoryStatus: { in: ["VALID", "WARNING"] },
+          inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
           model: {
             make: {
               name: { in: targetMakes },

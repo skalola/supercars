@@ -243,10 +243,12 @@ export async function ingestCrawlerListings(
       });
     }
 
-    const hasUsablePrice = listing.price !== null && listing.price > 0;
-    const listingStatus = hasUsablePrice ? "ACTIVE" : "INACTIVE";
-    const priceStatus = hasUsablePrice ? "VALID_PRICE" : "PRICE_MISSING";
     const listingImageUrl = listing.images[0] || null;
+    const hasUsablePrice = listing.price !== null && listing.price > 0;
+    const hasUsableImage = Boolean(listingImageUrl);
+    const listingStatus = hasUsablePrice && hasUsableImage ? "ACTIVE" : "INACTIVE";
+    const priceStatus = hasUsablePrice ? "VALID_PRICE" : "PRICE_MISSING";
+    const freshnessStatus = hasUsableImage ? "ACTIVE" : "INACTIVE";
 
     const savedListing = await prisma.listing.upsert({
       where: {
@@ -272,6 +274,7 @@ export async function ingestCrawlerListings(
         vinVerified: decoded.make ? true : false,
         validationStatus,
         priceStatus,
+        freshnessStatus,
       },
       create: {
         modelId: modelMatch.modelId,
@@ -293,6 +296,7 @@ export async function ingestCrawlerListings(
         vinVerified: decoded.make ? true : false,
         validationStatus,
         priceStatus,
+        freshnessStatus,
       },
     });
 

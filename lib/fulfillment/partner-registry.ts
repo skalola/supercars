@@ -111,12 +111,15 @@ export async function upsertPartnerContact(input: UpsertPartnerContactInput) {
     ? input.confidence || "PUBLIC_SOURCE"
     : "UNRESOLVED_EMAIL";
 
+  const makeScope = input.makeSpecialization
+    ? { OR: [{ makeSpecialization: input.makeSpecialization }, { makeSpecialization: "ALL" }] }
+    : {};
   const existing = await prisma.partnerContact.findFirst({
     where: {
       type: input.type,
       OR: [
-        { name: input.name },
-        ...(sourceDomain ? [{ sourceDomain }] : []),
+        { AND: [{ name: input.name }, makeScope] },
+        ...(sourceDomain ? [{ AND: [{ sourceDomain }, makeScope] }] : []),
         ...(input.marketSourceId ? [{ marketSourceId: input.marketSourceId }] : []),
       ],
     },
@@ -134,6 +137,11 @@ export async function upsertPartnerContact(input: UpsertPartnerContactInput) {
     const finalConfidence: PartnerConfidence = finalEmail
       ? input.confidence || (existing.confidence as PartnerConfidence) || "PUBLIC_SOURCE"
       : "UNRESOLVED_EMAIL";
+    const finalMarketSourceId = await resolveContactMarketSourceId(existing.id, existing.marketSourceId, input.marketSourceId);
+    const finalMakeSpecialization =
+      existing.makeSpecialization && existing.makeSpecialization !== "ALL" && input.makeSpecialization && existing.makeSpecialization !== input.makeSpecialization
+        ? existing.makeSpecialization
+        : input.makeSpecialization || existing.makeSpecialization;
 
     return prisma.partnerContact.update({
       where: { id: existing.id },
@@ -144,7 +152,7 @@ export async function upsertPartnerContact(input: UpsertPartnerContactInput) {
         phone: cleanPhone || existing.phone,
         website: input.website || existing.website,
         sourceDomain: sourceDomain || existing.sourceDomain,
-        makeSpecialization: input.makeSpecialization || existing.makeSpecialization,
+        makeSpecialization: finalMakeSpecialization,
         location: location.location || existing.location,
         streetAddress: location.streetAddress || existing.streetAddress,
         city: location.city || existing.city,
@@ -159,10 +167,12 @@ export async function upsertPartnerContact(input: UpsertPartnerContactInput) {
         contactStatus: finalStatus,
         coverage: input.coverage || existing.coverage,
         lastVerifiedAt: new Date(),
-        marketSourceId: input.marketSourceId || existing.marketSourceId,
+        marketSourceId: finalMarketSourceId,
       },
     });
   }
+
+  const marketSourceId = await resolveContactMarketSourceId(null, null, input.marketSourceId);
 
   return prisma.partnerContact.create({
     data: {
@@ -187,9 +197,30 @@ export async function upsertPartnerContact(input: UpsertPartnerContactInput) {
       contactStatus,
       coverage: input.coverage || "LOCAL",
       lastVerifiedAt: new Date(),
-      marketSourceId: input.marketSourceId || null,
+      marketSourceId,
     },
   });
+}
+
+async function resolveContactMarketSourceId(
+  contactId: string | null,
+  currentMarketSourceId?: string | null,
+  nextMarketSourceId?: string | null
+) {
+  if (!nextMarketSourceId || nextMarketSourceId === currentMarketSourceId) {
+    return currentMarketSourceId || null;
+  }
+
+  const holder = await prisma.partnerContact.findFirst({
+    where: { marketSourceId: nextMarketSourceId },
+    select: { id: true },
+  });
+
+  if (!holder || holder.id === contactId) {
+    return nextMarketSourceId;
+  }
+
+  return currentMarketSourceId || null;
 }
 
 /**

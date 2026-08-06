@@ -355,6 +355,7 @@ function nextStepCopy(status: string, requestType: string, role: "BUYER" | "SELL
   }
   if (status === "SENT" || status === "VIEWED" || status === "READY_TO_SEND") return "The request is with the fulfillment partner for review.";
   if (status === "ACCEPTED" && requestType === "INSURANCE_QUOTE") return "The insurance partner accepted the quote request. Policy binding is completed directly with the carrier.";
+  if (status === "ACCEPTED" && requestType === "DEALER_PURCHASE") return "The dealer accepted the purchase request. Final vehicle payment and paperwork are completed directly with the selling dealer.";
   if (status === "ACCEPTED_AWAITING_PAYMENT" && requestType === "SERVICE_BOOKING") return "The shop accepted your appointment. Pay the SUPERCAR DASH booking fee to confirm the booking.";
   if (status === "PAYMENT_PROCESSING" && requestType === "SERVICE_BOOKING") return "Stripe is processing the booking fee. This page will show confirmed once the webhook verifies payment.";
   if (status === "CONFIRMED" && requestType === "SERVICE_BOOKING") return "Your booking fee is paid and the appointment is confirmed. Service invoices are paid directly to the shop.";
@@ -379,9 +380,10 @@ function paymentHeadline(req: { paymentStatus: string; collectedAmount?: number;
   return paymentLabel(req.paymentStatus);
 }
 
-function paymentCopy(req: { paymentStatus: string; refundableAmount?: number }) {
+function paymentCopy(req: { paymentStatus: string; requestType?: string; refundableAmount?: number }) {
   if (req.paymentStatus === "PAYMENT_REQUIRED") return "The shop accepted. Pay the SUPERCAR DASH platform booking fee to confirm.";
   if (req.paymentStatus === "PROCESSING") return "Checkout was started. Payment is confirmed only after Stripe sends a verified webhook.";
+  if (req.paymentStatus === "PAID" && req.requestType === "DEALER_PURCHASE") return "The purchase request deposit is paid. Final vehicle payment and paperwork are handled directly by the selling dealer.";
   if (req.paymentStatus === "PAID") return "The platform booking fee has been paid. Repair invoices are paid directly to the service shop.";
   if (req.paymentStatus === "AUTHORIZED") return "Funds are authorized only. Capture happens after partner acceptance.";
   if (req.paymentStatus === "CAPTURED") return "Funds were captured after partner acceptance.";

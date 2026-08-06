@@ -1,5 +1,10 @@
 import https from "node:https";
-import { buildSalesEmailForWebsite, getHostname, isMarketplaceHostname } from "@/lib/directory/contact-domain-policy";
+import {
+  buildSalesEmailForWebsite,
+  getHostname,
+  isMarketplaceHostname,
+  isOfficialDealerMicrositeHostname,
+} from "@/lib/directory/contact-domain-policy";
 import { normalizePartnerLocation, normalizePhoneNumber } from "@/lib/directory/partner-contact-format";
 import { isValidEmail } from "@/lib/fulfillment/partner-registry";
 
@@ -337,7 +342,7 @@ function absolutizeUrl(value: string, baseUrl: string) {
 }
 
 function isMarketplaceDomain(domain: string) {
-  return /(^|\.)dupontregistry\.com$|(^|\.)autotrader\.com$|(^|\.)cars\.com$|(^|\.)bringatrailer\.com$|(^|\.)ferrari\.com$|(^|\.)preowned\.ferrari\.com$|(^|\.)lamborghini\.com$|(^|\.)preowned\.lamborghini\.com$|(^|\.)mclaren\.com$|(^|\.)preowned\.mclaren\.com$/i.test(domain);
+  return isMarketplaceHostname(domain) && !isOfficialDealerMicrositeHostname(domain);
 }
 
 function isGenericManufacturerContactUrl(value: string) {

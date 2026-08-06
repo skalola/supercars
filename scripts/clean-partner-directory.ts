@@ -3,6 +3,39 @@ import { prisma } from "../lib/prisma";
 async function cleanPartnerDirectory() {
   console.log("Starting Partner Directory Deduplication...");
 
+  const testContacts = await prisma.partnerContact.findMany({
+    where: {
+      OR: [
+        { website: { contains: ".example.", mode: "insensitive" } },
+        { website: { contains: "example.org", mode: "insensitive" } },
+        { website: { contains: "example.com", mode: "insensitive" } },
+        { email: { contains: "@example.", mode: "insensitive" } },
+        { name: { contains: "Sprint", mode: "insensitive" } },
+        { name: { contains: "Test", mode: "insensitive" } },
+        { name: { contains: "Transaction Center", mode: "insensitive" } },
+        { name: { contains: "Financial Settlement", mode: "insensitive" } },
+        { name: { contains: "Admin Ops", mode: "insensitive" } },
+      ],
+    },
+    include: { fulfillmentParties: true },
+  });
+
+  let removedTestContacts = 0;
+  let deactivatedTestContacts = 0;
+  for (const contact of testContacts) {
+    if (contact.fulfillmentParties.length > 0) {
+      await prisma.partnerContact.update({
+        where: { id: contact.id },
+        data: { active: false, confidence: "MANUAL_REVIEW" },
+      });
+      deactivatedTestContacts++;
+      continue;
+    }
+
+    await prisma.partnerContact.delete({ where: { id: contact.id } });
+    removedTestContacts++;
+  }
+
   const contacts = await prisma.partnerContact.findMany({
     include: {
       fulfillmentParties: true,
@@ -12,7 +45,7 @@ async function cleanPartnerDirectory() {
   const groups = new Map<string, typeof contacts>();
 
   for (const c of contacts) {
-    const key = `${c.name.toLowerCase().trim()}|${c.type}`;
+    const key = `${canonicalContactKey(c)}|${c.type}|${c.makeSpecialization || "ALL"}`;
     if (!groups.has(key)) {
       groups.set(key, []);
     }
@@ -60,6 +93,43 @@ async function cleanPartnerDirectory() {
   }
 
   console.log(`\nDeduplication complete! Deleted ${deletedCount} duplicate contacts. Migrated ${migratedCount} fulfillment relations.`);
+  console.log(`Removed test/example contacts: ${removedTestContacts}. Deactivated protected test contacts: ${deactivatedTestContacts}.`);
+}
+
+function canonicalContactKey(contact: { name: string; website: string | null; sourceDomain: string | null; makeSpecialization?: string | null; city?: string | null; state?: string | null }) {
+  const domain = contact.sourceDomain || domainFromUrl(contact.website);
+  if (domain && shouldDedupeByDomain(contact.makeSpecialization, domain)) return domain;
+  return [
+    contact.name,
+    contact.city || "",
+    contact.state || "",
+  ].join("|").toLowerCase().replace(/\b(of|the|inc|llc|corp|co|dealership|auto|motors)\b/g, "").replace(/[^a-z0-9|]+/g, "");
+}
+
+function domainFromUrl(value?: string | null) {
+  if (!value) return null;
+  try {
+    return new URL(value).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+function isManufacturerLocatorDomain(domain: string) {
+  return /(^|\.)lamborghini\.com$/i.test(domain) || /(^|\.)ferraridealers\.com$/i.test(domain) || /(^|\.)mclaren\.com$/i.test(domain);
+}
+
+function shouldDedupeByDomain(make: string | null | undefined, domain: string) {
+  if (isManufacturerLocatorDomain(domain) || isGenericOrRedirectDomain(domain)) return false;
+  if (!make || make === "ALL") return true;
+  if (make === "Ferrari") return /ferrari/i.test(domain);
+  if (make === "Lamborghini") return /lamborghini/i.test(domain);
+  if (make === "McLaren") return /mclaren/i.test(domain);
+  return true;
+}
+
+function isGenericOrRedirectDomain(domain: string) {
+  return /(^|\.)google\.com$/i.test(domain) || /(^|\.)goo\.gl$/i.test(domain);
 }
 
 cleanPartnerDirectory()

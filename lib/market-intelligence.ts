@@ -97,7 +97,7 @@ export async function getMarketRange(modelId: string): Promise<MarketRange | nul
       priceStatus: { not: "PRICE_INVALID" },
       vehicle: {
         is: {
-          inventoryStatus: { in: ["VALID", "WARNING"] },
+          inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
           model: {
             make: {
               name: { in: [...SUPPORTED_MAKES] },
@@ -144,7 +144,7 @@ export async function getMarketSupply(modelId: string): Promise<MarketSupply> {
       priceStatus: { not: "PRICE_INVALID" },
       vehicle: {
         is: {
-          inventoryStatus: { in: ["VALID", "WARNING"] },
+          inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
           model: {
             make: {
               name: { in: [...SUPPORTED_MAKES] },
@@ -313,7 +313,7 @@ export async function getMarketPriceHistory(modelId: string): Promise<MarketPric
         vehicleId: { not: null },
         vehicle: {
           is: {
-            inventoryStatus: { in: ["VALID", "WARNING"] },
+            inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
             model: {
               make: {
                 name: { in: [...SUPPORTED_MAKES] },

@@ -12,8 +12,10 @@
 import https from "node:https";
 import { prisma } from "../lib/prisma";
 import { upsertPartnerContact } from "../lib/fulfillment/partner-registry";
+import { buildSalesEmailForWebsite } from "../lib/directory/contact-domain-policy";
+import { MCLAREN_DEALERS } from "../lib/market-crawlers/dealer-registry";
 
-type Brand = "Ferrari" | "Lamborghini" | string;
+type Brand = "Ferrari" | "Lamborghini" | "McLaren" | string;
 type PartnerType = "DEALER" | "SERVICE_SHOP";
 
 type CrawledContact = {
@@ -31,6 +33,7 @@ type CrawledContact = {
   country?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  marketSourceId?: string | null;
 };
 
 type ZipDetails = {
@@ -40,6 +43,14 @@ type ZipDetails = {
   longitude: number;
 };
 
+type McLarenDepartment = {
+  available?: number | boolean | null;
+  phone?: string | null;
+  effective_address?: string | null;
+  effective_latitude?: string | number | null;
+  effective_longitude?: string | number | null;
+};
+
 const USER_AGENT = "Mozilla/5.0 (compatible; SUPERCARDASHDirectoryCrawler/0.1; +https://supercardash.vercel.app)";
 
 type BrandCrawler = () => Promise<CrawledContact[]>;
@@ -47,7 +58,7 @@ type BrandCrawler = () => Promise<CrawledContact[]>;
 const CRAWLERS: Record<string, BrandCrawler> = {
   Ferrari: crawlFerrariDealers,
   Lamborghini: crawlLamborghiniDealers,
-  // Add new brands here in the future (e.g. McLaren: crawlMcLarenDealers)
+  McLaren: crawlMcLarenDealers,
 };
 
 async function main() {
@@ -92,10 +103,14 @@ async function main() {
 
   console.log(`\nUpserting ${contacts.length} deduped contacts...`);
   for (const contact of contacts) {
+    const fallbackEmail =
+      contact.type === "DEALER" ? buildSalesEmailForWebsite(contact.website) : null;
+    const email = contact.email || fallbackEmail;
+
     await upsertPartnerContact({
       name: contact.name,
       type: contact.type,
-      email: contact.email || null,
+      email,
       phone: contact.phone || null,
       website: contact.website || null,
       sourceDomain: contact.sourceDomain || domainFromUrl(contact.website),
@@ -108,7 +123,7 @@ async function main() {
       country: contact.country || "US",
       latitude: contact.latitude ?? null,
       longitude: contact.longitude ?? null,
-      confidence: contact.email ? "PUBLIC_SOURCE" : "UNRESOLVED_EMAIL",
+      confidence: email ? "PUBLIC_SOURCE" : "UNRESOLVED_EMAIL",
       contactSource: "PUBLIC_WEBSITE",
       active: true,
     });
@@ -249,19 +264,28 @@ async function crawlLamborghiniDealers(): Promise<CrawledContact[]> {
     }
 
     const type: PartnerType = record.siteCategory.code === "SERVICE" ? "SERVICE_SHOP" : "DEALER";
-    const dealerName = cleanString(record.dealerName) || "Lamborghini Dealer";
-    const city = cleanString(record.siteData?.city?.value?.[0]);
-    const stateZip = parseLamborghiniStateZip(record.addressLoc || record.address || "", contactsMap.get("zipCode"));
     const officialProfileUrl = `https://www.lamborghini.com${record.url || "/en-en/dealerships"}`;
+    const dealerName = normalizeLamborghiniDealerName(cleanString(record.dealerName), record.url) || "Lamborghini Dealer";
+    const city = cleanString(record.siteData?.city?.value?.[0]) || inferCityFromDealerName(dealerName);
+    const stateZip = parseLamborghiniStateZip(record.addressLoc || record.address || "", contactsMap.get("zipCode"));
+    const dealerWebsite =
+      cleanString(contactsMap.get("organizationWebSite")) ||
+      inferLamborghiniDealerWebsite(dealerName) ||
+      websiteFromEmail(contactsMap.get("email")) ||
+      officialProfileUrl;
+    const sourceDomain = domainFromUrl(dealerWebsite);
+    const officialEmail = cleanEmail(contactsMap.get("email"));
+    const fallbackEmail = buildSalesEmailForWebsite(dealerWebsite);
+    const email = emailBelongsToDomain(officialEmail, sourceDomain) ? officialEmail : fallbackEmail || officialEmail;
 
     return {
       brand: "Lamborghini",
       type,
       name: type === "SERVICE_SHOP" ? `${dealerName} Service` : dealerName,
-      email: cleanEmail(contactsMap.get("email")),
+      email,
       phone: cleanPhone(contactsMap.get("phone")),
-      website: officialProfileUrl,
-      sourceDomain: domainFromUrl(officialProfileUrl),
+      website: dealerWebsite,
+      sourceDomain: sourceDomain && !isManufacturerLocatorDomain(sourceDomain) ? sourceDomain : null,
       streetAddress: cleanString(record.addressInt || record.address),
       city,
       state: stateZip.state,
@@ -275,6 +299,119 @@ async function crawlLamborghiniDealers(): Promise<CrawledContact[]> {
   const hydratedContacts = await hydrateMissingCoordinates(contacts);
   console.log(`  Found ${hydratedContacts.length} Lamborghini dealer/service contacts.`);
   return hydratedContacts;
+}
+
+async function crawlMcLarenDealers(): Promise<CrawledContact[]> {
+  console.log("Crawling McLaren official retailer locator...");
+  try {
+    const data = await fetchJson<{
+      retailers?: Array<{
+        id?: number | string;
+        name?: string;
+        address?: string;
+        url?: string;
+        retailer_page_link?: string;
+        preowned_link?: string | null;
+        retailer_id?: string | null;
+        latitude?: string | number | null;
+        longitude?: string | number | null;
+        departments?: {
+          sales?: McLarenDepartment | null;
+          service?: McLarenDepartment | null;
+        };
+      }>;
+    }>("https://cms.production.aws.mclaren.com/api/retailers?country=USA", {
+      Origin: "https://www.mclaren.com",
+      Referer: "https://www.mclaren.com/cars/us_en/retailers",
+    });
+
+    const contacts = (data.retailers || []).flatMap((retailer): CrawledContact[] => {
+      const dealerName = normalizeMcLarenDealerName(retailer.name);
+      const parsedAddress = parseUsAddress(retailer.address || "");
+      const website = inferMcLarenDealerWebsite(dealerName) || cleanString(retailer.retailer_page_link || retailer.url);
+      const sourceDomain = domainFromUrl(website);
+      const email = buildSalesEmailForWebsite(website);
+      const latitude = numberOrNull(retailer.departments?.sales?.effective_latitude) ?? numberOrNull(retailer.latitude);
+      const longitude = numberOrNull(retailer.departments?.sales?.effective_longitude) ?? numberOrNull(retailer.longitude);
+      const baseContact = {
+        brand: "McLaren",
+        email,
+        website,
+        sourceDomain: sourceDomain && !isManufacturerLocatorDomain(sourceDomain) ? sourceDomain : null,
+        streetAddress: cleanString(retailer.departments?.sales?.effective_address) || cleanString(retailer.address),
+        city: parsedAddress.city,
+        state: parsedAddress.state,
+        postalCode: parsedAddress.postalCode,
+        country: "US",
+        latitude,
+        longitude,
+      };
+      const sourceId = cleanString(retailer.retailer_id) || cleanString(retailer.id);
+      const output: CrawledContact[] = [];
+
+      if (retailer.departments?.sales?.available) {
+        output.push({
+          ...baseContact,
+          type: "DEALER",
+          name: dealerName,
+          phone: cleanPhone(retailer.departments.sales.phone),
+          marketSourceId: sourceId ? `mclaren-retailer:${sourceId}:sales` : null,
+        });
+      }
+
+      if (retailer.departments?.service?.available) {
+        output.push({
+          ...baseContact,
+          type: "SERVICE_SHOP",
+          name: `${dealerName} Service`,
+          phone: cleanPhone(retailer.departments.service.phone),
+          streetAddress: cleanString(retailer.departments.service.effective_address) || baseContact.streetAddress,
+          latitude: numberOrNull(retailer.departments.service.effective_latitude) ?? baseContact.latitude,
+          longitude: numberOrNull(retailer.departments.service.effective_longitude) ?? baseContact.longitude,
+          marketSourceId: sourceId ? `mclaren-retailer:${sourceId}:service` : null,
+        });
+      }
+
+      return output;
+    });
+
+    const hydratedContacts = await hydrateMissingCoordinates(contacts);
+    console.log(`  Found ${hydratedContacts.length} McLaren dealer/service contacts from official CMS.`);
+    return hydratedContacts;
+  } catch (error) {
+    console.warn("  McLaren official CMS unavailable; falling back to local registry.", error instanceof Error ? error.message : error);
+  }
+
+  console.log("Crawling McLaren official retailer locator fallback registry...");
+  const contacts = MCLAREN_DEALERS.flatMap((dealer): CrawledContact[] => {
+    const baseUrl = dealer.inventoryUrl ? originFromUrl(dealer.inventoryUrl) : null;
+    const email = buildSalesEmailForWebsite(baseUrl);
+    const common = {
+      brand: "McLaren",
+      email,
+      website: baseUrl,
+      sourceDomain: domainFromUrl(baseUrl),
+      city: dealer.city,
+      state: dealer.state,
+      country: "US",
+    };
+
+    return [
+      {
+        ...common,
+        type: "DEALER",
+        name: dealer.name,
+      },
+      {
+        ...common,
+        type: "SERVICE_SHOP",
+        name: `${dealer.name} Service`,
+      },
+    ];
+  });
+
+  console.log(`  Found ${contacts.length} McLaren dealer/service contacts.`);
+  return contacts;
 }
 
 async function hydrateMissingCoordinates(contacts: CrawledContact[]) {
@@ -412,6 +549,22 @@ async function fetchText(url: string): Promise<string> {
   return fetchTextInsecure(url);
 }
 
+async function fetchJson<T>(url: string, headers: Record<string, string> = {}): Promise<T> {
+  const response = await fetch(url, {
+    headers: {
+      "user-agent": USER_AGENT,
+      "accept": "application/json",
+      ...headers,
+    },
+    redirect: "follow",
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!response.ok) {
+    throw new Error(`Fetch failed for ${url}: ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}
+
 async function fetchTextInsecure(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
     https.get(url, {
@@ -490,6 +643,152 @@ function domainFromUrl(value?: string | null) {
   } catch {
     return null;
   }
+}
+
+function originFromUrl(value?: string | null) {
+  if (!value) return null;
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
+function websiteFromEmail(value?: string | null) {
+  const email = cleanEmail(value);
+  if (!email) return null;
+  const domain = email.split("@")[1];
+  if (!domain || isGenericEmailDomain(domain)) return null;
+  return `https://www.${domain}`;
+}
+
+function inferLamborghiniDealerWebsite(name: string) {
+  const slug = name
+    .toLowerCase()
+    .replace(/^lamborghini\s+/i, "")
+    .replace(/\bn\.?j\.?\b/g, "nj")
+    .replace(/\bst\.?\b/g, "st")
+    .replace(/[^a-z0-9]+/g, "");
+  if (!slug) return null;
+  return `https://www.lamborghini${slug}.com`;
+}
+
+function normalizeMcLarenDealerName(name?: string | null) {
+  const trimmed = cleanString(name) || "Dealer";
+  return /^mclaren\s+/i.test(trimmed) ? trimmed : `McLaren ${trimmed}`;
+}
+
+function inferMcLarenDealerWebsite(name: string) {
+  const known = MCLAREN_DEALERS.find((dealer) => normalizeName(dealer.name) === normalizeName(name));
+  const knownOrigin = known?.inventoryUrl ? originFromUrl(known.inventoryUrl) : null;
+  if (knownOrigin) return knownOrigin;
+
+  const slug = name
+    .toLowerCase()
+    .replace(/^mclaren\s+/i, "")
+    .replace(/[^a-z0-9]+/g, "");
+  if (!slug) return null;
+  return `https://www.mclaren${slug}.com`;
+}
+
+function normalizeLamborghiniDealerName(name?: string | null, officialPath?: string | null) {
+  const slug = typeof officialPath === "string" ? officialPath.match(/\/(lamborghini-[a-z0-9.-]+)(?:#|$|\/)/i)?.[1] : null;
+  if (slug && (!name || /^lamborghini[a-z]/i.test(name))) {
+    return titleCaseDealerSlug(slug);
+  }
+  if (!name) return null;
+  if (/^lamborghini[a-z]/i.test(name)) {
+    return titleCaseDealerSlug(name.replace(/^lamborghini/i, "lamborghini-"));
+  }
+  return name;
+}
+
+function titleCaseDealerSlug(slug: string) {
+  return slug
+    .replace(/^lamborghini[-\s]*/i, "")
+    .replace(/\bn[-.]?j\b/gi, "nj")
+    .split(/[-\s]+/)
+    .filter(Boolean)
+    .map((part) => {
+      const lower = part.toLowerCase();
+      if (lower === "nj") return "N.J.";
+      if (lower === "st") return "St.";
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join(" ")
+    .replace(/^/, "Lamborghini ");
+}
+
+function inferCityFromDealerName(name: string) {
+  const city = name.replace(/^Lamborghini\s+/i, "").replace(/\s+N\.J\.$/i, "").trim();
+  return city || null;
+}
+
+function parseUsAddress(address: string) {
+  const cleaned = cleanString(address) || "";
+  const postalCode = cleaned.match(/\b(\d{5})(?:-\d{4})?\s*$/)?.[1] || null;
+  const stateMatch = cleaned.match(/\b(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|IA|ID|IL|IN|KS|KY|LA|MA|MD|ME|MI|MN|MO|MS|MT|NC|ND|NE|NH|NJ|NM|NV|NY|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VA|VT|WA|WI|WV|WY|DC)\b[\s,.]*(?:\d{5})?$/i);
+  const fullStateMatch = cleaned.match(/\b(Alabama|Alaska|Arizona|Arkansas|California|Colorado|Connecticut|Delaware|Florida|Georgia|Hawaii|Iowa|Idaho|Illinois|Indiana|Kansas|Kentucky|Louisiana|Maine|Maryland|Massachusetts|Michigan|Minnesota|Mississippi|Missouri|Montana|Nebraska|Nevada|New Hampshire|New Jersey|New Mexico|New York|North Carolina|North Dakota|Ohio|Oklahoma|Oregon|Pennsylvania|Rhode Island|South Carolina|South Dakota|Tennessee|Texas|Utah|Vermont|Virginia|Washington|West Virginia|Wisconsin|Wyoming)\s+\d{5}$/i);
+  const state = stateMatch?.[1]?.toUpperCase() || stateNameToCode(fullStateMatch?.[1]) || null;
+  const beforeState = stripTrailingStateAndZip(cleaned, state, fullStateMatch?.[1]);
+  const city = cleanString(extractCityFromAddressPrefix(beforeState));
+  return { city, state, postalCode };
+}
+
+function stripTrailingStateAndZip(address: string, state: string | null, fullState?: string | null) {
+  let output = address.replace(/\s+\d{5}(?:-\d{4})?\s*$/, "").trim();
+  if (state) {
+    output = output.replace(new RegExp(`\\b${state}\\b[\\s,.]*$`, "i"), "").trim();
+  }
+  if (fullState) {
+    output = output.replace(new RegExp(`\\b${escapeRegExp(fullState)}\\b[\\s,.]*$`, "i"), "").trim();
+  }
+  return output.replace(/[,\s]+$/, "");
+}
+
+function extractCityFromAddressPrefix(value: string) {
+  const commaCity = value.split(",").map((part) => part.trim()).filter(Boolean).pop();
+  const cleanedCommaCity = cleanupCityCandidate(commaCity);
+  if (cleanedCommaCity) return cleanedCommaCity;
+
+  const suffixMatch = value.match(/\b(?:Road|Rd\.?|Street|St\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Drive|Dr\.?|Highway|Hwy|Court|Ct\.?|Pike|Place|Pl\.?|Route)\b[.,]?\s+(.+)$/i);
+  if (suffixMatch?.[1]) return cleanupCityCandidate(suffixMatch[1]);
+
+  return null;
+}
+
+function cleanupCityCandidate(value?: string | null) {
+  const cleaned = cleanString(value)
+    ?.replace(/^\d+\s+(?:north|south|east|west)\s+/i, "")
+    .replace(/^(?:dr\.?|drive|rd\.?|road|st\.?|street|ave\.?|avenue|blvd\.?|boulevard)\s+/i, "")
+    .trim();
+  if (!cleaned || /^\d/.test(cleaned)) return null;
+  return cleaned;
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function stateNameToCode(value?: string | null) {
+  if (!value) return null;
+  const states: Record<string, string> = {
+    alabama: "AL", alaska: "AK", arizona: "AZ", arkansas: "AR", california: "CA", colorado: "CO", connecticut: "CT", delaware: "DE", florida: "FL", georgia: "GA", hawaii: "HI", iowa: "IA", idaho: "ID", illinois: "IL", indiana: "IN", kansas: "KS", kentucky: "KY", louisiana: "LA", maine: "ME", maryland: "MD", massachusetts: "MA", michigan: "MI", minnesota: "MN", mississippi: "MS", missouri: "MO", montana: "MT", nebraska: "NE", nevada: "NV", "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM", "new york": "NY", "north carolina": "NC", "north dakota": "ND", ohio: "OH", oklahoma: "OK", oregon: "OR", pennsylvania: "PA", "rhode island": "RI", "south carolina": "SC", "south dakota": "SD", tennessee: "TN", texas: "TX", utah: "UT", vermont: "VT", virginia: "VA", washington: "WA", "west virginia": "WV", wisconsin: "WI", wyoming: "WY",
+  };
+  return states[value.toLowerCase()] || null;
+}
+
+function emailBelongsToDomain(email: string | null, domain: string | null) {
+  if (!email || !domain) return false;
+  return email.toLowerCase().endsWith(`@${domain.toLowerCase()}`);
+}
+
+function isManufacturerLocatorDomain(domain: string) {
+  return /(^|\.)lamborghini\.com$/i.test(domain) || /(^|\.)ferraridealers\.com$/i.test(domain) || /(^|\.)mclaren\.com$/i.test(domain);
+}
+
+function isGenericEmailDomain(domain: string) {
+  return /gmail\.com|yahoo\.com|icloud\.com|outlook\.com|hotmail\.com|aol\.com/i.test(domain);
 }
 
 function normalizeName(value: string) {

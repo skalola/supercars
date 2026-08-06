@@ -10,6 +10,7 @@ import { EuropeanCollectiblesCrawler } from "./european-collectibles";
 import { HemmingsCrawler } from "./hemmings";
 import { HighYieldSpecialistCrawler } from "./high-yield-specialists";
 import { MarshallGoldmanCrawler } from "./marshall-goldman";
+import { OfficialPreOwnedCrawler } from "./official-preowned";
 import { SpecialistDealerCrawler } from "./specialist-dealers";
 import { VelocityMotorcarsCrawler } from "./velocity-motorcars";
 
@@ -20,6 +21,7 @@ export function defaultInventorySources(): PublicInventorySource[] {
     new AutoTraderCrawler(),
     new CarsDotComCrawler(),
     new HemmingsCrawler(),
+    new OfficialPreOwnedCrawler(),
     new SpecialistDealerCrawler(),
     new CNCMotorsCrawler(),
     new MarshallGoldmanCrawler(),
