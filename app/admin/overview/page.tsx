@@ -392,7 +392,9 @@ export default async function AdminOverviewPage({
             </div>
             <div>
               <span>{metric.label}</span>
-              <strong>{metric.value}</strong>
+              <strong className={metric.value.startsWith("$") ? "currency-value" : undefined}>
+                {metric.value}
+              </strong>
               <p>{metric.detail}</p>
             </div>
           </div>

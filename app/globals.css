@@ -686,6 +686,11 @@ canvas {
   word-break: normal;
 }
 
+.admin-visual-kpi-card strong.currency-value {
+  font-size: clamp(18px, 1.65vw, 24px);
+  letter-spacing: 0;
+}
+
 .admin-visual-kpi-card p {
   margin: 0;
   color: var(--muted);
