@@ -73,6 +73,15 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
     );
   }
 
+  const isAdmin = session?.user?.role === "ADMIN";
+  if (vehicle.inventoryStatus === "ADMIN_TEST" && !isAdmin) {
+    return (
+      <main className="page-shell">
+        <h1>Vehicle not found</h1>
+      </main>
+    );
+  }
+
   const [maintenanceRules, market, serviceShops] = await Promise.all([
     prisma.maintenanceRule.findMany({
       where: {
@@ -310,7 +319,8 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
   const activeListing = [...vehicle.listings]
     .filter((l) => {
       const price = l.askingPrice ?? l.price ?? 0;
-      return l.status === "ACTIVE" && l.validationStatus === "VALID" && l.priceStatus !== "PRICE_INVALID" && price >= 10000;
+      const isAdminTestListing = isAdmin && l.validationStatus === "ADMIN_TEST";
+      return l.status === "ACTIVE" && (l.validationStatus === "VALID" || isAdminTestListing) && l.priceStatus !== "PRICE_INVALID" && price >= 10000;
     })
     .sort((a, b) => {
       if (Boolean(b.url) !== Boolean(a.url)) return Boolean(b.url) ? 1 : -1;

@@ -306,6 +306,11 @@ export function AdminListingsTable({ listings }: { listings: AdminListingRow[] }
                     <td className="admin-listing-vehicle-cell" data-label="Vehicle">
                       <strong>{listing.vehicleLabel}</strong>
                       <span className="admin-listing-identifier">{listing.vin || listing.externalListingId || listing.id}</span>
+                      {listing.vin ? (
+                        <a className="admin-inline-link" href={`/vehicle/${listing.vin}`}>
+                          Open vehicle
+                        </a>
+                      ) : null}
                     </td>
                     <td className="admin-listing-status-cell" data-label="Status">
                       <span className={`admin-status-pill ${isRemoved ? "is-muted" : ""}`}>

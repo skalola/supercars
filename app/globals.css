@@ -1242,6 +1242,15 @@ canvas {
   text-underline-offset: 4px;
 }
 
+.admin-management-table .admin-inline-link {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 7px;
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .admin-management-empty {
   padding: 32px !important;
   color: var(--muted) !important;
