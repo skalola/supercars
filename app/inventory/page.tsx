@@ -1,10 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import React from "react";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import InventoryExplorer from "@/components/market/InventoryExplorer";
 import { SUPPORTED_MAKES } from "@/lib/supported-makes";
 
 export default async function InventoryPage() {
+  const session = await auth();
+  const isAdmin = session?.user?.role === "ADMIN";
+
   // ── Diagnostic logging ──────────────────────────────────────────────────
   // Runs server-side on every page load so we can see filtering impact in logs.
   const [totalVehicles, totalListings, statusBreakdown] = await Promise.all([
@@ -24,19 +28,44 @@ export default async function InventoryPage() {
   const listings = await prisma.listing.findMany({
     where: {
       status: "ACTIVE",
-      validationStatus: "VALID",
       vehicleId: { not: null },
       imageUrl: { not: null },
-      vehicle: {
-        is: {
-          inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
-          model: {
-            make: {
-              name: { in: [...SUPPORTED_MAKES] },
+      AND: [
+        {
+          OR: [
+            {
+              validationStatus: "VALID",
+              vehicle: {
+                is: {
+                  inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
+                  model: {
+                    make: {
+                      name: { in: [...SUPPORTED_MAKES] },
+                    },
+                  },
+                },
+              },
             },
-          },
+            ...(isAdmin
+              ? [
+                  {
+                    validationStatus: "ADMIN_TEST",
+                    vehicle: {
+                      is: {
+                        inventoryStatus: "ADMIN_TEST",
+                        model: {
+                          make: {
+                            name: { in: [...SUPPORTED_MAKES] },
+                          },
+                        },
+                      },
+                    },
+                  },
+                ]
+              : []),
+          ],
         }
-      },
+      ],
       priceStatus: { not: "PRICE_INVALID" },
       OR: [
         { askingPrice: { gte: 10000 } },
@@ -73,7 +102,10 @@ export default async function InventoryPage() {
     orderBy: { createdAt: "desc" },
   });
 
-  console.log("[Inventory Page] Public VIN/price/image listings to display:", listings.length);
+  console.log(
+    `[Inventory Page] ${isAdmin ? "Admin-visible" : "Public"} VIN/price/image listings to display:`,
+    listings.length
+  );
 
   // Fetch makes and models for filters selection options
   const [makes, models] = await Promise.all([
