@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { getVehicleHeroImage } from "@/lib/vehicle-images";
+import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
 
 type MakeObj = {
   id: string;
@@ -33,7 +33,7 @@ type ListingObj = {
   vehicle: {
     vin: string;
     photos: Array<{ id: string; filePath: string; isHero: boolean }>;
-    images: Array<{ id: string; url: string; isPrimary: boolean }>;
+    images: Array<{ id: string; url: string; isPrimary: boolean; validationStatus?: string | null }>;
     model?: {
       images?: Array<{ url: string; type: string | null }> | null;
     } | null;
@@ -48,8 +48,10 @@ type InventoryExplorerProps = {
 };
 
 function getListingImage(listing: ListingObj) {
-  if (listing.imageUrl) return listing.imageUrl;
-  return getVehicleHeroImage(listing.vehicle);
+  const vehicleHero = getVehicleHeroImage(listing.vehicle);
+  if (vehicleHero && vehicleHero !== "/images/placeholder.jpg") return vehicleHero;
+  if (listing.imageUrl && !isNonVehicleImageUrl(listing.imageUrl)) return listing.imageUrl;
+  return "/images/placeholder.jpg";
 }
 
 export default function InventoryExplorer({

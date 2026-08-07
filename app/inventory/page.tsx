@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import InventoryExplorer from "@/components/market/InventoryExplorer";
 import { SUPPORTED_MAKES } from "@/lib/supported-makes";
+import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
 
 export default async function InventoryPage() {
   const session = await auth();
@@ -29,7 +30,6 @@ export default async function InventoryPage() {
     where: {
       status: "ACTIVE",
       vehicleId: { not: null },
-      imageUrl: { not: null },
       AND: [
         {
           OR: [
@@ -102,9 +102,11 @@ export default async function InventoryPage() {
     orderBy: { createdAt: "desc" },
   });
 
+  const visibleListings = listings.filter(hasCleanDisplayImage);
+
   console.log(
     `[Inventory Page] ${isAdmin ? "Admin-visible" : "Public"} VIN/price/image listings to display:`,
-    listings.length
+    visibleListings.length
   );
 
   // Fetch makes and models for filters selection options
@@ -127,7 +129,7 @@ export default async function InventoryPage() {
   ]);
 
   // Map database listings to matched explorer format
-  const mappedListings = listings.map((l: any) => ({
+  const mappedListings = visibleListings.map((l: any) => ({
     id: l.id,
     modelId: l.vehicle.modelId,
     imageUrl: l.imageUrl,
@@ -178,4 +180,10 @@ export default async function InventoryPage() {
   }));
 
   return <InventoryExplorer listings={mappedListings} makes={mappedMakes} models={mappedModels} />;
+}
+
+function hasCleanDisplayImage(listing: any) {
+  const vehicleHero = getVehicleHeroImage(listing.vehicle);
+  if (vehicleHero && vehicleHero !== "/images/placeholder.jpg" && !isNonVehicleImageUrl(vehicleHero)) return true;
+  return Boolean(listing.imageUrl && !isNonVehicleImageUrl(listing.imageUrl));
 }

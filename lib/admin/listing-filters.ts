@@ -1,12 +1,12 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { SUPPORTED_MAKES } from "@/lib/supported-makes";
+import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
 
 export const inventoryDashboardListingWhere: Prisma.ListingWhereInput = {
   status: "ACTIVE",
   validationStatus: "VALID",
   vehicleId: { not: null },
-  imageUrl: { not: null },
   vehicle: {
     is: {
       inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
@@ -36,8 +36,15 @@ export async function getInventoryDashboardListings() {
       },
       vehicle: {
         include: {
+          photos: {
+            orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+          },
+          images: {
+            orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+          },
           model: {
             include: {
+              images: true,
               make: true,
             },
           },
@@ -51,7 +58,7 @@ export async function getInventoryDashboardListings() {
     },
     orderBy: { createdAt: "desc" },
   });
-  return rawListings;
+  return rawListings.filter(hasCleanInventoryDisplayImage);
 }
 
 export async function getAdminInventoryListings() {
@@ -97,6 +104,15 @@ export async function getAdminInventoryListings() {
     },
     orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
   });
+}
+
+function hasCleanInventoryDisplayImage(listing: {
+  imageUrl?: string | null;
+  vehicle?: unknown;
+}) {
+  const vehicleHero = getVehicleHeroImage(listing.vehicle as Parameters<typeof getVehicleHeroImage>[0]);
+  if (vehicleHero && vehicleHero !== "/images/placeholder.jpg" && !isNonVehicleImageUrl(vehicleHero)) return true;
+  return Boolean(listing.imageUrl && !isNonVehicleImageUrl(listing.imageUrl));
 }
 
 export async function getInventoryDashboardListingCount() {

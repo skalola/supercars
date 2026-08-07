@@ -5,7 +5,7 @@ import { auth, signIn } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { toggleGarageItem } from "@/app/actions/garage";
 import { getMarketSummary } from "@/lib/market-intelligence";
-import { getVehicleHeroImage } from "@/lib/vehicle-images";
+import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
 import MarketPriceHistory from "@/components/market/MarketPriceHistory";
 import { isListingMatchForModel } from "@/lib/inventory/validate-listing-identity";
 import { SUPPORTED_MAKES } from "@/lib/supported-makes";
@@ -18,12 +18,12 @@ function getHeroImage(images: Array<{ url: string; type: string | null; source: 
 
 function getListingImage(listing: any) {
   const hasOwnerPhotos = listing.vehicle?.photos && listing.vehicle.photos.length > 0;
-  if (!hasOwnerPhotos && listing.imageUrl) {
+  if (!hasOwnerPhotos && listing.imageUrl && !isNonVehicleImageUrl(listing.imageUrl)) {
     return listing.imageUrl;
   }
   const vehicleHero = getVehicleHeroImage(listing.vehicle);
   if (vehicleHero && vehicleHero !== "/images/placeholder.jpg") return vehicleHero;
-  if (listing.imageUrl) return listing.imageUrl;
+  if (listing.imageUrl && !isNonVehicleImageUrl(listing.imageUrl)) return listing.imageUrl;
   return "/images/placeholder.jpg";
 }
 
