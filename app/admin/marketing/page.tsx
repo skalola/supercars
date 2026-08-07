@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/admin/auth";
 import { getMarketingAutomationSettings } from "@/lib/admin/marketing-settings";
+import { getMarketingEmailPreviews } from "@/lib/admin/marketing-email-previews";
 import {
   AdminMarketingSettingsClient,
   AdminMarketingSettingRow,
@@ -17,6 +18,7 @@ export default async function AdminMarketingPage() {
   await requireAdmin();
 
   const settings = await getMarketingAutomationSettings();
+  const previews = getMarketingEmailPreviews();
   const rows: AdminMarketingSettingRow[] = settings.map((setting) => ({
     key: setting.key,
     label: setting.label,
@@ -28,7 +30,7 @@ export default async function AdminMarketingPage() {
 
   return (
     <main className="page-shell wide">
-      <AdminMarketingSettingsClient settings={rows} />
+      <AdminMarketingSettingsClient settings={rows} previews={previews} />
     </main>
   );
 }
