@@ -1,15 +1,18 @@
 import { prisma } from "@/lib/prisma";
 import { validateVehicleImageContentFromUrl } from "@/lib/data-quality/vehicle-image-content-validator";
+import { isKnownInactiveListingUrl } from "@/lib/inventory/listing-url-quality";
 import { normalizeSupportedMake, SUPPORTED_MAKES } from "@/lib/supported-makes";
 
 const makeArg = process.argv.find((arg) => arg.startsWith("--make="))?.split("=")[1];
 const vinArg = process.argv.find((arg) => arg.startsWith("--vin="))?.split("=")[1]?.toUpperCase();
 const limitArg = Number(process.argv.find((arg) => arg.startsWith("--limit="))?.split("=")[1] ?? 100);
+const skipArg = Number(process.argv.find((arg) => arg.startsWith("--skip="))?.split("=")[1] ?? 0);
 const execute = process.argv.includes("--execute");
 const targetMakes = makeArg
   ? [normalizeSupportedMake(makeArg)].filter((make): make is (typeof SUPPORTED_MAKES)[number] => Boolean(make))
   : [...SUPPORTED_MAKES];
 const limit = Number.isFinite(limitArg) && limitArg > 0 ? Math.round(limitArg) : 100;
+const skip = Number.isFinite(skipArg) && skipArg > 0 ? Math.round(skipArg) : 0;
 
 async function main() {
   if (targetMakes.length === 0) throw new Error(`Unsupported make: ${makeArg}`);
@@ -32,6 +35,7 @@ async function main() {
     },
     select: {
       id: true,
+      url: true,
       imageUrl: true,
       vehicleId: true,
       vehicle: {
@@ -57,6 +61,7 @@ async function main() {
       },
     },
     orderBy: { updatedAt: "desc" },
+    skip,
     take: limit,
   });
 
@@ -69,9 +74,44 @@ async function main() {
     if (!listing.vehicleId || !listing.vehicle) continue;
     inspected++;
 
+    if (isKnownInactiveListingUrl(listing.url) || isKnownInactiveListingUrl(listing.imageUrl)) {
+      listingsDeactivated++;
+      console.log(`STALE ${listing.vehicle.vin} | sold/archive source | ${listing.url || listing.imageUrl}`);
+
+      if (execute) {
+        await prisma.listing.update({
+          where: { id: listing.id },
+          data: {
+            imageUrl: null,
+            status: "INACTIVE",
+            freshnessStatus: "INACTIVE",
+            validationStatus: "STALE_SOURCE",
+          },
+        });
+        await prisma.vehicleImage.updateMany({
+          where: {
+            vehicleId: listing.vehicleId,
+            OR: [
+              { url: { contains: "/sold-images" } },
+              { url: { contains: "/pre-owned-inventory-sold" } },
+              { url: { contains: "/used-inventory-sold" } },
+              { url: { contains: "/inventory-sold" } },
+              { url: { contains: "/sold-inventory" } },
+            ],
+          },
+          data: {
+            isPrimary: false,
+            validationStatus: "IMAGE_UNVERIFIED",
+          },
+        });
+      }
+
+      continue;
+    }
+
     const images = uniqueImages([
       ...(listing.imageUrl ? [{ id: null, url: listing.imageUrl, isPrimary: true }] : []),
-      ...listing.vehicle.images,
+      ...listing.vehicle.images.filter((image) => !isRejectedImageStatus(image.validationStatus)),
     ]);
     const validUrls: string[] = [];
     const invalidUrls: string[] = [];
@@ -156,6 +196,7 @@ async function main() {
         execute,
         targetMakes,
         vin: vinArg ?? null,
+        skip,
         inspected,
         invalidImages,
         listingHeroesUpdated,
@@ -174,6 +215,10 @@ function uniqueImages<T extends { url: string }>(images: T[]) {
     seen.add(image.url);
     return true;
   });
+}
+
+function isRejectedImageStatus(status: string | null) {
+  return status === "IMAGE_UNVERIFIED" || status === "IMAGE_MISMATCH";
 }
 
 main()

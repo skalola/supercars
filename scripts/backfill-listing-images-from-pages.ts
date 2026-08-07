@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { validateVehicleImageContentFromUrl } from "@/lib/data-quality/vehicle-image-content-validator";
+import { isKnownInactiveListingUrl } from "@/lib/inventory/listing-url-quality";
 import { normalizeSupportedMake, SUPPORTED_MAKES } from "@/lib/supported-makes";
 
 const makeArg = process.argv.find((arg) => arg.startsWith("--make="))?.split("=")[1];
@@ -83,10 +84,17 @@ async function main() {
   let listingsWithImagesUpdated = 0;
   let vehicleImagesAdded = 0;
   let pricesUpdated = 0;
+  let staleListingsDeactivated = 0;
   let skipped = 0;
 
   for (const listing of listings) {
     if (!listing.url || !listing.vehicleId) continue;
+    if (isKnownInactiveListingUrl(listing.url) || isKnownInactiveListingUrl(listing.imageUrl)) {
+      await deactivateStaleListingMedia(listing.id, listing.vehicleId);
+      staleListingsDeactivated++;
+      console.log(`STALE ${listing.model.make.name} ${listing.model.name} | sold/archive media | ${listing.url}`);
+      continue;
+    }
     if (!includeExistingGallery && (listing.vehicle?._count.images || 0) >= maxImages) {
       skipped++;
       continue;
@@ -171,7 +179,7 @@ async function main() {
     );
   }
 
-  console.log(JSON.stringify({ targetMakes, inspected: listings.length, updated, listingsWithImagesUpdated, vehicleImagesAdded, pricesUpdated, skipped }, null, 2));
+  console.log(JSON.stringify({ targetMakes, inspected: listings.length, updated, listingsWithImagesUpdated, vehicleImagesAdded, pricesUpdated, staleListingsDeactivated, skipped }, null, 2));
 }
 
 async function fetchHtml(url: string) {
@@ -304,6 +312,34 @@ async function markRejectedVehicleImages(vehicleId: string, imageUrls: string[])
     where: {
       vehicleId,
       url: { in: uniqueUrls },
+    },
+    data: {
+      isPrimary: false,
+      validationStatus: "IMAGE_UNVERIFIED",
+    },
+  });
+}
+
+async function deactivateStaleListingMedia(listingId: string, vehicleId: string) {
+  await prisma.listing.update({
+    where: { id: listingId },
+    data: {
+      status: "INACTIVE",
+      freshnessStatus: "INACTIVE",
+      validationStatus: "STALE_SOURCE",
+    },
+  });
+
+  await prisma.vehicleImage.updateMany({
+    where: {
+      vehicleId,
+      OR: [
+        { url: { contains: "/sold-images" } },
+        { url: { contains: "/pre-owned-inventory-sold" } },
+        { url: { contains: "/used-inventory-sold" } },
+        { url: { contains: "/inventory-sold" } },
+        { url: { contains: "/sold-inventory" } },
+      ],
     },
     data: {
       isPrimary: false,
