@@ -30,7 +30,7 @@ export function getVehicleHeroImage(vehicle: VehicleImageInput | null | undefine
   // Priority 2: Primary marketplace listing image
   if (vehicle.images && vehicle.images.length > 0) {
     const validImages = vehicle.images.filter(
-      (img) => img.validationStatus !== "IMAGE_UNVERIFIED" && img.validationStatus !== "IMAGE_MISMATCH"
+      (img) => img.validationStatus !== "IMAGE_UNVERIFIED" && img.validationStatus !== "IMAGE_MISMATCH" && !isNonVehicleImageUrl(img.url)
     );
     const primaryImg = validImages.find((img) => img.isPrimary);
     if (primaryImg?.url) {
@@ -41,7 +41,7 @@ export function getVehicleHeroImage(vehicle: VehicleImageInput | null | undefine
   // Priority 3: First available listing image
   if (vehicle.images && vehicle.images.length > 0) {
     const validImages = vehicle.images.filter(
-      (img) => img.validationStatus !== "IMAGE_UNVERIFIED" && img.validationStatus !== "IMAGE_MISMATCH"
+      (img) => img.validationStatus !== "IMAGE_UNVERIFIED" && img.validationStatus !== "IMAGE_MISMATCH" && !isNonVehicleImageUrl(img.url)
     );
     const firstImg = validImages[0];
     if (firstImg?.url) {
@@ -59,4 +59,9 @@ export function getVehicleHeroImage(vehicle: VehicleImageInput | null | undefine
 
   // Priority 5: Generic placeholder
   return "/images/placeholder.jpg";
+}
+
+export function isNonVehicleImageUrl(value: string | null | undefined) {
+  if (!value) return true;
+  return /placeholder|logo|icon|favicon|spinner|loading|avatar|profile|badge|sprite|transparent|blank|noimage|comingsoon|autocheck|carfax|e6-static-thumber/i.test(value);
 }

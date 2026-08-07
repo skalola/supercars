@@ -3,12 +3,15 @@ import { normalizeSupportedMake, SUPPORTED_MAKES } from "@/lib/supported-makes";
 
 const makeArg = process.argv.find((arg) => arg.startsWith("--make="))?.split("=")[1];
 const limitArg = Number(process.argv.find((arg) => arg.startsWith("--limit="))?.split("=")[1] ?? 100);
+const maxImagesArg = Number(process.argv.find((arg) => arg.startsWith("--max-images="))?.split("=")[1] ?? 12);
 const updateExistingImages = process.argv.includes("--update-existing-images");
 const updatePrices = process.argv.includes("--update-prices");
+const includeExistingGallery = process.argv.includes("--include-existing-gallery");
 const targetMakes = makeArg
   ? [normalizeSupportedMake(makeArg)].filter((make): make is (typeof SUPPORTED_MAKES)[number] => Boolean(make))
   : [...SUPPORTED_MAKES];
 const limit = Number.isFinite(limitArg) && limitArg > 0 ? limitArg : 100;
+const maxImages = Number.isFinite(maxImagesArg) && maxImagesArg > 0 ? Math.min(Math.round(maxImagesArg), 24) : 12;
 
 const HEADERS = {
   accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
@@ -50,6 +53,11 @@ async function main() {
       vehicle: {
         select: {
           vin: true,
+          _count: {
+            select: {
+              images: true,
+            },
+          },
         },
       },
       model: {
@@ -66,12 +74,18 @@ async function main() {
   });
 
   let updated = 0;
-  let imagesUpdated = 0;
+  let listingsWithImagesUpdated = 0;
+  let vehicleImagesAdded = 0;
   let pricesUpdated = 0;
   let skipped = 0;
 
   for (const listing of listings) {
     if (!listing.url || !listing.vehicleId) continue;
+    if (!includeExistingGallery && (listing.vehicle?._count.images || 0) >= maxImages) {
+      skipped++;
+      continue;
+    }
+
     const html = await fetchHtml(listing.url);
     if (!html) {
       skipped++;
@@ -89,12 +103,13 @@ async function main() {
       continue;
     }
 
-    const imageUrl = pickBestImage(html, listing.url, [
+    const pageImages = pickBestImages(html, listing.url, [
       String(listing.year),
       listing.model.make.name,
       listing.model.name,
       vin || "",
-    ], vin, isSingleVehiclePage);
+    ], vin, isSingleVehiclePage, maxImages) ?? [];
+    const imageUrl = pageImages[0] || null;
 
     const livePrice = updatePrices ? pickBestPrice(html, vin, isSingleVehiclePage) : null;
     const data: { imageUrl?: string; price?: number; askingPrice?: number; priceStatus?: string } = {};
@@ -109,51 +124,34 @@ async function main() {
       data.priceStatus = "VALID_PRICE";
     }
 
-    if (Object.keys(data).length === 0) {
+    const addedImages = await attachPageVehicleImages({
+      vehicleId: listing.vehicleId,
+      images: pageImages,
+      alt: `${listing.year} ${listing.model.make.name} ${listing.model.name}`,
+    });
+
+    if (Object.keys(data).length === 0 && addedImages === 0) {
       skipped++;
       continue;
     }
 
-    await prisma.listing.update({
-      where: { id: listing.id },
-      data,
-    });
-
-    if (data.imageUrl) {
-      const existingImage = await prisma.vehicleImage.findFirst({
-        where: {
-          vehicleId: listing.vehicleId,
-          url: data.imageUrl,
-        },
-        select: { id: true },
+    if (Object.keys(data).length > 0) {
+      await prisma.listing.update({
+        where: { id: listing.id },
+        data,
       });
-
-      if (!existingImage) {
-        const existingPrimary = await prisma.vehicleImage.count({
-          where: { vehicleId: listing.vehicleId, isPrimary: true },
-        });
-        await prisma.vehicleImage.create({
-          data: {
-            vehicleId: listing.vehicleId,
-            url: data.imageUrl,
-            alt: `${listing.year} ${listing.model.make.name} ${listing.model.name}`,
-            isPrimary: existingPrimary === 0,
-            validationStatus: "VALID",
-          },
-        });
-      }
-
-      imagesUpdated++;
     }
 
+    if (data.imageUrl || addedImages > 0) listingsWithImagesUpdated++;
+    vehicleImagesAdded += addedImages;
     if (data.price) pricesUpdated++;
     updated++;
     console.log(
-      `PAGE ${listing.model.make.name} ${listing.model.name} | ${data.price ? `$${data.price.toLocaleString()}` : "price unchanged"} | ${data.imageUrl || "image unchanged"}`,
+      `PAGE ${listing.model.make.name} ${listing.model.name} | ${data.price ? `$${data.price.toLocaleString()}` : "price unchanged"} | ${data.imageUrl || "hero unchanged"} | +${addedImages} gallery image${addedImages === 1 ? "" : "s"}`,
     );
   }
 
-  console.log(JSON.stringify({ targetMakes, inspected: listings.length, updated, imagesUpdated, pricesUpdated, skipped }, null, 2));
+  console.log(JSON.stringify({ targetMakes, inspected: listings.length, updated, listingsWithImagesUpdated, vehicleImagesAdded, pricesUpdated, skipped }, null, 2));
 }
 
 async function fetchHtml(url: string) {
@@ -176,29 +174,82 @@ async function fetchHtml(url: string) {
   }
 }
 
-function pickBestImage(html: string, pageUrl: string, hints: string[], vin: string | null, isSingleVehiclePage: boolean) {
+function pickBestImages(html: string, pageUrl: string, hints: string[], vin: string | null, isSingleVehiclePage: boolean, limit: number) {
   const candidates = [
     ...extractMetaImages(html, pageUrl),
     ...extractImageUrls(html, pageUrl),
+    ...extractJsonLikeImageUrls(html, pageUrl),
   ];
   const unique = Array.from(new Set(candidates.filter(isUsefulVehicleImageUrl)))
     .filter((url) => !hasDifferentVin(url, vin));
   if (unique.length === 0) return null;
 
   if (vin) {
-    const vinImage = unique.find((url) => extractVins(url).includes(vin));
-    if (vinImage) return vinImage;
+    const vinImages = unique.filter((url) => extractVins(url).includes(vin));
+    if (vinImages.length > 0) return rankImages(vinImages, hints).slice(0, limit);
   }
 
   if (!isSingleVehiclePage) return null;
 
+  return rankImages(unique, hints).slice(0, limit);
+}
+
+async function attachPageVehicleImages({
+  vehicleId,
+  images,
+  alt,
+}: {
+  vehicleId: string;
+  images: string[] | null;
+  alt: string;
+}) {
+  if (!images || images.length === 0) return 0;
+
+  const existing = await prisma.vehicleImage.findMany({
+    where: { vehicleId },
+    select: { id: true, url: true, isPrimary: true },
+  });
+  const existingUrls = new Set(existing.map((image) => image.url));
+  let hasPrimary = existing.some((image) => image.isPrimary);
+  let added = 0;
+
+  for (const url of images) {
+    if (existingUrls.has(url)) continue;
+
+    await prisma.vehicleImage.create({
+      data: {
+        vehicleId,
+        url,
+        alt,
+        isPrimary: !hasPrimary,
+        validationStatus: "VALID",
+      },
+    });
+
+    existingUrls.add(url);
+    hasPrimary = true;
+    added++;
+  }
+
+  return added;
+}
+
+function rankImages(images: string[], hints: string[]) {
   const normalizedHints = hints.map(normalize).filter(Boolean);
-  return (
-    unique.find((url) => {
-      const normalizedUrl = normalize(url);
-      return normalizedHints.some((hint) => normalizedUrl.includes(hint));
-    }) ?? unique[0]
-  );
+  return [...images].sort((a, b) => scoreImage(b, normalizedHints) - scoreImage(a, normalizedHints));
+}
+
+function scoreImage(url: string, normalizedHints: string[]) {
+  const normalizedUrl = normalize(url);
+  let score = 0;
+  if (normalizedHints.some((hint) => normalizedUrl.includes(hint))) score += 30;
+  if (/\/(?:new|used|certified)\//i.test(url)) score += 16;
+  if (/vehicle|inventory|photos?|gallery|large|xl|original|dealerinspire|cloudfront|images/i.test(url)) score += 12;
+  if (/\b(?:thumb|thumbnail|small|tiny|icon|logo)\b/i.test(url)) score -= 20;
+  const width = Number(url.match(/(?:width|w)[=/_-]?([0-9]{3,4})/i)?.[1] || 0);
+  if (width >= 900) score += 10;
+  if (width > 0 && width < 350) score -= 10;
+  return score;
 }
 
 function extractMetaImages(html: string, pageUrl: string) {
@@ -299,6 +350,23 @@ function extractImageUrls(html: string, pageUrl: string) {
   return Array.from(images);
 }
 
+function extractJsonLikeImageUrls(html: string, pageUrl: string) {
+  const images = new Set<string>();
+  const normalizedHtml = html.replace(/\\\//g, "/").replace(/\\u002F/g, "/");
+
+  for (const match of normalizedHtml.matchAll(/https?:\/\/[^"' <>)]+?\.(?:jpe?g|png|webp)(?:\?[^"' <>)]+)?/gi)) {
+    const absolute = absolutize(decodeHtml(match[0]), pageUrl);
+    if (absolute) images.add(absolute);
+  }
+
+  for (const match of normalizedHtml.matchAll(/["'](?:image|imageUrl|photo|photoUrl|src|url)["']\s*:\s*["']([^"']+\.(?:jpe?g|png|webp)(?:\?[^"']*)?)["']/gi)) {
+    const absolute = absolutize(decodeHtml(match[1]), pageUrl);
+    if (absolute) images.add(absolute);
+  }
+
+  return Array.from(images);
+}
+
 function absolutize(value: string, pageUrl: string) {
   try {
     return new URL(value, pageUrl).toString();
@@ -318,7 +386,7 @@ function decodeHtml(value: string) {
 
 function isUsefulVehicleImageUrl(value: string) {
   if (!/\.(?:jpe?g|png|webp)(?:[?#]|$)/i.test(value)) return false;
-  return !/placeholder|logo|icon|favicon|spinner|loading|avatar|profile|badge|sprite|transparent|blank/i.test(value);
+  return !/placeholder|logo|icon|favicon|spinner|loading|avatar|profile|badge|sprite|transparent|blank|noimage|comingsoon|autocheck|carfax|e6-static-thumber/i.test(value);
 }
 
 function extractVins(value: string | null | undefined) {

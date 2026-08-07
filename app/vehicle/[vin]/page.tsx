@@ -8,7 +8,7 @@ import { getMarketSummary } from "@/lib/market-intelligence";
 import MarketPriceHistory from "@/components/market/MarketPriceHistory";
 import PurchaseWizard from "@/components/market/PurchaseWizard";
 import OwnerSaleControls from "@/components/market/OwnerSaleControls";
-import { getVehicleHeroImage } from "@/lib/vehicle-images";
+import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
 import { isValidEmail } from "@/lib/fulfillment/partner-registry";
 import { emailMatchesWebsiteDomain } from "@/lib/directory/contact-domain-policy";
 
@@ -343,6 +343,8 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
   const originalListingUrl = activeListing?.sellerId
     ? null
     : activeListing?.url || vehicle.listings.find((listing) => !listing.sellerId && listing.url)?.url || null;
+  const galleryImages = buildVehicleGalleryImages(vehicle, resolvedHeroImage, activeListing?.imageUrl || null);
+
   return (
     <main className="page-shell" style={{ maxWidth: 900 }}>
       {/* Upgraded Hero block: Displays Year Make Model, FOR SALE badge, Asking Price, Verified Owner badge */}
@@ -517,17 +519,17 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
           <h2 style={{ fontSize: "20px", fontWeight: 700, margin: 0, color: "#111827" }}>Vehicle Photos</h2>
           <div style={{ position: "relative", width: "100%", paddingTop: "56.25%", borderRadius: "12px", overflow: "hidden", backgroundColor: "#f3f4f6" }}>
             <img src={resolvedHeroImage} alt="Vehicle Hero" style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-            {vehicle.photos?.find((p: any) => p.filePath === resolvedHeroImage)?.caption && (
+            {galleryImages.find((image) => image.src === resolvedHeroImage)?.caption && (
               <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.5)", color: "#ffffff", padding: "8px 12px", fontSize: "13px" }}>
-                {vehicle.photos.find((p: any) => p.filePath === resolvedHeroImage)?.caption}
+                {galleryImages.find((image) => image.src === resolvedHeroImage)?.caption}
               </div>
             )}
           </div>
-          {vehicle.photos && vehicle.photos.length > 1 && (
+          {galleryImages.length > 1 && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: "12px" }}>
-              {vehicle.photos.filter((p: any) => p.filePath !== resolvedHeroImage).map((p: any) => (
-                <div key={p.id} style={{ position: "relative", paddingTop: "66.67%", borderRadius: "8px", overflow: "hidden", backgroundColor: "#f3f4f6" }}>
-                  <img src={p.filePath} alt={p.caption || "Vehicle Thumbnail"} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+              {galleryImages.filter((image) => image.src !== resolvedHeroImage).map((image) => (
+                <div key={image.id} style={{ position: "relative", paddingTop: "66.67%", borderRadius: "8px", overflow: "hidden", backgroundColor: "#f3f4f6" }}>
+                  <img src={image.src} alt={image.alt} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }} />
                 </div>
               ))}
             </div>
@@ -1166,4 +1168,51 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
       />
     </main>
   );
+}
+
+function buildVehicleGalleryImages(vehicle: any, resolvedHeroImage: string | null, activeListingImageUrl: string | null) {
+  const seen = new Set<string>();
+  const gallery: Array<{ id: string; src: string; alt: string; caption?: string | null }> = [];
+
+  const addImage = (input: { id: string; src?: string | null; alt: string; caption?: string | null }) => {
+    const src = input.src?.trim();
+    if (!src || seen.has(src)) return;
+    seen.add(src);
+    gallery.push({ id: input.id, src, alt: input.alt, caption: input.caption });
+  };
+
+  addImage({
+    id: "resolved-hero",
+    src: resolvedHeroImage,
+    alt: `${vehicle.year} ${vehicle.model.make.name} ${vehicle.model.name}`,
+  });
+
+  for (const photo of vehicle.photos || []) {
+    addImage({
+      id: `owner-photo-${photo.id}`,
+      src: photo.filePath,
+      alt: photo.caption || `${vehicle.year} ${vehicle.model.make.name} ${vehicle.model.name}`,
+      caption: photo.caption,
+    });
+  }
+
+  const validImportedImages = (vehicle.images || []).filter(
+    (image: any) => image.validationStatus !== "IMAGE_UNVERIFIED" && image.validationStatus !== "IMAGE_MISMATCH" && !isNonVehicleImageUrl(image.url)
+  );
+
+  for (const image of validImportedImages) {
+    addImage({
+      id: `imported-image-${image.id}`,
+      src: image.url,
+      alt: image.alt || `${vehicle.year} ${vehicle.model.make.name} ${vehicle.model.name}`,
+    });
+  }
+
+  addImage({
+    id: "active-listing-image",
+    src: activeListingImageUrl,
+    alt: `${vehicle.year} ${vehicle.model.make.name} ${vehicle.model.name}`,
+  });
+
+  return gallery;
 }
