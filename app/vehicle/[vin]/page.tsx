@@ -8,6 +8,7 @@ import { getMarketSummary } from "@/lib/market-intelligence";
 import MarketPriceHistory from "@/components/market/MarketPriceHistory";
 import PurchaseWizard from "@/components/market/PurchaseWizard";
 import OwnerSaleControls from "@/components/market/OwnerSaleControls";
+import VehiclePhotoGallery, { VehicleGalleryImage } from "@/components/market/VehiclePhotoGallery";
 import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
 import { isValidEmail } from "@/lib/fulfillment/partner-registry";
 import { emailMatchesWebsiteDomain } from "@/lib/directory/contact-domain-policy";
@@ -506,35 +507,8 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
 
 
 
-      {!isOwner && resolvedHeroImage && (
-        <section style={{
-          border: "1px solid #e5e7eb",
-          borderRadius: "16px",
-          padding: "24px",
-          backgroundColor: "#fafafa",
-          display: "grid",
-          gap: "16px",
-          marginBottom: "32px"
-        }}>
-          <h2 style={{ fontSize: "20px", fontWeight: 700, margin: 0, color: "#111827" }}>Vehicle Photos</h2>
-          <div style={{ position: "relative", width: "100%", paddingTop: "56.25%", borderRadius: "12px", overflow: "hidden", backgroundColor: "#f3f4f6" }}>
-            <img src={resolvedHeroImage} alt="Vehicle Hero" style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-            {galleryImages.find((image) => image.src === resolvedHeroImage)?.caption && (
-              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.5)", color: "#ffffff", padding: "8px 12px", fontSize: "13px" }}>
-                {galleryImages.find((image) => image.src === resolvedHeroImage)?.caption}
-              </div>
-            )}
-          </div>
-          {galleryImages.length > 1 && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: "12px" }}>
-              {galleryImages.filter((image) => image.src !== resolvedHeroImage).map((image) => (
-                <div key={image.id} style={{ position: "relative", paddingTop: "66.67%", borderRadius: "8px", overflow: "hidden", backgroundColor: "#f3f4f6" }}>
-                  <img src={image.src} alt={image.alt} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+      {!isOwner && resolvedHeroImage && galleryImages.length > 0 && (
+        <VehiclePhotoGallery images={galleryImages} initialImageSrc={resolvedHeroImage} />
       )}
 
       {isOwner && (
@@ -1170,9 +1144,9 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
   );
 }
 
-function buildVehicleGalleryImages(vehicle: any, resolvedHeroImage: string | null, activeListingImageUrl: string | null) {
+function buildVehicleGalleryImages(vehicle: any, resolvedHeroImage: string | null, activeListingImageUrl: string | null): VehicleGalleryImage[] {
   const seen = new Set<string>();
-  const gallery: Array<{ id: string; src: string; alt: string; caption?: string | null }> = [];
+  const gallery: VehicleGalleryImage[] = [];
 
   const addImage = (input: { id: string; src?: string | null; alt: string; caption?: string | null }) => {
     const src = input.src?.trim();
