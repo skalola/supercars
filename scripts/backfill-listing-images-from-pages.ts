@@ -1,10 +1,13 @@
 import { prisma } from "@/lib/prisma";
+import { validateVehicleImageContentFromUrl } from "@/lib/data-quality/vehicle-image-content-validator";
 import { normalizeSupportedMake, SUPPORTED_MAKES } from "@/lib/supported-makes";
 
 const makeArg = process.argv.find((arg) => arg.startsWith("--make="))?.split("=")[1];
+const vinArg = process.argv.find((arg) => arg.startsWith("--vin="))?.split("=")[1]?.toUpperCase();
 const limitArg = Number(process.argv.find((arg) => arg.startsWith("--limit="))?.split("=")[1] ?? 100);
 const maxImagesArg = Number(process.argv.find((arg) => arg.startsWith("--max-images="))?.split("=")[1] ?? 12);
 const updateExistingImages = process.argv.includes("--update-existing-images");
+const validateExistingImages = process.argv.includes("--validate-existing-images");
 const updatePrices = process.argv.includes("--update-prices");
 const includeExistingGallery = process.argv.includes("--include-existing-gallery");
 const targetMakes = makeArg
@@ -24,6 +27,16 @@ const VIN_RE = /\b[A-HJ-NPR-Z0-9]{17}\b/g;
 async function main() {
   if (targetMakes.length === 0) throw new Error(`Unsupported make: ${makeArg}`);
 
+  const vehicleFilter: Record<string, unknown> = {
+    inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
+    model: {
+      make: {
+        name: { in: targetMakes },
+      },
+    },
+  };
+  if (vinArg) vehicleFilter.vin = vinArg;
+
   const listings = await prisma.listing.findMany({
     where: {
       url: { not: null },
@@ -32,14 +45,7 @@ async function main() {
       priceStatus: { not: "PRICE_INVALID" },
       OR: [{ askingPrice: { gte: 10000 } }, { price: { gte: 10000 } }],
       vehicle: {
-        is: {
-          inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
-          model: {
-            make: {
-              name: { in: targetMakes },
-            },
-          },
-        },
+        is: vehicleFilter,
       },
     },
     select: {
@@ -95,7 +101,11 @@ async function main() {
     const vin = listing.vehicle?.vin || null;
     const pageVins = extractVins(html);
     const pageContainsDifferentVin = Boolean(vin && pageVins.length > 0 && !pageVins.includes(vin));
-    const isSingleVehiclePage = Boolean(vin && pageVins.length === 1 && pageVins[0] === vin);
+    const isSingleVehiclePage = Boolean(
+      vin &&
+        pageVins.includes(vin) &&
+        (pageVins.length === 1 || isVehicleDetailUrl(listing.url))
+    );
 
     if (pageContainsDifferentVin) {
       skipped++;
@@ -108,13 +118,22 @@ async function main() {
       listing.model.make.name,
       listing.model.name,
       vin || "",
-    ], vin, isSingleVehiclePage, maxImages) ?? [];
-    const imageUrl = pageImages[0] || null;
+    ], vin, isSingleVehiclePage, maxImages * 3) ?? [];
+    const imageValidation = await validateCandidateImages(pageImages, maxImages);
+    const invalidExistingHero = validateExistingImages && listing.imageUrl
+      ? await isInvalidImageContent(listing.imageUrl)
+      : false;
+    const validImages = imageValidation.validImages;
+    const rejectedImages = [...imageValidation.rejectedImages];
+    if (invalidExistingHero && listing.imageUrl) rejectedImages.push(listing.imageUrl);
+    await markRejectedVehicleImages(listing.vehicleId, rejectedImages);
+
+    const imageUrl = validImages[0] || null;
 
     const livePrice = updatePrices ? pickBestPrice(html, vin, isSingleVehiclePage) : null;
     const data: { imageUrl?: string; price?: number; askingPrice?: number; priceStatus?: string } = {};
 
-    if (imageUrl && (updateExistingImages || !listing.imageUrl) && imageUrl !== listing.imageUrl) {
+    if (imageUrl && (updateExistingImages || invalidExistingHero || !listing.imageUrl) && imageUrl !== listing.imageUrl) {
       data.imageUrl = imageUrl;
     }
 
@@ -126,8 +145,9 @@ async function main() {
 
     const addedImages = await attachPageVehicleImages({
       vehicleId: listing.vehicleId,
-      images: pageImages,
+      images: validImages,
       alt: `${listing.year} ${listing.model.make.name} ${listing.model.name}`,
+      primaryUrl: data.imageUrl,
     });
 
     if (Object.keys(data).length === 0 && addedImages === 0) {
@@ -147,7 +167,7 @@ async function main() {
     if (data.price) pricesUpdated++;
     updated++;
     console.log(
-      `PAGE ${listing.model.make.name} ${listing.model.name} | ${data.price ? `$${data.price.toLocaleString()}` : "price unchanged"} | ${data.imageUrl || "hero unchanged"} | +${addedImages} gallery image${addedImages === 1 ? "" : "s"}`,
+      `PAGE ${listing.model.make.name} ${listing.model.name} | ${data.price ? `$${data.price.toLocaleString()}` : "price unchanged"} | ${data.imageUrl || "hero unchanged"} | +${addedImages} gallery image${addedImages === 1 ? "" : "s"} | ${rejectedImages.length} rejected`,
     );
   }
 
@@ -198,10 +218,12 @@ async function attachPageVehicleImages({
   vehicleId,
   images,
   alt,
+  primaryUrl,
 }: {
   vehicleId: string;
   images: string[] | null;
   alt: string;
+  primaryUrl?: string;
 }) {
   if (!images || images.length === 0) return 0;
 
@@ -221,7 +243,7 @@ async function attachPageVehicleImages({
         vehicleId,
         url,
         alt,
-        isPrimary: !hasPrimary,
+        isPrimary: primaryUrl ? url === primaryUrl : !hasPrimary,
         validationStatus: "VALID",
       },
     });
@@ -231,7 +253,63 @@ async function attachPageVehicleImages({
     added++;
   }
 
+  if (primaryUrl) {
+    await prisma.vehicleImage.updateMany({
+      where: { vehicleId, url: primaryUrl, validationStatus: "VALID" },
+      data: { isPrimary: true },
+    });
+    await prisma.vehicleImage.updateMany({
+      where: { vehicleId, url: { not: primaryUrl } },
+      data: { isPrimary: false },
+    });
+  }
+
   return added;
+}
+
+async function validateCandidateImages(images: string[], limit: number) {
+  const validImages: string[] = [];
+  const rejectedImages: string[] = [];
+
+  for (const image of images) {
+    const validation = await validateVehicleImageContentFromUrl(image);
+    if (validation.status === "VALID_CAR_IMAGE") {
+      validImages.push(image);
+      if (validImages.length >= limit) break;
+      continue;
+    }
+
+    rejectedImages.push(image);
+    console.log(
+      `REJECT image | ${validation.status} | ${validation.reason} | ${image}`
+    );
+  }
+
+  return { validImages, rejectedImages };
+}
+
+async function isInvalidImageContent(imageUrl: string) {
+  const validation = await validateVehicleImageContentFromUrl(imageUrl);
+  if (validation.status === "VALID_CAR_IMAGE") return false;
+
+  console.log(`REJECT current hero | ${validation.status} | ${validation.reason} | ${imageUrl}`);
+  return true;
+}
+
+async function markRejectedVehicleImages(vehicleId: string, imageUrls: string[]) {
+  const uniqueUrls = Array.from(new Set(imageUrls.filter(Boolean)));
+  if (uniqueUrls.length === 0) return;
+
+  await prisma.vehicleImage.updateMany({
+    where: {
+      vehicleId,
+      url: { in: uniqueUrls },
+    },
+    data: {
+      isPrimary: false,
+      validationStatus: "IMAGE_UNVERIFIED",
+    },
+  });
 }
 
 function rankImages(images: string[], hints: string[]) {
@@ -397,6 +475,10 @@ function hasDifferentVin(value: string, vin: string | null) {
   if (!vin) return false;
   const vins = extractVins(value);
   return vins.length > 0 && !vins.includes(vin);
+}
+
+function isVehicleDetailUrl(value: string) {
+  return /\/(?:new|used|certified|pre-owned|inventory)\/[^?#]+/i.test(value);
 }
 
 function htmlAroundVin(html: string, vin: string) {

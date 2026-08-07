@@ -23,6 +23,7 @@
     "validate-supported-inventory": "tsx --env-file .env scripts/validate-supported-inventory.ts",
     "backfill-listing-images": "tsx --env-file .env scripts/backfill-listing-images.ts",
     "backfill-listing-images-from-pages": "tsx --env-file .env scripts/backfill-listing-images-from-pages.ts",
+    "audit-inventory-images": "tsx --env-file .env scripts/audit-inventory-images.ts",
     "repair-listing-detail-urls": "tsx --env-file .env scripts/repair-listing-detail-urls.ts",
     "inventory-quality-report": "tsx scripts/inventory-quality-report.ts",
     "report-vin-conflicts": "tsx scripts/report-vin-conflicts.ts",
@@ -34,12 +35,10 @@
     "seed-national-directory": "tsx --env-file .env scripts/seed-national-partner-directory.ts",
     "clean-partner-directory": "tsx --env-file .env scripts/clean-partner-directory.ts",
     "discover:dealers": "tsx --env-file .env scripts/discovery/dealer-discovery.ts",
-    "clean-partner-directory": "tsx --env-file .env scripts/clean-partner-directory.ts",
     "enrich-partner-directory": "tsx --env-file .env scripts/enrich-partner-directory.ts",
     "discover:couriers": "tsx --env-file .env scripts/discovery/logistics-discovery.ts --type=couriers",
     "discover:insurers": "tsx --env-file .env scripts/discovery/logistics-discovery.ts --type=insurers",
     "verify-partner-websites": "tsx --env-file .env scripts/verify-partner-websites.ts",
-    "enrich-partner-directory": "tsx --env-file .env scripts/enrich-partner-directory.ts",
     "normalize-partner-directory": "tsx --env-file .env scripts/normalize-partner-directory.ts",
     "verify-public-directory": "tsx --env-file .env scripts/verify-public-partner-directory.ts",
     "sync-inventory-dealer-directory": "tsx --env-file .env scripts/sync-inventory-dealer-directory.ts",
@@ -66,7 +65,8 @@
     "next-auth": "^5.0.0-beta.31",
     "prisma": "^5.22.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
