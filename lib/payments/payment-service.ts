@@ -9,6 +9,7 @@
 
 import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
+import { getDealerPurchaseDepositCentsForPrice } from "@/lib/pricing/dealer-purchase-fees";
 
 export type PaymentProviderName = "ledger" | "stripe";
 
@@ -85,7 +86,11 @@ export function getServiceBookingFeeCents(): number {
   return 10000;
 }
 
-export function getDealerPurchaseDepositCents(): number {
+export function getDealerPurchaseDepositCents(vehiclePrice?: number | null): number {
+  if (Number.isFinite(vehiclePrice) && Number(vehiclePrice) > 0) {
+    return getDealerPurchaseDepositCentsForPrice(Number(vehiclePrice));
+  }
+
   const cents = Number(process.env.DEALER_PURCHASE_DEPOSIT_CENTS);
   if (Number.isFinite(cents) && cents > 0) return Math.round(cents);
 
@@ -210,6 +215,7 @@ export async function createDealerPurchaseCheckoutSession(
   body.set("line_items[0][price_data][currency]", currency);
   body.set("line_items[0][price_data][unit_amount]", String(amountCents));
   body.set("line_items[0][price_data][product_data][name]", "SUPERCAR DASH purchase request deposit");
+  body.set("payment_intent_data[capture_method]", "manual");
   body.set("metadata[dealerPurchaseId]", input.fulfillmentRequestId);
   body.set("metadata[fulfillmentRequestId]", input.fulfillmentRequestId);
   body.set("metadata[listingId]", input.listingId);
@@ -410,7 +416,7 @@ async function dispatchPaidDealerPurchaseRequest(fulfillmentRequestId: string) {
 
   if (partnerToken && packageRecord) {
     packageScope.decisionTokenUrl = decisionTokenUrl;
-    packageScope.depositStatus = "PAID";
+    packageScope.depositStatus = "AUTHORIZED_PENDING_DEALER_ACCEPTANCE";
     await prisma.fulfillmentPackage.update({
       where: { id: packageRecord.id },
       data: { scope: JSON.stringify(packageScope) },
@@ -445,7 +451,7 @@ async function dispatchPaidDealerPurchaseRequest(fulfillmentRequestId: string) {
       previousStatus: req.status,
       newStatus: req.status,
       actorType: "SYSTEM",
-      note: "Dealer purchase deposit paid; dealer email unresolved and ready for admin follow-up.",
+      note: "Dealer purchase deposit authorized; dealer email unresolved and ready for admin follow-up.",
     },
   });
 }
@@ -501,13 +507,14 @@ export async function processStripeWebhookPayload(payload: string): Promise<Paym
     if (object?.metadata?.feeType === "DEALER_PURCHASE_DEPOSIT" && fulfillmentRequestId) {
       const req = await prisma.fulfillmentRequest.findUnique({
         where: { id: fulfillmentRequestId },
-        include: { fees: true, depositIntents: true },
+        include: { fees: true, depositIntents: true, listing: true },
       });
       if (!req || req.requestType !== "DEALER_PURCHASE") {
         return { received: true, eventType, fulfillmentRequestId: null };
       }
 
-      const expectedCents = getDealerPurchaseDepositCents();
+      const listingAmount = req.listing?.askingPrice ?? req.listing?.price ?? 0;
+      const expectedCents = getDealerPurchaseDepositCents(listingAmount);
       if (object.amount_total !== expectedCents) {
         throw new Error("Stripe Checkout amount did not match configured dealer-purchase deposit.");
       }
@@ -517,9 +524,10 @@ export async function processStripeWebhookPayload(payload: string): Promise<Paym
         stripeSessionId: object.id,
         stripePaymentIntentId: typeof object.payment_intent === "string" ? object.payment_intent : null,
         amountCents: object.amount_total,
+        captureMethod: "manual",
       });
 
-      if (req.paymentStatus === "PAID") {
+      if (req.paymentStatus === "AUTHORIZED" || req.paymentStatus === "PAID") {
         await prisma.fulfillmentEvent.create({
           data: {
             fulfillmentRequestId: req.id,
@@ -537,8 +545,8 @@ export async function processStripeWebhookPayload(payload: string): Promise<Paym
         await tx.fulfillmentRequest.update({
           where: { id: req.id },
           data: {
-            paymentStatus: "PAID",
-            collectedAmount: expectedCents / 100,
+            paymentStatus: "AUTHORIZED",
+            collectedAmount: 0,
             refundableAmount: expectedCents / 100,
           },
         });
@@ -546,7 +554,7 @@ export async function processStripeWebhookPayload(payload: string): Promise<Paym
         for (const fee of req.fees.filter((fee) => fee.feeType === "DEPOSIT")) {
           await tx.fulfillmentFee.update({
             where: { id: fee.id },
-            data: { status: "CAPTURED" },
+            data: { status: "AUTHORIZED" },
           });
         }
 
@@ -555,8 +563,7 @@ export async function processStripeWebhookPayload(payload: string): Promise<Paym
           await tx.depositIntent.update({
             where: { id: checkoutIntent.id },
             data: {
-              status: "CAPTURED",
-              capturedAt: new Date(),
+              status: "AUTHORIZED",
               transactionRef: `stripe_checkout:${object.id};payment_intent:${object.payment_intent || "unknown"}`,
             },
           });
@@ -568,7 +575,7 @@ export async function processStripeWebhookPayload(payload: string): Promise<Paym
             previousStatus: req.status,
             newStatus: req.status,
             actorType: "SYSTEM",
-            note: "Stripe webhook processed",
+            note: "Stripe Checkout authorized dealer-purchase deposit for manual capture after dealer acceptance",
             metadata,
           },
         });

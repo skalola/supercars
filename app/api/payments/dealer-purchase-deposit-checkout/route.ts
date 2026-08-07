@@ -50,11 +50,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Purchase request is missing VIN-backed listing context." }, { status: 400 });
   }
 
-  if (requestRecord.paymentStatus === "PAID") {
-    return NextResponse.json({ error: "Purchase request deposit has already been paid." }, { status: 409 });
+  if (requestRecord.paymentStatus === "AUTHORIZED" || requestRecord.paymentStatus === "PAID") {
+    return NextResponse.json({ error: "Purchase request deposit is already pending dealer acceptance." }, { status: 409 });
   }
 
-  const depositCents = getDealerPurchaseDepositCents();
+  const listingAmount = requestRecord.listing?.askingPrice ?? requestRecord.listing?.price ?? 0;
+  const depositCents = getDealerPurchaseDepositCents(listingAmount);
+  if (!depositCents) {
+    return NextResponse.json({ error: "Purchase request is missing a valid listing price." }, { status: 400 });
+  }
   const depositDollars = depositCents / 100;
   const sessionResult = await createDealerPurchaseCheckoutSession({
     fulfillmentRequestId: requestRecord.id,
@@ -120,7 +124,9 @@ export async function POST(request: NextRequest) {
         metadata: JSON.stringify({
           stripeCheckoutSessionId: sessionResult.id,
           amountCents: depositCents,
+          listingAmount,
           currency: sessionResult.currency,
+          captureMethod: "manual",
         }),
       },
     });

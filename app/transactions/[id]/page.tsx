@@ -367,11 +367,12 @@ function nextStepCopy(status: string, requestType: string, role: "BUYER" | "SELL
   return "SUPERCARS is preparing this request for partner review.";
 }
 
-function paymentHeadline(req: { paymentStatus: string; collectedAmount?: number; refundableAmount?: number }) {
+function paymentHeadline(req: { paymentStatus: string; requestType?: string; collectedAmount?: number; refundableAmount?: number }) {
   if (req.paymentStatus === "NOT_REQUIRED") return "No payment required";
   if (req.paymentStatus === "PAYMENT_REQUIRED") return "Booking fee due";
   if (req.paymentStatus === "PROCESSING") return "Payment processing";
   if (req.paymentStatus === "PAID") return `$${(req.collectedAmount || 0).toLocaleString()} paid`;
+  if (req.paymentStatus === "AUTHORIZED" && req.requestType === "DEALER_PURCHASE") return "Deposit pending dealer acceptance";
   if (req.paymentStatus === "AUTHORIZED") return "Authorization active";
   if (req.paymentStatus === "CAPTURED") return `$${(req.collectedAmount || 0).toLocaleString()} captured`;
   if (req.paymentStatus === "REFUNDED") return "Refund processed";
@@ -385,6 +386,7 @@ function paymentCopy(req: { paymentStatus: string; requestType?: string; refunda
   if (req.paymentStatus === "PROCESSING") return "Checkout was started. Payment is confirmed only after Stripe sends a verified webhook.";
   if (req.paymentStatus === "PAID" && req.requestType === "DEALER_PURCHASE") return "The purchase request deposit is paid. Final vehicle payment and paperwork are handled directly by the selling dealer.";
   if (req.paymentStatus === "PAID") return "The platform booking fee has been paid. Repair invoices are paid directly to the service shop.";
+  if (req.paymentStatus === "AUTHORIZED" && req.requestType === "DEALER_PURCHASE") return "Your card is authorized only. SUPERCAR DASH captures the deposit only if the dealer accepts the purchase request.";
   if (req.paymentStatus === "AUTHORIZED") return "Funds are authorized only. Capture happens after partner acceptance.";
   if (req.paymentStatus === "CAPTURED") return "Funds were captured after partner acceptance.";
   if (req.paymentStatus === "REFUNDED") return "A refund has been applied according to the cancellation policy.";

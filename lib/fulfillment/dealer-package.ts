@@ -6,6 +6,7 @@
  */
 
 import { resolvePartnerContact } from "./partner-registry";
+import { getDealerPurchaseDepositAmount } from "@/lib/pricing/dealer-purchase-fees";
 
 export interface GenerateDealerPackageParams {
   vin: string;
@@ -31,8 +32,7 @@ export interface GenerateDealerPackageParams {
 }
 
 export function generateDealerPurchasePackagePayload(params: GenerateDealerPackageParams) {
-  // Platform fee: 1% of asking price (minimum $1,000)
-  const platformFee = Math.max(1000, Math.round(params.askingPrice * 0.01));
+  const platformFee = getDealerPurchaseDepositAmount(params.askingPrice);
 
   return {
     vin: params.vin,

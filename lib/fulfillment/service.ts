@@ -484,11 +484,7 @@ export async function submitPartnerDecision(input: PartnerDecisionInput) {
   let totalCaptured = 0;
 
   try {
-    if (
-      input.decision === "ACCEPTED" &&
-      req.requestType !== "SERVICE_BOOKING" &&
-      req.requestType !== "DEALER_PURCHASE"
-    ) {
+    if (input.decision === "ACCEPTED" && req.requestType !== "SERVICE_BOOKING") {
       for (const deposit of eligibleDeposits) {
         await captureDeposit(deposit.transactionRef || "", deposit.amount);
         totalCaptured += deposit.amount;
@@ -580,7 +576,7 @@ export async function submitPartnerDecision(input: PartnerDecisionInput) {
       });
     } else if (input.decision === "ACCEPTED") {
       for (const deposit of req.depositIntents) {
-        if (req.requestType !== "DEALER_PURCHASE" && (deposit.status === "AUTHORIZED" || deposit.status === "HELD")) {
+        if (deposit.status === "AUTHORIZED" || deposit.status === "HELD") {
           await tx.depositIntent.update({
             where: { id: deposit.id },
             data: {
@@ -590,7 +586,7 @@ export async function submitPartnerDecision(input: PartnerDecisionInput) {
           });
         }
       }
-      const shouldCaptureFeesOnAccept = req.requestType !== "INSURANCE_QUOTE" && req.requestType !== "DEALER_PURCHASE";
+      const shouldCaptureFeesOnAccept = req.requestType !== "INSURANCE_QUOTE";
       for (const fee of req.fees) {
         if (shouldCaptureFeesOnAccept && (fee.status === "AUTHORIZED" || fee.status === "ESTIMATED")) {
           await tx.fulfillmentFee.update({
@@ -600,9 +596,11 @@ export async function submitPartnerDecision(input: PartnerDecisionInput) {
         }
       }
 
-      const paymentStatus = req.requestType === "INSURANCE_QUOTE" || req.requestType === "DEALER_PURCHASE"
+      const paymentStatus = req.requestType === "INSURANCE_QUOTE"
         ? req.paymentStatus
-        : "CAPTURED";
+        : req.requestType === "DEALER_PURCHASE"
+          ? "PAID"
+          : "CAPTURED";
 
       await tx.fulfillmentRequest.update({
         where: { id: req.id },

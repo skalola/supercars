@@ -6,6 +6,10 @@ import {
   createInsuranceQuotePackage,
   createTransportQuotePackage
 } from "@/app/actions/purchase";
+import {
+  getDealerPurchaseDepositAmount,
+  getDealerPurchaseDepositPercentLabel,
+} from "@/lib/pricing/dealer-purchase-fees";
 
 type DeliveryMethod = "ENCLOSED" | "STANDARD";
 
@@ -49,8 +53,8 @@ export default function PurchaseWizard({
     zipCode: ""
   });
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const platformFee = askingPrice < 200000 ? askingPrice * 0.015 : askingPrice * 0.02;
-  const platformFeePercent = askingPrice < 200000 ? "1.5%" : "2%";
+  const platformFee = getDealerPurchaseDepositAmount(askingPrice);
+  const platformFeePercent = getDealerPurchaseDepositPercentLabel(askingPrice);
   const [purchaseId, setPurchaseId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 

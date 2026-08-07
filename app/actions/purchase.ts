@@ -182,7 +182,7 @@ export async function createDealerPurchasePackage(
     fees: [
       {
         feeType: "DEPOSIT",
-        amount: 5000,
+        amount: packagePayload.platformFee,
         status: "ESTIMATED",
         description: "Refundable purchase deposit due at final buyer checkout",
       },
