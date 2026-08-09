@@ -96,7 +96,7 @@ export function ClaimVinButton({
         onClick={openWorkflow}
       >
         {label}
-        {variant !== "menu" ? <span aria-hidden="true">&gt;</span> : null}
+        {variant === "hero" ? <span aria-hidden="true">&gt;</span> : null}
       </button>
 
       {modal && typeof document !== "undefined" ? createPortal(modal, document.body) : null}

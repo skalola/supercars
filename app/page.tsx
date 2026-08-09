@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { auth } from "@/auth";
 import { ClaimVinButton } from "@/components/garage/ClaimVinButton";
 import { getHomepageSummary, type HomepageFeaturedGarage, type HomepageGarageVehicle } from "@/lib/garage/homepage-summary";
@@ -51,6 +52,7 @@ export default async function HomePage() {
             ownedVehicles={summary.ownedVehicles}
             dreamVehicles={summary.dreamVehicles}
             previousVehicles={summary.previousVehicles}
+            isSignedIn={Boolean(session?.user)}
           />
         </div>
       </section>
@@ -61,7 +63,7 @@ export default async function HomePage() {
             <span>Featured Garages</span>
             <Link href={summary.username ? `/garage/${summary.username}` : "/garage"}>View garage</Link>
           </div>
-          <FeaturedGarageGrid garages={summary.featuredGarages} />
+          <FeaturedGarageGrid garages={summary.featuredGarages} isSignedIn={Boolean(session?.user)} />
         </article>
 
         <article id="nearby-meets" className="garage-home-panel">
@@ -79,12 +81,10 @@ export default async function HomePage() {
   );
 }
 
-function FeaturedGarageGrid({ garages }: { garages: HomepageFeaturedGarage[] }) {
+function FeaturedGarageGrid({ garages, isSignedIn }: { garages: HomepageFeaturedGarage[]; isSignedIn: boolean }) {
   if (garages.length === 0) {
     return (
-      <Link href="/garage" className="garage-home-empty-card">
-        Claim your car to start a public garage
-      </Link>
+      <ClaimVinButton label="Claim your car to start a public garage" className="garage-home-empty-card" isSignedIn={isSignedIn} variant="empty" />
     );
   }
 
@@ -160,14 +160,24 @@ function GarageRail({
   ownedVehicles,
   dreamVehicles,
   previousVehicles,
+  isSignedIn,
 }: {
   ownedVehicles: HomepageGarageVehicle[];
   dreamVehicles: HomepageGarageVehicle[];
   previousVehicles: HomepageGarageVehicle[];
+  isSignedIn: boolean;
 }) {
   return (
     <div className="garage-home-rail" aria-label="Garage collection">
-      <GarageRailGroup title="Owned" vehicles={ownedVehicles} emptyText="Claim your first car" emptyHref="/garage" />
+      <GarageRailGroup
+        title="Owned"
+        vehicles={ownedVehicles}
+        emptyText="Claim your first car"
+        emptyHref="/garage"
+        emptyAction={
+          <ClaimVinButton label="Claim your first car" className="garage-home-empty-card" isSignedIn={isSignedIn} variant="empty" />
+        }
+      />
       <GarageRailGroup title="View The Market" vehicles={dreamVehicles} emptyText="Browse live inventory" emptyHref="/inventory" wide carousel />
       <GarageRailGroup title="Previously Owned" vehicles={previousVehicles} emptyText="Add cars to dream garage" emptyHref="/makes" />
     </div>
@@ -179,6 +189,7 @@ function GarageRailGroup({
   vehicles,
   emptyText,
   emptyHref,
+  emptyAction,
   wide = false,
   carousel = false,
 }: {
@@ -186,6 +197,7 @@ function GarageRailGroup({
   vehicles: HomepageGarageVehicle[];
   emptyText: string;
   emptyHref: string;
+  emptyAction?: ReactNode;
   wide?: boolean;
   carousel?: boolean;
 }) {
@@ -217,9 +229,11 @@ function GarageRailGroup({
           </div>
         </div>
       ) : (
-        <Link href={emptyHref} className="garage-home-empty-card">
-          {emptyText}
-        </Link>
+        emptyAction || (
+          <Link href={emptyHref} className="garage-home-empty-card">
+            {emptyText}
+          </Link>
+        )
       )}
     </section>
   );

@@ -407,6 +407,8 @@ canvas {
   border-color: rgba(226, 15, 27, 0.45);
   background: linear-gradient(180deg, rgba(226, 15, 27, 0.22), rgba(5, 5, 5, 0.74));
   color: #ffffff;
+  cursor: pointer;
+  font-family: inherit;
   font-size: 13px;
   font-style: italic;
   font-weight: 900;
