@@ -278,44 +278,36 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
 
   return (
     <div className="page-shell wide">
-      {/* Header */}
-      <div className="page-header" style={styles.header}>
+      <div className="page-header admin-ops-header">
         <div>
-          <div className="eyebrow" style={styles.badgeLabel}>SUPERCARS INTERNAL OPERATIONS</div>
+          <div className="eyebrow admin-ops-eyebrow">SUPERCAR DASH INTERNAL OPERATIONS</div>
           <h1 className="page-title compact" style={styles.title}>Fulfillment Review & Control Center</h1>
           <p className="page-copy" style={styles.subtitle}>
             Enterprise administrative control layer for stuck requests, partner contact auditing, financial reconciliation, and manual overrides.
           </p>
         </div>
-        <div style={styles.headerActions}>
+        <div className="admin-ops-header-actions">
           <button
             type="button"
             onClick={handleProcessExpired}
             disabled={isProcessingExpired}
-            style={{
-              ...styles.headerActionBtn,
-              ...(isProcessingExpired ? styles.disabledActionBtn : {}),
-            }}
+            className="admin-ops-header-button"
           >
             {isProcessingExpired ? "Processing..." : "Process Expired Links"}
           </button>
-          <div style={styles.adminBadge}>ADMIN CONTROL ACTIVE</div>
+          <div className="admin-ops-admin-badge">ADMIN CONTROL ACTIVE</div>
         </div>
       </div>
 
       {actionMessage?.id === "global" && (
         <div
-          style={{
-            ...styles.globalActionMessage,
-            ...(actionMessage.type === "success" ? styles.globalActionSuccess : styles.globalActionError),
-          }}
+          className={`admin-ops-message ${actionMessage.type === "success" ? "is-success" : "is-error"}`}
         >
           {actionMessage.msg}
         </div>
       )}
 
-      {/* Filter Summary Grid */}
-      <div style={styles.kpiGrid}>
+      <div className="admin-ops-kpi-grid">
         {filterCards.map((card) => {
           const isActive = activeTab === card.id;
           return (
@@ -323,50 +315,34 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
               key={card.id}
               type="button"
               onClick={() => setActiveTab(card.id)}
-              style={{
-                ...styles.kpiCard,
-                ...(card.tone === "warning" ? styles.kpiCardWarn : {}),
-                ...(card.tone === "danger" ? styles.kpiCardDanger : {}),
-                ...(isActive ? styles.activeKpiCard : {}),
-              }}
+              className={[
+                "admin-ops-kpi-card",
+                card.tone ? `is-${card.tone}` : "",
+                isActive ? "is-active" : "",
+              ].filter(Boolean).join(" ")}
               aria-pressed={isActive}
             >
-              <div style={{ ...styles.kpiLabel, ...(isActive ? styles.activeKpiLabel : {}) }}>
-                {card.label}
-              </div>
-              <div
-                style={{
-                  ...styles.kpiValue,
-                  ...(card.tone === "success" ? styles.kpiValueSuccess : {}),
-                  ...(card.tone === "warning" ? styles.kpiValueWarning : {}),
-                  ...(card.tone === "danger" ? styles.kpiValueDanger : {}),
-                  ...(isActive ? styles.activeKpiValue : {}),
-                }}
-              >
-                {card.value}
-              </div>
-              <div style={{ ...styles.kpiSub, ...(isActive ? styles.activeKpiSub : {}) }}>
-                {card.sub}
-              </div>
+              <span>{card.label}</span>
+              <strong>{card.value}</strong>
+              <em>{card.sub}</em>
             </button>
           );
         })}
       </div>
 
-      {/* Search Input Bar */}
-      <div style={styles.searchBar}>
+      <div className="admin-ops-search-bar">
         <input
           type="text"
           placeholder="Search by Request ID, VIN, Make, Model, or Partner Email..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          style={styles.searchInput}
+          className="admin-ops-search-input"
         />
         <select
           aria-label="Filter by request type"
           value={requestTypeFilter}
           onChange={(e) => setRequestTypeFilter(e.target.value)}
-          style={styles.typeFilterSelect}
+          className="admin-ops-type-filter"
         >
           <option value="">All Request Types</option>
           {requestTypeOptions.map((requestType) => (
@@ -376,15 +352,14 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
           ))}
         </select>
         {searchQuery && (
-          <button onClick={() => setSearchQuery("")} style={styles.clearBtn}>
+          <button onClick={() => setSearchQuery("")} className="admin-ops-clear-button">
             Clear
           </button>
         )}
       </div>
 
-      {/* Operations Table */}
-      <div className="mobile-scroll admin-table-shell" style={styles.tableContainer}>
-        <table className="admin-ops-table" style={styles.table}>
+      <div className="mobile-scroll admin-table-shell admin-ops-table-shell">
+        <table className="admin-ops-table">
           <colgroup>
             <col className="admin-ops-request-col" />
             <col className="admin-ops-vehicle-col" />
@@ -395,20 +370,20 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
             <col className="admin-ops-actions-col" />
           </colgroup>
           <thead>
-            <tr style={styles.tableHeaderRow}>
-              <th style={styles.th}>REQUEST TYPE</th>
-              <th style={styles.th}>VEHICLE & VIN</th>
-              <th style={styles.th}>PARTIES & PARTNER</th>
-              <th style={styles.th}>STATUS & PAYMENT</th>
-              <th style={styles.th}>LAST AUDIT EVENT</th>
-              <th style={styles.th}>FINANCIALS</th>
-              <th style={styles.th}>ADMIN ACTIONS</th>
+            <tr>
+              <th>REQUEST TYPE</th>
+              <th>VEHICLE & VIN</th>
+              <th>PARTIES & PARTNER</th>
+              <th>STATUS & PAYMENT</th>
+              <th>LAST AUDIT EVENT</th>
+              <th>FINANCIALS</th>
+              <th>ADMIN ACTIONS</th>
             </tr>
           </thead>
           <tbody>
             {filteredRequests.length === 0 ? (
               <tr>
-                <td colSpan={7} style={{ padding: "40px", textAlign: "center", color: "#64748B" }}>
+                <td colSpan={7} className="admin-ops-empty">
                   No fulfillment requests match the selected filter.
                 </td>
               </tr>
@@ -425,63 +400,58 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
                 const latestAuditContext = getAuditContextSummary(latestEvent?.metadata);
 
                 return (
-                  <tr key={req.id} style={styles.tableRow}>
-                    {/* 1. Request Type */}
-                    <td className="admin-ops-request-cell" style={styles.td}>
+                  <tr key={req.id}>
+                    <td className="admin-ops-request-cell">
                       <span className="admin-ops-type-badge" style={getTypeBadgeStyle(req.requestType)}>
                         {formatRequestType(req.requestType)}
                       </span>
                     </td>
 
-                    {/* 2. Vehicle & VIN */}
-                    <td style={styles.td}>
+                    <td>
                       {req.vehicle ? (
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: "13px", color: "#0F172A" }}>
+                        <div className="admin-ops-vehicle-stack">
+                          <strong>
                             {req.vehicle.year} {req.vehicle.make} {req.vehicle.model}
-                          </div>
+                          </strong>
                           <Link href={`/vehicle/${req.vehicle.vin}`} style={styles.vinLink}>
                             VIN: {req.vehicle.vin}
                           </Link>
                         </div>
                       ) : (
-                        <span style={{ fontSize: "12px", color: "#94A3B8" }}>No Vehicle Attached</span>
+                        <span className="admin-ops-muted">No Vehicle Attached</span>
                       )}
                     </td>
 
-                    {/* 3. Parties & Partner */}
-                    <td style={styles.td}>
-                      <div style={{ fontWeight: 700, fontSize: "13px", color: "#1E293B" }}>
+                    <td>
+                      <div className="admin-ops-partner-name">
                         {partner?.name || "Unresolved Partner"}
                       </div>
                       {partner?.email ? (
-                        <div style={{ fontSize: "11px", color: "#10B981" }}>{partner.email}</div>
+                        <div className="admin-ops-partner-email">{partner.email}</div>
                       ) : (
-                        <div style={{ fontSize: "11px", color: "#EF4444", fontWeight: 700 }}>⚠️ UNRESOLVED EMAIL</div>
+                        <div className="admin-ops-unresolved-email">UNRESOLVED EMAIL</div>
                       )}
-                      <div style={{ fontSize: "11px", color: "#64748B", marginTop: "2px" }}>
+                      <div className="admin-ops-buyer-line">
                         Buyer: {buyer?.name || "N/A"}
                       </div>
                     </td>
 
-                    {/* 4. Status & Payment */}
-                    <td className="admin-ops-status-cell" style={styles.td}>
+                    <td className="admin-ops-status-cell">
                       <span className="admin-ops-status-badge" style={getStatusBadgeStyle(req.status)}>{req.status}</span>
-                      <div style={{ marginTop: "4px" }}>
+                      <div className="admin-ops-payment-row">
                         <span className="admin-ops-payment-badge" style={getPaymentBadgeStyle(req.paymentStatus)}>{req.paymentStatus}</span>
                       </div>
                     </td>
 
-                    {/* 5. Last Audit Event */}
-                    <td style={styles.td}>
-                      <div style={{ fontSize: "12px", color: "#334155", fontWeight: 600 }}>
+                    <td>
+                      <div className="admin-ops-audit-time">
                         {new Date(latestEvent?.createdAt || req.updatedAt).toLocaleTimeString(undefined, {
                           hour: "2-digit",
                           minute: "2-digit",
                         })}{" "}
                         ({new Date(latestEvent?.createdAt || req.updatedAt).toLocaleDateString()})
                       </div>
-                      <div className="admin-ops-audit-note" style={{ fontSize: "11px", color: "#64748B", marginTop: "2px" }}>
+                      <div className="admin-ops-audit-note">
                         {latestEvent?.note || latestEvent?.newStatus || "Request created"}
                       </div>
                       {latestAuditContext && (
@@ -489,23 +459,21 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
                       )}
                     </td>
 
-                    {/* 6. Financials */}
-                    <td style={styles.td}>
-                      <div style={{ fontSize: "12px", fontWeight: 700, color: "#0F172A" }}>
+                    <td>
+                      <div className="admin-ops-financial-primary">
                         Coll: ${req.collectedAmount.toLocaleString()}
                       </div>
-                      <div style={{ fontSize: "11px", color: "#64748B" }}>
+                      <div className="admin-ops-financial-secondary">
                         Exp: ${(req.expectedPlatformFee + req.expectedPartnerCommission).toLocaleString()}
                       </div>
                     </td>
 
-                    {/* 7. Admin Actions */}
-                    <td style={styles.td}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "6px", minWidth: "132px" }}>
+                    <td>
+                      <div className="admin-ops-actions">
                         <button
                           disabled={isBusy}
                           onClick={() => handleResend(req.id)}
-                          style={styles.actionBtnResend}
+                          className="admin-ops-action-button is-resend"
                         >
                           Resend Email
                         </button>
@@ -514,7 +482,7 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
                           <button
                             disabled={isBusy}
                             onClick={() => handleCancelAndRefund(req.id)}
-                            style={styles.actionBtnCancel}
+                            className="admin-ops-action-button is-cancel"
                           >
                             Cancel / Refund
                           </button>
@@ -524,7 +492,7 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
                           <button
                             disabled={isBusy}
                             onClick={() => handleMarkCompleted(req.id)}
-                            style={styles.actionBtnComplete}
+                            className="admin-ops-action-button is-complete"
                           >
                             Complete
                           </button>
@@ -534,7 +502,7 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
                           <button
                             disabled={isBusy}
                             onClick={() => handleReleaseRefund(req.id)}
-                            style={styles.actionBtnRefund}
+                            className="admin-ops-action-button is-refund"
                           >
                             Release / Refund
                           </button>
@@ -542,7 +510,7 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
 
                         <Link
                           href={`/transactions/${req.publicTransactionToken}`}
-                          style={styles.actionBtnHub}
+                          className="admin-ops-action-button is-view"
                           title="Buyer/owner scoped transaction page. Admin access is intentionally limited unless the admin account is a transaction party."
                         >
                           View
@@ -551,7 +519,7 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
                         <button
                           disabled={isBusy}
                           onClick={() => handleDelete(req.id)}
-                          style={styles.actionBtnDelete}
+                          className="admin-ops-action-button is-delete"
                           title="Permanently remove this fulfillment transaction after money state is resolved."
                         >
                           Delete
@@ -560,12 +528,7 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
 
                       {msg && (
                         <div
-                          style={{
-                            marginTop: "6px",
-                            fontSize: "10px",
-                            fontWeight: 700,
-                            color: msg.type === "success" ? "#10B981" : "#EF4444",
-                          }}
+                          className={`admin-ops-row-message ${msg.type === "success" ? "is-success" : "is-error"}`}
                         >
                           {msg.msg}
                         </div>
