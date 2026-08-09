@@ -37,6 +37,14 @@ export interface SendEmailResult {
   message: string;
 }
 
+export interface SendBasicEmailInput {
+  recipientEmail?: string | null;
+  recipientName: string;
+  subject: string;
+  html: string;
+  text: string;
+}
+
 type MailProviderName = "log" | "resend" | "sendgrid" | "postmark";
 
 interface ProviderSendInput {
@@ -165,6 +173,55 @@ async function deliverWithProvider(input: ProviderSendInput): Promise<ProviderSe
     },
   );
   return { provider, providerMessageId: result.MessageID };
+}
+
+export async function sendBasicEmail(input: SendBasicEmailInput): Promise<Omit<SendEmailResult, "templateType">> {
+  if (!isValidEmail(input.recipientEmail) || !input.recipientEmail) {
+    return {
+      dispatched: false,
+      recipientEmail: input.recipientEmail,
+      subject: input.subject,
+      html: input.html,
+      text: input.text,
+      reason: "UNRESOLVED_EMAIL",
+      message: "Email dispatch held — recipient email is unresolved.",
+    };
+  }
+
+  const recipientEmail = input.recipientEmail.trim().toLowerCase();
+  const provider = getMailProvider();
+
+  try {
+    const providerResult = await deliverWithProvider({
+      to: recipientEmail,
+      recipientName: input.recipientName,
+      subject: input.subject,
+      html: input.html,
+      text: input.text,
+    });
+
+    return {
+      dispatched: true,
+      recipientEmail,
+      provider: providerResult.provider,
+      providerMessageId: providerResult.providerMessageId,
+      subject: input.subject,
+      html: input.html,
+      text: input.text,
+      message: `Email successfully dispatched to ${recipientEmail}.`,
+    };
+  } catch (error) {
+    return {
+      dispatched: false,
+      recipientEmail,
+      provider,
+      subject: input.subject,
+      html: input.html,
+      text: input.text,
+      reason: "PROVIDER_SEND_FAILED",
+      message: error instanceof Error ? error.message : "Email dispatch failed.",
+    };
+  }
 }
 
 function parseEmailIdentity(value: string): { email: string; name?: string } {

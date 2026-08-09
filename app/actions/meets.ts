@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { notifyMeetCancelled, notifyMeetCreated, notifyMeetRsvp } from "@/lib/meets/meet-notifications";
 
 const SUPPORTED_MEET_MAKES = ["Ferrari", "Lamborghini", "McLaren"];
 
@@ -56,6 +57,8 @@ export async function createMeetAction(formData: FormData) {
       publishedAt: new Date(),
     },
   });
+
+  await notifyMeetCreated(meet.id);
 
   revalidatePath("/meets");
   revalidatePath(`/garage/${await getUsername(session.user.id as string)}`);
@@ -119,6 +122,8 @@ export async function rsvpMeetAction(formData: FormData) {
     },
   });
 
+  await notifyMeetRsvp(meetId, session.user.id as string, finalStatus);
+
   revalidatePath("/meets");
   revalidatePath(`/meets/${meet.slug}`);
   revalidatePath("/garage");
@@ -158,6 +163,8 @@ export async function cancelHostedMeetAction(formData: FormData) {
       cancelledAt: new Date(),
     },
   });
+
+  await notifyMeetCancelled(meet.id, session.user.id as string);
 
   revalidatePath("/meets");
   revalidatePath(`/meets/${meet.slug}`);

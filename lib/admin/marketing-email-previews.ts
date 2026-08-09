@@ -184,6 +184,23 @@ export function getMarketingEmailPreviews(): MarketingEmailPreview[] {
       audience: "Owners with maintenance tracker enabled for a claimed VIN-backed vehicle.",
       trigger: "Vehicle Passport maintenance signals indicate service is due or coming due.",
     }),
+    buildTrackerEmailPreview({
+      key: "event_alerts",
+      eyebrow: "Meet alert",
+      subject: "[SUPERCAR DASH] RSVP Updated - Charlotte Supercar Breakfast",
+      headline: "RSVP updated",
+      body: "your RSVP for Charlotte Supercar Breakfast is confirmed. The meet page includes location details, roll call, and vehicle requirements.",
+      ctaLabel: "View Meet",
+      ctaUrl: `${appUrl}/meets/charlotte-supercar-breakfast`,
+      rows: [
+        ["Meet", "Charlotte Supercar Breakfast"],
+        ["Format", "Cars & Coffee"],
+        ["Date", "Aug 24 at 8:30 AM"],
+        ["Location", "Charlotte, NC"],
+      ],
+      audience: "Users with Events tracker enabled, plus hosts receiving RSVP operational notices.",
+      trigger: "A meet is published, a user RSVPs, a host receives a new RSVP, or a meet is cancelled.",
+    }),
     {
       key: "transaction_flow_alerts",
       eyebrow: "Transaction flow",

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { assertAdmin } from "@/lib/admin/auth";
+import { notifyMeetCancelled } from "@/lib/meets/meet-notifications";
 import { prisma } from "@/lib/prisma";
 
 type AdminMeetActionResult = {
@@ -31,6 +32,10 @@ export async function updateMeetStatusAction(meetId: string, status: "PUBLISHED"
         completedAt: status === "COMPLETED" ? new Date() : undefined,
       },
     });
+
+    if (status === "CANCELLED") {
+      await notifyMeetCancelled(meet.id);
+    }
 
     revalidatePath("/admin/meets");
     revalidatePath("/meets");

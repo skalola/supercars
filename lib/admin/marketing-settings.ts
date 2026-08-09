@@ -20,6 +20,12 @@ export const MARKETING_AUTOMATION_SETTINGS = [
     defaultEnabled: false,
   },
   {
+    key: "event_alerts",
+    label: "Event Alerts",
+    description: "Send meet hosting, RSVP, cancellation, and reminder emails.",
+    defaultEnabled: true,
+  },
+  {
     key: "transaction_flow_alerts",
     label: "Transaction Flow Alerts",
     description: "Send lifecycle emails for purchase, service, transport, and insurance requests.",

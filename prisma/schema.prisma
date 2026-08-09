@@ -222,6 +222,7 @@ model User {
   hostedMeets        Meet[]
   meetRsvps          MeetRsvp[]
   meetPhotos         MeetPhoto[]
+  meetNotifications  MeetNotification[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -343,6 +344,7 @@ model Meet {
   host           User     @relation(fields: [hostId], references: [id], onDelete: Cascade)
   rsvps          MeetRsvp[]
   photos         MeetPhoto[]
+  notifications  MeetNotification[]
 
   @@index([status, startsAt])
   @@index([city, state])
@@ -384,6 +386,27 @@ model MeetPhoto {
 
   @@index([meetId])
   @@index([vehicleId])
+}
+
+model MeetNotification {
+  id                String   @id @default(uuid())
+  meetId            String
+  userId            String?
+  notificationType  String
+  recipientEmail    String?
+  status            String   @default("PENDING")
+  provider          String?
+  providerMessageId String?
+  subject           String?
+  reason            String?
+  createdAt         DateTime @default(now())
+
+  meet              Meet     @relation(fields: [meetId], references: [id], onDelete: Cascade)
+  user              User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([meetId, notificationType])
+  @@index([userId, notificationType])
+  @@index([status, createdAt])
 }
 
 model VehicleProfile {
