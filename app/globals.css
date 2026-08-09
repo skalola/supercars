@@ -2476,6 +2476,7 @@ canvas {
   .site-brand {
     position: absolute;
     left: 50%;
+    grid-column: 1 / -1;
     justify-self: center;
     width: 132px;
     max-width: calc(100vw - 212px);
