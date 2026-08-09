@@ -5,12 +5,14 @@ const prisma = new PrismaClient();
 
 type CliOptions = {
   limit: number;
+  offset: number;
   make: string | null;
   minConfidence: number;
   dryRun: boolean;
   includeReviewed: boolean;
   delayMs: number;
   storeReviewCandidates: boolean;
+  missingImagesOnly: boolean;
 };
 
 type IngestStats = {
@@ -41,7 +43,7 @@ async function main() {
     rateLimitStops: 0,
   };
 
-  const models = await prisma.model.findMany({
+  const allModels = await prisma.model.findMany({
     where: {
       ...(options.make ? { make: { name: { equals: options.make, mode: "insensitive" } } } : {}),
       ...(options.includeReviewed ? {} : { metadataStatus: { not: "READY" } }),
@@ -64,11 +66,18 @@ async function main() {
       { make: { name: "asc" } },
       { name: "asc" },
     ],
-    take: options.limit,
   });
+  const models = allModels
+    .filter((model) => !options.missingImagesOnly || !hasDisplayableImage(model.images))
+    .slice(options.offset, options.offset + options.limit);
+
+  console.log(`[model-catalog-ingest] Selected ${models.length} model${models.length === 1 ? "" : "s"} from ${allModels.length} eligible row${allModels.length === 1 ? "" : "s"} at offset ${options.offset}.`);
 
   for (const model of models) {
     stats.scanned += 1;
+    if (stats.scanned === 1 || stats.scanned % 10 === 0 || stats.scanned === models.length) {
+      console.log(`[model-catalog-ingest] Processing ${stats.scanned}/${models.length}: ${model.make.name} ${model.name}`);
+    }
 
     const record: ModelCatalogRecord = {
       modelId: model.id,
@@ -243,20 +252,27 @@ function selectCandidate(candidates: ModelMetadataCandidate[], minConfidence: nu
   );
 }
 
+function hasDisplayableImage(images: Array<{ type: string | null; reviewStatus: string }>) {
+  return images.some((image) => image.type?.toLowerCase() !== "candidate" && image.reviewStatus !== "NEEDS_REVIEW");
+}
+
 function parseOptions(args: string[]): CliOptions {
   const limitArg = args.find((arg) => arg.startsWith("--limit="));
+  const offsetArg = args.find((arg) => arg.startsWith("--offset="));
   const makeArg = args.find((arg) => arg.startsWith("--make="));
   const minConfidenceArg = args.find((arg) => arg.startsWith("--min-confidence="));
   const delayArg = args.find((arg) => arg.startsWith("--delay-ms="));
 
   return {
     limit: limitArg ? Math.max(1, Number(limitArg.split("=")[1]) || 25) : 25,
+    offset: offsetArg ? Math.max(0, Number(offsetArg.split("=")[1]) || 0) : 0,
     make: makeArg ? makeArg.split("=").slice(1).join("=").trim() || null : null,
     minConfidence: minConfidenceArg ? Math.max(0, Math.min(100, Number(minConfidenceArg.split("=")[1]) || 88)) : 88,
     dryRun: args.includes("--dry-run"),
     includeReviewed: args.includes("--include-reviewed"),
     delayMs: delayArg ? Math.max(0, Number(delayArg.split("=")[1]) || 0) : 1200,
     storeReviewCandidates: args.includes("--store-review-candidates"),
+    missingImagesOnly: args.includes("--missing-images-only"),
   };
 }
 
