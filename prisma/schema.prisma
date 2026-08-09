@@ -30,6 +30,11 @@ model Model {
   bodyStyle           String?
   productionCount     Int?
   description         String?
+  metadataStatus      String      @default("UNREVIEWED")
+  metadataConfidence  Float?
+  metadataSource      String?
+  metadataSourceUrl   String?
+  lastMetadataAuditAt DateTime?
 
   make                Make        @relation(fields: [makeId], references: [id])
   vehicles            Vehicle[]
@@ -92,6 +97,13 @@ model ModelImage {
   url       String
   source    String?
   type      String?
+  sourceUrl String?
+  sourceName String?
+  license String?
+  attribution String?
+  attributionUrl String?
+  confidence Float?
+  reviewStatus String @default("UNREVIEWED")
 
   model     Model    @relation(fields: [modelId], references: [id])
 
