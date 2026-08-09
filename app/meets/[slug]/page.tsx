@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { addMeetPhotoAction, manageMeetRsvpAction, rsvpMeetAction, updateHostedMeetAction } from "@/app/actions/meets";
 import { HostCancelMeetForm } from "@/components/meets/HostCancelMeetForm";
+import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
 import { prisma } from "@/lib/prisma";
 import { getMeetBySlug } from "../meet-data";
 
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function MeetDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [meet, session] = await Promise.all([getMeetBySlug(slug), auth()]);
+  const [meet, session, catalog] = await Promise.all([getMeetBySlug(slug), auth(), getMakeModelCatalogOptions()]);
 
   if (!meet) {
     notFound();
@@ -253,10 +254,10 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
               </label>
               <fieldset className="meet-make-fieldset">
                 <legend>Allowed Makes</legend>
-                {["Ferrari", "Lamborghini", "McLaren"].map((make) => (
-                  <label key={make}>
-                    <input name="allowedMakes" type="checkbox" value={make} defaultChecked={parseAllowedMakes(privateMeetContext.allowedMakes).includes(make)} />
-                    <span>{make}</span>
+                {catalog.makes.map((make) => (
+                  <label key={make.id}>
+                    <input name="allowedMakes" type="checkbox" value={make.name} defaultChecked={parseAllowedMakes(privateMeetContext.allowedMakes).includes(make.name)} />
+                    <span>{make.name}</span>
                   </label>
                 ))}
               </fieldset>

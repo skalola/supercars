@@ -4,11 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getCatalogMakeNames } from "@/lib/makes/catalog";
 import { notifyMeetCancelled, notifyMeetCreated, notifyMeetRsvp, notifyMeetUpdated } from "@/lib/meets/meet-notifications";
 import { isUploadableImageFile, uploadPublicImage } from "@/lib/media/upload-storage";
 import { enforceActionRateLimit } from "@/lib/security/action-rate-limit";
-
-const SUPPORTED_MEET_MAKES = ["Ferrari", "Lamborghini", "McLaren"];
 
 export async function createMeetAction(formData: FormData) {
   const session = await auth();
@@ -34,7 +33,7 @@ export async function createMeetAction(formData: FormData) {
   const description = readString(formData, "description");
   const visibility = readString(formData, "visibility") === "INVITE_ONLY" ? "INVITE_ONLY" : "PUBLIC";
   const capacity = parseOptionalInt(readString(formData, "capacity"));
-  const allowedMakes = SUPPORTED_MEET_MAKES.filter((make) => formData.getAll("allowedMakes").includes(make));
+  const allowedMakes = await readAllowedCatalogMakes(formData);
 
   if (!title || !startsAtInput || !city || !state || !locationName) {
     throw new Error("Title, date/time, city, state, and location name are required.");
@@ -62,7 +61,7 @@ export async function createMeetAction(formData: FormData) {
       exactAddress: exactAddress || null,
       capacity,
       description: description || null,
-      allowedMakes: JSON.stringify(allowedMakes.length > 0 ? allowedMakes : SUPPORTED_MEET_MAKES),
+      allowedMakes: JSON.stringify(allowedMakes),
       mapX: estimateMapX(state),
       mapY: estimateMapY(state),
       publishedAt: new Date(),
@@ -185,7 +184,7 @@ export async function updateHostedMeetAction(formData: FormData) {
   const exactAddress = readString(formData, "exactAddress");
   const description = readString(formData, "description");
   const visibility = readString(formData, "visibility") === "INVITE_ONLY" ? "INVITE_ONLY" : "PUBLIC";
-  const allowedMakes = SUPPORTED_MEET_MAKES.filter((make) => formData.getAll("allowedMakes").includes(make));
+  const allowedMakes = await readAllowedCatalogMakes(formData);
 
   if (!meetId || !title || !startsAtInput || !city || !state || !locationName) {
     throw new Error("Meet id, title, date/time, city, state, and location name are required.");
@@ -223,7 +222,7 @@ export async function updateHostedMeetAction(formData: FormData) {
       exactAddress: exactAddress || null,
       description: description || null,
       visibility,
-      allowedMakes: JSON.stringify(allowedMakes.length > 0 ? allowedMakes : SUPPORTED_MEET_MAKES),
+      allowedMakes: JSON.stringify(allowedMakes),
       mapX: estimateMapX(state),
       mapY: estimateMapY(state),
     },
@@ -443,6 +442,13 @@ export async function addMeetPhotoAction(formData: FormData) {
 
 function readString(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
+}
+
+async function readAllowedCatalogMakes(formData: FormData) {
+  const catalogMakes = await getCatalogMakeNames();
+  const selectedMakes = new Set(formData.getAll("allowedMakes").map((value) => String(value).trim()).filter(Boolean));
+  const allowedMakes = catalogMakes.filter((make) => selectedMakes.has(make));
+  return allowedMakes.length > 0 ? allowedMakes : catalogMakes;
 }
 
 function parseOptionalInt(value: string) {

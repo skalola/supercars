@@ -1,0 +1,66 @@
+import { prisma } from "@/lib/prisma";
+
+export type MakeOption = {
+  id: string;
+  name: string;
+  slug: string;
+  region: string | null;
+  logoUrl: string | null;
+};
+
+export type ModelOption = {
+  id: string;
+  name: string;
+  slug: string;
+  makeId: string;
+  make: MakeOption;
+};
+
+export async function getMakeModelCatalogOptions() {
+  const makes = await prisma.make.findMany({
+    include: {
+      models: {
+        orderBy: { name: "asc" },
+      },
+    },
+    orderBy: [
+      { region: "asc" },
+      { name: "asc" },
+    ],
+  });
+
+  const makeOptions: MakeOption[] = makes.map((make) => ({
+    id: make.id,
+    name: make.name.trim(),
+    slug: make.slug,
+    region: make.region,
+    logoUrl: make.logoUrl,
+  }));
+
+  const modelOptions: ModelOption[] = makes.flatMap((make) => {
+    const mappedMake = makeOptions.find((option) => option.id === make.id);
+    if (!mappedMake) return [];
+
+    return make.models.map((model) => ({
+      id: model.id,
+      name: model.name.trim(),
+      slug: model.slug,
+      makeId: model.makeId,
+      make: mappedMake,
+    }));
+  });
+
+  return {
+    makes: makeOptions,
+    models: modelOptions,
+  };
+}
+
+export async function getCatalogMakeNames() {
+  const makes = await prisma.make.findMany({
+    select: { name: true },
+    orderBy: { name: "asc" },
+  });
+
+  return makes.map((make) => make.name.trim()).filter(Boolean);
+}

@@ -11,7 +11,7 @@
 import React, { useEffect, useMemo, useState, useTransition } from "react";
 import { addVendorAction, removeVendorAction, resolvePartnerEmailAction } from "@/app/actions/admin-partner";
 import type { PartnerConfidence, PartnerType } from "@/lib/fulfillment/partner-registry";
-import { SUPPORTED_MAKES } from "@/lib/supported-makes";
+import type { MakeOption } from "@/lib/makes/catalog";
 
 type VendorFormState = {
   name: string;
@@ -53,9 +53,10 @@ export interface AdminPartnerContactItem {
 
 interface AdminPartnersClientProps {
   contacts: AdminPartnerContactItem[];
+  makeOptions?: MakeOption[];
 }
 
-export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
+export function AdminPartnersClient({ contacts, makeOptions = [] }: AdminPartnersClientProps) {
   const [filterTab, setFilterTab] = useState<"UNRESOLVED" | "ALL">("UNRESOLVED");
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
@@ -145,9 +146,12 @@ export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
     { value: "INSURER", label: "Insurance" },
   ];
 
-  const makeOptions = Array.from(
+  const contactMakeOptions = Array.from(
     new Set(contacts.map((c) => c.makeSpecialization || "ALL").filter(Boolean))
   ).sort();
+  const catalogMakeOptions = makeOptions.length > 0
+    ? makeOptions.map((make) => make.name)
+    : contactMakeOptions.filter((make) => make !== "ALL");
 
   const resetFilters = () => {
     setSearchQuery("");
@@ -376,7 +380,7 @@ export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
           <span>Make</span>
           <select value={makeFilter} onChange={(e) => setMakeFilter(e.target.value)}>
             <option value="">All Makes</option>
-            {makeOptions.map((make) => (
+            {contactMakeOptions.map((make) => (
               <option key={make} value={make}>
                 {make}
               </option>
@@ -470,7 +474,7 @@ export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
                   className="admin-partners-modal-input"
                 >
                   <option value="ALL">All</option>
-                  {SUPPORTED_MAKES.map((make) => (
+                  {catalogMakeOptions.map((make) => (
                     <option key={make} value={make}>{make}</option>
                   ))}
                 </select>

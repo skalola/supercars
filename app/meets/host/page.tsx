@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { createMeetAction } from "@/app/actions/meets";
+import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,7 @@ export default async function HostMeetPage() {
   if (!session?.user?.id) {
     redirect("/login");
   }
+  const { makes } = await getMakeModelCatalogOptions();
 
   return (
     <main className="meet-detail-shell">
@@ -91,10 +93,10 @@ export default async function HostMeetPage() {
 
         <fieldset className="meet-make-fieldset">
           <legend>Allowed Makes</legend>
-          {["Ferrari", "Lamborghini", "McLaren"].map((make) => (
-            <label key={make}>
-              <input name="allowedMakes" type="checkbox" value={make} defaultChecked />
-              <span>{make}</span>
+          {makes.map((make) => (
+            <label key={make.id}>
+              <input name="allowedMakes" type="checkbox" value={make.name} defaultChecked />
+              <span>{make.name}</span>
             </label>
           ))}
         </fieldset>

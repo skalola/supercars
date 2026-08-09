@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { addVendorAction } from "@/app/actions/admin-partner";
 import type { PartnerType } from "@/lib/fulfillment/partner-registry";
-import { SUPPORTED_MAKES } from "@/lib/supported-makes";
+import type { MakeOption } from "@/lib/makes/catalog";
 
 type VendorFormState = {
   name: string;
@@ -25,7 +25,7 @@ const initialForm: VendorFormState = {
   makeSpecialization: "ALL",
 };
 
-export function AdminDirectoryActions() {
+export function AdminDirectoryActions({ makeOptions }: { makeOptions: MakeOption[] }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [form, setForm] = useState<VendorFormState>(initialForm);
@@ -105,9 +105,9 @@ export function AdminDirectoryActions() {
                 <span>Make</span>
                 <select value={form.makeSpecialization} onChange={(event) => updateForm("makeSpecialization", event.target.value)}>
                   <option value="ALL">All</option>
-                  {SUPPORTED_MAKES.map((make) => (
-                    <option key={make} value={make}>
-                      {make}
+                  {makeOptions.map((make) => (
+                    <option key={make.id} value={make.name}>
+                      {make.name}
                     </option>
                   ))}
                 </select>

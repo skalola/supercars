@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { SUPPORTED_MAKES } from "@/lib/supported-makes";
+import type { MakeOption } from "@/lib/makes/catalog";
 
 export type DirectoryVendorType = "DEALER" | "SERVICE_SHOP" | "TRANSPORTER" | "INSURER";
 
@@ -23,6 +23,7 @@ export type DirectoryVendor = {
 
 type DirectoryTabsProps = {
   vendors: DirectoryVendor[];
+  makeOptions: MakeOption[];
 };
 
 const tabs: Array<{ id: DirectoryVendorType; label: string }> = [
@@ -32,7 +33,7 @@ const tabs: Array<{ id: DirectoryVendorType; label: string }> = [
   { id: "INSURER", label: "Insurance" },
 ];
 
-export default function DirectoryTabs({ vendors }: DirectoryTabsProps) {
+export default function DirectoryTabs({ vendors, makeOptions }: DirectoryTabsProps) {
   const [activeTab, setActiveTab] = useState<DirectoryVendorType>("DEALER");
   const [makeFilter, setMakeFilter] = useState("ALL");
   const [locationFilter, setLocationFilter] = useState("");
@@ -47,10 +48,8 @@ export default function DirectoryTabs({ vendors }: DirectoryTabsProps) {
 
   useEffect(() => {
     const query = locationFilter.trim();
-    setGeocodedLocation(null);
 
     if (!query || localLocation) {
-      setIsGeocoding(false);
       return;
     }
 
@@ -173,6 +172,15 @@ export default function DirectoryTabs({ vendors }: DirectoryTabsProps) {
     );
   };
 
+  const handleLocationFilterChange = (value: string) => {
+    setLocationFilter(value);
+    setGeocodedLocation(null);
+    setLocationMessage("");
+    if (!value.trim()) {
+      setIsGeocoding(false);
+    }
+  };
+
   return (
     <section className="surface-panel directory-panel">
       <div className="directory-tabs" role="tablist" aria-label="Vendor directory categories">
@@ -200,8 +208,8 @@ export default function DirectoryTabs({ vendors }: DirectoryTabsProps) {
           <span>Make</span>
           <select value={makeFilter} onChange={(event) => setMakeFilter(event.target.value)}>
             <option value="ALL">All makes</option>
-            {SUPPORTED_MAKES.map((make) => (
-              <option key={make} value={make}>{make}</option>
+            {makeOptions.map((make) => (
+              <option key={make.id} value={make.name}>{make.name}</option>
             ))}
           </select>
         </label>
@@ -209,7 +217,7 @@ export default function DirectoryTabs({ vendors }: DirectoryTabsProps) {
           <span>Location</span>
           <input
             value={locationFilter}
-            onChange={(event) => setLocationFilter(event.target.value)}
+            onChange={(event) => handleLocationFilterChange(event.target.value)}
             placeholder="Zip, city, or state"
           />
         </label>

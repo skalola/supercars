@@ -3,10 +3,12 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
+import type { MakeOption } from "@/lib/makes/catalog";
 import type { MeetEvent } from "./meet-data";
 
 type MeetsMapExperienceProps = {
   meetEvents: MeetEvent[];
+  makeOptions: MakeOption[];
 };
 
 type UserLocation = {
@@ -27,17 +29,18 @@ type MapPoint = {
   y: number;
 };
 
-export function MeetsMapExperience({ meetEvents }: MeetsMapExperienceProps) {
+export function MeetsMapExperience({ meetEvents, makeOptions }: MeetsMapExperienceProps) {
   const [makeFilter, setMakeFilter] = useState("ALL");
   const [nearMeEnabled, setNearMeEnabled] = useState(false);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [locationStatus, setLocationStatus] = useState("");
 
-  const makeOptions = useMemo(() => {
+  const visibleMakeOptions = useMemo(() => {
     const makes = new Set<string>();
+    makeOptions.forEach((make) => makes.add(make.name));
     meetEvents.forEach((meet) => meet.allowedMakes.forEach((make) => makes.add(make)));
     return Array.from(makes).sort((a, b) => a.localeCompare(b));
-  }, [meetEvents]);
+  }, [makeOptions, meetEvents]);
 
   const meetsWithDistance = useMemo(
     () =>
@@ -111,7 +114,7 @@ export function MeetsMapExperience({ meetEvents }: MeetsMapExperienceProps) {
           <span>Make</span>
           <select value={makeFilter} onChange={(event) => setMakeFilter(event.target.value)}>
             <option value="ALL">All makes</option>
-            {makeOptions.map((make) => (
+            {visibleMakeOptions.map((make) => (
               <option key={make} value={make}>
                 {make}
               </option>

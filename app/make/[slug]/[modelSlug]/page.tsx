@@ -8,7 +8,6 @@ import { getMarketSummary } from "@/lib/market-intelligence";
 import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
 import MarketPriceHistory from "@/components/market/MarketPriceHistory";
 import { isListingMatchForModel } from "@/lib/inventory/validate-listing-identity";
-import { SUPPORTED_MAKES } from "@/lib/supported-makes";
 
 
 
@@ -197,11 +196,6 @@ export default async function ModelPage({ params }: ModelPageProps) {
             // NEEDS_REVIEW = confirmed identity conflict, hidden from public pages.
             // REMOVED = duplicate/invalid VIN, permanently hidden.
             inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
-            model: {
-              make: {
-                name: { in: [...SUPPORTED_MAKES] },
-              },
-            },
           }
         },
         validationStatus: "VALID",

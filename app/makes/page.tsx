@@ -7,6 +7,10 @@ const regionOrder = ["Japan", "Europe", "United Kingdom", "United States", "Kore
 export default async function MakesPage() {
   const makes = await prisma.make.findMany({
     include: {
+      models: {
+        orderBy: { name: "asc" },
+        take: 4,
+      },
       _count: {
         select: {
           models: true,
@@ -64,6 +68,11 @@ export default async function MakesPage() {
                   </span>
                   <span className="makes-logo-name">{make.name}</span>
                   <small>{make._count.models.toLocaleString()} models</small>
+                  {make.models.length > 0 ? (
+                    <span className="makes-model-preview">
+                      {make.models.map((model) => model.name).join(" · ")}
+                    </span>
+                  ) : null}
                 </Link>
               ))}
             </div>

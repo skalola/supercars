@@ -1,6 +1,5 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { SUPPORTED_MAKES } from "@/lib/supported-makes";
 import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
 
 export const inventoryDashboardListingWhere: Prisma.ListingWhereInput = {
@@ -10,11 +9,6 @@ export const inventoryDashboardListingWhere: Prisma.ListingWhereInput = {
   vehicle: {
     is: {
       inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
-      model: {
-        make: {
-          name: { in: [...SUPPORTED_MAKES] },
-        },
-      },
     },
   },
   priceStatus: { not: "PRICE_INVALID" },
@@ -65,15 +59,6 @@ export async function getAdminInventoryListings() {
   return prisma.listing.findMany({
     where: {
       vehicleId: { not: null },
-      vehicle: {
-        is: {
-          model: {
-            make: {
-              name: { in: [...SUPPORTED_MAKES] },
-            },
-          },
-        },
-      },
       NOT: [
         { source: { is: { type: "AUCTION" } } },
         { url: { contains: "bringatrailer.com", mode: "insensitive" } },

@@ -3,7 +3,7 @@ import React from "react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import InventoryExplorer from "@/components/market/InventoryExplorer";
-import { SUPPORTED_MAKES } from "@/lib/supported-makes";
+import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
 import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
 
 export default async function InventoryPage() {
@@ -38,11 +38,6 @@ export default async function InventoryPage() {
               vehicle: {
                 is: {
                   inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
-                  model: {
-                    make: {
-                      name: { in: [...SUPPORTED_MAKES] },
-                    },
-                  },
                 },
               },
             },
@@ -53,11 +48,6 @@ export default async function InventoryPage() {
                     vehicle: {
                       is: {
                         inventoryStatus: "ADMIN_TEST",
-                        model: {
-                          make: {
-                            name: { in: [...SUPPORTED_MAKES] },
-                          },
-                        },
                       },
                     },
                   },
@@ -142,41 +132,7 @@ export default async function InventoryPage() {
     },
   }));
 
-  const catalogModels = await prisma.model.findMany({
-    include: {
-      make: true,
-    },
-    orderBy: [
-      { make: { name: "asc" } },
-      { name: "asc" },
-    ],
-  });
-
-  const makeOptions = Array.from(
-    new Map(catalogModels.map((model: any) => [model.make.id, model.make])).values(),
-  ).sort((a: any, b: any) => a.name.localeCompare(b.name));
-  const modelOptions = catalogModels.sort((a: any, b: any) => {
-    const makeCompare = a.make.name.localeCompare(b.make.name);
-    return makeCompare || a.name.localeCompare(b.name);
-  });
-
-  const mappedMakes = makeOptions.map((m: any) => ({
-    id: m.id,
-    name: m.name,
-    slug: m.slug,
-  }));
-
-  const mappedModels = modelOptions.map((m: any) => ({
-    id: m.id,
-    name: m.name,
-    slug: m.slug,
-    makeId: m.makeId,
-    make: {
-      id: m.make.id,
-      name: m.make.name,
-      slug: m.make.slug,
-    },
-  }));
+  const { makes: mappedMakes, models: mappedModels } = await getMakeModelCatalogOptions();
 
   return <InventoryExplorer listings={mappedListings} makes={mappedMakes} models={mappedModels} />;
 }

@@ -1,10 +1,14 @@
 import { MeetsMapExperience } from "./MeetsMapExperience";
+import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
 import { getUpcomingMeetEvents } from "./meet-data";
 
 export const dynamic = "force-dynamic";
 
 export default async function MeetsPage() {
-  const meetEvents = await getUpcomingMeetEvents();
+  const [meetEvents, catalog] = await Promise.all([
+    getUpcomingMeetEvents(),
+    getMakeModelCatalogOptions(),
+  ]);
 
   return (
     <main className="meets-page-shell">
@@ -15,7 +19,7 @@ export default async function MeetsPage() {
           <p>Upcoming owner gatherings, private routes, and garage nights mapped around verified cars.</p>
         </div>
 
-        <MeetsMapExperience meetEvents={meetEvents} />
+        <MeetsMapExperience meetEvents={meetEvents} makeOptions={catalog.makes} />
       </section>
     </main>
   );

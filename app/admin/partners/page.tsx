@@ -2,6 +2,7 @@ import DirectoryTabs, { DirectoryVendor, DirectoryVendorType } from "@/app/direc
 import { AdminDirectoryActions } from "@/components/admin/AdminDirectoryActions";
 import { requireAdmin } from "@/lib/admin/auth";
 import { formatCityState, normalizePartnerLocation, normalizePhoneNumber } from "@/lib/directory/partner-contact-format";
+import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
 import { prisma } from "@/lib/prisma";
 
 const allowedTypes = new Set<DirectoryVendorType>([
@@ -14,21 +15,24 @@ const allowedTypes = new Set<DirectoryVendorType>([
 export default async function AdminPartnersPage() {
   await requireAdmin();
 
-  const contacts = await prisma.partnerContact.findMany({
-    where: {
-      active: true,
-      website: { not: null },
-      city: { not: null },
-      state: { not: null },
-      type: {
-        in: Array.from(allowedTypes),
+  const [contacts, catalog] = await Promise.all([
+    prisma.partnerContact.findMany({
+      where: {
+        active: true,
+        website: { not: null },
+        city: { not: null },
+        state: { not: null },
+        type: {
+          in: Array.from(allowedTypes),
+        },
       },
-    },
-    orderBy: [
-      { updatedAt: "desc" },
-      { name: "asc" },
-    ],
-  });
+      orderBy: [
+        { updatedAt: "desc" },
+        { name: "asc" },
+      ],
+    }),
+    getMakeModelCatalogOptions(),
+  ]);
 
   const vendors = dedupeVendors(
     contacts
@@ -63,10 +67,10 @@ export default async function AdminPartnersPage() {
             Admin-only fulfillment contacts for dealers, service shops, transport providers, and insurance partners.
           </p>
         </div>
-        <AdminDirectoryActions />
+        <AdminDirectoryActions makeOptions={catalog.makes} />
       </section>
 
-      <DirectoryTabs vendors={vendors} />
+      <DirectoryTabs vendors={vendors} makeOptions={catalog.makes} />
     </main>
   );
 }

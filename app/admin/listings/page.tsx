@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/lib/admin/auth";
 import { getAdminInventoryListings } from "@/lib/admin/listing-filters";
 import { AdminListingsTable, AdminListingRow } from "@/components/admin/AdminListingsTable";
+import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
 
 function formatDate(value: Date) {
   return new Intl.DateTimeFormat("en-US", {
@@ -27,7 +28,10 @@ function formatMileage(value: number | null | undefined) {
 export default async function AdminListingsPage() {
   await requireAdmin();
 
-  const listings = await getAdminInventoryListings();
+  const [listings, catalog] = await Promise.all([
+    getAdminInventoryListings(),
+    getMakeModelCatalogOptions(),
+  ]);
   const referenceTimeIso = new Date().toISOString();
 
   const rows: AdminListingRow[] = listings.flatMap((listing) => {
@@ -67,7 +71,7 @@ export default async function AdminListingsPage() {
 
   return (
     <main className="page-shell wide">
-      <AdminListingsTable listings={rows} referenceTimeIso={referenceTimeIso} />
+      <AdminListingsTable listings={rows} referenceTimeIso={referenceTimeIso} makes={catalog.makes} models={catalog.models} />
     </main>
   );
 }
