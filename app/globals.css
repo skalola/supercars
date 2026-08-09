@@ -4595,7 +4595,9 @@ canvas {
 .meets-filter-strip button {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
+  height: 48px;
   min-height: 48px;
   padding: 0 18px;
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -4614,6 +4616,10 @@ canvas {
 .meets-filter-strip select {
   min-width: 176px;
   appearance: auto;
+}
+
+.meets-filter-strip button {
+  min-width: 176px;
 }
 
 .meets-filter-strip button span {
