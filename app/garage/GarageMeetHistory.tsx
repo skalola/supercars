@@ -25,10 +25,6 @@ export default function GarageMeetHistory({ meetSummary, isOwner }: { meetSummar
           <span>Upcoming</span>
           <strong>{meetSummary.stats.upcoming}</strong>
         </Link>
-        <Link href="/meets">
-          <span>Photos</span>
-          <strong>{meetSummary.stats.photos}</strong>
-        </Link>
       </div>
     </section>
   );
