@@ -1,8 +1,12 @@
 import type { ModelCatalogRecord, ModelCatalogSource } from "./types";
+import { openverseModelCatalogSource } from "./sources/openverse";
+import { wikidataModelCatalogSource } from "./sources/wikidata";
 import { wikipediaModelCatalogSource } from "./sources/wikimedia";
 
 export const modelCatalogSources: ModelCatalogSource[] = [
+  wikidataModelCatalogSource,
   wikipediaModelCatalogSource,
+  openverseModelCatalogSource,
 ];
 
 export async function findModelMetadataCandidates(record: ModelCatalogRecord, sources = modelCatalogSources) {

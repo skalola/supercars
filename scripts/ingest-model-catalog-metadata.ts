@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { findModelMetadataCandidates, type ModelCatalogRecord } from "@/lib/model-catalog";
+import { findModelMetadataCandidates, type ModelCatalogRecord, type ModelMetadataCandidate } from "@/lib/model-catalog";
 
 const prisma = new PrismaClient();
 
@@ -81,7 +81,7 @@ async function main() {
     };
 
     const candidates = await findModelMetadataCandidates(record);
-    const candidate = candidates[0] || null;
+    const candidate = selectCandidate(candidates, options.minConfidence);
     if (!candidate) continue;
 
     stats.candidatesFound += 1;
@@ -232,6 +232,15 @@ function getNextStatus(input: {
   }
 
   return "NEEDS_REVIEW";
+}
+
+function selectCandidate(candidates: ModelMetadataCandidate[], minConfidence: number) {
+  return (
+    candidates.find((candidate) => Boolean(candidate.imageUrl) && !candidate.requiresManualReview && candidate.confidence >= minConfidence) ||
+    candidates.find((candidate) => Boolean(candidate.imageUrl) && candidate.confidence >= minConfidence) ||
+    candidates[0] ||
+    null
+  );
 }
 
 function parseOptions(args: string[]): CliOptions {
