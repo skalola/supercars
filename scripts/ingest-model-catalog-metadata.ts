@@ -319,13 +319,13 @@ type BaseFallbackModel = {
 };
 
 function findBaseModelFallback(target: BaseFallbackModel, models: BaseFallbackModel[]) {
-  const targetBase = canonicalBaseModelName(target.name);
+  const targetBase = canonicalBaseModelName(target.name, target.make.name);
   if (!targetBase) return null;
 
   return models
     .filter((model) => model.id !== target.id && model.make.name === target.make.name)
     .map((sourceModel) => {
-      const sourceBase = canonicalBaseModelName(sourceModel.name);
+      const sourceBase = canonicalBaseModelName(sourceModel.name, sourceModel.make.name);
       const confidence = scoreBaseModelFallback(targetBase, sourceBase);
       const image = sourceModel.images.find((item) => item.reviewStatus !== "NEEDS_REVIEW" && item.type?.toLowerCase() !== "candidate");
       return image ? { sourceModel, image, confidence } : null;
@@ -382,7 +382,16 @@ function isGenericModelToken(token: string) {
   ].includes(token);
 }
 
-function canonicalBaseModelName(value: string) {
+function canonicalBaseModelName(value: string, makeName?: string) {
+  const makeTokens = makeName
+    ? makeName
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .split(" ")
+        .filter(Boolean)
+    : [];
   const withoutParens = value.replace(/\([^)]*\)/g, " ");
   const normalized = withoutParens
     .normalize("NFD")
@@ -398,7 +407,10 @@ function canonicalBaseModelName(value: string) {
     .replace(/\s+/g, " ")
     .trim();
 
-  return normalized;
+  return normalized
+    .split(" ")
+    .filter((token) => !makeTokens.includes(token))
+    .join(" ");
 }
 
 function parseOptions(args: string[]): CliOptions {
