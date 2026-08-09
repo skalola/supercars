@@ -48,7 +48,7 @@ export default async function HomePage() {
               icon="M"
               href={summary.mostExpensiveHref}
             />
-            <KpiCard label="Fastest Car" value={summary.fastestCarValue} detail={summary.fastestCarLabel} icon="F" />
+            <KpiCard label="Highest HP" value={summary.fastestCarValue} detail={summary.fastestCarLabel} icon="HP" />
           </div>
 
           <GarageRail

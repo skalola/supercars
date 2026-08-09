@@ -47,7 +47,7 @@ export async function getHomepageSummary(user: SessionUser | undefined | null): 
 }
 
 async function getSignedInHomepageSummary(userId: string): Promise<HomepageSummary | null> {
-  const [user, ownedRows, dreamRows, inventoryVehicles, inventoryStats, fastestInventoryCar] = await Promise.all([
+  const [user, ownedRows, dreamRows, inventoryVehicles, inventoryStats, highestHorsepowerCar] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: { username: true, name: true },
@@ -101,7 +101,7 @@ async function getSignedInHomepageSummary(userId: string): Promise<HomepageSumma
     }),
     getLiveInventoryVehicles(12),
     getLiveInventoryValueStats(),
-    getFastestInventoryCar(),
+    getHighestHorsepowerInventoryCar(),
   ]);
 
   if (!user) return null;
@@ -148,8 +148,8 @@ async function getSignedInHomepageSummary(userId: string): Promise<HomepageSumma
     mostExpensiveLabel: inventoryStats.mostExpensive?.label ?? "Most expensive",
     mostExpensiveHref: inventoryStats.mostExpensive?.href ?? null,
     mostExpensiveValue: inventoryStats.mostExpensive?.value ?? null,
-    fastestCarLabel: fastestInventoryCar.label,
-    fastestCarValue: fastestInventoryCar.value,
+    fastestCarLabel: highestHorsepowerCar.label,
+    fastestCarValue: highestHorsepowerCar.value,
     ownedVehicles,
     dreamVehicles,
     previousVehicles: [],
@@ -165,7 +165,7 @@ async function getPublicHomepageSummary(): Promise<HomepageSummary> {
     getLatestUserActivity(),
   ]);
 
-  const fastestCar = await getFastestInventoryCar();
+  const highestHorsepowerCar = await getHighestHorsepowerInventoryCar();
   const heroVehicle = featuredVehicles[0] || null;
 
   return {
@@ -179,8 +179,8 @@ async function getPublicHomepageSummary(): Promise<HomepageSummary> {
     mostExpensiveLabel: valueStats.mostExpensive?.label ?? "Most expensive",
     mostExpensiveHref: valueStats.mostExpensive?.href ?? null,
     mostExpensiveValue: valueStats.mostExpensive?.value ?? null,
-    fastestCarLabel: fastestCar.label,
-    fastestCarValue: fastestCar.value,
+    fastestCarLabel: highestHorsepowerCar.label,
+    fastestCarValue: highestHorsepowerCar.value,
     ownedVehicles: [],
     dreamVehicles: featuredVehicles,
     previousVehicles: [],
@@ -293,17 +293,17 @@ async function getVisibleLiveInventoryListings(take: number) {
     .filter((listing) => cleanImage(getVehicleHeroImage(listing.vehicle)) || cleanImage(listing.imageUrl));
 }
 
-async function getFastestInventoryCar() {
+async function getHighestHorsepowerInventoryCar() {
   const rows = await getVisibleLiveInventoryListings(2000);
-  const fastest = rows
+  const strongest = rows
     .filter((listing) => listing.vehicle)
-    .map((listing) => ({ listing, mph: parseMph(listing.vehicle?.model.spec?.topSpeed) }))
-    .filter((item): item is { listing: (typeof rows)[number]; mph: number } => item.mph !== null)
-    .sort((a, b) => b.mph - a.mph)[0];
-  if (!fastest?.listing.vehicle) return { label: "Performance stats pending", value: "Pending" };
+    .map((listing) => ({ listing, horsepower: parseHorsepower(listing.vehicle?.model.spec?.horsepower) }))
+    .filter((item): item is { listing: (typeof rows)[number]; horsepower: number } => item.horsepower !== null)
+    .sort((a, b) => b.horsepower - a.horsepower)[0];
+  if (!strongest?.listing.vehicle) return { label: "Horsepower stats pending", value: "Pending" };
   return {
-    label: `${fastest.listing.vehicle.year} ${fastest.listing.vehicle.model.make.name} ${fastest.listing.vehicle.model.name}`,
-    value: `${fastest.mph} mph`,
+    label: `${strongest.listing.vehicle.year} ${strongest.listing.vehicle.model.make.name} ${strongest.listing.vehicle.model.name}`,
+    value: `${strongest.horsepower.toLocaleString()} hp`,
   };
 }
 
@@ -336,9 +336,9 @@ async function getLatestUserActivity() {
   ];
 }
 
-function parseMph(value: string | null | undefined) {
+function parseHorsepower(value: string | null | undefined) {
   if (!value) return null;
-  const match = value.match(/(\d{2,3})/);
+  const match = value.replace(/,/g, "").match(/(\d+(?:\.\d+)?)/);
   return match ? Number(match[1]) : null;
 }
 
