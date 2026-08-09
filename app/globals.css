@@ -202,6 +202,37 @@ canvas {
   color: #ffffff;
 }
 
+.supercar-logo-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 50px;
+  min-width: 190px;
+  padding: 0 28px;
+  border: 1px solid rgba(226, 15, 27, 0.9);
+  border-radius: 6px;
+  background: linear-gradient(180deg, #f0222d 0%, #b90913 100%);
+  box-shadow: 0 0 24px rgba(226, 15, 27, 0.22);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 13px;
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  text-decoration: none;
+  text-transform: uppercase;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.supercar-logo-cta:hover,
+.supercar-logo-cta:focus-visible {
+  border-color: rgba(255, 255, 255, 0.72);
+  background: linear-gradient(180deg, #ff303a 0%, #d10d18 100%);
+  transform: translateY(-1px);
+}
+
 .garage-home-secondary {
   border: 1px solid rgba(255, 255, 255, 0.46);
   background: rgba(8, 8, 8, 0.38);
@@ -373,10 +404,138 @@ canvas {
   place-items: center;
   margin-top: 10px;
   padding: 18px;
-  color: rgba(255, 255, 255, 0.62);
+  border-color: rgba(226, 15, 27, 0.45);
+  background: linear-gradient(180deg, rgba(226, 15, 27, 0.22), rgba(5, 5, 5, 0.74));
+  color: #ffffff;
   font-size: 13px;
-  font-weight: 720;
+  font-style: italic;
+  font-weight: 900;
+  letter-spacing: 0.12em;
   text-align: center;
+  text-transform: uppercase;
+}
+
+.claim-vin-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.claim-vin-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.72);
+  cursor: pointer;
+}
+
+.claim-vin-card {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 18px;
+  width: min(440px, 100%);
+  padding: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(19, 20, 24, 0.98), rgba(5, 5, 6, 0.98));
+  box-shadow: 0 26px 80px rgba(0, 0, 0, 0.55);
+  color: #ffffff;
+}
+
+.claim-vin-card h2,
+.claim-vin-card p {
+  margin: 0;
+}
+
+.claim-vin-card div > span,
+.claim-vin-card label > span {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.claim-vin-card h2 {
+  margin-top: 8px;
+  font-size: 28px;
+  font-weight: 640;
+}
+
+.claim-vin-card p {
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.5;
+}
+
+.claim-vin-card label {
+  display: grid;
+  gap: 8px;
+}
+
+.claim-vin-card input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 760;
+  letter-spacing: 0.08em;
+  outline: none;
+  text-transform: uppercase;
+}
+
+.claim-vin-card input:focus {
+  border-color: rgba(226, 15, 27, 0.85);
+  box-shadow: 0 0 0 3px rgba(226, 15, 27, 0.18);
+}
+
+.claim-vin-error {
+  padding: 10px 12px;
+  border: 1px solid rgba(226, 15, 27, 0.4);
+  border-radius: 6px;
+  background: rgba(226, 15, 27, 0.12);
+  color: #ffb7bc;
+}
+
+.claim-vin-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  gap: 10px;
+}
+
+.claim-vin-actions button {
+  min-height: 46px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.claim-vin-actions button:first-child {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+.claim-vin-actions button:last-child {
+  border: 1px solid rgba(226, 15, 27, 0.9);
+  background: #d6141c;
+  color: #ffffff;
+}
+
+.claim-vin-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.54;
 }
 
 .garage-home-car-image {
@@ -1196,6 +1355,50 @@ canvas {
   display: grid;
   min-width: 180px;
   gap: 8px;
+}
+
+.vehicle-purchase-buttons {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.82fr) minmax(190px, 1fr);
+  gap: 10px;
+  align-items: stretch;
+}
+
+.vehicle-favorite-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 48px;
+  padding: 0 18px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.vehicle-favorite-button:hover,
+.vehicle-favorite-button:focus-visible {
+  border-color: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.11);
+  transform: translateY(-1px);
+}
+
+.vehicle-favorite-button.is-saved {
+  border-color: rgba(226, 15, 27, 0.62);
+  background: rgba(226, 15, 27, 0.16);
+}
+
+.vehicle-favorite-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.64;
+  transform: none;
 }
 
 .vehicle-owner-passport-panel,
@@ -6069,6 +6272,10 @@ canvas {
 
   .vehicle-purchase-action {
     width: 100%;
+  }
+
+  .vehicle-purchase-buttons {
+    grid-template-columns: 1fr;
   }
 
   .market-page-shell {

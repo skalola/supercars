@@ -10,6 +10,7 @@ import MarketPriceHistory from "@/components/market/MarketPriceHistory";
 import PurchaseWizard from "@/components/market/PurchaseWizard";
 import OwnerSaleControls from "@/components/market/OwnerSaleControls";
 import VehiclePhotoGallery, { VehicleGalleryImage } from "@/components/market/VehiclePhotoGallery";
+import { AddToFavoritesButton } from "@/components/garage/AddToFavoritesButton";
 import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
 import { isValidEmail } from "@/lib/fulfillment/partner-registry";
 import { emailMatchesWebsiteDomain } from "@/lib/directory/contact-domain-policy";
@@ -119,7 +120,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
     );
   }
 
-  const [maintenanceRules, market, serviceShops] = await Promise.all([
+  const [maintenanceRules, market, serviceShops, savedFavorite] = await Promise.all([
     prisma.maintenanceRule.findMany({
       where: {
         OR: [
@@ -154,6 +155,17 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
         makeSpecialization: true,
       },
     }),
+    session?.user?.id
+      ? prisma.garageItem.findUnique({
+          where: {
+            userId_modelId: {
+              userId: session.user.id as string,
+              modelId: vehicle.modelId,
+            },
+          },
+          select: { id: true },
+        })
+      : null,
   ]);
 
   const makeName = vehicle.model.make.name;
@@ -503,19 +515,22 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
               ) : null}
             </div>
             <div className="vehicle-purchase-action">
-              <PurchaseWizard
-                vin={vehicle.vin}
-                year={vehicle.year}
-                make={vehicle.model.make.name}
-                model={vehicle.model.name}
-                askingPrice={askingPrice || 0}
-                mileage={vehicle.profile?.currentMileage || vehicle.mileage}
-                color={vehicle.profile?.exteriorColor || vehicle.color}
-                listingId={activeListing.id}
-                originalListingUrl={originalListingUrl}
-                listedByLabel={localSeller ? localSellerLabel : null}
-                listedByHref={localSeller ? localSellerHref : null}
-              />
+              <div className="vehicle-purchase-buttons">
+                <AddToFavoritesButton modelId={vehicle.modelId} initialSaved={Boolean(savedFavorite)} />
+                <PurchaseWizard
+                  vin={vehicle.vin}
+                  year={vehicle.year}
+                  make={vehicle.model.make.name}
+                  model={vehicle.model.name}
+                  askingPrice={askingPrice || 0}
+                  mileage={vehicle.profile?.currentMileage || vehicle.mileage}
+                  color={vehicle.profile?.exteriorColor || vehicle.color}
+                  listingId={activeListing.id}
+                  originalListingUrl={originalListingUrl}
+                  listedByLabel={localSeller ? localSellerLabel : null}
+                  listedByHref={localSeller ? localSellerHref : null}
+                />
+              </div>
             </div>
           </div>
         </section>

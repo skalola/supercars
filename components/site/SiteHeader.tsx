@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { logoutAction } from "@/app/actions/auth-session";
+import { ClaimVinButton } from "@/components/garage/ClaimVinButton";
 
 type SiteHeaderProps = {
   isSignedIn: boolean;
@@ -134,6 +135,7 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, tracke
               <Link href="/garage" className="site-account-link" role="menuitem" onClick={closeMenus}>
                 My Garage
               </Link>
+              <ClaimVinButton label="Claim Car" isSignedIn={isSignedIn} variant="menu" onOpen={closeMenus} />
               {!isAdmin && trackersHref ? (
                 <Link href={trackersHref} className="site-account-link" role="menuitem" onClick={closeMenus}>
                   Trackers

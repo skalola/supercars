@@ -1,12 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { auth } from "@/auth";
+import { ClaimVinButton } from "@/components/garage/ClaimVinButton";
 import { getHomepageSummary, type HomepageGarageVehicle } from "@/lib/garage/homepage-summary";
 
 export default async function HomePage() {
   const session = await auth();
   const summary = await getHomepageSummary(session?.user);
-  const primaryGarageHref = session?.user ? "/garage" : "/login";
 
   return (
     <main className="garage-home">
@@ -28,10 +28,7 @@ export default async function HomePage() {
             <h1>Your Digital Garage</h1>
             <p>Build, track, and share the story of your real cars.</p>
             <div className="garage-home-actions">
-              <Link href={primaryGarageHref} className="garage-home-primary">
-                Enter My Garage
-                <span aria-hidden="true">&gt;</span>
-              </Link>
+              <ClaimVinButton isSignedIn={Boolean(session?.user)} />
               <Link href="/meets" className="garage-home-secondary">
                 Explore Meets
               </Link>
@@ -158,8 +155,8 @@ function GarageRail({
   return (
     <div className="garage-home-rail" aria-label="Garage collection">
       <GarageRailGroup title="Owned" vehicles={ownedVehicles} emptyText="Claim your first car" emptyHref="/garage" />
-      <GarageRailGroup title="Dream Garage" vehicles={dreamVehicles} emptyText="Browse live inventory" emptyHref="/inventory" wide carousel />
-      <GarageRailGroup title="Previously Owned" vehicles={previousVehicles} emptyText="Add ownership history" emptyHref="/garage" />
+      <GarageRailGroup title="View The Market" vehicles={dreamVehicles} emptyText="Browse live inventory" emptyHref="/inventory" wide carousel />
+      <GarageRailGroup title="Previously Owned" vehicles={previousVehicles} emptyText="Add cars to dream garage" emptyHref="/inventory" />
     </div>
   );
 }
