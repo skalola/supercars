@@ -3329,6 +3329,101 @@ canvas {
   text-decoration: none;
 }
 
+.claim-page-shell {
+  align-content: center;
+  min-height: calc(100vh - 82px);
+}
+
+.claim-panel {
+  display: grid;
+  gap: 24px;
+  width: min(680px, 100%);
+  margin: 0 auto;
+  padding: clamp(22px, 4vw, 34px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.04)),
+    rgba(9, 9, 10, 0.78);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(18px);
+}
+
+.claim-panel h1 {
+  margin: 8px 0 0;
+  color: #ffffff;
+  font-size: clamp(38px, 7vw, 64px);
+  font-weight: 560;
+  line-height: 0.98;
+}
+
+.claim-panel p {
+  max-width: 520px;
+  margin: 14px 0 0;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.claim-form,
+.claim-field {
+  display: grid;
+  gap: 12px;
+}
+
+.claim-form {
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.claim-field label {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.claim-field input {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.22);
+  color: #ffffff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  outline: none;
+}
+
+.claim-field input::placeholder {
+  color: rgba(255, 255, 255, 0.44);
+  font-family: var(--font-clean-sans);
+  letter-spacing: 0;
+}
+
+.claim-field input:focus {
+  border-color: rgba(226, 15, 27, 0.78);
+}
+
+.claim-error {
+  padding: 12px;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 6px;
+  background: rgba(127, 29, 29, 0.32);
+  color: #fecaca;
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.claim-submit-button:disabled {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.14);
+  cursor: wait;
+}
+
 .directory-panel {
   display: grid;
   gap: 18px;

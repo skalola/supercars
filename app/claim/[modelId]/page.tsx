@@ -17,20 +17,33 @@ export default async function ClaimPage({ params }: { params: Promise<{ modelId:
   });
 
   if (!model) {
-    return <div style={{ padding: 40 }}>Model not found</div>;
+    return (
+      <main className="garage-page-shell auth-page-shell">
+        <section className="auth-panel">
+          <div className="garage-page-eyebrow">Claim vehicle</div>
+          <h1>Model not found</h1>
+          <p>This model is not available for ownership verification.</p>
+        </section>
+      </main>
+    );
   }
 
   return (
-    <main style={{ maxWidth: 560, margin: "40px auto", padding: 24, fontFamily: "system-ui" }}>
-      <h1 style={{ fontSize: 32, marginBottom: 12 }}>Claim Your {model.make.name} {model.name}</h1>
-      <p style={{ color: "#666", marginBottom: 24 }}>
-        Enter your vehicle's VIN to begin the ownership verification process.
-      </p>
-      <ClaimForm 
-        modelId={model.id} 
-        modelName={model.name} 
-        makeName={model.make.name} 
-      />
+    <main className="garage-page-shell claim-page-shell">
+      <section className="claim-panel">
+        <div>
+          <div className="garage-page-eyebrow">Ownership verification</div>
+          <h1>
+            Claim Your {model.make.name} {model.name}
+          </h1>
+          <p>Enter your vehicle VIN to create a verified Vehicle Passport in your garage.</p>
+        </div>
+        <ClaimForm
+          modelId={model.id}
+          modelName={model.name}
+          makeName={model.make.name}
+        />
+      </section>
     </main>
   );
 }
