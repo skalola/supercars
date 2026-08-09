@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from "react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -109,25 +109,6 @@ export default async function InventoryPage() {
     visibleListings.length
   );
 
-  // Fetch makes and models for filters selection options
-  const [makes, models] = await Promise.all([
-    prisma.make.findMany({
-      where: { name: { in: [...SUPPORTED_MAKES] } },
-      orderBy: { name: "asc" },
-    }),
-    prisma.model.findMany({
-      where: {
-        make: {
-          name: { in: [...SUPPORTED_MAKES] },
-        },
-      },
-      include: {
-        make: true,
-      },
-      orderBy: { name: "asc" },
-    }),
-  ]);
-
   // Map database listings to matched explorer format
   const mappedListings = visibleListings.map((l: any) => ({
     id: l.id,
@@ -161,13 +142,23 @@ export default async function InventoryPage() {
     },
   }));
 
-  const mappedMakes = makes.map((m) => ({
+  const makeOptions = Array.from(
+    new Map(mappedListings.map((listing: any) => [listing.model.make.id, listing.model.make])).values(),
+  ).sort((a: any, b: any) => a.name.localeCompare(b.name));
+  const modelOptions = Array.from(
+    new Map(mappedListings.map((listing: any) => [listing.model.id, listing.model])).values(),
+  ).sort((a: any, b: any) => {
+    const makeCompare = a.make.name.localeCompare(b.make.name);
+    return makeCompare || a.name.localeCompare(b.name);
+  });
+
+  const mappedMakes = makeOptions.map((m: any) => ({
     id: m.id,
     name: m.name,
     slug: m.slug,
   }));
 
-  const mappedModels = models.map((m) => ({
+  const mappedModels = modelOptions.map((m: any) => ({
     id: m.id,
     name: m.name,
     slug: m.slug,

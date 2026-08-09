@@ -111,7 +111,7 @@ export default function InventoryExplorer({
           </article>
           <article>
             <span>Value</span>
-            <strong>{formatCompactCurrency(visibleValue)}</strong>
+            <strong className="market-value-number">{formatFullCurrency(visibleValue)}</strong>
           </article>
           <article>
             <span>Filters</span>
@@ -289,12 +289,11 @@ export default function InventoryExplorer({
   );
 }
 
-function formatCompactCurrency(value: number) {
+function formatFullCurrency(value: number) {
   if (!value) return "$0";
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 1,
-    notation: value >= 1000000 ? "compact" : "standard",
+    maximumFractionDigits: 0,
   }).format(value);
 }

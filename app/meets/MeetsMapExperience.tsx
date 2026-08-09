@@ -201,53 +201,30 @@ export function MeetsMapExperience({ meetEvents }: MeetsMapExperienceProps) {
 }
 
 function CountryMapGraphic({ countryCode }: { countryCode: "US" }) {
-  const outline = countryOutlines[countryCode];
+  const map = countryMapAssets[countryCode];
 
   return (
-    <svg className="meets-map-svg" viewBox={outline.viewBox} role="img" aria-label={outline.label}>
-      <defs>
-        <radialGradient id="meetCityGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.8" />
-          <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      <path
-        d={outline.path}
-        fill="rgba(255,255,255,0.035)"
-        stroke="rgba(255,255,255,0.2)"
-        strokeWidth="1.5"
-        vectorEffect="non-scaling-stroke"
-      />
-      <path
-        d="M158 208 C248 244 310 232 390 270 S556 340 654 298 806 278 880 322 M166 412 C284 374 398 430 504 394 S686 370 814 448 M292 146 C310 238 314 330 298 438 M506 130 C516 232 512 336 490 462 M706 156 C696 264 672 356 632 478"
-        fill="none"
-        stroke="rgba(255,255,255,0.1)"
-        strokeWidth="1"
-        vectorEffect="non-scaling-stroke"
-      />
-      {outline.glows.map(([cx, cy]) => (
-        <circle key={`${cx}:${cy}`} cx={cx} cy={cy} r="18" fill="url(#meetCityGlow)" opacity="0.42" />
+    <div className="meets-map-svg meets-real-map" role="img" aria-label={map.label}>
+      <span className="meets-real-map-image" aria-hidden="true" style={{ backgroundImage: `url("${map.src}")` }} />
+      {map.glows.map(([x, y]) => (
+        <span key={`${x}:${y}`} className="meets-map-glow" style={{ left: `${x}%`, top: `${y}%` }} />
       ))}
-    </svg>
+    </div>
   );
 }
 
-const countryOutlines = {
+const countryMapAssets = {
   US: {
     label: "United States meet map",
-    viewBox: "0 0 1000 620",
-    path:
-      "M86 243 L105 202 L143 191 L167 143 L221 130 L270 96 L332 108 L390 96 L457 118 L510 107 L564 124 L620 118 L678 134 L737 151 L791 179 L842 182 L887 224 L922 281 L904 336 L870 371 L852 425 L822 476 L762 493 L719 531 L652 509 L611 478 L558 470 L512 444 L452 469 L392 457 L337 424 L279 423 L229 441 L174 418 L139 378 L107 353 L94 304 Z M826 492 L857 513 L838 538 L799 527 Z M155 107 L181 93 L207 104 L198 128 L164 130 Z",
+    src: "/maps/us-contiguous-48.svg",
     glows: [
-      [120, 144],
-      [162, 372],
-      [455, 390],
-      [575, 268],
-      [646, 392],
-      [702, 506],
-      [776, 244],
-      [850, 322],
-      [522, 184],
+      [16, 23],
+      [18, 60],
+      [58, 43],
+      [65, 64],
+      [69, 58],
+      [77, 78],
+      [78, 36],
     ] as Array<[number, number]>,
   },
 };

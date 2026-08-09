@@ -3948,11 +3948,14 @@ canvas {
 .market-stat-grid strong {
   min-width: 0;
   color: #ffffff;
-  font-size: clamp(20px, 1.7vw, 28px);
+  font-size: clamp(18px, 1.45vw, 26px);
   line-height: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.market-stat-grid strong.market-value-number {
+  font-size: clamp(16px, 1.18vw, 22px);
+  letter-spacing: 0;
 }
 
 .market-layout {
@@ -4281,6 +4284,35 @@ canvas {
   height: 84%;
   opacity: 0.92;
   filter: drop-shadow(0 0 26px rgba(255, 255, 255, 0.08));
+}
+
+.meets-real-map {
+  inset: 12% 4% 8%;
+}
+
+.meets-real-map-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  object-fit: contain;
+  opacity: 0.54;
+  filter:
+    brightness(0)
+    invert(1)
+    drop-shadow(0 0 20px rgba(255, 255, 255, 0.08));
+}
+
+.meets-map-glow {
+  position: absolute;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0));
+  opacity: 0.38;
+  transform: translate(-50%, -50%);
 }
 
 .meets-map-pin {
