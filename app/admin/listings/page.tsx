@@ -28,6 +28,7 @@ export default async function AdminListingsPage() {
   await requireAdmin();
 
   const listings = await getAdminInventoryListings();
+  const referenceTimeIso = new Date().toISOString();
 
   const rows: AdminListingRow[] = listings.flatMap((listing) => {
     const vehicle = listing.vehicle;
@@ -66,7 +67,7 @@ export default async function AdminListingsPage() {
 
   return (
     <main className="page-shell wide">
-      <AdminListingsTable listings={rows} />
+      <AdminListingsTable listings={rows} referenceTimeIso={referenceTimeIso} />
     </main>
   );
 }

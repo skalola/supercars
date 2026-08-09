@@ -28,7 +28,13 @@ export type AdminListingRow = {
   updatedAtIso: string;
 };
 
-export function AdminListingsTable({ listings }: { listings: AdminListingRow[] }) {
+export function AdminListingsTable({
+  listings,
+  referenceTimeIso,
+}: {
+  listings: AdminListingRow[];
+  referenceTimeIso: string;
+}) {
   const [isPending, startTransition] = useTransition();
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -71,7 +77,7 @@ export function AdminListingsTable({ listings }: { listings: AdminListingRow[] }
 
   const filteredListings = useMemo(() => {
     const trimmedQuery = searchQuery.trim().toLowerCase();
-    const now = Date.now();
+    const referenceTime = new Date(referenceTimeIso).getTime();
     const maxAgeDays = dateFilter ? Number(dateFilter) : null;
 
     return listings.filter((listing) => {
@@ -88,7 +94,7 @@ export function AdminListingsTable({ listings }: { listings: AdminListingRow[] }
 
       if (maxAgeDays) {
         const updatedAt = new Date(listing.updatedAtIso).getTime();
-        const ageDays = (now - updatedAt) / (1000 * 60 * 60 * 24);
+        const ageDays = (referenceTime - updatedAt) / (1000 * 60 * 60 * 24);
         if (Number.isFinite(ageDays) && ageDays > maxAgeDays) return false;
       }
 
@@ -109,7 +115,7 @@ export function AdminListingsTable({ listings }: { listings: AdminListingRow[] }
 
       return true;
     });
-  }, [dateFilter, listings, makeFilter, modelFilter, qualityFilter, searchQuery, sourceFilter, statusFilter, yearFilter]);
+  }, [dateFilter, listings, makeFilter, modelFilter, qualityFilter, referenceTimeIso, searchQuery, sourceFilter, statusFilter, yearFilter]);
 
   const resetFilters = () => {
     setSearchQuery("");

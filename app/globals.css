@@ -2869,7 +2869,7 @@ canvas {
 }
 
 .admin-listing-vehicle-cell {
-  min-width: 230px;
+  min-width: 240px;
 }
 
 .admin-management-table td .admin-listing-identifier {
@@ -2891,6 +2891,33 @@ canvas {
 
 .admin-listing-actions-cell {
   min-width: 188px;
+}
+
+.admin-listing-quality-cell {
+  min-width: 180px;
+}
+
+.admin-shell .admin-listing-money-cell {
+  color: #ffffff;
+  font-weight: 850;
+}
+
+.admin-shell .admin-listing-identifier {
+  max-width: 100%;
+  color: rgba(255, 255, 255, 0.52) !important;
+}
+
+.admin-shell .admin-management-table tr:hover td {
+  background: rgba(255, 255, 255, 0.035) !important;
+}
+
+.admin-shell .admin-row-actions {
+  align-items: stretch;
+}
+
+.admin-shell .admin-row-actions .admin-secondary-button,
+.admin-shell .admin-row-actions .admin-danger-button {
+  min-width: 88px;
 }
 
 .admin-management-table a {
@@ -5301,6 +5328,11 @@ canvas {
     box-shadow: var(--shadow-subtle);
   }
 
+  .admin-shell .admin-management-table tr {
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(16, 16, 18, 0.76);
+  }
+
   .admin-management-table td {
     display: grid;
     grid-template-columns: minmax(104px, 0.42fr) minmax(0, 1fr);
@@ -5316,6 +5348,15 @@ canvas {
     font-size: 11px;
     font-weight: 800;
     text-transform: uppercase;
+  }
+
+  .admin-shell .admin-management-table td::before {
+    color: rgba(255, 255, 255, 0.52);
+  }
+
+  .admin-management-table .admin-row-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .admin-management-empty {
