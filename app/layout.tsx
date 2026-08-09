@@ -20,6 +20,7 @@ export default async function RootLayout({
     : null;
   const userLabel = navUser?.username || navUser?.name || navUser?.email || "Profile";
   const profileHref = isAdmin ? "/admin" : navUser?.username ? `/garage/${navUser.username}` : "/garage";
+  const garageHref = navUser?.username ? `/garage/${navUser.username}` : "/garage";
   const trackersHref = !isAdmin && navUser?.username ? `/garage/${navUser.username}/trackers` : null;
   const profileImageUrl = isAdmin ? null : navUser?.image || session?.user?.image || null;
 
@@ -32,6 +33,7 @@ export default async function RootLayout({
             isAdmin={isAdmin}
             userLabel={userLabel}
             profileHref={profileHref}
+            garageHref={garageHref}
             trackersHref={trackersHref}
             profileImageUrl={profileImageUrl}
           />

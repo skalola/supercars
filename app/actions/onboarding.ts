@@ -4,6 +4,8 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 
+const USERNAME_RE = /^[a-z0-9_-]+$/;
+
 export async function updateUsername(formData: FormData): Promise<void> {
   const username = formData.get("username")?.toString()?.trim().toLowerCase();
   const session = await auth();
@@ -12,7 +14,7 @@ export async function updateUsername(formData: FormData): Promise<void> {
     redirect("/login");
   }
 
-  if (username.length < 3) {
+  if (username.length < 3 || !USERNAME_RE.test(username)) {
     return;
   }
 

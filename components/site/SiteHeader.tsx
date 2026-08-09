@@ -10,6 +10,7 @@ type SiteHeaderProps = {
   isAdmin: boolean;
   userLabel: string;
   profileHref: string;
+  garageHref: string;
   trackersHref?: string | null;
   profileImageUrl?: string | null;
 };
@@ -22,7 +23,7 @@ const leftNavLinks = [
 
 const rightNavLinks: typeof leftNavLinks = [];
 
-export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, trackersHref, profileImageUrl }: SiteHeaderProps) {
+export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garageHref, trackersHref, profileImageUrl }: SiteHeaderProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement | null>(null);
@@ -132,7 +133,7 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, tracke
               <Link href={profileHref} className="site-account-link" role="menuitem" onClick={closeMenus}>
                 {isAdmin ? "Admin Portal" : "Profile"}
               </Link>
-              <Link href="/garage" className="site-account-link" role="menuitem" onClick={closeMenus}>
+              <Link href={garageHref} className="site-account-link" role="menuitem" onClick={closeMenus}>
                 My Garage
               </Link>
               <ClaimVinButton label="Claim Car" isSignedIn={isSignedIn} variant="menu" onOpen={closeMenus} />
