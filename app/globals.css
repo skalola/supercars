@@ -3783,50 +3783,59 @@ canvas {
   text-transform: uppercase;
 }
 
-.meets-page-shell {
-  display: grid;
-  gap: 28px;
+.meets-page-shell,
+.meet-detail-shell {
   min-height: calc(100vh - 82px);
-  padding: clamp(28px, 4vw, 56px) clamp(18px, 5vw, 72px) 64px;
   background:
-    radial-gradient(circle at 76% 10%, rgba(226, 15, 27, 0.16), transparent 30%),
-    linear-gradient(180deg, #090909 0%, #050505 100%);
+    radial-gradient(circle at 72% 26%, rgba(226, 15, 27, 0.18), transparent 30%),
+    linear-gradient(180deg, #050608 0%, #020203 100%);
   color: #ffffff;
 }
 
-.meets-hero,
-.meets-content-grid {
-  width: min(1360px, 100%);
-  margin: 0 auto;
+.meets-page-shell {
+  padding: 0 clamp(16px, 3vw, 34px) 48px;
 }
 
-.meets-hero {
+.meets-map-stage {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.34fr);
-  align-items: end;
-  gap: 28px;
-  min-height: clamp(420px, 54vh, 620px);
-  padding: clamp(28px, 5vw, 58px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  background:
-    linear-gradient(90deg, rgba(0, 0, 0, 0.84), rgba(0, 0, 0, 0.24)),
-    url("/images/garage-home-hero.png?v=garage-2") center / cover;
+  grid-template-columns: minmax(0, 1fr) minmax(330px, 390px);
+  gap: 22px;
+  width: min(1680px, 100%);
+  min-height: calc(100vh - 82px);
+  margin: 0 auto;
+  padding: clamp(24px, 4vw, 46px) 0 0;
 }
 
-.meets-eyebrow,
-.meets-panel-heading span,
-.meets-format-card span,
-.meets-readiness-card span {
-  color: rgba(255, 255, 255, 0.62);
+.meets-map-copy {
+  position: absolute;
+  top: clamp(28px, 5vw, 60px);
+  left: clamp(18px, 3vw, 42px);
+  z-index: 3;
+  width: min(480px, calc(100% - 36px));
+}
+
+.meets-map-copy span,
+.meets-panel-title span,
+.meet-detail-hero-copy span,
+.meet-status-card span,
+.meet-info-grid span {
+  color: rgba(255, 255, 255, 0.58);
   font-size: 11px;
   font-weight: 850;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
-.meets-hero h1 {
-  max-width: 880px;
+.meets-map-copy h1 {
+  margin: 8px 0 0;
+  color: #ffffff;
+  font-size: clamp(34px, 4vw, 54px);
+  font-weight: 560;
+  line-height: 0.98;
+}
+
+.meet-detail-hero h1 {
   margin: 8px 0 0;
   color: #ffffff;
   font-size: clamp(42px, 6vw, 82px);
@@ -3834,31 +3843,221 @@ canvas {
   line-height: 0.98;
 }
 
-.meets-hero p,
-.meets-panel p,
-.meets-format-card p,
-.meets-readiness-card p {
-  max-width: 680px;
+.meets-map-copy p,
+.meets-host-panel p,
+.meet-detail-hero p,
+.meet-info-panel p,
+.meet-rsvp-panel p {
+  max-width: 620px;
   margin: 14px 0 0;
   color: rgba(255, 255, 255, 0.66);
   font-size: 15px;
   line-height: 1.65;
 }
 
-.meets-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 28px;
+.meets-map-copy p {
+  max-width: 420px;
 }
 
+.meets-map-panel {
+  position: relative;
+  min-height: min(820px, calc(100vh - 128px));
+  overflow: hidden;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    radial-gradient(circle at 58% 54%, rgba(255, 255, 255, 0.12), transparent 2px),
+    radial-gradient(circle at 72% 48%, rgba(226, 15, 27, 0.24), transparent 24%),
+    #050608;
+  background-size: 42px 42px, 42px 42px, 18px 18px, auto, auto;
+}
+
+.meets-map-panel::after {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  background:
+    linear-gradient(90deg, rgba(2, 2, 3, 0.36), transparent 26%, rgba(2, 2, 3, 0.18)),
+    linear-gradient(180deg, rgba(2, 2, 3, 0.05), rgba(2, 2, 3, 0.44));
+}
+
+.meets-map-svg {
+  position: absolute;
+  inset: 12% 3% 3%;
+  width: 94%;
+  height: 84%;
+  opacity: 0.92;
+  filter: drop-shadow(0 0 26px rgba(255, 255, 255, 0.08));
+}
+
+.meets-map-pin {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  gap: 7px;
+  justify-items: center;
+  transform: translate(-50%, -50%);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 850;
+  text-decoration: none;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
+}
+
+.meets-map-pin span {
+  position: relative;
+  display: block;
+  width: 26px;
+  height: 26px;
+  border: 3px solid #ffffff;
+  border-radius: 999px 999px 999px 0;
+  background: #e20f1b;
+  box-shadow: 0 0 0 9px rgba(226, 15, 27, 0.18), 0 0 28px rgba(226, 15, 27, 0.82);
+  transform: rotate(-45deg);
+}
+
+.meets-map-pin span::after {
+  position: absolute;
+  inset: 6px;
+  border-radius: 999px;
+  background: #ffffff;
+  content: "";
+}
+
+.meets-map-pin.is-white span {
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.12), 0 0 24px rgba(255, 255, 255, 0.44);
+}
+
+.meets-map-pin:hover span {
+  box-shadow: 0 0 0 12px rgba(226, 15, 27, 0.22), 0 0 36px rgba(226, 15, 27, 1);
+}
+
+.meets-filter-strip {
+  position: absolute;
+  bottom: 28px;
+  left: 22px;
+  z-index: 4;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.meets-filter-strip a {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 18px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(12, 14, 16, 0.84);
+  color: rgba(255, 255, 255, 0.84);
+  text-decoration: none;
+  backdrop-filter: blur(18px);
+}
+
+.meets-filter-strip a span {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.meets-filter-strip a.is-active {
+  border-color: #e20f1b;
+  color: #ffffff;
+  box-shadow: inset 0 -2px 0 #e20f1b;
+}
+
+.meets-filter-strip a.is-active span {
+  background: #e20f1b;
+}
+
+.meets-selected-card,
+.meets-upcoming-panel,
+.meets-host-panel,
+.meet-status-card,
+.meet-info-panel,
+.meet-rsvp-panel,
+.meet-cars-panel {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(10, 12, 14, 0.86);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(20px);
+}
+
+.meets-selected-card {
+  position: absolute;
+  right: 28%;
+  bottom: 23%;
+  z-index: 4;
+  width: min(330px, 48%);
+  overflow: hidden;
+}
+
+.meets-selected-image,
+.meets-upcoming-image,
+.meet-car-image {
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.38)),
+    url("/images/garage-home-hero.png?v=garage-2") center / cover;
+}
+
+.meets-selected-image {
+  height: 116px;
+}
+
+.meets-selected-card > div:last-child {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+}
+
+.meets-selected-card span,
+.meets-upcoming-card span {
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 12px;
+}
+
+.meets-selected-card h2 {
+  margin: 0;
+  color: #ffffff;
+  font-size: 20px;
+}
+
+.meets-selected-card p,
+.meets-upcoming-card p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 13px;
+}
+
+.meets-selected-card strong,
+.meets-upcoming-card p {
+  color: #ff4a53;
+}
+
+.meets-selected-actions,
+.meet-detail-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.meets-selected-actions a,
 .meets-primary-button,
-.meets-secondary-button {
+.meets-secondary-button,
+.meets-host-button,
+.meets-host-panel a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 48px;
-  padding: 0 20px;
+  min-height: 44px;
   border-radius: 6px;
   color: #ffffff;
   font-size: 13px;
@@ -3867,107 +4066,256 @@ canvas {
   text-transform: uppercase;
 }
 
-.meets-primary-button {
-  border: 1px solid #e20f1b;
-  background: #e20f1b;
-}
-
+.meets-selected-actions a,
 .meets-secondary-button {
-  border: 1px solid rgba(255, 255, 255, 0.36);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.meets-readiness-card,
-.meets-panel,
-.meets-format-card {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
   background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(18px);
 }
 
-.meets-readiness-card {
+.meets-selected-actions a.is-primary,
+.meets-primary-button,
+.meets-host-button,
+.meets-host-panel a {
+  border: 1px solid #e20f1b;
+  background: linear-gradient(180deg, #f0222d, #b90913);
+}
+
+.meets-upcoming-panel {
+  position: sticky;
+  top: 100px;
   display: grid;
-  gap: 8px;
-  padding: 20px;
+  align-content: start;
+  gap: 16px;
+  height: fit-content;
+  max-height: calc(100vh - 124px);
+  padding: 18px;
 }
 
-.meets-readiness-card strong {
+.meets-panel-title {
+  display: grid;
+  gap: 6px;
+}
+
+.meets-panel-title strong {
   color: #ffffff;
-  font-size: 30px;
+  font-size: 24px;
+}
+
+.meets-upcoming-list {
+  display: grid;
+  gap: 10px;
+  overflow: auto;
+}
+
+.meets-upcoming-card {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.meets-upcoming-card:hover {
+  border-color: rgba(226, 15, 27, 0.64);
+  background: rgba(226, 15, 27, 0.1);
+}
+
+.meets-upcoming-image {
+  width: 92px;
+  aspect-ratio: 1.15;
+  border-radius: 5px;
+}
+
+.meets-upcoming-card div:last-of-type {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.meets-upcoming-card strong {
+  color: #ffffff;
+  font-size: 15px;
+}
+
+.meets-upcoming-card em {
+  color: rgba(255, 255, 255, 0.74);
+  font-style: normal;
+  font-size: 24px;
+}
+
+.meets-host-button {
+  gap: 12px;
+}
+
+.meets-host-button span {
+  font-size: 24px;
   line-height: 1;
 }
 
-.meets-content-grid {
+.meets-host-panel {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
+  width: min(1680px, 100%);
+  margin: 22px auto 0;
+  padding: 22px;
 }
 
-.meets-panel {
+.meet-detail-shell {
+  display: grid;
+  gap: 22px;
+  padding: clamp(24px, 4vw, 52px) clamp(18px, 5vw, 72px) 64px;
+}
+
+.meet-detail-hero,
+.meet-detail-layout {
+  width: min(1500px, 100%);
+  margin: 0 auto;
+}
+
+.meet-detail-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(270px, 0.32fr);
+  align-items: end;
+  gap: 24px;
+  min-height: clamp(420px, 52vh, 620px);
+  padding: clamp(28px, 5vw, 58px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.24)),
+    url("/images/garage-home-hero.png?v=garage-2") center / cover;
+}
+
+.meet-back-link {
+  display: inline-flex;
+  margin-bottom: 28px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 850;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.meet-status-card {
+  display: grid;
+  gap: 9px;
+  padding: 20px;
+}
+
+.meet-status-card strong {
+  color: #ffffff;
+  font-size: 26px;
+  line-height: 1.08;
+}
+
+.meet-status-card p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.66);
+}
+
+.meet-detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.55fr);
+  gap: 16px;
+}
+
+.meet-info-panel,
+.meet-rsvp-panel,
+.meet-cars-panel {
   display: grid;
   gap: 18px;
   padding: 20px;
 }
 
-.meets-panel.wide {
-  grid-column: 1 / -1;
+.meet-info-panel {
+  grid-row: span 2;
 }
 
-.meets-panel-heading {
-  display: grid;
-  gap: 6px;
+.meet-location-map {
+  position: relative;
+  min-height: 300px;
+  overflow: hidden;
+  border-radius: 8px;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.032) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.032) 1px, transparent 1px),
+    radial-gradient(circle at 64% 55%, rgba(226, 15, 27, 0.28), transparent 22%),
+    #07090c;
+  background-size: 36px 36px, 36px 36px, auto, auto;
 }
 
-.meets-panel-heading strong {
-  color: #ffffff;
-  font-size: 22px;
-  font-weight: 720;
+.meet-location-map span {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border: 3px solid #ffffff;
+  border-radius: 999px 999px 999px 0;
+  background: #e20f1b;
+  box-shadow: 0 0 0 14px rgba(226, 15, 27, 0.18), 0 0 42px rgba(226, 15, 27, 0.76);
+  transform: translate(-50%, -50%) rotate(-45deg);
 }
 
-.meets-format-grid {
+.meet-info-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 
-.meets-format-card {
+.meet-info-grid div {
   display: grid;
-  align-content: end;
-  min-height: 230px;
-  padding: 18px;
+  gap: 7px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
 }
 
-.meets-format-card h2 {
-  margin: 10px 0 0;
+.meet-info-grid strong {
   color: #ffffff;
-  font-size: 24px;
-  font-weight: 720;
+  font-size: 15px;
 }
 
-.meets-checklist {
+.meet-car-grid {
   display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
-.meets-checklist div {
+.meet-car-card {
   display: grid;
-  grid-template-columns: 12px minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  text-decoration: none;
 }
 
-.meets-checklist span {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #e20f1b;
+.meet-car-image {
+  min-height: 130px;
 }
 
-.meets-checklist p {
-  margin: 0;
-  color: rgba(255, 255, 255, 0.72);
+.meet-car-card div:last-child {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+}
+
+.meet-car-card span {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 12px;
+}
+
+.meet-car-card strong {
+  color: #ffffff;
   font-size: 14px;
+  line-height: 1.2;
 }
 
 .vehicle-photo-gallery {
@@ -4857,18 +5205,57 @@ canvas {
     position: static;
   }
 
-  .meets-page-shell {
-    padding: 24px 18px 52px;
-  }
-
-  .meets-hero,
-  .meets-content-grid,
-  .meets-format-grid {
+  .meets-map-stage,
+  .meet-detail-hero,
+  .meet-detail-layout {
     grid-template-columns: 1fr;
   }
 
-  .meets-hero {
+  .meets-page-shell {
+    padding: 0 18px 52px;
+  }
+
+  .meets-map-stage {
+    min-height: auto;
+    padding-top: 24px;
+  }
+
+  .meets-map-copy {
+    position: static;
+    width: 100%;
+    padding: 8px 0 14px;
+  }
+
+  .meets-map-panel {
     min-height: 520px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+  }
+
+  .meets-upcoming-panel {
+    position: static;
+    max-height: none;
+  }
+
+  .meets-selected-card {
+    right: 18px;
+    bottom: 94px;
+    width: min(340px, calc(100% - 36px));
+  }
+
+  .meets-filter-strip {
+    position: static;
+    order: 3;
+    padding-top: 12px;
+  }
+
+  .meet-info-panel {
+    grid-row: auto;
+  }
+
+  .meet-info-grid,
+  .meet-car-grid {
+    grid-template-columns: 1fr;
   }
 
   .admin-marketing-shell {
@@ -5120,17 +5507,32 @@ canvas {
     flex-direction: column;
   }
 
-  .meets-hero {
-    padding: 24px;
-  }
-
-  .meets-hero h1 {
+  .meets-map-copy h1,
+  .meet-detail-hero h1 {
     font-size: clamp(38px, 12vw, 58px);
   }
 
-  .meets-actions {
+  .meet-detail-hero {
+    min-height: 520px;
+    padding: 24px;
+  }
+
+  .meet-detail-actions,
+  .meets-selected-actions {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .meets-map-pin em {
+    display: none;
+  }
+
+  .meets-upcoming-card {
+    grid-template-columns: 78px minmax(0, 1fr) auto;
+  }
+
+  .meets-upcoming-image {
+    width: 78px;
   }
 
   .site-header {
