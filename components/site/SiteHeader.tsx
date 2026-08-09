@@ -67,7 +67,7 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, tracke
   return (
     <header className="site-header">
       <Link href="/" className="site-brand" aria-label="SUPERCAR DASH home" onClick={closeMenus}>
-        <img src="/images/supercar-dash-wordmark.png" alt="" aria-hidden="true" />
+        <img src="/images/supercar-dash-wordmark.svg" alt="" aria-hidden="true" />
       </Link>
 
       <div className="site-mobile-menu">

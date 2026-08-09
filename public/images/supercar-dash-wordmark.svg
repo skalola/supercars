@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 78" role="img" aria-labelledby="title">
+  <title>SUPERCAR DASH</title>
+  <defs>
+    <style>
+      .super {
+        fill: #f7f7f7;
+        font-family: "DIN Alternate", "Avenir Next Condensed", "Helvetica Neue Condensed Black", "Arial Narrow", Arial, sans-serif;
+        font-size: 35px;
+        font-style: italic;
+        font-weight: 900;
+        letter-spacing: 10px;
+        text-transform: uppercase;
+        transform: skewX(-13deg);
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+
+      .dash {
+        fill: #e20f1b;
+        font-family: "DIN Alternate", "Avenir Next Condensed", "Helvetica Neue Condensed Black", "Arial Narrow", Arial, sans-serif;
+        font-size: 21px;
+        font-style: italic;
+        font-weight: 900;
+        letter-spacing: 13px;
+        text-transform: uppercase;
+        transform: skewX(-13deg);
+        transform-box: fill-box;
+        transform-origin: center;
+      }
+    </style>
+  </defs>
+  <text class="super" x="180" y="33" text-anchor="middle" textLength="304" lengthAdjust="spacingAndGlyphs">SUPERCAR</text>
+  <text class="dash" x="180" y="61" text-anchor="middle" textLength="128" lengthAdjust="spacingAndGlyphs">DASH</text>
+</svg>
