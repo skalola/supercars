@@ -379,6 +379,7 @@ function isGenericModelToken(token: string) {
     "coupe",
     "sedan",
     "roadster",
+    "spyder",
   ].includes(token);
 }
 
