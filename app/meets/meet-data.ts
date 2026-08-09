@@ -20,6 +20,8 @@ export type MeetEvent = {
   locationDetail: string;
   description: string;
   allowedMakes: string[];
+  latitude: number | null;
+  longitude: number | null;
   mapX: number;
   mapY: number;
   accent: "red" | "white";
@@ -40,6 +42,29 @@ export type MeetEvent = {
     vehicleHref: string | null;
     createdAt: string;
   }>;
+};
+
+const cityCoordinates: Record<string, { latitude: number; longitude: number }> = {
+  "charlotte, nc": { latitude: 35.2271, longitude: -80.8431 },
+  "miami, fl": { latitude: 25.7617, longitude: -80.1918 },
+  "los angeles, ca": { latitude: 34.0522, longitude: -118.2437 },
+  "atlanta, ga": { latitude: 33.749, longitude: -84.388 },
+  "chicago, il": { latitude: 41.8781, longitude: -87.6298 },
+  "seattle, wa": { latitude: 47.6062, longitude: -122.3321 },
+};
+
+const stateCoordinates: Record<string, { latitude: number; longitude: number }> = {
+  AZ: { latitude: 34.0489, longitude: -111.0937 },
+  CA: { latitude: 36.7783, longitude: -119.4179 },
+  CO: { latitude: 39.5501, longitude: -105.7821 },
+  FL: { latitude: 27.6648, longitude: -81.5158 },
+  GA: { latitude: 32.1656, longitude: -82.9001 },
+  IL: { latitude: 40.6331, longitude: -89.3985 },
+  MI: { latitude: 44.3148, longitude: -85.6024 },
+  NC: { latitude: 35.7596, longitude: -79.0193 },
+  NY: { latitude: 43.2994, longitude: -74.2179 },
+  TX: { latitude: 31.9686, longitude: -99.9018 },
+  WA: { latitude: 47.7511, longitude: -120.7401 },
 };
 
 export const demoMeetEvents: MeetEvent[] = [
@@ -238,6 +263,8 @@ function serializeMeet(row: MeetRow): MeetEvent {
     locationDetail: row.locationDetail || (row.visibility === "INVITE_ONLY" ? "Shared with approved RSVPs" : "Address shared after RSVP"),
     description: row.description || "A SUPERCAR DASH owner meet built around verified garage profiles.",
     allowedMakes,
+    latitude: row.latitude ?? estimateLatitude(row.city, row.state),
+    longitude: row.longitude ?? estimateLongitude(row.city, row.state),
     mapX: row.mapX ?? estimateMapX(row.state),
     mapY: row.mapY ?? estimateMapY(row.state),
     accent: row.status === "FULL" || row.visibility === "INVITE_ONLY" ? "white" : "red",
@@ -268,7 +295,22 @@ function serializeMeet(row: MeetRow): MeetEvent {
   };
 }
 
-function createDemoMeet(input: Omit<MeetEvent, "id" | "capacity" | "hostUserId" | "hostUsername" | "allowedMakes" | "heroImage" | "isDemo" | "cars" | "photos">): MeetEvent {
+function createDemoMeet(
+  input: Omit<
+    MeetEvent,
+    | "id"
+    | "capacity"
+    | "hostUserId"
+    | "hostUsername"
+    | "allowedMakes"
+    | "latitude"
+    | "longitude"
+    | "heroImage"
+    | "isDemo"
+    | "cars"
+    | "photos"
+  >,
+): MeetEvent {
   return {
     ...input,
     id: null,
@@ -276,6 +318,8 @@ function createDemoMeet(input: Omit<MeetEvent, "id" | "capacity" | "hostUserId" 
     hostUserId: null,
     hostUsername: null,
     allowedMakes: ["Ferrari", "Lamborghini", "McLaren"],
+    latitude: estimateLatitude(input.city, input.state),
+    longitude: estimateLongitude(input.city, input.state),
     heroImage: "/images/garage-home-hero.png?v=garage-2",
     isDemo: true,
     cars: [
@@ -327,4 +371,16 @@ function estimateMapY(state: string) {
     WA: 23, CA: 60, AZ: 65, CO: 48, TX: 73, IL: 43, MI: 38, NC: 58, GA: 64, FL: 78, NY: 36,
   };
   return yByState[state.toUpperCase()] ?? 50;
+}
+
+function estimateLatitude(city: string, state: string) {
+  const key = `${city}, ${state}`.toLowerCase();
+  const coordinates = cityCoordinates[key] ?? stateCoordinates[state.toUpperCase()];
+  return coordinates?.latitude ?? null;
+}
+
+function estimateLongitude(city: string, state: string) {
+  const key = `${city}, ${state}`.toLowerCase();
+  const coordinates = cityCoordinates[key] ?? stateCoordinates[state.toUpperCase()];
+  return coordinates?.longitude ?? null;
 }

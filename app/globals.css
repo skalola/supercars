@@ -1269,6 +1269,23 @@ canvas {
   backdrop-filter: blur(18px);
 }
 
+.site-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  background:
+    linear-gradient(180deg, rgba(10, 10, 12, 0.96), rgba(3, 3, 4, 0.98)),
+    radial-gradient(circle at 50% 0%, rgba(226, 15, 27, 0.12), transparent 42%);
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.site-footer a,
+.site-footer div {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.site-footer a:hover {
+  color: #ffffff;
+}
+
 .site-brand {
   display: block;
   grid-column: 2;
@@ -3916,6 +3933,7 @@ canvas {
 .market-stat-grid article {
   display: grid;
   gap: 6px;
+  min-width: 0;
   min-height: 86px;
   padding: 16px;
 }
@@ -3928,9 +3946,12 @@ canvas {
 }
 
 .market-stat-grid strong {
+  min-width: 0;
   color: #ffffff;
-  font-size: clamp(22px, 2vw, 30px);
+  font-size: clamp(20px, 1.7vw, 28px);
   line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -4232,6 +4253,17 @@ canvas {
   background-size: 42px 42px, 42px 42px, 18px 18px, auto, auto;
 }
 
+.meets-map-canvas {
+  position: absolute;
+  inset: 0;
+  transform-origin: var(--meet-focus-x, 50%) var(--meet-focus-y, 50%);
+  transition: transform 520ms ease;
+}
+
+.meets-map-panel.is-focused .meets-map-canvas {
+  transform: scale(1.28);
+}
+
 .meets-map-panel::after {
   position: absolute;
   inset: 0;
@@ -4304,7 +4336,23 @@ canvas {
   gap: 10px;
 }
 
-.meets-filter-strip a {
+.meets-filter-strip label {
+  display: grid;
+  gap: 6px;
+}
+
+.meets-filter-strip label > span {
+  padding-left: 4px;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.meets-filter-strip select,
+.meets-filter-strip button {
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -4314,25 +4362,61 @@ canvas {
   border-radius: 999px;
   background: rgba(12, 14, 16, 0.84);
   color: rgba(255, 255, 255, 0.84);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 850;
   text-decoration: none;
+  text-transform: uppercase;
   backdrop-filter: blur(18px);
 }
 
-.meets-filter-strip a span {
+.meets-filter-strip select {
+  min-width: 176px;
+  appearance: auto;
+}
+
+.meets-filter-strip button span {
   width: 12px;
   height: 12px;
   border-radius: 999px;
   background: currentColor;
 }
 
-.meets-filter-strip a.is-active {
+.meets-filter-strip button.is-active,
+.meets-filter-strip select:focus {
   border-color: #e20f1b;
   color: #ffffff;
   box-shadow: inset 0 -2px 0 #e20f1b;
+  outline: none;
 }
 
-.meets-filter-strip a.is-active span {
+.meets-filter-strip button.is-active span {
   background: #e20f1b;
+}
+
+.meets-map-message,
+.meets-location-status {
+  position: absolute;
+  z-index: 5;
+  left: 22px;
+  max-width: min(360px, calc(100% - 44px));
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.meets-map-message {
+  top: 164px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(8, 9, 10, 0.82);
+}
+
+.meets-location-status {
+  bottom: 88px;
+  margin: 0;
 }
 
 .meets-selected-card,
@@ -5986,11 +6070,13 @@ canvas {
 
   .meets-map-copy {
     position: static;
+    order: 1;
     width: 100%;
     padding: 8px 0 14px;
   }
 
   .meets-map-panel {
+    order: 2;
     min-height: 520px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
@@ -5998,6 +6084,7 @@ canvas {
 
   .meets-upcoming-panel {
     position: static;
+    order: 5;
     max-height: none;
   }
 
@@ -6010,7 +6097,21 @@ canvas {
   .meets-filter-strip {
     position: static;
     order: 3;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
     padding-top: 12px;
+  }
+
+  .meets-filter-strip select,
+  .meets-filter-strip button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .meets-location-status {
+    position: static;
+    order: 4;
+    max-width: none;
   }
 
   .meet-info-panel {

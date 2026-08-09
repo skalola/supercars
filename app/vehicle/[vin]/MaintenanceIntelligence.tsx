@@ -2,7 +2,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { completeMaintenanceItem, createServiceBookingPackage } from "@/app/actions/passport";
@@ -78,12 +78,6 @@ export default function MaintenanceIntelligence({
       .sort((a, b) => a.distanceMiles - b.distanceMiles);
   }, [serviceShops, userCoordinates]);
 
-  useEffect(() => {
-    if (!selectedShop && nearbyServiceShops.length > 0) {
-      setSelectedShop(nearbyServiceShops[0].name);
-    }
-  }, [nearbyServiceShops, selectedShop]);
-
   async function handleSubmitBooking() {
     if (!bookingRule) return;
     try {
@@ -114,10 +108,27 @@ export default function MaintenanceIntelligence({
     setLocationStatus("Checking your location for shops within 100 miles...");
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setUserCoordinates({
+        const coordinates = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
+        };
+        setUserCoordinates({
+          latitude: coordinates.latitude,
+          longitude: coordinates.longitude,
         });
+        const nearestShop = serviceShops
+          .map((shop) => ({
+            ...shop,
+            distanceMiles: calculateDistanceMiles(
+              coordinates.latitude,
+              coordinates.longitude,
+              shop.latitude,
+              shop.longitude,
+            ),
+          }))
+          .filter((shop) => shop.distanceMiles <= 100)
+          .sort((a, b) => a.distanceMiles - b.distanceMiles)[0];
+        setSelectedShop((current) => current || nearestShop?.name || "");
         setLocationStatus("Showing verified shops within 100 miles.");
       },
       () => {
@@ -193,14 +204,14 @@ export default function MaintenanceIntelligence({
 
 
   return (
-    <section style={{
+    <section className="maintenance-intelligence-panel" style={{
       marginTop: "48px",
-      borderTop: "1px solid #e5e7eb",
+      borderTop: "1px solid rgba(255, 255, 255, 0.14)",
       paddingTop: "32px",
       display: "grid",
       gap: "24px"
     }}>
-      <h2 style={{ fontSize: "24px", fontWeight: 700, margin: 0, color: "#111827" }}>
+      <h2 style={{ fontSize: "24px", fontWeight: 700, margin: 0, color: "#ffffff" }}>
         Maintenance Intelligence
       </h2>
 
@@ -220,18 +231,18 @@ export default function MaintenanceIntelligence({
         <div style={{ display: "grid", gap: "24px" }}>
           
           {/* Current Mileage Display */}
-          <div style={{ fontSize: "16px", fontWeight: 600, color: "#4b5563" }}>
-            Current Mileage: <span style={{ color: "#111827", fontWeight: 700 }}>{currentMileage.toLocaleString()} miles</span>
+          <div style={{ fontSize: "16px", fontWeight: 600, color: "rgba(255, 255, 255, 0.72)" }}>
+            Current Mileage: <span style={{ color: "#ffffff", fontWeight: 700 }}>{currentMileage.toLocaleString()} miles</span>
           </div>
 
           {/* Subsection 1: Upcoming Maintenance */}
           <div>
-            <h3 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 16px 0", color: "#374151" }}>
+            <h3 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 16px 0", color: "#ffffff" }}>
               Upcoming Maintenance:
             </h3>
 
             {sortedRules.length === 0 ? (
-              <p style={{ color: "#6b7280", fontStyle: "italic", margin: 0 }}>No maintenance recommendations available for this model.</p>
+              <p style={{ color: "rgba(255, 255, 255, 0.68)", fontStyle: "italic", margin: 0 }}>No maintenance recommendations available for this model.</p>
             ) : (
               <div style={{ display: "grid", gap: "16px" }}>
                 {sortedRules.map((rule) => {
@@ -292,10 +303,10 @@ export default function MaintenanceIntelligence({
 
                   return (
                     <div key={rule.id} style={{
-                      border: "1px solid #e5e7eb",
+                      border: "1px solid rgba(255, 255, 255, 0.14)",
                       borderRadius: "12px",
                       padding: "16px",
-                      backgroundColor: "#ffffff",
+                      backgroundColor: "rgba(10, 12, 14, 0.78)",
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "flex-start",
@@ -305,8 +316,8 @@ export default function MaintenanceIntelligence({
                       <div style={{ display: "grid", gap: "8px", flex: "1 1 300px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                           <span style={{
-                            backgroundColor: "#f3f4f6",
-                            color: "#4b5563",
+                            backgroundColor: "rgba(255, 255, 255, 0.12)",
+                            color: "#ffffff",
                             fontSize: "11px",
                             fontWeight: 600,
                             padding: "2px 6px",
@@ -328,12 +339,12 @@ export default function MaintenanceIntelligence({
                           </span>
                         </div>
                         
-                        <h4 style={{ fontSize: "16px", fontWeight: 700, color: "#111827", margin: 0 }}>
+                        <h4 style={{ fontSize: "16px", fontWeight: 700, color: "#ffffff", margin: 0 }}>
                           {rule.serviceName}
                         </h4>
 
                         <div style={{ display: "grid", gap: "4px" }}>
-                          <div style={{ fontSize: "13px", color: "#4b5563" }}>
+                          <div style={{ fontSize: "13px", color: "#ffffff" }}>
                             Status: <span style={{
                               backgroundColor: statusColor.bg,
                               color: statusColor.text,
@@ -345,19 +356,19 @@ export default function MaintenanceIntelligence({
                             }}>{statusText}</span>
                           </div>
                           
-                          <div style={{ fontSize: "13px", color: "#4b5563" }}>
-                            Due: <span style={{ fontWeight: 600, color: "#111827" }}>{dueText}</span>
+                          <div style={{ fontSize: "13px", color: "#ffffff" }}>
+                            Due: <span style={{ fontWeight: 600, color: "#ffffff" }}>{dueText}</span>
                           </div>
 
                           {hasMileageCalc && (
-                            <div style={{ fontSize: "13px", color: "#4b5563" }}>
-                              Remaining: <span style={{ fontWeight: 600, color: statusText === "Due" ? "#ef4444" : "#111827" }}>{remainingText}</span>
+                            <div style={{ fontSize: "13px", color: "#ffffff" }}>
+                              Remaining: <span style={{ fontWeight: 600, color: statusText === "Due" ? "#ff4a53" : "#ffffff" }}>{remainingText}</span>
                             </div>
                           )}
                         </div>
                         
                         {rule.description && (
-                          <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "#6b7280", lineHeight: 1.4 }}>
+                          <p style={{ margin: "4px 0 0 0", fontSize: "13px", color: "rgba(255, 255, 255, 0.68)", lineHeight: 1.4 }}>
                             {rule.description}
                           </p>
                         )}

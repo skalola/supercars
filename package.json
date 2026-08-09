@@ -49,6 +49,7 @@
     "seed-test-transactions": "tsx --env-file .env scripts/seed-fulfillment-demo.ts",
     "seed-admin-test-inventory": "tsx --env-file .env scripts/seed-admin-test-inventory.ts",
     "seed-mclaren": "tsx --env-file .env scripts/seed-mclaren.ts",
+    "import-gt7-model-catalog": "tsx --env-file .env scripts/import-gt7-model-catalog.ts",
     "migrate:neon:dry": "tsx --env-file .env scripts/migrate-sqlite-to-neon.ts",
     "migrate:neon": "tsx --env-file .env scripts/migrate-sqlite-to-neon.ts --execute",
     "verify:neon": "tsx --env-file .env scripts/verify-neon-migration.ts",

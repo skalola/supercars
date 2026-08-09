@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function SiteFooter() {
   return (
-    <footer className="w-full border-t border-[var(--border-subtle)] mt-12 py-8 bg-[var(--background)]">
+    <footer className="site-footer w-full mt-12 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="text-sm text-[var(--text-muted)]">
           &copy; {new Date().getFullYear()} SUPERCAR DASH. All rights reserved.
