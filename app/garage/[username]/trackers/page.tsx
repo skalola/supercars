@@ -41,11 +41,11 @@ export default async function ProfileTrackersPage({ params }: { params: Promise<
 
   if (!user) {
     return (
-      <main className="page-shell" style={{ maxWidth: 900 }}>
-        <section className="surface-panel">
-          <h1 className="page-title compact">Profile not found</h1>
-          <p style={{ color: "var(--muted)" }}>This profile does not exist.</p>
-          <Link href="/" className="button-primary">
+      <main className="garage-page-shell">
+        <section className="garage-empty-panel">
+          <h1>Profile not found</h1>
+          <p>This profile does not exist.</p>
+          <Link href="/">
             Return home
           </Link>
         </section>
@@ -55,11 +55,11 @@ export default async function ProfileTrackersPage({ params }: { params: Promise<
 
   if (!session?.user || session.user.id !== user.id) {
     return (
-      <main className="page-shell" style={{ maxWidth: 900 }}>
-        <section className="surface-panel">
-          <h1 className="page-title compact">Private Trackers</h1>
-          <p style={{ color: "var(--muted)" }}>Only the profile owner can manage tracker settings.</p>
-          <Link href="/" className="button-primary">
+      <main className="garage-page-shell">
+        <section className="garage-empty-panel">
+          <h1>Private Trackers</h1>
+          <p>Only the profile owner can manage tracker settings.</p>
+          <Link href="/">
             Return home
           </Link>
         </section>
@@ -130,18 +130,34 @@ export default async function ProfileTrackersPage({ params }: { params: Promise<
   ];
 
   return (
-    <main className="page-shell" style={{ maxWidth: 1120 }}>
-      <section className="page-header">
+    <main className="garage-page-shell">
+      <section className="garage-page-header">
         <div>
-          <div className="eyebrow">Profile</div>
-          <h1 className="page-title compact">Trackers</h1>
-          <p style={{ maxWidth: 700, color: "var(--muted)", margin: "10px 0 0", lineHeight: 1.55 }}>
+          <div className="garage-page-eyebrow">Profile automation</div>
+          <h1>Trackers</h1>
+          <p>
             Manage the email signals tied to your saved models and claimed VIN-backed vehicles.
           </p>
         </div>
-        <Link href={`/garage/${username}`} className="button-secondary">
-          Back to Profile
-        </Link>
+        <div className="tracker-header-panel">
+          <div className="garage-page-stats tracker-page-stats" aria-label="Tracker coverage">
+            <article>
+              <span>Saved models</span>
+              <strong>{user.garageItems.length}</strong>
+            </article>
+            <article>
+              <span>Claimed cars</span>
+              <strong>{user.vehicles.length}</strong>
+            </article>
+            <article>
+              <span>Signals</span>
+              <strong>{trackers.filter((tracker) => tracker.enabled).length}</strong>
+            </article>
+          </div>
+          <Link href={`/garage/${username}`} className="garage-secondary-button">
+            Back to Profile
+          </Link>
+        </div>
       </section>
 
       <TrackersClient trackers={trackers} />

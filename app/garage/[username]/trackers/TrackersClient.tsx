@@ -35,15 +35,15 @@ export default function TrackersClient({ trackers }: { trackers: TrackerCard[] }
   }
 
   return (
-    <div style={styles.grid}>
+    <div className="tracker-grid">
       {localTrackers.map((tracker) => {
         const disabled = isPending && pendingId === tracker.id;
         return (
-          <section key={tracker.id} style={styles.card}>
-            <div style={styles.cardTop}>
+          <section key={tracker.id} className="tracker-card">
+            <div className="tracker-card-top">
               <div>
-                <div style={styles.kicker}>{tracker.countLabel}</div>
-                <h2 style={styles.title}>{tracker.label}</h2>
+                <div className="tracker-kicker">{tracker.countLabel}</div>
+                <h2>{tracker.label}</h2>
               </div>
               <Switch
                 checked={tracker.enabled}
@@ -52,10 +52,10 @@ export default function TrackersClient({ trackers }: { trackers: TrackerCard[] }
                 onChange={(checked) => updateTracker(tracker.id, checked)}
               />
             </div>
-            <p style={styles.description}>{tracker.description}</p>
-            <div style={styles.signal}>
-              <span style={styles.signalLabel}>Signal</span>
-              <span style={styles.signalText}>{tracker.signal}</span>
+            <p className="tracker-description">{tracker.description}</p>
+            <div className="tracker-signal">
+              <span>Signal</span>
+              <p>{tracker.signal}</p>
             </div>
           </section>
         );
@@ -76,127 +76,18 @@ function Switch({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label style={{ ...styles.switchWrap, opacity: disabled ? 0.58 : 1 }}>
-      <span style={styles.srOnly}>{label}</span>
+    <label className={`tracker-switch${disabled ? " is-disabled" : ""}`}>
+      <span className="sr-only">{label}</span>
       <input
         type="checkbox"
         checked={checked}
         disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
-        style={styles.input}
+        className="tracker-switch-input"
       />
-      <span style={trackStyle(checked)}>
-        <span style={knobStyle(checked)} />
+      <span className={`tracker-switch-track${checked ? " is-checked" : ""}`}>
+        <span className="tracker-switch-knob" />
       </span>
     </label>
   );
 }
-
-function trackStyle(checked: boolean): React.CSSProperties {
-  return {
-    display: "block",
-    position: "relative",
-    width: 48,
-    height: 28,
-    borderRadius: 999,
-    backgroundColor: checked ? "#111111" : "#dedfda",
-    transition: "background-color 160ms ease",
-  };
-}
-
-function knobStyle(checked: boolean): React.CSSProperties {
-  return {
-    position: "absolute",
-    top: 4,
-    left: checked ? 24 : 4,
-    width: 20,
-    height: 20,
-    borderRadius: "50%",
-    backgroundColor: "#ffffff",
-    boxShadow: "0 1px 2px rgba(16, 24, 40, 0.18)",
-    transition: "left 160ms ease",
-  };
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))",
-    gap: 14,
-  },
-  card: {
-    display: "grid",
-    gap: 18,
-    alignContent: "start",
-    minHeight: 230,
-    padding: 20,
-    border: "1px solid var(--line)",
-    borderRadius: 8,
-    backgroundColor: "var(--surface)",
-    boxShadow: "var(--shadow-subtle)",
-  },
-  cardTop: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: 16,
-    alignItems: "flex-start",
-  },
-  kicker: {
-    color: "var(--muted)",
-    fontSize: 11,
-    fontWeight: 800,
-    textTransform: "uppercase",
-  },
-  title: {
-    margin: "5px 0 0",
-    color: "var(--foreground)",
-    fontSize: 22,
-    lineHeight: 1.12,
-    fontWeight: 820,
-  },
-  description: {
-    margin: 0,
-    color: "var(--muted-strong)",
-    fontSize: 14,
-    lineHeight: 1.55,
-  },
-  signal: {
-    display: "grid",
-    gap: 6,
-    paddingTop: 14,
-    borderTop: "1px solid var(--line)",
-  },
-  signalLabel: {
-    color: "var(--muted)",
-    fontSize: 11,
-    fontWeight: 800,
-    textTransform: "uppercase",
-  },
-  signalText: {
-    color: "var(--foreground)",
-    fontSize: 13,
-    lineHeight: 1.45,
-  },
-  switchWrap: {
-    position: "relative",
-    display: "inline-flex",
-    cursor: "pointer",
-    flexShrink: 0,
-  },
-  input: {
-    position: "absolute",
-    opacity: 0,
-    pointerEvents: "none",
-  },
-  srOnly: {
-    position: "absolute",
-    width: 1,
-    height: 1,
-    padding: 0,
-    margin: -1,
-    overflow: "hidden",
-    clip: "rect(0, 0, 0, 0)",
-    whiteSpace: "nowrap",
-    borderWidth: 0,
-  },
-};
