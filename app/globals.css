@@ -6414,9 +6414,20 @@ canvas {
   }
 
   .meets-map-panel {
+    display: grid;
+    gap: 14px;
     order: 2;
     min-height: 520px;
+    overflow: visible;
+    padding: 14px;
     border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+  }
+
+  .meets-map-canvas {
+    position: relative;
+    min-height: 360px;
+    overflow: hidden;
     border-radius: 8px;
   }
 
@@ -6427,9 +6438,11 @@ canvas {
   }
 
   .meets-selected-card {
-    right: 18px;
-    bottom: 94px;
-    width: min(340px, calc(100% - 36px));
+    position: relative;
+    right: auto;
+    bottom: auto;
+    z-index: 1;
+    width: 100%;
   }
 
   .meets-filter-strip {
