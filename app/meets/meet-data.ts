@@ -31,6 +31,15 @@ export type MeetEvent = {
     ownerHref: string;
     image: string;
   }>;
+  photos: Array<{
+    id: string;
+    url: string;
+    caption: string | null;
+    owner: string;
+    vehicleLabel: string | null;
+    vehicleHref: string | null;
+    createdAt: string;
+  }>;
 };
 
 export const demoMeetEvents: MeetEvent[] = [
@@ -191,6 +200,18 @@ const meetInclude = {
     orderBy: { createdAt: "asc" },
     take: 12,
   },
+  photos: {
+    include: {
+      user: { select: { username: true, name: true } },
+      vehicle: {
+        include: {
+          model: { include: { make: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 24,
+  },
 } satisfies Prisma.MeetInclude;
 
 type MeetRow = Prisma.MeetGetPayload<{ include: typeof meetInclude }>;
@@ -233,10 +254,21 @@ function serializeMeet(row: MeetRow): MeetEvent {
           image: vehicle.photos[0]?.filePath || vehicle.images[0]?.url || vehicle.model.images[0]?.url || "/images/garage-home-hero.png?v=garage-2",
         };
       }),
+    photos: row.photos.map((photo) => ({
+      id: photo.id,
+      url: photo.url,
+      caption: photo.caption,
+      owner: `@${photo.user?.username || photo.user?.name || "member"}`,
+      vehicleLabel: photo.vehicle
+        ? `${photo.vehicle.year} ${photo.vehicle.model.make.name} ${photo.vehicle.model.name}`
+        : null,
+      vehicleHref: photo.vehicle ? `/vehicle/${photo.vehicle.vin}` : null,
+      createdAt: photo.createdAt.toISOString(),
+    })),
   };
 }
 
-function createDemoMeet(input: Omit<MeetEvent, "id" | "capacity" | "hostUserId" | "hostUsername" | "allowedMakes" | "heroImage" | "isDemo" | "cars">): MeetEvent {
+function createDemoMeet(input: Omit<MeetEvent, "id" | "capacity" | "hostUserId" | "hostUsername" | "allowedMakes" | "heroImage" | "isDemo" | "cars" | "photos">): MeetEvent {
   return {
     ...input,
     id: null,
@@ -251,6 +283,7 @@ function createDemoMeet(input: Omit<MeetEvent, "id" | "capacity" | "hostUserId" 
       { name: "Lamborghini Huracan", owner: "@v10club", ownerHref: "/garage", image: "/images/garage-home-hero.png?v=garage-2" },
       { name: "McLaren 720S", owner: "@carbonclub", ownerHref: "/garage", image: "/images/garage-home-hero.png?v=garage-2" },
     ],
+    photos: [],
   };
 }
 

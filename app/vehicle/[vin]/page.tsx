@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @next/next/no-img-element */
 
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import MaintenanceIntelligence from "./MaintenanceIntelligence";
@@ -63,6 +64,40 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
             },
           },
         },
+      },
+      meetRsvps: {
+        where: { status: { in: ["GOING", "MAYBE", "WAITLISTED"] } },
+        include: {
+          meet: {
+            select: {
+              slug: true,
+              title: true,
+              type: true,
+              status: true,
+              startsAt: true,
+              city: true,
+              state: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 6,
+      },
+      meetPhotos: {
+        include: {
+          meet: {
+            select: {
+              slug: true,
+              title: true,
+              status: true,
+              startsAt: true,
+              city: true,
+              state: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 8,
       },
     },
   });
@@ -346,6 +381,25 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
     ? null
     : activeListing?.url || vehicle.listings.find((listing) => !listing.sellerId && listing.url)?.url || null;
   const galleryImages = buildVehicleGalleryImages(vehicle, resolvedHeroImage, activeListing?.imageUrl || null);
+  const meetAppearances = vehicle.meetRsvps
+    .filter((rsvp) => ["PUBLISHED", "FULL", "COMPLETED"].includes(rsvp.meet.status))
+    .map((rsvp) => ({
+      slug: rsvp.meet.slug,
+      title: rsvp.meet.title,
+      detail: `${rsvp.meet.type} · ${rsvp.meet.city}, ${rsvp.meet.state}`,
+      date: new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(rsvp.meet.startsAt),
+      status: rsvp.meet.status === "COMPLETED" ? "Completed" : "Upcoming",
+    }));
+  const meetGalleryPhotos = vehicle.meetPhotos
+    .filter((photo) => ["PUBLISHED", "FULL", "COMPLETED"].includes(photo.meet.status))
+    .map((photo) => ({
+      id: photo.id,
+      url: photo.url,
+      caption: photo.caption,
+      meetHref: `/meets/${photo.meet.slug}`,
+      meetTitle: photo.meet.title,
+      date: new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(photo.meet.startsAt),
+    }));
   const heroStyle = resolvedHeroImage
     ? ({ "--vehicle-passport-hero-image": `url("${resolvedHeroImage}")` } as CSSProperties)
     : undefined;
@@ -844,6 +898,77 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+            </div>
+
+            {/* 3. Meet History */}
+            <div style={{ border: "1px solid #e5e7eb", borderRadius: "12px", backgroundColor: "#ffffff", padding: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+                <span style={{ fontSize: "18px" }}>📍</span>
+                <span style={{ fontWeight: 700, color: "#111827", fontSize: "16px" }}>Meet History</span>
+              </div>
+
+              {meetAppearances.length === 0 && meetGalleryPhotos.length === 0 ? (
+                <span style={{ fontSize: "13px", color: "#9ca3af", fontStyle: "italic" }}>No meet history yet.</span>
+              ) : (
+                <div style={{ display: "grid", gap: "14px" }}>
+                  {meetAppearances.length > 0 ? (
+                    <div style={{ display: "grid", gap: "10px" }}>
+                      {meetAppearances.map((meet) => (
+                        <Link
+                          key={meet.slug}
+                          href={`/meets/${meet.slug}`}
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "minmax(0, 1fr) auto",
+                            gap: "12px",
+                            alignItems: "center",
+                            padding: "12px",
+                            border: "1px solid #f3f4f6",
+                            borderRadius: "8px",
+                            backgroundColor: "#fafafa",
+                            color: "#111827",
+                            textDecoration: "none",
+                          }}
+                        >
+                          <span style={{ display: "grid", gap: "4px", minWidth: 0 }}>
+                            <strong style={{ overflow: "hidden", fontSize: "14px", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{meet.title}</strong>
+                            <span style={{ color: "#6b7280", fontSize: "12px" }}>{meet.detail}</span>
+                          </span>
+                          <span style={{ display: "grid", gap: "4px", textAlign: "right" }}>
+                            <strong style={{ color: meet.status === "Completed" ? "#059669" : "#dc2626", fontSize: "12px", textTransform: "uppercase" }}>{meet.status}</strong>
+                            <span style={{ color: "#6b7280", fontSize: "12px" }}>{meet.date}</span>
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {meetGalleryPhotos.length > 0 ? (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: "10px" }}>
+                      {meetGalleryPhotos.map((photo) => (
+                        <Link
+                          key={photo.id}
+                          href={photo.meetHref}
+                          style={{
+                            overflow: "hidden",
+                            border: "1px solid #f3f4f6",
+                            borderRadius: "8px",
+                            backgroundColor: "#fafafa",
+                            color: "#111827",
+                            textDecoration: "none",
+                          }}
+                        >
+                          <img src={photo.url} alt={photo.caption || photo.meetTitle} style={{ display: "block", width: "100%", aspectRatio: "4 / 3", objectFit: "cover" }} />
+                          <span style={{ display: "grid", gap: "3px", padding: "9px" }}>
+                            <strong style={{ overflow: "hidden", fontSize: "12px", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{photo.meetTitle}</strong>
+                            <span style={{ color: "#6b7280", fontSize: "11px" }}>{photo.date}</span>
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               )}
             </div>

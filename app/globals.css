@@ -4073,7 +4073,8 @@ canvas {
 .meet-status-card,
 .meet-info-panel,
 .meet-rsvp-panel,
-.meet-cars-panel {
+.meet-cars-panel,
+.meet-photos-panel {
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 8px;
   background: rgba(10, 12, 14, 0.86);
@@ -4369,7 +4370,8 @@ canvas {
 
 .meet-info-panel,
 .meet-rsvp-panel,
-.meet-cars-panel {
+.meet-cars-panel,
+.meet-photos-panel {
   display: grid;
   gap: 18px;
   padding: 20px;
@@ -4395,7 +4397,8 @@ canvas {
 }
 
 .meet-host-form label,
-.meet-rsvp-form label {
+.meet-rsvp-form label,
+.meet-photo-form label {
   display: grid;
   gap: 8px;
   min-width: 0;
@@ -4403,6 +4406,7 @@ canvas {
 
 .meet-host-form label span,
 .meet-rsvp-form label span,
+.meet-photo-form label span,
 .meet-make-fieldset legend {
   color: rgba(255, 255, 255, 0.58);
   font-size: 11px;
@@ -4414,7 +4418,9 @@ canvas {
 .meet-host-form input,
 .meet-host-form select,
 .meet-host-form textarea,
-.meet-rsvp-form select {
+.meet-rsvp-form select,
+.meet-photo-form input,
+.meet-photo-form select {
   width: 100%;
   min-height: 46px;
   padding: 0 12px;
@@ -4432,7 +4438,8 @@ canvas {
 }
 
 .meet-host-form option,
-.meet-rsvp-form option {
+.meet-rsvp-form option,
+.meet-photo-form option {
   background: #101010;
   color: #ffffff;
 }
@@ -4588,6 +4595,89 @@ canvas {
   color: #ffffff;
   font-size: 14px;
   line-height: 1.2;
+}
+
+.meet-photos-panel {
+  grid-column: 1 / -1;
+}
+
+.meet-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.meet-photo-card {
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  min-width: 0;
+}
+
+.meet-photo-image {
+  min-height: 190px;
+  background-position: center;
+  background-size: cover;
+}
+
+.meet-photo-card figcaption {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.meet-photo-card span {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 12px;
+}
+
+.meet-photo-card a,
+.meet-photo-card strong {
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 850;
+  line-height: 1.2;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meet-photo-card p,
+.meet-empty-note {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.meet-photo-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.2fr) minmax(180px, 0.8fr) minmax(220px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  padding-top: 4px;
+}
+
+.meet-photo-form button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 18px;
+  border: 1px solid #e20f1b;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #f0222d, #b90913);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 850;
+  text-transform: uppercase;
 }
 
 .vehicle-photo-gallery {
@@ -5532,7 +5622,12 @@ canvas {
   }
 
   .meet-info-grid,
-  .meet-car-grid {
+  .meet-car-grid,
+  .meet-photo-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .meet-photo-form {
     grid-template-columns: 1fr;
   }
 
@@ -5803,7 +5898,8 @@ canvas {
   .meet-detail-actions,
   .meets-selected-actions,
   .meet-host-actions,
-  .meet-rsvp-buttons {
+  .meet-rsvp-buttons,
+  .meet-photo-form {
     display: grid;
     grid-template-columns: 1fr;
   }

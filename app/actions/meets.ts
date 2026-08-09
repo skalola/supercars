@@ -174,6 +174,71 @@ export async function cancelHostedMeetAction(formData: FormData) {
   redirect(`/meets/${meet.slug}`);
 }
 
+export async function addMeetPhotoAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+
+  const userId = session.user.id as string;
+  const meetId = readString(formData, "meetId");
+  const photoUrl = readString(formData, "photoUrl");
+  const caption = readString(formData, "caption");
+  const vehicleId = readString(formData, "vehicleId") || null;
+
+  if (!meetId || !isPublicImageUrl(photoUrl)) {
+    throw new Error("A completed meet and public photo URL are required.");
+  }
+
+  const meet = await prisma.meet.findUnique({
+    where: { id: meetId },
+    select: { id: true, slug: true, hostId: true, status: true },
+  });
+
+  if (!meet || meet.status !== "COMPLETED") {
+    throw new Error("Photos can be added after a meet is completed.");
+  }
+
+  const rsvp = await prisma.meetRsvp.findUnique({
+    where: { meetId_userId: { meetId, userId } },
+    select: { status: true },
+  });
+  const canAddPhoto = meet.hostId === userId || (rsvp && rsvp.status !== "CANCELLED");
+  if (!canAddPhoto) {
+    throw new Error("Only the host or RSVP'd members can add photos to this meet.");
+  }
+
+  let vehicleVin: string | null = null;
+  if (vehicleId) {
+    const vehicle = await prisma.vehicle.findFirst({
+      where: { id: vehicleId, ownerId: userId, status: "CLAIMED" },
+      select: { id: true, vin: true },
+    });
+    if (!vehicle) {
+      throw new Error("Choose one of your claimed cars.");
+    }
+    vehicleVin = vehicle.vin;
+  }
+
+  await prisma.meetPhoto.create({
+    data: {
+      meetId,
+      userId,
+      vehicleId,
+      url: photoUrl,
+      caption: caption || null,
+    },
+  });
+
+  revalidatePath("/meets");
+  revalidatePath(`/meets/${meet.slug}`);
+  revalidatePath("/garage");
+  const username = await getUsername(userId);
+  if (username) revalidatePath(`/garage/${username}`);
+  if (vehicleVin) revalidatePath(`/vehicle/${vehicleVin}`);
+  redirect(`/meets/${meet.slug}#photos`);
+}
+
 function readString(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
 }
@@ -187,6 +252,16 @@ function parseOptionalInt(value: string) {
 function normalizeRsvpStatus(value: string) {
   if (value === "MAYBE" || value === "CANCELLED") return value;
   return "GOING";
+}
+
+function isPublicImageUrl(value: string) {
+  if (!value || value.length > 1200) return false;
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol);
+  } catch {
+    return false;
+  }
 }
 
 async function createUniqueMeetSlug(title: string, city: string, startsAt: Date) {

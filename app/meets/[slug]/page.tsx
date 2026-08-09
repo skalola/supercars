@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
-import { rsvpMeetAction } from "@/app/actions/meets";
+import { addMeetPhotoAction, rsvpMeetAction } from "@/app/actions/meets";
 import { HostCancelMeetForm } from "@/components/meets/HostCancelMeetForm";
 import { prisma } from "@/lib/prisma";
 import { getMeetBySlug } from "../meet-data";
@@ -139,6 +139,62 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
               </Link>
             ))}
           </div>
+        </article>
+
+        <article id="photos" className="meet-photos-panel">
+          <div className="meets-panel-title">
+            <span>Event History</span>
+            <strong>Photo Gallery</strong>
+          </div>
+
+          {meet.photos.length > 0 ? (
+            <div className="meet-photo-grid">
+              {meet.photos.map((photo) => (
+                <figure key={photo.id} className="meet-photo-card">
+                  <div className="meet-photo-image" style={{ backgroundImage: `url("${photo.url}")` }} />
+                  <figcaption>
+                    <span>{photo.owner}</span>
+                    {photo.vehicleHref && photo.vehicleLabel ? (
+                      <Link href={photo.vehicleHref}>{photo.vehicleLabel}</Link>
+                    ) : null}
+                    {photo.caption ? <p>{photo.caption}</p> : null}
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+          ) : (
+            <p className="meet-empty-note">
+              {meet.status === "Completed"
+                ? "No photos have been added yet."
+                : "Photo history opens when the meet is completed."}
+            </p>
+          )}
+
+          {meet.id && session?.user?.id && meet.status === "Completed" ? (
+            <form action={addMeetPhotoAction} className="meet-photo-form">
+              <input type="hidden" name="meetId" value={meet.id} />
+              <label>
+                <span>Photo URL</span>
+                <input type="url" name="photoUrl" placeholder="https://..." required />
+              </label>
+              <label>
+                <span>Vehicle</span>
+                <select name="vehicleId" defaultValue="">
+                  <option value="">No vehicle tag</option>
+                  {garageVehicles.map((vehicle) => (
+                    <option key={vehicle.id} value={vehicle.id}>
+                      {vehicle.year} {vehicle.model.make.name} {vehicle.model.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="meet-photo-caption-field">
+                <span>Caption</span>
+                <input name="caption" maxLength={180} placeholder="Optional event note" />
+              </label>
+              <button type="submit">Add Photo</button>
+            </form>
+          ) : null}
         </article>
       </section>
     </main>
