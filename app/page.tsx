@@ -38,11 +38,6 @@ export default async function HomePage() {
             </div>
           </div>
 
-          <div className="garage-home-vehicle-focus" aria-label="Selected vehicle">
-            <span>{summary.heroVehicleMeta}</span>
-            <strong>{summary.heroVehicleLabel}</strong>
-          </div>
-
           <div className="garage-home-kpis" aria-label="Garage status">
             <KpiCard label={summary.garageValueLabel} value={formatCurrency(summary.garageValue)} detail="Synced from verified cars" icon="$" />
             <KpiCard label={summary.nextServiceLabel} value={summary.nextServiceDetail} detail="Maintenance status" icon="S" />

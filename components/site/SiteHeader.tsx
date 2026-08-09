@@ -14,10 +14,15 @@ type SiteHeaderProps = {
   profileImageUrl?: string | null;
 };
 
-const browseLinks = [
-  { href: "/make/ferrari", label: "Ferrari" },
-  { href: "/make/lamborghini", label: "Lamborghini" },
-  { href: "/make/mclaren", label: "McLaren" },
+const leftNavLinks = [
+  { href: "/garage", label: "Garage" },
+  { href: "/#nearby-meets", label: "Meets" },
+  { href: "/make/ferrari", label: "Explore" },
+];
+
+const rightNavLinks = [
+  { href: "/garage", label: "Passport" },
+  { href: "/inventory", label: "Market" },
 ];
 
 export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, trackersHref, profileImageUrl }: SiteHeaderProps) {
@@ -62,7 +67,8 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, tracke
   return (
     <header className="site-header">
       <Link href="/" className="site-brand" onClick={closeMenus}>
-        SUPERCAR DASH
+        <span>SUPERCAR</span>
+        <strong>DASH</strong>
       </Link>
 
       <div className="site-mobile-menu">
@@ -82,7 +88,7 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, tracke
           aria-label="Mobile navigation"
           aria-hidden={!isMobileOpen}
         >
-          {browseLinks.map((link) => (
+          {[...leftNavLinks, ...rightNavLinks].map((link) => (
             <Link key={link.href} href={link.href} className="site-nav-link" onClick={closeMenus}>
               {link.label}
             </Link>
@@ -91,7 +97,7 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, tracke
       </div>
 
       <nav className="site-nav" aria-label="Primary navigation">
-        {browseLinks.map((link) => (
+        {leftNavLinks.map((link) => (
           <Link key={link.href} href={link.href} className="site-nav-link">
             {link.label}
           </Link>
@@ -99,6 +105,13 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, tracke
       </nav>
 
       <div className="site-actions">
+        <nav className="site-nav site-nav-right" aria-label="Secondary navigation">
+          {rightNavLinks.map((link) => (
+            <Link key={link.href} href={link.href} className="site-nav-link">
+              {link.label}
+            </Link>
+          ))}
+        </nav>
         {isSignedIn ? (
           <div
             ref={accountRef}
