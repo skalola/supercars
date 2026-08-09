@@ -13,6 +13,7 @@ type CliOptions = {
   delayMs: number;
   storeReviewCandidates: boolean;
   missingImagesOnly: boolean;
+  baseModelFallback: boolean;
 };
 
 type IngestStats = {
@@ -23,6 +24,7 @@ type IngestStats = {
   imagesSkippedLowConfidence: number;
   imagesSkippedManualReview: number;
   reviewImagesCreated: number;
+  baseFallbackImagesCreated: number;
   metadataUpdated: number;
   descriptionsSkipped: number;
   rateLimitStops: number;
@@ -38,6 +40,7 @@ async function main() {
     imagesSkippedLowConfidence: 0,
     imagesSkippedManualReview: 0,
     reviewImagesCreated: 0,
+    baseFallbackImagesCreated: 0,
     metadataUpdated: 0,
     descriptionsSkipped: 0,
     rateLimitStops: 0,
@@ -70,6 +73,18 @@ async function main() {
   const models = allModels
     .filter((model) => !options.missingImagesOnly || !hasDisplayableImage(model.images))
     .slice(options.offset, options.offset + options.limit);
+  const fallbackModels = options.baseModelFallback
+    ? await prisma.model.findMany({
+        include: {
+          make: true,
+          images: true,
+        },
+        orderBy: [
+          { make: { name: "asc" } },
+          { name: "asc" },
+        ],
+      })
+    : [];
 
   console.log(`[model-catalog-ingest] Selected ${models.length} model${models.length === 1 ? "" : "s"} from ${allModels.length} eligible row${allModels.length === 1 ? "" : "s"} at offset ${options.offset}.`);
 
@@ -106,6 +121,8 @@ async function main() {
       Boolean(candidate.imageUrl) &&
       candidate.confidence >= options.minConfidence &&
       !candidate.requiresManualReview;
+
+    let imageCreatedForModel = false;
 
     if (!candidate.imageUrl || candidate.confidence < options.minConfidence) {
       stats.imagesSkippedLowConfidence += 1;
@@ -151,8 +168,35 @@ async function main() {
         },
       });
       stats.imagesCreated += 1;
+      imageCreatedForModel = true;
     } else {
       stats.imagesCreated += 1;
+      imageCreatedForModel = true;
+    }
+
+    if (!imageCreatedForModel && options.baseModelFallback && !hasDisplayableImage(model.images)) {
+      const fallback = findBaseModelFallback(model, fallbackModels);
+      if (fallback && !model.images.some((image) => image.url === fallback.image.url)) {
+        if (!options.dryRun) {
+          await prisma.modelImage.create({
+            data: {
+              modelId: model.id,
+              url: fallback.image.url,
+              type: "hero",
+              source: "BASE_MODEL_FALLBACK",
+              sourceName: `Base model fallback from ${fallback.sourceModel.make.name} ${fallback.sourceModel.name}`,
+              sourceUrl: fallback.image.sourceUrl,
+              license: fallback.image.license,
+              attribution: fallback.image.attribution,
+              attributionUrl: fallback.image.attributionUrl,
+              confidence: fallback.confidence,
+              reviewStatus: "APPROVED",
+            },
+          });
+        }
+        stats.baseFallbackImagesCreated += 1;
+        imageCreatedForModel = true;
+      }
     }
 
     if (!options.dryRun) {
@@ -160,7 +204,7 @@ async function main() {
         where: { id: model.id },
         data: {
           metadataStatus: getNextStatus({
-            hasImage: hasAnyImage || approved,
+            hasImage: hasAnyImage || approved || imageCreatedForModel,
             hasDescription: Boolean(model.description),
             hasProductionYears: Boolean(model.years || model.productionStartYear || model.productionEndYear),
             hasSpecs: hasSpecs(model.spec),
@@ -191,6 +235,7 @@ async function main() {
   console.log(`[model-catalog-ingest] Images skipped low confidence/no image: ${stats.imagesSkippedLowConfidence}`);
   console.log(`[model-catalog-ingest] Images skipped manual review: ${stats.imagesSkippedManualReview}`);
   console.log(`[model-catalog-ingest] Review candidate images ${options.dryRun ? "eligible" : "created"}: ${stats.reviewImagesCreated}`);
+  console.log(`[model-catalog-ingest] Base fallback images ${options.dryRun ? "eligible" : "created"}: ${stats.baseFallbackImagesCreated}`);
   console.log(`[model-catalog-ingest] Metadata rows ${options.dryRun ? "eligible" : "updated"}: ${stats.metadataUpdated}`);
   console.log(`[model-catalog-ingest] Descriptions skipped to avoid copying source text verbatim: ${stats.descriptionsSkipped}`);
   console.log(`[model-catalog-ingest] Rate limit stops: ${stats.rateLimitStops}`);
@@ -256,6 +301,105 @@ function hasDisplayableImage(images: Array<{ type: string | null; reviewStatus: 
   return images.some((image) => image.type?.toLowerCase() !== "candidate" && image.reviewStatus !== "NEEDS_REVIEW");
 }
 
+type BaseFallbackModel = {
+  id: string;
+  name: string;
+  make: {
+    name: string;
+  };
+  images: Array<{
+    url: string;
+    type: string | null;
+    sourceUrl: string | null;
+    license: string | null;
+    attribution: string | null;
+    attributionUrl: string | null;
+    reviewStatus: string;
+  }>;
+};
+
+function findBaseModelFallback(target: BaseFallbackModel, models: BaseFallbackModel[]) {
+  const targetBase = canonicalBaseModelName(target.name);
+  if (!targetBase) return null;
+
+  return models
+    .filter((model) => model.id !== target.id && model.make.name === target.make.name)
+    .map((sourceModel) => {
+      const sourceBase = canonicalBaseModelName(sourceModel.name);
+      const confidence = scoreBaseModelFallback(targetBase, sourceBase);
+      const image = sourceModel.images.find((item) => item.reviewStatus !== "NEEDS_REVIEW" && item.type?.toLowerCase() !== "candidate");
+      return image ? { sourceModel, image, confidence } : null;
+    })
+    .filter((item) => item !== null)
+    .filter((item) => item.confidence >= 82)
+    .sort((a, b) => b.confidence - a.confidence)[0] || null;
+}
+
+function scoreBaseModelFallback(targetBase: string, sourceBase: string) {
+  if (!targetBase || !sourceBase) return 0;
+  if (targetBase === sourceBase) return 96;
+
+  const targetTokens = targetBase.split(" ").filter(Boolean);
+  const sourceTokens = sourceBase.split(" ").filter(Boolean);
+  if (sourceTokens.length === 0 || targetTokens.length === 0) return 0;
+
+  const targetDistinctiveTokens = targetTokens.filter((token) => !isGenericModelToken(token));
+  const sourceDistinctiveTokens = sourceTokens.filter((token) => !isGenericModelToken(token));
+  const sharedDistinctiveTokens = sourceDistinctiveTokens.filter((token) => targetDistinctiveTokens.includes(token));
+  if (sharedDistinctiveTokens.length === 0) return 0;
+
+  const sourcePhrase = ` ${sourceBase} `;
+  const targetPhrase = ` ${targetBase} `;
+  if (targetPhrase.includes(sourcePhrase) && sourceBase.length >= 4) return 90;
+  if (sourcePhrase.includes(targetPhrase) && targetBase.length >= 4) return 84;
+
+  const sharedTokens = sourceTokens.filter((token) => targetTokens.includes(token));
+  const sharedRatio = sharedTokens.length / Math.max(sourceTokens.length, targetTokens.length);
+  return sharedTokens.length >= 2 && sharedRatio >= 0.5 ? Math.round(80 + sharedRatio * 10) : 0;
+}
+
+function isGenericModelToken(token: string) {
+  return [
+    "srt",
+    "amg",
+    "m",
+    "r",
+    "rs",
+    "gt",
+    "gts",
+    "gtr",
+    "sti",
+    "wrx",
+    "type",
+    "sport",
+    "sports",
+    "turbo",
+    "hybrid",
+    "coupe",
+    "sedan",
+    "roadster",
+  ].includes(token);
+}
+
+function canonicalBaseModelName(value: string) {
+  const withoutParens = value.replace(/\([^)]*\)/g, " ");
+  const normalized = withoutParens
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/\b(gr\.?\s?[134b]|group\s?[134b]|vgt|vision gran turismo|safety car|pace car|race car|racing car|rally car|drift car|road car|concept|prototype|touring car)\b/g, " ")
+    .replace(/\b(gt500|gt300|gt3|gt4|gte|gtr|gt-r|lm|super gt|dtm|pikes peak|endurance model|sprint model)\b/g, " ")
+    .replace(/\b(type\s?[rs]|v[\s-]?spec|spec|edition|final|limited|premium|performance|sport|sports|allure|line|rs|rz|sz|gsr|mr|evo|evolution)\b/g, " ")
+    .replace(/\b(mark|mk)\s?[ivx]+\b/g, " ")
+    .replace(/\b[0-9]{4}\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return normalized;
+}
+
 function parseOptions(args: string[]): CliOptions {
   const limitArg = args.find((arg) => arg.startsWith("--limit="));
   const offsetArg = args.find((arg) => arg.startsWith("--offset="));
@@ -273,6 +417,7 @@ function parseOptions(args: string[]): CliOptions {
     delayMs: delayArg ? Math.max(0, Number(delayArg.split("=")[1]) || 0) : 1200,
     storeReviewCandidates: args.includes("--store-review-candidates"),
     missingImagesOnly: args.includes("--missing-images-only"),
+    baseModelFallback: args.includes("--base-model-fallback"),
   };
 }
 
