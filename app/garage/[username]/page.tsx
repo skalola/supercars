@@ -1,7 +1,7 @@
 import Link from "next/link";
-import Image from "next/image";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import GarageTabs, { type GarageClaimedVehicle, type GarageSavedVehicle } from "../GarageTabs";
 
 export default async function UserGaragePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
@@ -13,66 +13,135 @@ export default async function UserGaragePage({ params }: { params: Promise<{ use
 
   if (!user) {
     return (
-      <main style={{ maxWidth: 900, margin: "40px auto", padding: 24, fontFamily: "system-ui" }}>
-        <h1>Garage not found</h1>
-        <p>The requested garage does not exist.</p>
-        <Link href="/" style={{ color: "#2563eb" }}>Return home</Link>
+      <main className="garage-page-shell">
+        <section className="garage-empty-panel">
+          <div className="garage-page-eyebrow">Garage</div>
+          <h2>Garage not found</h2>
+          <p>The requested garage does not exist.</p>
+          <Link href="/">Return home</Link>
+        </section>
       </main>
     );
   }
 
-  // Only allow the owner to view the garage for now
   if (!session?.user || session.user.id !== user.id) {
     return (
-      <main style={{ maxWidth: 900, margin: "40px auto", padding: 24, fontFamily: "system-ui" }}>
-        <h1>Private Garage</h1>
-        <p>This garage is private.</p>
-        <Link href="/" style={{ color: "#2563eb" }}>Return home</Link>
+      <main className="garage-page-shell">
+        <section className="garage-empty-panel">
+          <div className="garage-page-eyebrow">Private Garage</div>
+          <h2>This garage is private</h2>
+          <p>Only the owner can view this collection right now.</p>
+          <Link href="/">Return home</Link>
+        </section>
       </main>
     );
   }
 
-  const garageItems = await prisma.garageItem.findMany({
-    where: { userId: user.id },
-    include: {
-      model: {
-        include: {
-          make: true,
-          images: {
-            orderBy: [{ type: "asc" }, { createdAt: "asc" }],
-            take: 1,
+  const [claimedVehicleRows, garageItems] = await Promise.all([
+    prisma.vehicle.findMany({
+      where: {
+        ownerId: user.id,
+        status: "CLAIMED",
+      },
+      include: {
+        model: {
+          include: {
+            make: true,
+            images: {
+              orderBy: [{ type: "asc" }, { createdAt: "asc" }],
+              take: 1,
+            },
+          },
+        },
+        photos: {
+          orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+          take: 1,
+        },
+        images: {
+          orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+          take: 1,
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.garageItem.findMany({
+      where: { userId: user.id },
+      include: {
+        model: {
+          include: {
+            make: true,
+            images: {
+              orderBy: [{ type: "asc" }, { createdAt: "asc" }],
+              take: 1,
+            },
           },
         },
       },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+
+  const claimedModelIds = new Set(claimedVehicleRows.map((vehicle) => vehicle.modelId));
+  const claimedVehicles: GarageClaimedVehicle[] = claimedVehicleRows.map((vehicle) => ({
+    id: vehicle.id,
+    vin: vehicle.vin,
+    year: vehicle.year,
+    status: vehicle.status,
+    mileage: vehicle.mileage,
+    image: vehicle.photos[0]?.filePath || vehicle.images[0]?.url || vehicle.model.images[0]?.url || null,
+    makeName: vehicle.model.make.name,
+    makeSlug: vehicle.model.make.slug,
+    modelName: vehicle.model.name,
+    modelSlug: vehicle.model.slug,
+    trim: vehicle.trim,
+  }));
+
+  const savedVehicles: GarageSavedVehicle[] = garageItems
+    .filter((item) => !claimedModelIds.has(item.modelId))
+    .map((item) => ({
+      id: item.id,
+      image: item.model.images[0]?.url || null,
+      makeName: item.model.make.name,
+      makeSlug: item.model.make.slug,
+      modelName: item.model.name,
+      modelSlug: item.model.slug,
+      years: item.model.years,
+      priceTrackerAlertsEnabled: item.priceTrackerAlertsEnabled,
+      listingTrackerAlertsEnabled: item.listingTrackerAlertsEnabled,
+    }));
+  const totalVehicles = claimedVehicles.length + savedVehicles.length;
 
   return (
-    <main style={{ maxWidth: 900, margin: "40px auto", padding: 24, fontFamily: "system-ui" }}>
-      <h1 style={{ fontSize: 32, marginBottom: 24 }}>{user.username}'s Garage</h1>
-      {garageItems.length === 0 ? (
-        <p style={{ color: "#666" }}>Your saved models will appear here.</p>
-      ) : (
-        <div style={{ display: "grid", gap: 16 }}>
-          {garageItems.map((item) => {
-            const heroImage = item.model.images[0]?.url ?? null;
-            return (
-              <Link key={item.id} href={`/make/${item.model.make.slug}/${item.model.slug}`} style={{ display: "flex", gap: 16, padding: 16, border: "1px solid #e5e7eb", borderRadius: 12, textDecoration: "none", color: "inherit" }}>
-                <div style={{ position: "relative", width: 140, height: 90, borderRadius: 10, overflow: "hidden", background: "#f8fafc" }}>
-                  {heroImage ? (
-                    <Image src={heroImage} alt={`${item.model.make.name} ${item.model.name}`} fill sizes="140px" style={{ objectFit: "cover" }} unoptimized />
-                  ) : null}
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 20 }}>{item.model.name}</div>
-                  <div style={{ color: "#666", marginTop: 4 }}>{item.model.make.name}</div>
-                  <div style={{ color: "#666", marginTop: 4 }}>{item.model.years ?? "Production years unavailable"}</div>
-                </div>
-              </Link>
-            );
-          })}
+    <main className="garage-page-shell">
+      <section className="garage-page-header">
+        <div>
+          <div className="garage-page-eyebrow">Profile Garage</div>
+          <h1>{user.username}&apos;s Garage</h1>
+          <p>Claimed vehicles and saved models are organized as one persistent collection.</p>
         </div>
+        <div className="garage-page-stats" aria-label="Garage summary">
+          <article>
+            <span>Claimed</span>
+            <strong>{claimedVehicles.length}</strong>
+          </article>
+          <article>
+            <span>Saved</span>
+            <strong>{savedVehicles.length}</strong>
+          </article>
+          <article>
+            <span>Total</span>
+            <strong>{totalVehicles}</strong>
+          </article>
+        </div>
+      </section>
+      {totalVehicles === 0 ? (
+        <section className="garage-empty-panel">
+          <h2>No vehicles yet</h2>
+          <p>Your claimed vehicles and saved models will appear here.</p>
+          <Link href="/inventory">Browse Market</Link>
+        </section>
+      ) : (
+        <GarageTabs claimedVehicles={claimedVehicles} savedVehicles={savedVehicles} />
       )}
     </main>
   );

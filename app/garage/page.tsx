@@ -9,17 +9,17 @@ export default async function GaragePage() {
 
   if (!session?.user) {
     return (
-      <main className="page-shell" style={{ maxWidth: 900 }}>
-        <section className="surface-panel">
-          <div className="eyebrow">Garage</div>
-          <h1 className="page-title compact">My Garage</h1>
-          <p className="page-copy">Sign in to create your collection.</p>
-          <div style={{ display: "flex", gap: 12, marginTop: 24, flexWrap: "wrap" }}>
+      <main className="garage-page-shell">
+        <section className="garage-empty-hero">
+          <div className="garage-page-eyebrow">Garage</div>
+          <h1>Build Your Digital Garage</h1>
+          <p>Sign in to claim VIN-backed vehicles, save dream models, and track ownership from one collection view.</p>
+          <div className="garage-empty-actions">
             <form action={async () => {
               "use server";
               await signIn("google", { redirectTo: "/garage" });
             }}>
-              <button type="submit" className="site-button secondary">Login with Google</button>
+              <button type="submit" className="garage-primary-button">Login with Google</button>
             </form>
           </div>
         </section>
@@ -107,18 +107,36 @@ export default async function GaragePage() {
       priceTrackerAlertsEnabled: item.priceTrackerAlertsEnabled,
       listingTrackerAlertsEnabled: item.listingTrackerAlertsEnabled,
     }));
+  const totalVehicles = claimedVehicles.length + savedVehicles.length;
 
   return (
-    <main className="page-shell" style={{ maxWidth: 1120 }}>
-      <section className="page-header">
+    <main className="garage-page-shell">
+      <section className="garage-page-header">
         <div>
-          <div className="eyebrow">Garage</div>
-          <h1 className="page-title compact">My Garage</h1>
+          <div className="garage-page-eyebrow">Garage</div>
+          <h1>My Digital Garage</h1>
+          <p>Claimed vehicles, saved models, tracker settings, and ownership history live here.</p>
+        </div>
+        <div className="garage-page-stats" aria-label="Garage summary">
+          <article>
+            <span>Claimed</span>
+            <strong>{claimedVehicles.length}</strong>
+          </article>
+          <article>
+            <span>Saved</span>
+            <strong>{savedVehicles.length}</strong>
+          </article>
+          <article>
+            <span>Total</span>
+            <strong>{totalVehicles}</strong>
+          </article>
         </div>
       </section>
-      {claimedVehicles.length === 0 && savedVehicles.length === 0 ? (
-        <section className="surface-panel">
-          <p style={{ color: "var(--muted)", margin: 0 }}>Your saved models will appear here.</p>
+      {totalVehicles === 0 ? (
+        <section className="garage-empty-panel">
+          <h2>No vehicles yet</h2>
+          <p>Your claimed vehicles and saved models will appear here.</p>
+          <Link href="/inventory">Browse Market</Link>
         </section>
       ) : (
         <GarageTabs claimedVehicles={claimedVehicles} savedVehicles={savedVehicles} />
