@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { deleteMeetAction, updateMeetStatusAction } from "@/app/actions/admin-meets";
 
 export type AdminMeetRow = {
@@ -10,19 +10,84 @@ export type AdminMeetRow = {
   href: string;
   host: string;
   date: string;
+  startsAtIso: string;
   location: string;
+  city: string;
+  state: string;
   type: string;
   visibility: string;
+  rawStatus: string;
   status: string;
   capacity: number | null;
   rsvpCount: number;
   createdAt: string;
+  createdAtIso: string;
 };
 
-export function AdminMeetsTable({ meets }: { meets: AdminMeetRow[] }) {
+export function AdminMeetsTable({ meets, referenceTimeIso }: { meets: AdminMeetRow[]; referenceTimeIso: string }) {
   const [isPending, startTransition] = useTransition();
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [locationFilter, setLocationFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
+  const [capacityFilter, setCapacityFilter] = useState("");
+
+  const statusOptions = useMemo(
+    () => Array.from(new Set(meets.map((meet) => meet.rawStatus))).sort(),
+    [meets]
+  );
+  const typeOptions = useMemo(
+    () => Array.from(new Set(meets.map((meet) => meet.type))).sort(),
+    [meets]
+  );
+  const locationOptions = useMemo(
+    () => Array.from(new Set(meets.map((meet) => `${meet.city}, ${meet.state}`))).sort(),
+    [meets]
+  );
+
+  const filteredMeets = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const now = new Date(referenceTimeIso).getTime();
+
+    return meets.filter((meet) => {
+      if (statusFilter && meet.rawStatus !== statusFilter) return false;
+      if (typeFilter && meet.type !== typeFilter) return false;
+      if (locationFilter && `${meet.city}, ${meet.state}` !== locationFilter) return false;
+
+      const startsAt = new Date(meet.startsAtIso).getTime();
+      if (dateFilter === "UPCOMING" && startsAt < now) return false;
+      if (dateFilter === "PAST" && startsAt >= now) return false;
+      if (dateFilter === "NEXT_30") {
+        const thirtyDays = 1000 * 60 * 60 * 24 * 30;
+        if (startsAt < now || startsAt > now + thirtyDays) return false;
+      }
+
+      if (capacityFilter === "FULL" && (!meet.capacity || meet.rsvpCount < meet.capacity)) return false;
+      if (capacityFilter === "OPEN" && meet.capacity && meet.rsvpCount >= meet.capacity) return false;
+      if (capacityFilter === "NO_CAPACITY" && meet.capacity) return false;
+
+      if (query) {
+        const haystack = [meet.title, meet.host, meet.location, meet.type, meet.visibility, meet.status]
+          .join(" ")
+          .toLowerCase();
+        if (!haystack.includes(query)) return false;
+      }
+
+      return true;
+    });
+  }, [capacityFilter, dateFilter, locationFilter, meets, referenceTimeIso, searchQuery, statusFilter, typeFilter]);
+
+  const resetFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("");
+    setTypeFilter("");
+    setLocationFilter("");
+    setDateFilter("");
+    setCapacityFilter("");
+  };
 
   const updateStatus = (meet: AdminMeetRow, status: "PUBLISHED" | "HIDDEN" | "CANCELLED" | "COMPLETED") => {
     const confirmed = window.confirm(`Mark "${meet.title}" as ${status.toLowerCase()}?`);
@@ -57,10 +122,76 @@ export function AdminMeetsTable({ meets }: { meets: AdminMeetRow[] }) {
           <p className="eyebrow">Meets</p>
           <h2>Meet Operations</h2>
         </div>
-        <span>{meets.length.toLocaleString()} total</span>
+        <span>
+          {filteredMeets.length.toLocaleString()} shown of {meets.length.toLocaleString()} total
+        </span>
       </div>
 
       {message && <div className={`admin-action-message ${message.type}`}>{message.text}</div>}
+
+      <div className="admin-filter-toolbar admin-meet-filter-toolbar" aria-label="Meet filters">
+        <label>
+          <span>Search</span>
+          <input
+            type="search"
+            placeholder="Meet, host, city, format"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
+        </label>
+        <label>
+          <span>Status</span>
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            <option value="">All Statuses</option>
+            {statusOptions.map((status) => (
+              <option key={status} value={status}>
+                {formatStatus(status)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Format</span>
+          <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+            <option value="">All Formats</option>
+            {typeOptions.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Location</span>
+          <select value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)}>
+            <option value="">All Locations</option>
+            {locationOptions.map((location) => (
+              <option key={location} value={location}>
+                {location}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Date</span>
+          <select value={dateFilter} onChange={(event) => setDateFilter(event.target.value)}>
+            <option value="">All Dates</option>
+            <option value="UPCOMING">Upcoming</option>
+            <option value="NEXT_30">Next 30 Days</option>
+            <option value="PAST">Past</option>
+          </select>
+        </label>
+        <label>
+          <span>Capacity</span>
+          <select value={capacityFilter} onChange={(event) => setCapacityFilter(event.target.value)}>
+            <option value="">All Capacity</option>
+            <option value="OPEN">Open Spots</option>
+            <option value="FULL">Full</option>
+            <option value="NO_CAPACITY">No Limit</option>
+          </select>
+        </label>
+        <button type="button" onClick={resetFilters}>Reset</button>
+      </div>
 
       <div className="mobile-scroll admin-management-table-shell">
         <table className="admin-management-table">
@@ -77,14 +208,14 @@ export function AdminMeetsTable({ meets }: { meets: AdminMeetRow[] }) {
             </tr>
           </thead>
           <tbody>
-            {meets.length === 0 ? (
+            {filteredMeets.length === 0 ? (
               <tr>
                 <td colSpan={8} className="admin-management-empty">
-                  No real meets have been created yet.
+                  No meets match the current filters.
                 </td>
               </tr>
             ) : (
-              meets.map((meet) => {
+              filteredMeets.map((meet) => {
                 const isBusy = isPending && processingId === meet.id;
                 return (
                   <tr key={meet.id}>
@@ -132,4 +263,11 @@ export function AdminMeetsTable({ meets }: { meets: AdminMeetRow[] }) {
       </div>
     </section>
   );
+}
+
+function formatStatus(value: string) {
+  return value
+    .split("_")
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(" ");
 }
