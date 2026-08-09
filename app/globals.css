@@ -1474,6 +1474,12 @@ canvas {
 
 .admin-shell {
   min-height: calc(100vh - 68px);
+  padding-bottom: 64px;
+  background:
+    radial-gradient(circle at 78% 8%, rgba(226, 15, 27, 0.14), transparent 30%),
+    radial-gradient(circle at 8% 0%, rgba(255, 255, 255, 0.07), transparent 26%),
+    linear-gradient(180deg, #090909 0%, #050505 100%);
+  color: #ffffff;
 }
 
 .admin-shell-inner {
@@ -1492,7 +1498,7 @@ canvas {
 
 .admin-shell-title {
   margin: 6px 0 0;
-  color: var(--foreground);
+  color: #ffffff;
   font-size: clamp(30px, 4vw, 52px);
   font-weight: 720;
   line-height: 1;
@@ -1501,7 +1507,7 @@ canvas {
 .admin-shell-copy {
   max-width: 520px;
   margin: 0;
-  color: var(--muted);
+  color: rgba(255, 255, 255, 0.64);
   font-size: 14px;
   line-height: 1.6;
 }
@@ -1511,10 +1517,11 @@ canvas {
   gap: 6px;
   overflow-x: auto;
   padding: 6px;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: var(--shadow-subtle);
+  background: rgba(12, 12, 14, 0.74);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(18px);
   -webkit-overflow-scrolling: touch;
 }
 
@@ -1526,7 +1533,7 @@ canvas {
   padding: 0 14px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  color: var(--muted-strong);
+  color: rgba(255, 255, 255, 0.68);
   font-size: 13px;
   font-weight: 700;
   line-height: 1;
@@ -1542,14 +1549,15 @@ canvas {
 }
 
 .admin-nav-tab:hover {
-  background: var(--surface-soft);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
 }
 
 .admin-nav-tab.is-active {
-  border-color: var(--foreground);
-  background: var(--foreground);
-  color: var(--accent-foreground);
-  box-shadow: 0 1px 2px rgba(17, 17, 17, 0.12);
+  border-color: #e20f1b;
+  background: #e20f1b;
+  color: #ffffff;
+  box-shadow: 0 14px 32px rgba(226, 15, 27, 0.25);
 }
 
 .admin-overview-hero {
@@ -2526,6 +2534,182 @@ canvas {
   color: var(--muted-strong);
   font: 12px/1.55 var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace);
   white-space: pre-wrap;
+}
+
+.admin-shell .page-shell,
+.admin-shell .page-shell.wide {
+  padding-top: clamp(22px, 3vw, 36px);
+}
+
+.admin-shell .eyebrow {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.admin-shell .page-title,
+.admin-shell .admin-overview-hero h2,
+.admin-shell .admin-management-panel-header h2,
+.admin-shell .admin-email-preview-header h2 {
+  color: #ffffff;
+}
+
+.admin-shell .page-copy,
+.admin-shell .admin-overview-hero p:not(.eyebrow),
+.admin-shell .admin-management-panel-header > span,
+.admin-shell .admin-analytics-panel > p,
+.admin-shell .admin-command-card p,
+.admin-shell .admin-placeholder-panel p:not(.eyebrow),
+.admin-shell .admin-toggle-row p,
+.admin-shell .admin-email-preview-toolbar em,
+.admin-shell .admin-email-preview-text pre {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.admin-shell .surface-panel,
+.admin-shell .admin-management-panel,
+.admin-shell .admin-analytics-panel,
+.admin-shell .admin-metric-card,
+.admin-shell .admin-visual-kpi-card,
+.admin-shell .admin-command-card,
+.admin-shell .admin-placeholder-panel,
+.admin-shell .admin-email-preview-panel,
+.admin-shell .admin-toggle-list,
+.admin-shell .admin-sales-kpi-card,
+.admin-shell .admin-segment-card,
+.admin-shell .admin-attention-list div,
+.admin-shell .admin-management-table-shell,
+.admin-shell .admin-table-shell {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  background: rgba(16, 16, 18, 0.76) !important;
+  color: #ffffff !important;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.26) !important;
+  backdrop-filter: blur(18px);
+}
+
+.admin-shell .admin-metric-card span,
+.admin-shell .admin-visual-kpi-card span,
+.admin-shell .admin-sales-kpi-card span,
+.admin-shell .admin-segment-card span,
+.admin-shell .admin-segment-card em,
+.admin-shell .admin-analytics-panel-header span,
+.admin-shell .admin-mini-list span,
+.admin-shell .admin-bar-row span,
+.admin-shell .admin-filter-toolbar label span,
+.admin-shell .admin-toggle-switch,
+.admin-shell .admin-toggle-switch em,
+.admin-shell .admin-email-preview-meta span,
+.admin-shell .admin-email-preview-toolbar span {
+  color: rgba(255, 255, 255, 0.54);
+}
+
+.admin-shell .admin-metric-card strong,
+.admin-shell .admin-visual-kpi-card strong,
+.admin-shell .admin-sales-kpi-card strong,
+.admin-shell .admin-segment-card strong,
+.admin-shell .admin-segment-card p,
+.admin-shell .admin-analytics-panel-header strong,
+.admin-shell .admin-mini-list strong,
+.admin-shell .admin-bar-row strong,
+.admin-shell .admin-kpi-ring span,
+.admin-shell .admin-command-card span,
+.admin-shell .admin-placeholder-panel h2,
+.admin-shell .admin-toggle-row strong,
+.admin-shell .admin-email-preview-meta strong,
+.admin-shell .admin-email-preview-text summary {
+  color: #ffffff;
+}
+
+.admin-shell .admin-metric-card p,
+.admin-shell .admin-visual-kpi-card p,
+.admin-shell .admin-sales-kpi-card p,
+.admin-shell .admin-attention-list p {
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.admin-shell .admin-filter-toolbar,
+.admin-shell .admin-period-tabs,
+.admin-shell .admin-toggle-row.is-selected,
+.admin-shell .admin-email-preview-meta div,
+.admin-shell .admin-email-preview-text,
+.admin-shell .admin-email-preview-toolbar {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 0.055) !important;
+}
+
+.admin-shell .admin-toggle-row,
+.admin-shell .admin-mini-list div,
+.admin-shell .admin-management-table th,
+.admin-shell .admin-management-table td {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.admin-shell .admin-management-table th {
+  background: rgba(255, 255, 255, 0.055) !important;
+  color: rgba(255, 255, 255, 0.54);
+}
+
+.admin-shell .admin-management-table td {
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.admin-shell .admin-management-table td strong,
+.admin-shell .admin-management-table a,
+.admin-shell .admin-management-table .admin-inline-link {
+  color: #ffffff !important;
+}
+
+.admin-shell .admin-management-table td span {
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.admin-shell input,
+.admin-shell select,
+.admin-shell textarea {
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  background: rgba(0, 0, 0, 0.24) !important;
+  color: #ffffff !important;
+}
+
+.admin-shell input::placeholder,
+.admin-shell textarea::placeholder {
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.admin-shell option {
+  background: #111111;
+  color: #ffffff;
+}
+
+.admin-shell .admin-secondary-button,
+.admin-shell .admin-filter-toolbar button {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.admin-shell .admin-secondary-button:hover,
+.admin-shell .admin-filter-toolbar button:hover {
+  border-color: rgba(255, 255, 255, 0.36);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.admin-shell .admin-period-tabs a {
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.admin-shell .admin-period-tabs a.is-active,
+.admin-shell .admin-toggle-switch input:checked + span {
+  border-color: #e20f1b;
+  background: #e20f1b;
+  color: #ffffff;
+}
+
+.admin-shell .admin-kpi-ring::before {
+  background: rgba(0, 0, 0, 0.54);
+}
+
+.admin-shell .admin-bar-row i {
+  background: linear-gradient(90deg, #e20f1b, rgba(255, 255, 255, 0.7));
 }
 
 .inventory-shell {

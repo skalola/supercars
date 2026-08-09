@@ -10,11 +10,11 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       <div className="admin-shell-inner">
         <div className="admin-shell-header">
           <div>
-            <p className="eyebrow">Admin</p>
+            <p className="eyebrow">SUPERCAR DASH Admin</p>
             <h1 className="admin-shell-title">Command Center</h1>
           </div>
           <p className="admin-shell-copy">
-            Manage platform operations, fulfillment, partners, and acquisition workflows from one place.
+            Monitor inventory quality, fulfillment, partners, users, and marketing automation from one place.
           </p>
         </div>
         <AdminNav />
