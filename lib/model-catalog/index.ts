@@ -1,10 +1,12 @@
 import type { ModelCatalogRecord, ModelCatalogSource } from "./types";
+import { commonsCategoryModelCatalogSource } from "./sources/commons-category";
 import { openverseModelCatalogSource } from "./sources/openverse";
 import { wikidataModelCatalogSource } from "./sources/wikidata";
 import { wikipediaModelCatalogSource } from "./sources/wikimedia";
 
 export const modelCatalogSources: ModelCatalogSource[] = [
   wikidataModelCatalogSource,
+  commonsCategoryModelCatalogSource,
   wikipediaModelCatalogSource,
   openverseModelCatalogSource,
 ];
