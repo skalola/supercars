@@ -12,6 +12,7 @@ import VehiclePhotoGallery, { VehicleGalleryImage } from "@/components/market/Ve
 import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
 import { isValidEmail } from "@/lib/fulfillment/partner-registry";
 import { emailMatchesWebsiteDomain } from "@/lib/directory/contact-domain-policy";
+import type { CSSProperties } from "react";
 
 type VehiclePageProps = {
   params: Promise<{ vin: string }>;
@@ -345,57 +346,49 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
     ? null
     : activeListing?.url || vehicle.listings.find((listing) => !listing.sellerId && listing.url)?.url || null;
   const galleryImages = buildVehicleGalleryImages(vehicle, resolvedHeroImage, activeListing?.imageUrl || null);
+  const heroStyle = resolvedHeroImage
+    ? ({ "--vehicle-passport-hero-image": `url("${resolvedHeroImage}")` } as CSSProperties)
+    : undefined;
 
   return (
-    <main className="page-shell" style={{ maxWidth: 900 }}>
-      {/* Upgraded Hero block: Displays Year Make Model, FOR SALE badge, Asking Price, Verified Owner badge */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: 32 }}>
-        <h1 style={{ fontSize: 42, margin: 0 }}>
-          {vehicle.year} {vehicle.model.make.name} {vehicle.model.name}
-        </h1>
-        <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", marginTop: 4 }}>
+    <main className="vehicle-passport-shell">
+      <section className="vehicle-passport-hero" style={heroStyle}>
+        <div className="vehicle-passport-hero-shade" aria-hidden="true" />
+        <div className="vehicle-passport-hero-content">
+          <div>
+            <div className="vehicle-passport-eyebrow">Vehicle Passport</div>
+            <h1>
+              {vehicle.year} {vehicle.model.make.name} {vehicle.model.name}
+            </h1>
+            <p>
+              VIN {vehicle.vin}
+              {vehicle.trim ? ` · ${vehicle.trim}` : ""}
+              {currentMileage !== null && currentMileage !== undefined ? ` · ${currentMileage.toLocaleString()} mi` : ""}
+            </p>
+          </div>
+          <div className="vehicle-passport-chips" aria-label="Vehicle status">
           {isForSale && (
-            <span style={{
-              backgroundColor: "#fef3c7",
-              color: "#d97706",
-              fontSize: "12px",
-              fontWeight: "bold",
-              padding: "4px 8px",
-              borderRadius: "6px",
-              textTransform: "uppercase",
-              border: "1px solid #fcd34d"
-            }}>
+            <span className="vehicle-status-chip sale">
               FOR SALE
             </span>
           )}
           {vehicle.status === "CLAIMED" && (
-            <span style={{
-              backgroundColor: "#dbeafe",
-              color: "#1d4ed8",
-              fontSize: "12px",
-              fontWeight: "bold",
-              padding: "4px 8px",
-              borderRadius: "6px",
-            }}>
-              ✓ Verified Owner
+            <span className="vehicle-status-chip verified">
+              Verified Owner
             </span>
           )}
           {isForSale && askingPrice !== null && (
-            <span style={{
-              fontSize: "20px",
-              fontWeight: 800,
-              color: "#10b981",
-              marginLeft: "8px"
-            }}>
+            <span className="vehicle-status-price">
               ${askingPrice.toLocaleString()}
             </span>
           )}
         </div>
-      </div>
+        </div>
+      </section>
 
       {/* Success Banners */}
       {successParam === "listed" && (
-        <div style={{
+        <div className="vehicle-passport-alert success" style={{
           backgroundColor: "#dcfce7",
           color: "#15803d",
           border: "1px solid #bbf7d0",
@@ -409,7 +402,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
         </div>
       )}
       {successParam === "removed" && (
-        <div style={{
+        <div className="vehicle-passport-alert removed" style={{
           backgroundColor: "#fee2e2",
           color: "#991b1b",
           border: "1px solid #fecaca",
@@ -425,45 +418,22 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
 
       {/* Buyer CTA Block */}
       {!isOwner && isForSale && (
-        <section style={{
-          border: "1px solid #bfdbfe",
-          borderRadius: "16px",
-          padding: "24px",
-          backgroundColor: "#eff6ff",
-          marginBottom: "32px",
-          boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)"
-        }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
+        <section className="vehicle-purchase-panel">
+          <div className="vehicle-purchase-panel-inner">
             <div>
-              <span style={{
-                backgroundColor: "#dbeafe",
-                color: "#1e40af",
-                fontSize: "11px",
-                fontWeight: "bold",
-                padding: "4px 8px",
-                borderRadius: "6px",
-                textTransform: "uppercase"
-              }}>
+              <span className="vehicle-purchase-label">
                 Available For Purchase
               </span>
-              <h3 style={{ fontSize: "20px", fontWeight: 800, color: "#1e3a8a", margin: "8px 0 4px 0" }}>
+              <h3>
                 Interested in acquiring this supercar?
               </h3>
-              <p style={{ fontSize: "14px", color: "#3b82f6", margin: 0 }}>
-                List Price: <strong style={{ color: "#1e3a8a" }}>${askingPrice?.toLocaleString()}</strong>
+              <p>
+                List Price: <strong>${askingPrice?.toLocaleString()}</strong>
               </p>
               {localSeller ? (
                 <a
                   href={localSellerHref}
-                  style={{
-                    display: "inline-block",
-                    marginTop: "6px",
-                    color: "#1d4ed8",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    textDecoration: "underline",
-                    textUnderlineOffset: "3px",
-                  }}
+                  className="vehicle-source-link"
                 >
                   Listed by {localSellerLabel}
                 </a>
@@ -472,21 +442,13 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
                   href={originalListingUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{
-                    display: "inline-block",
-                    marginTop: "6px",
-                    color: "#1d4ed8",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    textDecoration: "underline",
-                    textUnderlineOffset: "3px",
-                  }}
+                  className="vehicle-source-link"
                 >
                   View original listing
                 </a>
               ) : null}
             </div>
-            <div style={{ minWidth: "160px", display: "grid", gap: "8px" }}>
+            <div className="vehicle-purchase-action">
               <PurchaseWizard
                 vin={vehicle.vin}
                 year={vehicle.year}
@@ -512,7 +474,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
       )}
 
       {isOwner && (
-        <section style={{
+        <section className="vehicle-owner-passport-panel" style={{
           border: "1px solid #e5e7eb",
           borderRadius: "16px",
           padding: "24px",
@@ -1038,7 +1000,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
         </section>
       )}
 
-      <div style={{ display: "grid", gap: 32 }}>
+      <div className="vehicle-decode-grid" style={{ display: "grid", gap: 32 }}>
         {sections.map((section) => {
           const visibleFields = section.fields.filter(([, value]) => {
             if (value === null || value === undefined || value === "") return false;
@@ -1049,7 +1011,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
           if (visibleFields.length === 0) return null;
 
           return (
-            <section key={section.title}>
+            <section key={section.title} className="vehicle-decode-card">
               <h2 style={{ fontSize: 20, borderBottom: "1px solid #eee", paddingBottom: 8, marginBottom: 16, color: "#666" }}>
                 {section.title}
               </h2>
@@ -1067,7 +1029,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
       </div>
 
       {/* Market Intelligence Section (visible to everyone) */}
-      <section style={{
+      <section className="vehicle-market-panel" style={{
         border: "1px solid #e5e7eb",
         borderRadius: "8px",
         padding: "24px",
