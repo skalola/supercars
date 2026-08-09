@@ -169,7 +169,7 @@ function GarageRail({
     <div className="garage-home-rail" aria-label="Garage collection">
       <GarageRailGroup title="Owned" vehicles={ownedVehicles} emptyText="Claim your first car" emptyHref="/garage" />
       <GarageRailGroup title="View The Market" vehicles={dreamVehicles} emptyText="Browse live inventory" emptyHref="/inventory" wide carousel />
-      <GarageRailGroup title="Previously Owned" vehicles={previousVehicles} emptyText="Add cars to dream garage" emptyHref="/inventory" />
+      <GarageRailGroup title="Previously Owned" vehicles={previousVehicles} emptyText="Add cars to dream garage" emptyHref="/makes" />
     </div>
   );
 }

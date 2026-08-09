@@ -5900,8 +5900,132 @@ canvas {
   color: #ffffff;
 }
 
+.makes-page-shell {
+  background:
+    radial-gradient(circle at 78% 8%, rgba(226, 15, 27, 0.18), transparent 30%),
+    linear-gradient(180deg, #090909 0%, #050505 100%);
+}
+
+.makes-page-header {
+  align-items: end;
+}
+
 .make-page-stats {
   grid-template-columns: minmax(120px, 1fr);
+}
+
+.makes-region-list {
+  display: grid;
+  gap: 28px;
+  width: min(1360px, 100%);
+  margin: 0 auto;
+}
+
+.makes-region-section {
+  display: grid;
+  gap: 14px;
+}
+
+.makes-region-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.makes-region-heading span {
+  color: #ffffff;
+  font-size: clamp(24px, 3vw, 38px);
+  font-weight: 560;
+  line-height: 1;
+}
+
+.makes-region-heading strong {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.makes-logo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.makes-logo-card {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 10px;
+  min-height: 148px;
+  padding: 18px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.025)),
+    rgba(10, 11, 13, 0.84);
+  color: #ffffff;
+  text-align: center;
+  text-decoration: none;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(18px);
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.makes-logo-card:hover,
+.makes-logo-card:focus-visible {
+  border-color: rgba(226, 15, 27, 0.58);
+  background:
+    linear-gradient(180deg, rgba(226, 15, 27, 0.14), rgba(255, 255, 255, 0.035)),
+    rgba(14, 14, 16, 0.92);
+  transform: translateY(-2px);
+}
+
+.makes-logo-mark {
+  display: grid;
+  place-items: center;
+  width: 74px;
+  height: 50px;
+}
+
+.makes-logo-mark img {
+  max-width: 74px;
+  max-height: 44px;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.42));
+}
+
+.makes-logo-mark > span {
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.makes-logo-name {
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 760;
+  line-height: 1.15;
+}
+
+.makes-logo-card small {
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 11px;
+  font-weight: 820;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .make-model-grid {
@@ -6345,6 +6469,24 @@ canvas {
   .garage-page-stats {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     min-width: 0;
+  }
+
+  .makes-page-header {
+    align-items: start;
+  }
+
+  .makes-region-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .makes-logo-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .makes-logo-card {
+    min-height: 132px;
   }
 
   .garage-meet-columns {

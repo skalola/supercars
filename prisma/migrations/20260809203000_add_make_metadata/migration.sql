@@ -1,0 +1,2 @@
+ALTER TABLE "Make" ADD COLUMN "logoUrl" TEXT;
+ALTER TABLE "Make" ADD COLUMN "region" TEXT;

@@ -11,6 +11,8 @@ model Make {
   id        String   @id @default(uuid())
   name      String   @unique
   slug      String   @unique
+  logoUrl   String?
+  region    String?
   models    Model[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

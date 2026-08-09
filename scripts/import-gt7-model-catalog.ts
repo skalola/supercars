@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { buildMakeLogoUrl, getMakeMetadata } from "@/lib/makes/make-metadata";
 
 const prisma = new PrismaClient();
 
@@ -49,8 +50,8 @@ async function main() {
   for (const row of rows) {
     const make = await prisma.make.upsert({
       where: { slug: slugify(row.make) },
-      update: { name: row.make },
-      create: { name: row.make, slug: slugify(row.make) },
+      update: { name: row.make, ...buildMakeMetadata(row.make) },
+      create: { name: row.make, slug: slugify(row.make), ...buildMakeMetadata(row.make) },
     });
     makesUpserted += 1;
 
@@ -272,6 +273,15 @@ function slugify(value: string) {
     .replace(/&/g, " and ")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function buildMakeMetadata(make: string) {
+  const slug = slugify(make);
+  const metadata = getMakeMetadata(slug);
+  return {
+    region: metadata.region,
+    logoUrl: buildMakeLogoUrl(slug),
+  };
 }
 
 main()
