@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import GarageTabs, { type GarageClaimedVehicle, type GarageSavedVehicle } from "./GarageTabs";
 import { getGarageMeetSummary } from "./garage-meets";
 import { getGarageStats } from "./garage-stats";
+import GarageMeetHistory from "./GarageMeetHistory";
 
 export default async function GaragePage() {
   const session = await auth();
@@ -162,43 +163,7 @@ export default async function GaragePage() {
       ) : (
         <GarageTabs claimedVehicles={claimedVehicles} savedVehicles={savedVehicles} isOwner />
       )}
-      <GarageMeetHistory meetSummary={meetSummary} />
+      <GarageMeetHistory meetSummary={meetSummary} isOwner />
     </main>
-  );
-}
-
-function GarageMeetHistory({ meetSummary }: { meetSummary: Awaited<ReturnType<typeof getGarageMeetSummary>> }) {
-  return (
-    <section className="garage-meet-history" aria-label="Garage meet history">
-      <article>
-        <div>
-          <span>Hosted</span>
-          <Link href="/meets/host">Host a Meet</Link>
-        </div>
-        <GarageMeetList items={meetSummary.hosted} emptyText="Hosted meets will appear here." />
-      </article>
-      <article>
-        <div>
-          <span>Attended</span>
-          <Link href="/meets">Find Meets</Link>
-        </div>
-        <GarageMeetList items={meetSummary.attended} emptyText="RSVP history will appear here." />
-      </article>
-    </section>
-  );
-}
-
-function GarageMeetList({ items, emptyText }: { items: Array<{ title: string; href: string; meta: string; status: string }>; emptyText: string }) {
-  if (items.length === 0) return <p>{emptyText}</p>;
-  return (
-    <div className="garage-meet-list">
-      {items.map((item) => (
-        <Link key={`${item.href}:${item.status}`} href={item.href}>
-          <strong>{item.title}</strong>
-          <span>{item.meta}</span>
-          <em>{item.status}</em>
-        </Link>
-      ))}
-    </div>
   );
 }

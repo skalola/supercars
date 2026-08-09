@@ -631,13 +631,65 @@ canvas {
 
 .garage-meet-history {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   width: min(1360px, 100%);
   margin: 0 auto;
 }
 
-.garage-meet-history article {
+.garage-meet-heading,
+.garage-meet-columns,
+.garage-meet-stat-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.garage-meet-heading {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.garage-meet-heading div {
+  display: grid;
+  gap: 6px;
+}
+
+.garage-meet-heading span {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.garage-meet-heading strong {
+  color: #ffffff;
+  font-size: clamp(24px, 3vw, 36px);
+  font-weight: 560;
+  line-height: 1;
+}
+
+.garage-meet-heading a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 850;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.garage-meet-stat-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.garage-meet-stat-grid article,
+.garage-meet-columns article,
+.garage-meet-photo-strip {
   display: grid;
   gap: 14px;
   min-width: 0;
@@ -648,14 +700,11 @@ canvas {
   backdrop-filter: blur(18px);
 }
 
-.garage-meet-history article > div:first-child {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.garage-meet-stat-grid article {
+  gap: 8px;
 }
 
-.garage-meet-history article > div:first-child span {
+.garage-meet-stat-grid span {
   color: rgba(255, 255, 255, 0.58);
   font-size: 11px;
   font-weight: 850;
@@ -663,7 +712,35 @@ canvas {
   text-transform: uppercase;
 }
 
-.garage-meet-history article > div:first-child a {
+.garage-meet-stat-grid strong {
+  color: #ffffff;
+  font-size: clamp(24px, 3vw, 38px);
+  line-height: 1;
+}
+
+.garage-meet-columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.garage-meet-columns article > div:first-child,
+.garage-meet-photo-strip > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.garage-meet-columns article > div:first-child span,
+.garage-meet-photo-strip > div:first-child span {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.garage-meet-columns article > div:first-child a,
+.garage-meet-photo-strip > div:first-child a {
   color: rgba(255, 255, 255, 0.74);
   font-size: 12px;
   font-weight: 850;
@@ -718,6 +795,45 @@ canvas {
   font-style: normal;
   font-weight: 850;
   text-transform: uppercase;
+}
+
+.garage-meet-photo-strip > div:last-child {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.garage-meet-photo-strip > div:last-child a {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  min-height: 130px;
+  overflow: hidden;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background-position: center;
+  background-size: cover;
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.garage-meet-photo-strip > div:last-child a::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: linear-gradient(180deg, transparent 38%, rgba(0, 0, 0, 0.72));
+}
+
+.garage-meet-photo-strip > div:last-child span {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .garage-empty-hero {
@@ -5650,8 +5766,20 @@ canvas {
     min-width: 0;
   }
 
-  .garage-meet-history {
+  .garage-meet-columns {
     grid-template-columns: 1fr;
+  }
+
+  .garage-meet-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .garage-meet-stat-grid article:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .garage-meet-photo-strip > div:last-child {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .vehicle-passport-shell {
