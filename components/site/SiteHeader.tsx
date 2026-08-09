@@ -89,7 +89,7 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, tracke
           aria-hidden={!isMobileOpen}
         >
           {[...leftNavLinks, ...rightNavLinks].map((link) => (
-            <Link key={link.href} href={link.href} className="site-nav-link" onClick={closeMenus}>
+            <Link key={`${link.label}:${link.href}`} href={link.href} className="site-nav-link" onClick={closeMenus}>
               {link.label}
             </Link>
           ))}
@@ -98,7 +98,7 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, tracke
 
       <nav className="site-nav" aria-label="Primary navigation">
         {leftNavLinks.map((link) => (
-          <Link key={link.href} href={link.href} className="site-nav-link">
+          <Link key={`${link.label}:${link.href}`} href={link.href} className="site-nav-link">
             {link.label}
           </Link>
         ))}
@@ -107,7 +107,7 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, tracke
       <div className="site-actions">
         <nav className="site-nav site-nav-right" aria-label="Secondary navigation">
           {rightNavLinks.map((link) => (
-            <Link key={link.href} href={link.href} className="site-nav-link">
+            <Link key={`${link.label}:${link.href}`} href={link.href} className="site-nav-link">
               {link.label}
             </Link>
           ))}
