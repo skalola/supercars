@@ -21,22 +21,22 @@ export default async function LoginPage() {
   const isAdmin = session?.user?.role === "ADMIN";
 
   return (
-    <main className="page-shell" style={{ maxWidth: 620 }}>
-      <section className="surface-panel">
-        <div className="eyebrow">Account</div>
-        <h1 className="page-title compact">Sign in</h1>
-        <p className="page-copy" style={{ marginBottom: 24 }}>Use one of the supported providers to continue.</p>
+    <main className="garage-page-shell auth-page-shell">
+      <section className="auth-panel">
+        <div className="garage-page-eyebrow">Account access</div>
+        <h1>Sign in</h1>
+        <p>Use your SUPERCAR DASH account to manage garage, transaction, and admin workflows.</p>
         {session?.user && (
-          <div style={{ display: "grid", gap: 10, padding: 12, border: "1px solid #d1fae5", background: "#ecfdf5", borderRadius: 8, marginBottom: 12 }}>
+          <div className="auth-session-card">
             <strong>Signed in as {session.user.email || session.user.name}</strong>
-            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <Link href="/transactions" style={{ color: "#047857", fontWeight: 700 }}>View transactions</Link>
-              {isAdmin && <Link href="/admin/fulfillment" style={{ color: "#047857", fontWeight: 700 }}>Open admin console</Link>}
+            <div>
+              <Link href="/transactions">View transactions</Link>
+              {isAdmin && <Link href="/admin/fulfillment">Open admin console</Link>}
             </div>
           </div>
         )}
-        <div style={{ display: "grid", gap: 12 }}>
-          <form action={credentialSignIn} style={{ display: "grid", gap: 10, padding: 16, border: "1px solid #e5e7eb", borderRadius: 10 }}>
+        <div className="auth-form-stack">
+          <form action={credentialSignIn} className="auth-form">
             <strong>Account login</strong>
             <input
               name="email"
@@ -44,7 +44,6 @@ export default async function LoginPage() {
               placeholder="Email"
               autoComplete="off"
               required
-              style={{ padding: 12, border: "1px solid #ddd", borderRadius: 8 }}
             />
             <input
               name="password"
@@ -52,26 +51,25 @@ export default async function LoginPage() {
               placeholder="Password"
               autoComplete="new-password"
               required
-              style={{ padding: 12, border: "1px solid #ddd", borderRadius: 8 }}
             />
-            <button type="submit" style={{ width: "100%", padding: "12px 16px", borderRadius: 8, border: "1px solid #111827", background: "#111827", color: "#fff", cursor: "pointer", fontWeight: 700 }}>
+            <button type="submit" className="garage-primary-button">
               Sign in
             </button>
           </form>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 12, alignItems: "center", color: "#9ca3af", fontSize: 12 }}>
-            <span style={{ height: 1, background: "#e5e7eb" }} />
+          <div className="auth-divider">
+            <span />
             <span>or</span>
-            <span style={{ height: 1, background: "#e5e7eb" }} />
+            <span />
           </div>
           <form action={async () => {
             "use server";
             await signIn("google", { redirectTo: "/garage" });
           }}>
-            <button type="submit" style={{ width: "100%", padding: "12px 16px", borderRadius: 8, border: "1px solid #ddd", background: "#fff", cursor: "pointer", fontWeight: 700 }}>
+            <button type="submit" className="auth-google-button">
               Continue with Google
             </button>
           </form>
-          <Link href="/" style={{ color: "#2563eb", marginTop: 8 }}>Back to home</Link>
+          <Link href="/" className="auth-back-link">Back to home</Link>
         </div>
       </section>
     </main>
