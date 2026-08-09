@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { addMeetPhotoAction, manageMeetRsvpAction, rsvpMeetAction, updateHostedMeetAction } from "@/app/actions/meets";
 import { HostCancelMeetForm } from "@/components/meets/HostCancelMeetForm";
 import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
+import { projectContiguousUsToPercent } from "@/lib/maps/us-projection";
 import { prisma } from "@/lib/prisma";
 import { getMeetBySlug } from "../meet-data";
 
@@ -64,6 +65,9 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
   const displayedLocationDetail = canViewExactAddress && privateMeetContext?.exactAddress
     ? privateMeetContext.exactAddress
     : meet.locationDetail;
+  const mapPoint = meet.latitude !== null && meet.longitude !== null
+    ? projectContiguousUsToPercent(meet.latitude, meet.longitude)
+    : { x: meet.mapX, y: meet.mapY };
   const attendeeRows = isHost ? privateMeetContext?.rsvps || [] : [];
   const attendeeCsv = buildRosterCsv(attendeeRows);
 
@@ -107,7 +111,7 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
             <strong>{meet.locationName}</strong>
           </div>
           <div className="meet-location-map">
-            <span style={{ left: `${meet.mapX}%`, top: `${meet.mapY}%` }} />
+            <span style={{ left: `${mapPoint.x}%`, top: `${mapPoint.y}%` }} />
           </div>
           <p>{displayedLocationDetail}</p>
           {privateMeetContext?.exactAddress ? (

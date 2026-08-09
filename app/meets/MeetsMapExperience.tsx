@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
 import type { MakeOption } from "@/lib/makes/catalog";
+import { projectContiguousUsToPercent, type MapPoint } from "@/lib/maps/us-projection";
 import type { MeetEvent } from "./meet-data";
 
 type MeetsMapExperienceProps = {
@@ -17,18 +18,6 @@ type UserLocation = {
 };
 
 const NEARBY_RADIUS_MILES = 250;
-const US_MAP_LAYER = {
-  left: 4,
-  top: 12,
-  width: 92,
-  height: 80,
-};
-
-type MapPoint = {
-  x: number;
-  y: number;
-};
-
 export function MeetsMapExperience({ meetEvents, makeOptions }: MeetsMapExperienceProps) {
   const [makeFilter, setMakeFilter] = useState("ALL");
   const [nearMeEnabled, setNearMeEnabled] = useState(false);
@@ -71,8 +60,8 @@ export function MeetsMapExperience({ meetEvents, makeOptions }: MeetsMapExperien
     ? [...meetsWithDistance].filter((meet) => meet.distanceMiles !== null).sort((a, b) => (a.distanceMiles ?? 9999) - (b.distanceMiles ?? 9999))[0]
     : null;
   const focusPoint = focusMeet ? getMeetMapPoint(focusMeet) : null;
-  const focusX = focusPoint ? US_MAP_LAYER.left + (focusPoint.x / 100) * US_MAP_LAYER.width : 50;
-  const focusY = focusPoint ? US_MAP_LAYER.top + (focusPoint.y / 100) * US_MAP_LAYER.height : 50;
+  const focusX = focusPoint ? focusPoint.x : 50;
+  const focusY = focusPoint ? focusPoint.y : 50;
   const visibleMeetPoints = visibleMeets.map((meet) => ({
     meet,
     point: getMeetMapPoint(meet),
@@ -236,60 +225,9 @@ function CountryMapGraphic({ countryCode, children }: { countryCode: "US"; child
 
 function getMeetMapPoint(meet: MeetEvent): MapPoint {
   if (meet.latitude !== null && meet.longitude !== null) {
-    return projectContiguousUs(meet.latitude, meet.longitude);
+    return projectContiguousUsToPercent(meet.latitude, meet.longitude);
   }
   return { x: meet.mapX, y: meet.mapY };
-}
-
-function projectContiguousUs(latitude: number, longitude: number): MapPoint {
-  const projected = projectAlbersUsa(latitude, longitude);
-  const x = ((projected.x - US_ALBERS_EXTENT.minX) / (US_ALBERS_EXTENT.maxX - US_ALBERS_EXTENT.minX)) * 100;
-  const y = 100 - ((projected.y - US_ALBERS_EXTENT.minY) / (US_ALBERS_EXTENT.maxY - US_ALBERS_EXTENT.minY)) * 100;
-
-  return {
-    x: clamp(x, 2, 98),
-    y: clamp(y, 2, 98),
-  };
-}
-
-function projectAlbersUsa(latitude: number, longitude: number) {
-  const radians = Math.PI / 180;
-  const phi1 = 29.5 * radians;
-  const phi2 = 45.5 * radians;
-  const phi0 = 23 * radians;
-  const lambda0 = -96 * radians;
-  const phi = latitude * radians;
-  const lambda = longitude * radians;
-  const n = (Math.sin(phi1) + Math.sin(phi2)) / 2;
-  const c = Math.cos(phi1) ** 2 + 2 * n * Math.sin(phi1);
-  const theta = n * (lambda - lambda0);
-  const rho = Math.sqrt(c - 2 * n * Math.sin(phi)) / n;
-  const rho0 = Math.sqrt(c - 2 * n * Math.sin(phi0)) / n;
-
-  return {
-    x: rho * Math.sin(theta),
-    y: rho0 - rho * Math.cos(theta),
-  };
-}
-
-const US_ALBERS_EXTENT = (() => {
-  const points: Array<{ x: number; y: number }> = [];
-  for (let latitude = 24.4; latitude <= 49.4; latitude += 0.5) {
-    for (let longitude = -124.8; longitude <= -66.9; longitude += 0.5) {
-      points.push(projectAlbersUsa(latitude, longitude));
-    }
-  }
-
-  return {
-    minX: Math.min(...points.map((point) => point.x)),
-    maxX: Math.max(...points.map((point) => point.x)),
-    minY: Math.min(...points.map((point) => point.y)),
-    maxY: Math.max(...points.map((point) => point.y)),
-  };
-})();
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
 }
 
 const countryMapAssets = {
@@ -297,13 +235,13 @@ const countryMapAssets = {
     label: "United States meet map",
     src: "/maps/us-contiguous-48.svg",
     glows: [
-      [16, 23],
-      [18, 60],
-      [58, 43],
-      [65, 64],
-      [69, 58],
-      [77, 78],
-      [78, 36],
+      [20.7, 14.4],
+      [19.9, 55.4],
+      [60.4, 37.7],
+      [66, 60.9],
+      [70.4, 55.3],
+      [73.9, 82.5],
+      [77.3, 36.3],
     ] as Array<[number, number]>,
   },
 };

@@ -4762,7 +4762,12 @@ canvas {
 }
 
 .meets-real-map {
-  inset: 12% 4% 8%;
+  top: 50%;
+  left: 50%;
+  width: min(94%, 1120px);
+  height: auto;
+  aspect-ratio: 958.69 / 592.79;
+  transform: translate(-50%, -50%);
 }
 
 .meets-real-map-image {
