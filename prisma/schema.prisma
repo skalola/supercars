@@ -241,6 +241,23 @@ model UserTrackerPreference {
   user                       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model ActionRateLimit {
+  id          String   @id @default(uuid())
+  actorKey    String
+  action      String
+  bucketKey   String   @default("GLOBAL")
+  windowStart DateTime
+  expiresAt   DateTime
+  count       Int      @default(1)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([actorKey, action, bucketKey, windowStart])
+  @@index([expiresAt])
+  @@index([actorKey, action])
+}
+
 model TrackerAlertDelivery {
   id        String   @id @default(cuid())
   userId    String
