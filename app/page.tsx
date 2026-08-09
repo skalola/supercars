@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { ClaimVinButton } from "@/components/garage/ClaimVinButton";
-import { getHomepageSummary, type HomepageGarageVehicle } from "@/lib/garage/homepage-summary";
+import { getHomepageSummary, type HomepageFeaturedGarage, type HomepageGarageVehicle } from "@/lib/garage/homepage-summary";
 
 export default async function HomePage() {
   const session = await auth();
@@ -62,16 +62,7 @@ export default async function HomePage() {
             <span>Featured Garages</span>
             <Link href={summary.username ? `/garage/${summary.username}` : "/garage"}>View garage</Link>
           </div>
-          <div className="garage-home-mini-grid">
-            {summary.featuredVehicles.slice(0, 3).map((vehicle) => (
-              <Link key={vehicle.id} href={vehicle.href} className="garage-home-mini-card">
-                {vehicle.imageUrl ? (
-                  <Image src={vehicle.imageUrl} alt="" fill sizes="(max-width: 760px) 33vw, 180px" unoptimized />
-                ) : null}
-                <span>{vehicle.label}</span>
-              </Link>
-            ))}
-          </div>
+          <FeaturedGarageGrid garages={summary.featuredGarages} />
         </article>
 
         <article id="nearby-meets" className="garage-home-panel">
@@ -101,6 +92,44 @@ export default async function HomePage() {
         </article>
       </section>
     </main>
+  );
+}
+
+function FeaturedGarageGrid({ garages }: { garages: HomepageFeaturedGarage[] }) {
+  if (garages.length === 0) {
+    return (
+      <Link href="/garage" className="garage-home-empty-card">
+        Claim your car to start a public garage
+      </Link>
+    );
+  }
+
+  return (
+    <div className="garage-home-mini-grid">
+      {garages.map((garage) => (
+        <Link key={garage.id} href={garage.href} className="garage-home-featured-garage-card">
+          <div className="garage-home-featured-lead">
+            {garage.topCar.imageUrl ? (
+              <Image src={garage.topCar.imageUrl} alt="" fill sizes="(max-width: 760px) 100vw, 260px" unoptimized />
+            ) : null}
+            <div>
+              <span>{garage.totalCars} {garage.totalCars === 1 ? "car" : "cars"}</span>
+              <strong>{garage.displayName}</strong>
+              <p>{garage.topCar.label}</p>
+            </div>
+          </div>
+          <div className="garage-home-featured-carousel" aria-label={`${garage.displayName} garage cars`}>
+            {garage.carouselVehicles.slice(0, 6).map((vehicle) => (
+              <span key={vehicle.id}>
+                {vehicle.imageUrl ? (
+                  <Image src={vehicle.imageUrl} alt="" fill sizes="72px" unoptimized />
+                ) : null}
+              </span>
+            ))}
+          </div>
+        </Link>
+      ))}
+    </div>
   );
 }
 

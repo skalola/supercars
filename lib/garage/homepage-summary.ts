@@ -13,6 +13,16 @@ export type HomepageGarageVehicle = {
   meta: string;
 };
 
+export type HomepageFeaturedGarage = {
+  id: string;
+  username: string;
+  displayName: string;
+  href: string;
+  topCar: HomepageGarageVehicle;
+  carouselVehicles: HomepageGarageVehicle[];
+  totalCars: number;
+};
+
 export type HomepageSummary = {
   username: string | null;
   heroImageUrl: string | null;
@@ -30,6 +40,7 @@ export type HomepageSummary = {
   dreamVehicles: HomepageGarageVehicle[];
   previousVehicles: HomepageGarageVehicle[];
   featuredVehicles: HomepageGarageVehicle[];
+  featuredGarages: HomepageFeaturedGarage[];
   activityItems: Array<{ label: string; detail: string; href: string }>;
 };
 
@@ -47,7 +58,7 @@ export async function getHomepageSummary(user: SessionUser | undefined | null): 
 }
 
 async function getSignedInHomepageSummary(userId: string): Promise<HomepageSummary | null> {
-  const [user, ownedRows, dreamRows, inventoryVehicles, inventoryStats, highestHorsepowerCar] = await Promise.all([
+  const [user, ownedRows, dreamRows, inventoryVehicles, inventoryStats, highestHorsepowerCar, featuredGarages] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: { username: true, name: true },
@@ -102,6 +113,7 @@ async function getSignedInHomepageSummary(userId: string): Promise<HomepageSumma
     getLiveInventoryVehicles(12),
     getLiveInventoryValueStats(),
     getHighestHorsepowerInventoryCar(),
+    getFeaturedGarages(3),
   ]);
 
   if (!user) return null;
@@ -154,15 +166,17 @@ async function getSignedInHomepageSummary(userId: string): Promise<HomepageSumma
     dreamVehicles,
     previousVehicles: [],
     featuredVehicles,
+    featuredGarages,
     activityItems: buildActivityItems(ownedRows, dreamVehicles),
   };
 }
 
 async function getPublicHomepageSummary(): Promise<HomepageSummary> {
-  const [featuredVehicles, valueStats, activityItems] = await Promise.all([
+  const [featuredVehicles, valueStats, activityItems, featuredGarages] = await Promise.all([
     getLiveInventoryVehicles(12),
     getLiveInventoryValueStats(),
     getLatestUserActivity(),
+    getFeaturedGarages(3),
   ]);
 
   const highestHorsepowerCar = await getHighestHorsepowerInventoryCar();
@@ -185,8 +199,134 @@ async function getPublicHomepageSummary(): Promise<HomepageSummary> {
     dreamVehicles: featuredVehicles,
     previousVehicles: [],
     featuredVehicles,
+    featuredGarages,
     activityItems,
   };
+}
+
+async function getFeaturedGarages(take: number): Promise<HomepageFeaturedGarage[]> {
+  const users = await prisma.user.findMany({
+    where: {
+      username: { not: null },
+      OR: [
+        {
+          vehicles: {
+            some: {
+              status: "CLAIMED",
+            },
+          },
+        },
+        {
+          garageItems: {
+            some: {},
+          },
+        },
+      ],
+    },
+    select: {
+      id: true,
+      username: true,
+      name: true,
+      vehicles: {
+        where: {
+          status: "CLAIMED",
+        },
+        include: {
+          model: { include: { make: true, images: true } },
+          photos: { orderBy: [{ isHero: "desc" }, { displayOrder: "asc" }, { createdAt: "asc" }] },
+          images: { orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] },
+          listings: {
+            where: {
+              status: "ACTIVE",
+              OR: [{ askingPrice: { gte: 10000 } }, { price: { gte: 10000 } }],
+            },
+            select: { askingPrice: true, price: true },
+            take: 1,
+          },
+        },
+        orderBy: { updatedAt: "desc" },
+        take: 6,
+      },
+      garageItems: {
+        include: {
+          model: {
+            include: {
+              make: true,
+              images: { orderBy: [{ type: "asc" }, { createdAt: "asc" }] },
+              listings: {
+                where: {
+                  status: "ACTIVE",
+                  validationStatus: "VALID",
+                  priceStatus: { not: "PRICE_INVALID" },
+                  OR: [{ askingPrice: { gte: 10000 } }, { price: { gte: 10000 } }],
+                },
+                include: {
+                  vehicle: {
+                    include: {
+                      photos: { orderBy: [{ isHero: "desc" }, { displayOrder: "asc" }, { createdAt: "asc" }] },
+                      images: { orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] },
+                      model: { include: { images: true } },
+                    },
+                  },
+                },
+                take: 1,
+              },
+            },
+          },
+        },
+        orderBy: { updatedAt: "desc" },
+        take: 6,
+      },
+    },
+    orderBy: { updatedAt: "desc" },
+    take: take * 3,
+  });
+
+  return users
+    .map((user) => {
+      const ownedVehicles: HomepageGarageVehicle[] = user.vehicles.map((vehicle) => ({
+        id: vehicle.id,
+        label: `${vehicle.year} ${vehicle.model.make.name} ${vehicle.model.name}`,
+        eyebrow: vehicle.model.make.name,
+        href: `/vehicle/${vehicle.vin}`,
+        imageUrl: cleanImage(getVehicleHeroImage(vehicle)),
+        status: "OWNED" as const,
+        meta: vehicle.listings[0] ? formatCurrency(vehicle.listings[0].askingPrice ?? vehicle.listings[0].price) : "Claimed",
+      }));
+
+      const ownedModelIds = new Set(user.vehicles.map((vehicle) => vehicle.modelId));
+      const savedVehicles: HomepageGarageVehicle[] = user.garageItems
+        .filter((item) => !ownedModelIds.has(item.modelId))
+        .map((item) => {
+          const listing = item.model.listings[0];
+          const listingVehicleImage = cleanImage(getVehicleHeroImage(listing?.vehicle));
+          return {
+            id: item.id,
+            label: `${item.model.make.name} ${item.model.name}`,
+            eyebrow: "Dream Garage",
+            href: `/make/${item.model.make.slug}/${item.model.slug}`,
+            imageUrl: listingVehicleImage || cleanImage(item.model.images[0]?.url || null),
+            status: "DREAM" as const,
+            meta: listing ? formatCurrency(listing.askingPrice ?? listing.price) : item.model.years || "Saved",
+          };
+        });
+
+      const carouselVehicles = [...ownedVehicles, ...savedVehicles].filter((vehicle) => vehicle.imageUrl);
+      const topCar = carouselVehicles[0];
+      if (!user.username || !topCar) return null;
+
+      return {
+        id: user.id,
+        username: user.username,
+        displayName: user.name || `@${user.username}`,
+        href: `/garage/${user.username}`,
+        topCar,
+        carouselVehicles,
+        totalCars: ownedVehicles.length + savedVehicles.length,
+      };
+    })
+    .filter((garage): garage is HomepageFeaturedGarage => Boolean(garage))
+    .slice(0, take);
 }
 
 async function getLiveInventoryValueStats() {
