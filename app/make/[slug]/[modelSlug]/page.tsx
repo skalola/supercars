@@ -131,7 +131,15 @@ export default async function ModelPage({ params }: ModelPageProps) {
   });
 
   if (!make) {
-    return <div style={{ padding: 40 }}>Make not found</div>;
+    return (
+      <main className="garage-page-shell auth-page-shell">
+        <section className="auth-panel">
+          <div className="garage-page-eyebrow">Explore</div>
+          <h1>Make not found</h1>
+          <p>This manufacturer is not available in SUPERCAR DASH yet.</p>
+        </section>
+      </main>
+    );
   }
 
   const model = (await prisma.model.findUnique({
@@ -156,7 +164,15 @@ export default async function ModelPage({ params }: ModelPageProps) {
   })) as ModelDetail | null;
 
   if (!model) {
-    return <div style={{ padding: 40 }}>Model not found</div>;
+    return (
+      <main className="garage-page-shell auth-page-shell">
+        <section className="auth-panel">
+          <div className="garage-page-eyebrow">Explore</div>
+          <h1>Model not found</h1>
+          <p>This model is not available in SUPERCAR DASH yet.</p>
+        </section>
+      </main>
+    );
   }
 
   const [spec, modelImages, market, rawListings] = await Promise.all([
@@ -293,22 +309,15 @@ export default async function ModelPage({ params }: ModelPageProps) {
   ].filter((entry): entry is [string, string] => Boolean(entry[1]));
 
   return (
-    <main
-      style={{
-        padding: 40,
-        fontFamily: "system-ui",
-        maxWidth: 1100,
-        margin: "0 auto",
-      }}
-    >
+    <main className="garage-page-shell model-detail-shell">
       <Link
+        className="model-back-link"
         href={`/make/${model.make.slug}`}
-        style={{ color: "#555", textDecoration: "none" }}
       >
         {model.make.name}
       </Link>
 
-      <h1 style={{ fontSize: 52, margin: "12px 0 8px" }}>{model.name}</h1>
+      <h1 className="model-detail-title">{model.name}</h1>
 
       <div style={{ marginTop: 20, display: "grid", gap: 20 }}>
         {heroImage ? (
@@ -317,10 +326,10 @@ export default async function ModelPage({ params }: ModelPageProps) {
               position: "relative",
               width: "100%",
               aspectRatio: "16 / 9",
-              borderRadius: 16,
+              borderRadius: 8,
               overflow: "hidden",
-              border: "1px solid #e5e7eb",
-              background: "#f8fafc",
+              border: "1px solid rgba(255, 255, 255, 0.12)",
+              background: "rgba(255, 255, 255, 0.06)",
             }}
           >
             <Image
@@ -329,6 +338,7 @@ export default async function ModelPage({ params }: ModelPageProps) {
               fill
               sizes="(max-width: 768px) 100vw, 75vw"
               style={{ objectFit: "cover" }}
+              priority
               unoptimized
             />
             <form action={async () => {
@@ -346,7 +356,8 @@ export default async function ModelPage({ params }: ModelPageProps) {
                   borderRadius: 999,
                   padding: "10px 12px",
                   cursor: "pointer",
-                  background: "rgba(255,255,255,0.9)",
+                  background: "#e20f1b",
+                  color: "#ffffff",
                   fontWeight: 700,
                 }}
               >
@@ -359,8 +370,8 @@ export default async function ModelPage({ params }: ModelPageProps) {
             style={{
               width: "100%",
               aspectRatio: "16 / 9",
-              borderRadius: 16,
-              border: "1px solid #e5e7eb",
+              borderRadius: 8,
+              border: "1px solid rgba(255, 255, 255, 0.12)",
               background: "linear-gradient(135deg, #0f172a, #1d4ed8)",
               color: "white",
               display: "flex",
@@ -379,17 +390,17 @@ export default async function ModelPage({ params }: ModelPageProps) {
         )}
       </div>
 
-      <div style={{ marginTop: 24, padding: 20, border: "1px solid #e5e7eb", borderRadius: 12, background: "#f9fafb" }}>
+      <div style={{ marginTop: 24, padding: 20, border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: 8, background: "rgba(255, 255, 255, 0.06)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <div style={{ fontSize: 14, color: "#666", fontWeight: 600 }}>Ownership</div>
+            <div style={{ fontSize: 14, color: "rgba(255, 255, 255, 0.62)", fontWeight: 600 }}>Ownership</div>
             <div style={{ fontSize: 18, fontWeight: 700 }}>
               {claimedVehicle ? (
                 <span style={{ color: claimedVehicle.status === "CLAIMED" ? "#059669" : "#d97706" }}>
                   {claimedVehicle.status === "CLAIMED" ? "CLAIMED" : "CLAIM PENDING"}
                 </span>
               ) : garageItem ? (
-                <span style={{ color: "#666" }}>In My Garage</span>
+                <span style={{ color: "rgba(255, 255, 255, 0.62)" }}>In My Garage</span>
               ) : (
                 "Not Claimed"
               )}
@@ -401,7 +412,7 @@ export default async function ModelPage({ params }: ModelPageProps) {
                   style={{ 
                     display: "inline-block",
                     padding: "6px 12px", 
-                    background: "#111827", 
+                    background: "#e20f1b", 
                     color: "#fff", 
                     borderRadius: 8, 
                     textDecoration: "none", 
@@ -419,7 +430,7 @@ export default async function ModelPage({ params }: ModelPageProps) {
               href={`/claim/${model.id}`}
               style={{ 
                 padding: "8px 16px", 
-                background: "#000", 
+                background: "#e20f1b", 
                 color: "#fff", 
                 borderRadius: 8, 
                 textDecoration: "none", 
@@ -443,21 +454,21 @@ export default async function ModelPage({ params }: ModelPageProps) {
 
       >
         <div>
-          <div style={{ color: "#777", fontSize: 13 }}>Production years</div>
+          <div style={{ color: "rgba(255, 255, 255, 0.58)", fontSize: 13 }}>Production years</div>
           <strong>
             {formatYears(model.productionStartYear, model.productionEndYear)}
           </strong>
         </div>
         <div>
-          <div style={{ color: "#777", fontSize: 13 }}>Category</div>
+          <div style={{ color: "rgba(255, 255, 255, 0.58)", fontSize: 13 }}>Category</div>
           <strong>{model.category ?? "Uncategorized"}</strong>
         </div>
         <div>
-          <div style={{ color: "#777", fontSize: 13 }}>Body style</div>
+          <div style={{ color: "rgba(255, 255, 255, 0.58)", fontSize: 13 }}>Body style</div>
           <strong>{model.bodyStyle ?? "Unavailable"}</strong>
         </div>
         <div>
-          <div style={{ color: "#777", fontSize: 13 }}>Production count</div>
+          <div style={{ color: "rgba(255, 255, 255, 0.58)", fontSize: 13 }}>Production count</div>
           <strong>{formatCount(model.productionCount)}</strong>
         </div>
       </div>
@@ -465,7 +476,7 @@ export default async function ModelPage({ params }: ModelPageProps) {
       {model.description ? (
         <section style={{ marginTop: 36 }}>
           <h2>History</h2>
-          <p style={{ color: "#333", fontSize: 18, lineHeight: 1.65 }}>
+          <p style={{ color: "rgba(255, 255, 255, 0.78)", fontSize: 18, lineHeight: 1.65 }}>
             {model.description}
           </p>
         </section>
@@ -485,25 +496,25 @@ export default async function ModelPage({ params }: ModelPageProps) {
               <div
                 key={variant.id}
                 style={{
-                  border: "1px solid #e8e8e8",
+                  border: "1px solid rgba(255, 255, 255, 0.12)",
                   borderRadius: 8,
                   padding: 16,
                 }}
               >
                 <h3 style={{ margin: "0 0 8px" }}>{variant.name}</h3>
-                <div style={{ color: "#777", fontSize: 13 }}>
+                <div style={{ color: "rgba(255, 255, 255, 0.58)", fontSize: 13 }}>
                   {formatYears(
                     variant.productionStartYear,
                     variant.productionEndYear,
                   )}
                 </div>
                 {variant.productionCount ? (
-                  <div style={{ color: "#777", fontSize: 13, marginTop: 4 }}>
+                  <div style={{ color: "rgba(255, 255, 255, 0.58)", fontSize: 13, marginTop: 4 }}>
                     {variant.productionCount.toLocaleString()} built
                   </div>
                 ) : null}
                 {variant.description ? (
-                  <p style={{ color: "#333", lineHeight: 1.5 }}>
+                  <p style={{ color: "rgba(255, 255, 255, 0.78)", lineHeight: 1.5 }}>
                     {variant.description}
                   </p>
                 ) : null}
@@ -527,12 +538,12 @@ export default async function ModelPage({ params }: ModelPageProps) {
               <div
                 key={label}
                 style={{
-                  border: "1px solid #e8e8e8",
+                  border: "1px solid rgba(255, 255, 255, 0.12)",
                   borderRadius: 8,
                   padding: 16,
                 }}
               >
-                <div style={{ color: "#777", fontSize: 13 }}>{label}</div>
+                <div style={{ color: "rgba(255, 255, 255, 0.58)", fontSize: 13 }}>{label}</div>
                 <strong>{value}</strong>
               </div>
             ))}
@@ -554,42 +565,42 @@ export default async function ModelPage({ params }: ModelPageProps) {
             }}>
               {/* Market Range */}
               {market.range && (
-                <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, background: "#fff" }}>
-                  <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Market Range</div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: "#111827" }}>
+                <div style={{ border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: 8, padding: 16, background: "rgba(255, 255, 255, 0.06)" }}>
+                  <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.58)", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Market Range</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "#ffffff" }}>
                     ${market.range.lowestPrice.toLocaleString()} &ndash; ${market.range.highestPrice.toLocaleString()}
                   </div>
-                  <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>Active listings</div>
+                  <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.5)", marginTop: 4 }}>Active listings</div>
                 </div>
               )}
 
               {/* Avg Asking */}
               {market.range && (
-                <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, background: "#fff" }}>
-                  <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Avg Asking Price</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: "#111827" }}>${market.range.averageAskingPrice.toLocaleString()}</div>
-                  <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>Median ${market.range.medianAskingPrice.toLocaleString()}</div>
+                <div style={{ border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: 8, padding: 16, background: "rgba(255, 255, 255, 0.06)" }}>
+                  <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.58)", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Avg Asking Price</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: "#ffffff" }}>${market.range.averageAskingPrice.toLocaleString()}</div>
+                  <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.5)", marginTop: 4 }}>Median ${market.range.medianAskingPrice.toLocaleString()}</div>
                 </div>
               )}
 
               {/* Supply */}
-              <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, background: "#fff" }}>
-                <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Active Listings</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: "#111827" }}>{market.supply.activeListingCount}</div>
-                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>Currently on market</div>
+              <div style={{ border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: 8, padding: 16, background: "rgba(255, 255, 255, 0.06)" }}>
+                <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.58)", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Active Listings</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#ffffff" }}>{market.supply.activeListingCount}</div>
+                <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.5)", marginTop: 4 }}>Currently on market</div>
               </div>
 
               {/* Recent Sales */}
-              <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, background: "#fff" }}>
-                <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Recent Sales</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: "#111827" }}>{market.recentSales.salesCount}</div>
-                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>Last {market.recentSales.periodDays} days</div>
+              <div style={{ border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: 8, padding: 16, background: "rgba(255, 255, 255, 0.06)" }}>
+                <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.58)", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Recent Sales</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: "#ffffff" }}>{market.recentSales.salesCount}</div>
+                <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.5)", marginTop: 4 }}>Last {market.recentSales.periodDays} days</div>
               </div>
 
               {/* Asking vs Sold */}
               {market.askingVsSold.differencePercent !== null && (
-                <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 16, background: "#fff" }}>
-                  <div style={{ fontSize: 12, color: "#6b7280", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Asking vs Sold</div>
+                <div style={{ border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: 8, padding: 16, background: "rgba(255, 255, 255, 0.06)" }}>
+                  <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.58)", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Asking vs Sold</div>
                   <div style={{
                     fontSize: 18,
                     fontWeight: 800,
@@ -597,21 +608,21 @@ export default async function ModelPage({ params }: ModelPageProps) {
                   }}>
                     {market.askingVsSold.differencePercent > 0 ? "+" : ""}{market.askingVsSold.differencePercent}%
                   </div>
-                  <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>Sold vs asking</div>
+                  <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.5)", marginTop: 4 }}>Sold vs asking</div>
                 </div>
               )}
 
             </div>
           </>
         ) : (
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 20, background: "#fff" }}>
-            <div style={{ fontSize: 16, color: "#4b5563", fontStyle: "italic", marginBottom: 12 }}>
+          <div style={{ border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: 8, padding: 20, background: "rgba(255, 255, 255, 0.06)" }}>
+            <div style={{ fontSize: 16, color: "rgba(255, 255, 255, 0.66)", fontStyle: "italic", marginBottom: 12 }}>
               No market data available yet.
             </div>
-            <div style={{ fontSize: 13, color: "#4b5563", marginTop: 12, borderTop: "1px solid #f3f4f6", paddingTop: 12 }}>
+            <div style={{ fontSize: 13, color: "rgba(255, 255, 255, 0.66)", marginTop: 12, borderTop: "1px solid rgba(255, 255, 255, 0.1)", paddingTop: 12 }}>
               <strong>Monitored Sources:</strong> Bring a Trailer, RM Sotheby&apos;s, DuPont Registry, and supported dealer networks
             </div>
-            <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>
+            <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.5)", marginTop: 4 }}>
               Status: Active monitoring in progress. Data is updated daily as auctions close and dealer inventories refresh.
             </div>
           </div>
@@ -624,7 +635,7 @@ export default async function ModelPage({ params }: ModelPageProps) {
       <section style={{ marginTop: 40, marginBottom: 40 }}>
         <h2 style={{ fontSize: 24, marginBottom: 20 }}>Available Inventory</h2>
         {listings.length === 0 ? (
-          <p style={{ color: "#777", fontStyle: "italic" }}>No active listings for this model currently available.</p>
+          <p style={{ color: "rgba(255, 255, 255, 0.58)", fontStyle: "italic" }}>No active listings for this model currently available.</p>
         ) : (
           <div style={{
             display: "grid",
@@ -638,10 +649,10 @@ export default async function ModelPage({ params }: ModelPageProps) {
                 <div
                   key={lst.id}
                   style={{
-                    border: "1px solid #e5e7eb",
-                    borderRadius: 16,
+                    border: "1px solid rgba(255, 255, 255, 0.12)",
+                    borderRadius: 8,
                     overflow: "hidden",
-                    backgroundColor: "#fff",
+                    backgroundColor: "rgba(255, 255, 255, 0.06)",
                     boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
                     display: "flex",
                     flexDirection: "column",
@@ -650,7 +661,7 @@ export default async function ModelPage({ params }: ModelPageProps) {
                 >
                   <div>
                     {image ? (
-                      <div style={{ position: "relative", width: "100%", paddingTop: "56.25%", backgroundColor: "#f3f4f6" }}>
+                      <div style={{ position: "relative", width: "100%", paddingTop: "56.25%", backgroundColor: "rgba(255, 255, 255, 0.08)" }}>
                         <img
                           src={image}
                           alt={`${lst.vehicle?.year ?? "Year"} ${lst.vehicle?.model?.make?.name ?? "Make"} ${lst.vehicle?.model?.name ?? "Model"}`}
@@ -661,11 +672,11 @@ export default async function ModelPage({ params }: ModelPageProps) {
                       <div style={{
                         width: "100%",
                         paddingTop: "56.25%",
-                        backgroundColor: "#f3f4f6",
+                        backgroundColor: "rgba(255, 255, 255, 0.08)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        color: "#9ca3af",
+                        color: "rgba(255, 255, 255, 0.5)",
                         fontSize: "14px",
                         position: "relative"
                       }}>
@@ -693,10 +704,10 @@ export default async function ModelPage({ params }: ModelPageProps) {
                           </span>
                         )}
                       </div>
-                      <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 6px 0", color: "#111827" }}>
+                      <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 6px 0", color: "#ffffff" }}>
                         {lst.vehicle?.year ?? "Year"} {lst.vehicle?.model?.make?.name ?? "Make"} {lst.vehicle?.model?.name ?? "Model"}
                       </h3>
-                      <div style={{ fontSize: 13, color: "#6b7280" }}>
+                      <div style={{ fontSize: 13, color: "rgba(255, 255, 255, 0.58)" }}>
                         {lst.mileage !== null ? `${lst.mileage.toLocaleString()} miles` : "Mileage unavailable"}
                       </div>
                     </div>
@@ -707,7 +718,7 @@ export default async function ModelPage({ params }: ModelPageProps) {
                       style={{
                         display: "block",
                         textAlign: "center",
-                        backgroundColor: "#2563eb",
+                        backgroundColor: "#e20f1b",
                         color: "#ffffff",
                         padding: "10px 16px",
                         borderRadius: 8,

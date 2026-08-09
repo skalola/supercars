@@ -3424,6 +3424,105 @@ canvas {
   cursor: wait;
 }
 
+.make-page-shell,
+.model-detail-shell {
+  color: #ffffff;
+}
+
+.make-page-stats {
+  grid-template-columns: minmax(120px, 1fr);
+}
+
+.make-model-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
+  gap: 14px;
+  width: min(1360px, 100%);
+  margin: 0 auto;
+}
+
+.make-model-card {
+  display: grid;
+  gap: 8px;
+  min-height: 138px;
+  align-content: end;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.04)),
+    rgba(9, 9, 10, 0.78);
+  color: #ffffff;
+  text-decoration: none;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(18px);
+}
+
+.make-model-card span,
+.make-model-card small {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.make-model-card strong {
+  font-size: 22px;
+  line-height: 1.08;
+}
+
+.model-detail-shell {
+  width: 100%;
+}
+
+.model-detail-shell > * {
+  width: min(1360px, 100%);
+  margin-right: auto !important;
+  margin-left: auto !important;
+}
+
+.model-back-link {
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 13px;
+  font-weight: 850;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.model-detail-title {
+  margin: -8px auto 0;
+  color: #ffffff;
+  font-size: clamp(52px, 8vw, 104px);
+  font-weight: 560;
+  line-height: 0.92;
+}
+
+.model-detail-shell section h2 {
+  color: #ffffff;
+}
+
+.model-detail-shell .surface-card {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #ffffff !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+}
+
+.model-detail-shell .surface-card h3,
+.model-detail-shell .surface-card div,
+.model-detail-shell .surface-card p {
+  color: inherit;
+}
+
+.model-detail-shell .surface-card [style*="var(--muted)"] {
+  color: rgba(255, 255, 255, 0.62) !important;
+}
+
+.model-detail-shell .surface-card [style*="var(--surface-soft)"] {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
 .directory-panel {
   display: grid;
   gap: 18px;
