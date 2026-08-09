@@ -15,6 +15,17 @@ type UserLocation = {
 };
 
 const NEARBY_RADIUS_MILES = 250;
+const US_MAP_LAYER = {
+  left: 4,
+  top: 12,
+  width: 92,
+  height: 80,
+};
+
+type MapPoint = {
+  x: number;
+  y: number;
+};
 
 export function MeetsMapExperience({ meetEvents }: MeetsMapExperienceProps) {
   const [makeFilter, setMakeFilter] = useState("ALL");
@@ -56,8 +67,13 @@ export function MeetsMapExperience({ meetEvents }: MeetsMapExperienceProps) {
   const focusMeet = nearMeEnabled && userLocation
     ? [...meetsWithDistance].filter((meet) => meet.distanceMiles !== null).sort((a, b) => (a.distanceMiles ?? 9999) - (b.distanceMiles ?? 9999))[0]
     : null;
-  const focusX = focusMeet?.mapX ?? 50;
-  const focusY = focusMeet?.mapY ?? 50;
+  const focusPoint = focusMeet ? getMeetMapPoint(focusMeet) : null;
+  const focusX = focusPoint ? US_MAP_LAYER.left + (focusPoint.x / 100) * US_MAP_LAYER.width : 50;
+  const focusY = focusPoint ? US_MAP_LAYER.top + (focusPoint.y / 100) * US_MAP_LAYER.height : 50;
+  const visibleMeetPoints = visibleMeets.map((meet) => ({
+    meet,
+    point: getMeetMapPoint(meet),
+  }));
 
   function handleNearMe() {
     if (!navigator.geolocation) {
@@ -128,19 +144,20 @@ export function MeetsMapExperience({ meetEvents }: MeetsMapExperienceProps) {
         } as CSSProperties}
       >
         <div className="meets-map-canvas">
-          <CountryMapGraphic countryCode="US" />
-          {visibleMeets.map((meet) => (
-            <Link
-              key={meet.slug}
-              href={`/meets/${meet.slug}`}
-              className={`meets-map-pin is-${meet.accent}`}
-              style={{ left: `${meet.mapX}%`, top: `${meet.mapY}%` }}
-              aria-label={`${meet.title} in ${meet.city}, ${meet.state}`}
-            >
-              <span />
-              <em>{meet.city.toUpperCase()}</em>
-            </Link>
-          ))}
+          <CountryMapGraphic countryCode="US">
+            {visibleMeetPoints.map(({ meet, point }) => (
+              <Link
+                key={meet.slug}
+                href={`/meets/${meet.slug}`}
+                className={`meets-map-pin is-${meet.accent}`}
+                style={{ left: `${point.x}%`, top: `${point.y}%` }}
+                aria-label={`${meet.title} in ${meet.city}, ${meet.state}`}
+              >
+                <span />
+                <em>{meet.city.toUpperCase()}</em>
+              </Link>
+            ))}
+          </CountryMapGraphic>
         </div>
 
         {filteredMeets.length === 0 && nearMeEnabled ? (
@@ -200,7 +217,7 @@ export function MeetsMapExperience({ meetEvents }: MeetsMapExperienceProps) {
   );
 }
 
-function CountryMapGraphic({ countryCode }: { countryCode: "US" }) {
+function CountryMapGraphic({ countryCode, children }: { countryCode: "US"; children: React.ReactNode }) {
   const map = countryMapAssets[countryCode];
 
   return (
@@ -209,8 +226,67 @@ function CountryMapGraphic({ countryCode }: { countryCode: "US" }) {
       {map.glows.map(([x, y]) => (
         <span key={`${x}:${y}`} className="meets-map-glow" style={{ left: `${x}%`, top: `${y}%` }} />
       ))}
+      {children}
     </div>
   );
+}
+
+function getMeetMapPoint(meet: MeetEvent): MapPoint {
+  if (meet.latitude !== null && meet.longitude !== null) {
+    return projectContiguousUs(meet.latitude, meet.longitude);
+  }
+  return { x: meet.mapX, y: meet.mapY };
+}
+
+function projectContiguousUs(latitude: number, longitude: number): MapPoint {
+  const projected = projectAlbersUsa(latitude, longitude);
+  const x = ((projected.x - US_ALBERS_EXTENT.minX) / (US_ALBERS_EXTENT.maxX - US_ALBERS_EXTENT.minX)) * 100;
+  const y = 100 - ((projected.y - US_ALBERS_EXTENT.minY) / (US_ALBERS_EXTENT.maxY - US_ALBERS_EXTENT.minY)) * 100;
+
+  return {
+    x: clamp(x, 2, 98),
+    y: clamp(y, 2, 98),
+  };
+}
+
+function projectAlbersUsa(latitude: number, longitude: number) {
+  const radians = Math.PI / 180;
+  const phi1 = 29.5 * radians;
+  const phi2 = 45.5 * radians;
+  const phi0 = 23 * radians;
+  const lambda0 = -96 * radians;
+  const phi = latitude * radians;
+  const lambda = longitude * radians;
+  const n = (Math.sin(phi1) + Math.sin(phi2)) / 2;
+  const c = Math.cos(phi1) ** 2 + 2 * n * Math.sin(phi1);
+  const theta = n * (lambda - lambda0);
+  const rho = Math.sqrt(c - 2 * n * Math.sin(phi)) / n;
+  const rho0 = Math.sqrt(c - 2 * n * Math.sin(phi0)) / n;
+
+  return {
+    x: rho * Math.sin(theta),
+    y: rho0 - rho * Math.cos(theta),
+  };
+}
+
+const US_ALBERS_EXTENT = (() => {
+  const points: Array<{ x: number; y: number }> = [];
+  for (let latitude = 24.4; latitude <= 49.4; latitude += 0.5) {
+    for (let longitude = -124.8; longitude <= -66.9; longitude += 0.5) {
+      points.push(projectAlbersUsa(latitude, longitude));
+    }
+  }
+
+  return {
+    minX: Math.min(...points.map((point) => point.x)),
+    maxX: Math.max(...points.map((point) => point.x)),
+    minY: Math.min(...points.map((point) => point.y)),
+    maxY: Math.max(...points.map((point) => point.y)),
+  };
+})();
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
 }
 
 const countryMapAssets = {
