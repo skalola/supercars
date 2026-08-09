@@ -142,12 +142,20 @@ export default async function InventoryPage() {
     },
   }));
 
+  const catalogModels = await prisma.model.findMany({
+    include: {
+      make: true,
+    },
+    orderBy: [
+      { make: { name: "asc" } },
+      { name: "asc" },
+    ],
+  });
+
   const makeOptions = Array.from(
-    new Map(mappedListings.map((listing: any) => [listing.model.make.id, listing.model.make])).values(),
+    new Map(catalogModels.map((model: any) => [model.make.id, model.make])).values(),
   ).sort((a: any, b: any) => a.name.localeCompare(b.name));
-  const modelOptions = Array.from(
-    new Map(mappedListings.map((listing: any) => [listing.model.id, listing.model])).values(),
-  ).sort((a: any, b: any) => {
+  const modelOptions = catalogModels.sort((a: any, b: any) => {
     const makeCompare = a.make.name.localeCompare(b.make.name);
     return makeCompare || a.name.localeCompare(b.name);
   });
