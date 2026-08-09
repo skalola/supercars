@@ -364,6 +364,7 @@ function isGenericModelToken(token: string) {
     "amg",
     "m",
     "r",
+    "s",
     "rs",
     "gt",
     "gts",
