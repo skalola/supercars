@@ -41,7 +41,13 @@ export default async function HomePage() {
           <div className="garage-home-kpis" aria-label="Garage status">
             <KpiCard label={summary.garageValueLabel} value={formatCurrency(summary.garageValue)} detail="Live priced cars" icon="$" />
             <KpiCard label="Total Cars" value={summary.totalCars.toLocaleString()} detail="Collection and market count" icon="#" />
-            <KpiCard label="Most Expensive" value={formatCurrency(summary.mostExpensiveValue)} detail={summary.mostExpensiveLabel} icon="M" />
+            <KpiCard
+              label="Most Expensive"
+              value={formatCurrency(summary.mostExpensiveValue)}
+              detail={summary.mostExpensiveLabel}
+              icon="M"
+              href={summary.mostExpensiveHref}
+            />
             <KpiCard label="Fastest Car" value={summary.fastestCarValue} detail={summary.fastestCarLabel} icon="F" />
           </div>
 
@@ -106,20 +112,36 @@ function KpiCard({
   value,
   detail,
   icon,
+  href,
 }: {
   label: string;
   value: string;
   detail: string;
   icon: string;
+  href?: string | null;
 }) {
-  return (
-    <article className="garage-home-kpi">
+  const content = (
+    <>
       <span className="garage-home-kpi-icon" aria-hidden="true">{icon}</span>
       <div>
         <span>{label}</span>
         <strong>{value}</strong>
         <p>{detail}</p>
       </div>
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className="garage-home-kpi is-link">
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <article className="garage-home-kpi">
+      {content}
     </article>
   );
 }

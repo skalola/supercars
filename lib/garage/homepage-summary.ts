@@ -22,6 +22,7 @@ export type HomepageSummary = {
   garageValueLabel: string;
   totalCars: number;
   mostExpensiveLabel: string;
+  mostExpensiveHref: string | null;
   mostExpensiveValue: number | null;
   fastestCarLabel: string;
   fastestCarValue: string;
@@ -46,7 +47,7 @@ export async function getHomepageSummary(user: SessionUser | undefined | null): 
 }
 
 async function getSignedInHomepageSummary(userId: string): Promise<HomepageSummary | null> {
-  const [user, ownedRows, dreamRows, inventoryVehicles] = await Promise.all([
+  const [user, ownedRows, dreamRows, inventoryVehicles, inventoryStats, fastestInventoryCar] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: { username: true, name: true },
@@ -99,6 +100,8 @@ async function getSignedInHomepageSummary(userId: string): Promise<HomepageSumma
       take: 8,
     }),
     getLiveInventoryVehicles(12),
+    getLiveInventoryValueStats(),
+    getFastestInventoryCar(),
   ]);
 
   if (!user) return null;
@@ -132,10 +135,6 @@ async function getSignedInHomepageSummary(userId: string): Promise<HomepageSumma
   ].slice(0, 12);
 
   const heroVehicle = ownedVehicles[0] || dreamVehicles[0] || null;
-  const ownedValues = getOwnedValues(ownedRows);
-  const garageValue = ownedValues.reduce((sum, item) => sum + item.value, 0) || calculateVehicleListValue(inventoryVehicles);
-  const mostExpensive = getMostExpensiveFromOwned(ownedRows) ?? getMostExpensiveFromCards(inventoryVehicles);
-  const fastestCar = getFastestOwnedVehicle(ownedRows) ?? { label: "Performance stats pending", value: "Pending" };
   const featuredVehicles = [...ownedVehicles, ...dreamVehicles].slice(0, 6);
 
   return {
@@ -143,13 +142,14 @@ async function getSignedInHomepageSummary(userId: string): Promise<HomepageSumma
     heroImageUrl: heroVehicle?.imageUrl || null,
     heroVehicleLabel: heroVehicle?.label || "Build your verified garage",
     heroVehicleMeta: heroVehicle?.meta || "Claim a VIN or save a dream car to begin.",
-    garageValue,
-    garageValueLabel: ownedVehicles.length > 0 ? "Garage Value" : "Dream Value",
-    totalCars: ownedVehicles.length || inventoryVehicles.length,
-    mostExpensiveLabel: mostExpensive?.label ?? "Most expensive",
-    mostExpensiveValue: mostExpensive?.value ?? null,
-    fastestCarLabel: fastestCar.label,
-    fastestCarValue: fastestCar.value,
+    garageValue: inventoryStats.totalValue || null,
+    garageValueLabel: "Live Collection Value",
+    totalCars: inventoryStats.totalCars,
+    mostExpensiveLabel: inventoryStats.mostExpensive?.label ?? "Most expensive",
+    mostExpensiveHref: inventoryStats.mostExpensive?.href ?? null,
+    mostExpensiveValue: inventoryStats.mostExpensive?.value ?? null,
+    fastestCarLabel: fastestInventoryCar.label,
+    fastestCarValue: fastestInventoryCar.value,
     ownedVehicles,
     dreamVehicles,
     previousVehicles: [],
@@ -159,11 +159,8 @@ async function getSignedInHomepageSummary(userId: string): Promise<HomepageSumma
 }
 
 async function getPublicHomepageSummary(): Promise<HomepageSummary> {
-  const [featuredVehicles, totalCars, valueStats, activityItems] = await Promise.all([
+  const [featuredVehicles, valueStats, activityItems] = await Promise.all([
     getLiveInventoryVehicles(12),
-    prisma.listing.count({
-      where: liveInventoryWhere,
-    }),
     getLiveInventoryValueStats(),
     getLatestUserActivity(),
   ]);
@@ -178,8 +175,9 @@ async function getPublicHomepageSummary(): Promise<HomepageSummary> {
     heroVehicleMeta: heroVehicle?.meta || "Claim a VIN-backed car or save a dream model.",
     garageValue: valueStats.totalValue || null,
     garageValueLabel: "Live Collection Value",
-    totalCars,
+    totalCars: valueStats.totalCars,
     mostExpensiveLabel: valueStats.mostExpensive?.label ?? "Most expensive",
+    mostExpensiveHref: valueStats.mostExpensive?.href ?? null,
     mostExpensiveValue: valueStats.mostExpensive?.value ?? null,
     fastestCarLabel: fastestCar.label,
     fastestCarValue: fastestCar.value,
@@ -192,39 +190,52 @@ async function getPublicHomepageSummary(): Promise<HomepageSummary> {
 }
 
 async function getLiveInventoryValueStats() {
-  const listings = await prisma.listing.findMany({
-    where: liveInventoryWhere,
-    select: {
-      askingPrice: true,
-      price: true,
-      vehicle: {
-        select: {
-          year: true,
-          model: { select: { name: true, make: { select: { name: true } } } },
-        },
-      },
-    },
-    take: 1500,
-  });
+  const listings = await getVisibleLiveInventoryListings(2000);
   const pricedListings = listings
     .map((listing) => ({
       label: listing.vehicle
         ? `${listing.vehicle.year} ${listing.vehicle.model.make.name} ${listing.vehicle.model.name}`
         : "Most expensive",
+      href: listing.vehicle ? `/vehicle/${listing.vehicle.vin}` : null,
       value: listing.askingPrice ?? listing.price ?? 0,
+      listing,
     }))
-    .filter((listing) => listing.value >= 10000);
+    .filter((listing) => listing.value >= 10000)
+    .filter((listing) => isPlausibleHeadlinePrice(listing.listing, listing.value));
   return {
+    totalCars: listings.length,
     totalValue: pricedListings.reduce((sum, listing) => sum + listing.value, 0),
     mostExpensive: pricedListings.sort((a, b) => b.value - a.value)[0] ?? null,
   };
+}
+
+function isPlausibleHeadlinePrice(
+  listing: Awaited<ReturnType<typeof getVisibleLiveInventoryListings>>[number],
+  value: number,
+) {
+  const modelName = listing.vehicle?.model.name ?? "";
+  const url = listing.url ?? "";
+  const context = `${modelName} ${url}`;
+  if (/laferrari|enzo|f40|f50|monza|daytona|sp[0-9]|p1|senna|speedtail|mclaren f1|countach|miura|reventon|sian|centenario/i.test(context)) {
+    return true;
+  }
+
+  const normalized = context.toLowerCase();
+  const familyCaps: Array<[RegExp, number]> = [
+    [/f430|360|355|348|328|308/, 550000],
+    [/458|california|roma|portofino/, 850000],
+    [/488|f8|296/, 950000],
+    [/812|sf90|aventador|revuelto/, 1350000],
+    [/huracan|gallardo|urus|mp4-12c|570|600lt|650s|720s|750s|artura|gt\b/, 750000],
+  ];
+  const cap = familyCaps.find(([pattern]) => pattern.test(normalized))?.[1] ?? 1500000;
+  return value <= cap;
 }
 
 const liveInventoryWhere = {
   status: "ACTIVE",
   validationStatus: "VALID",
   priceStatus: { not: "PRICE_INVALID" },
-  imageUrl: { not: null },
   vehicle: {
     is: {
       inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
@@ -239,6 +250,26 @@ const liveInventoryWhere = {
 } satisfies Prisma.ListingWhereInput;
 
 async function getLiveInventoryVehicles(take: number): Promise<HomepageGarageVehicle[]> {
+  const listings = await getVisibleLiveInventoryListings(take);
+
+  return listings
+    .map((listing) => {
+      const vehicle = listing.vehicle!;
+      return {
+        id: listing.id,
+        label: `${vehicle.year} ${vehicle.model.make.name} ${vehicle.model.name}`,
+        eyebrow: listing.dealerName || vehicle.model.make.name,
+        href: `/vehicle/${vehicle.vin}`,
+        imageUrl: cleanImage(getVehicleHeroImage(vehicle)) || cleanImage(listing.imageUrl),
+        status: "DREAM" as const,
+        meta: formatCurrency(listing.askingPrice ?? listing.price),
+      };
+    })
+    .filter((vehicle) => vehicle.imageUrl)
+    .slice(0, take);
+}
+
+async function getVisibleLiveInventoryListings(take: number) {
   const listings = await prisma.listing.findMany({
     where: {
       ...liveInventoryWhere,
@@ -259,79 +290,11 @@ async function getLiveInventoryVehicles(take: number): Promise<HomepageGarageVeh
 
   return listings
     .filter((listing) => listing.vehicle)
-    .map((listing) => {
-      const vehicle = listing.vehicle!;
-      return {
-        id: listing.id,
-        label: `${vehicle.year} ${vehicle.model.make.name} ${vehicle.model.name}`,
-        eyebrow: listing.dealerName || vehicle.model.make.name,
-        href: `/vehicle/${vehicle.vin}`,
-        imageUrl: cleanImage(getVehicleHeroImage(vehicle)) || cleanImage(listing.imageUrl),
-        status: "DREAM" as const,
-        meta: formatCurrency(listing.askingPrice ?? listing.price),
-      };
-    })
-    .filter((vehicle) => vehicle.imageUrl);
-}
-
-function getOwnedValues(
-  vehicles: Array<{ year?: number; model?: { name: string; make: { name: string } }; listings: Array<{ askingPrice: number | null; price: number | null }> }>
-) {
-  return vehicles
-    .map((vehicle) => vehicle.listings[0]?.askingPrice ?? vehicle.listings[0]?.price ?? null)
-    .map((value, index) => ({ value, vehicle: vehicles[index] }))
-    .filter((item): item is { value: number; vehicle: (typeof vehicles)[number] } => Boolean(item.value && item.value >= 10000));
-}
-
-function calculateVehicleListValue(vehicles: HomepageGarageVehicle[]) {
-  return vehicles.reduce((sum, vehicle) => sum + parseCurrency(vehicle.meta), 0) || null;
-}
-
-function getMostExpensiveFromCards(vehicles: HomepageGarageVehicle[]) {
-  return vehicles
-    .map((vehicle) => ({ label: vehicle.label, value: parseCurrency(vehicle.meta) }))
-    .filter((item) => item.value >= 10000)
-    .sort((a, b) => b.value - a.value)[0] ?? null;
-}
-
-function getMostExpensiveFromOwned(
-  vehicles: Array<{ year: number; model: { name: string; make: { name: string } }; listings: Array<{ askingPrice: number | null; price: number | null }> }>
-) {
-  const highest = getOwnedValues(vehicles).sort((a, b) => b.value - a.value)[0];
-  if (!highest?.vehicle.model) return null;
-  return {
-    label: `${highest.vehicle.year} ${highest.vehicle.model.make.name} ${highest.vehicle.model.name}`,
-    value: highest.value,
-  };
-}
-
-function getFastestOwnedVehicle(
-  vehicles: Array<{ year: number; model: { name: string; make: { name: string }; spec: { topSpeed: string | null } | null } }>
-) {
-  const fastest = vehicles
-    .map((vehicle) => ({ vehicle, mph: parseMph(vehicle.model.spec?.topSpeed) }))
-    .filter((item): item is { vehicle: (typeof vehicles)[number]; mph: number } => item.mph !== null)
-    .sort((a, b) => b.mph - a.mph)[0];
-  if (!fastest) return null;
-  return {
-    label: `${fastest.vehicle.year} ${fastest.vehicle.model.make.name} ${fastest.vehicle.model.name}`,
-    value: `${fastest.mph} mph`,
-  };
+    .filter((listing) => cleanImage(getVehicleHeroImage(listing.vehicle)) || cleanImage(listing.imageUrl));
 }
 
 async function getFastestInventoryCar() {
-  const rows = await prisma.listing.findMany({
-    where: liveInventoryWhere,
-    include: {
-      vehicle: {
-        include: {
-          model: { include: { make: true, spec: true } },
-        },
-      },
-    },
-    orderBy: { updatedAt: "desc" },
-    take: 80,
-  });
+  const rows = await getVisibleLiveInventoryListings(2000);
   const fastest = rows
     .filter((listing) => listing.vehicle)
     .map((listing) => ({ listing, mph: parseMph(listing.vehicle?.model.spec?.topSpeed) }))
@@ -377,16 +340,6 @@ function parseMph(value: string | null | undefined) {
   if (!value) return null;
   const match = value.match(/(\d{2,3})/);
   return match ? Number(match[1]) : null;
-}
-
-function parseCurrency(value: string | null | undefined) {
-  if (!value) return 0;
-  const compactMatch = value.match(/\$?([\d.]+)\s*([MK])/i);
-  if (compactMatch) {
-    const base = Number(compactMatch[1]);
-    return base * (compactMatch[2].toUpperCase() === "M" ? 1000000 : 1000);
-  }
-  return Number(value.replace(/[^0-9.]/g, "")) || 0;
 }
 
 function buildActivityItems(

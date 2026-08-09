@@ -256,6 +256,13 @@ canvas {
   border-radius: 8px;
   background: rgba(14, 14, 14, 0.72);
   backdrop-filter: blur(20px);
+  color: inherit;
+  text-decoration: none;
+}
+
+.garage-home-kpi.is-link:hover {
+  border-color: rgba(226, 15, 27, 0.62);
+  background: rgba(226, 15, 27, 0.12);
 }
 
 .garage-home-kpi-icon {
@@ -274,12 +281,10 @@ canvas {
   display: block;
   margin-top: 5px;
   color: #ffffff;
-  font-size: clamp(17px, 1.8vw, 24px);
+  font-size: clamp(13px, 1.12vw, 20px);
   font-weight: 680;
   line-height: 1.05;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .garage-home-kpi p {
