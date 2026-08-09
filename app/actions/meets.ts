@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { notifyMeetCancelled, notifyMeetCreated, notifyMeetRsvp } from "@/lib/meets/meet-notifications";
+import { notifyMeetCancelled, notifyMeetCreated, notifyMeetRsvp, notifyMeetUpdated } from "@/lib/meets/meet-notifications";
 
 const SUPPORTED_MEET_MAKES = ["Ferrari", "Lamborghini", "McLaren"];
 
@@ -21,6 +21,7 @@ export async function createMeetAction(formData: FormData) {
   const state = readString(formData, "state").toUpperCase();
   const locationName = readString(formData, "locationName");
   const locationDetail = readString(formData, "locationDetail") || "Address shared after RSVP";
+  const exactAddress = readString(formData, "exactAddress");
   const description = readString(formData, "description");
   const visibility = readString(formData, "visibility") === "INVITE_ONLY" ? "INVITE_ONLY" : "PUBLIC";
   const capacity = parseOptionalInt(readString(formData, "capacity"));
@@ -49,6 +50,7 @@ export async function createMeetAction(formData: FormData) {
       state,
       locationName,
       locationDetail,
+      exactAddress: exactAddress || null,
       capacity,
       description: description || null,
       allowedMakes: JSON.stringify(allowedMakes.length > 0 ? allowedMakes : SUPPORTED_MEET_MAKES),
@@ -98,8 +100,12 @@ export async function rsvpMeetAction(formData: FormData) {
     }
   }
 
+  const existingRsvp = await prisma.meetRsvp.findUnique({
+    where: { meetId_userId: { meetId, userId: session.user.id as string } },
+    select: { status: true },
+  });
   const goingCount = await prisma.meetRsvp.count({
-    where: { meetId, status: "GOING" },
+    where: { meetId, status: "GOING", userId: { not: session.user.id as string } },
   });
   const finalStatus = meet.capacity && goingCount >= meet.capacity && status === "GOING" ? "WAITLISTED" : status;
 
@@ -123,6 +129,10 @@ export async function rsvpMeetAction(formData: FormData) {
   });
 
   await notifyMeetRsvp(meetId, session.user.id as string, finalStatus);
+  await syncMeetCapacityStatus(meetId);
+  if (existingRsvp?.status === "GOING" && finalStatus === "CANCELLED") {
+    await promoteWaitlistIfSpace(meetId);
+  }
 
   revalidatePath("/meets");
   revalidatePath(`/meets/${meet.slug}`);
@@ -130,6 +140,140 @@ export async function rsvpMeetAction(formData: FormData) {
   const username = await getUsername(session.user.id as string);
   if (username) revalidatePath(`/garage/${username}`);
   redirect(`/meets/${meet.slug}`);
+}
+
+export async function updateHostedMeetAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+
+  const userId = session.user.id as string;
+  const meetId = readString(formData, "meetId");
+  const title = readString(formData, "title");
+  const type = readString(formData, "type") || "Cars & Coffee";
+  const startsAtInput = readString(formData, "startsAt");
+  const capacity = parseOptionalInt(readString(formData, "capacity"));
+  const city = readString(formData, "city");
+  const state = readString(formData, "state").toUpperCase();
+  const locationName = readString(formData, "locationName");
+  const locationDetail = readString(formData, "locationDetail") || "Address shared after RSVP";
+  const exactAddress = readString(formData, "exactAddress");
+  const description = readString(formData, "description");
+  const visibility = readString(formData, "visibility") === "INVITE_ONLY" ? "INVITE_ONLY" : "PUBLIC";
+  const allowedMakes = SUPPORTED_MEET_MAKES.filter((make) => formData.getAll("allowedMakes").includes(make));
+
+  if (!meetId || !title || !startsAtInput || !city || !state || !locationName) {
+    throw new Error("Meet id, title, date/time, city, state, and location name are required.");
+  }
+
+  const startsAt = new Date(startsAtInput);
+  if (Number.isNaN(startsAt.getTime())) {
+    throw new Error("Choose a valid event date and time.");
+  }
+
+  const meet = await prisma.meet.findFirst({
+    where: {
+      id: meetId,
+      hostId: userId,
+      status: { in: ["DRAFT", "PUBLISHED", "FULL"] },
+    },
+    select: { id: true, slug: true },
+  });
+
+  if (!meet) {
+    throw new Error("Only the host can edit an active meet.");
+  }
+
+  await prisma.meet.update({
+    where: { id: meet.id },
+    data: {
+      title,
+      type,
+      startsAt,
+      capacity,
+      city,
+      state,
+      locationName,
+      locationDetail,
+      exactAddress: exactAddress || null,
+      description: description || null,
+      visibility,
+      allowedMakes: JSON.stringify(allowedMakes.length > 0 ? allowedMakes : SUPPORTED_MEET_MAKES),
+      mapX: estimateMapX(state),
+      mapY: estimateMapY(state),
+    },
+  });
+
+  await syncMeetCapacityStatus(meet.id);
+  await notifyMeetUpdated(meet.id, userId);
+
+  revalidatePath("/meets");
+  revalidatePath(`/meets/${meet.slug}`);
+  revalidatePath("/garage");
+  const username = await getUsername(userId);
+  if (username) revalidatePath(`/garage/${username}`);
+  redirect(`/meets/${meet.slug}`);
+}
+
+export async function manageMeetRsvpAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+
+  const userId = session.user.id as string;
+  const rsvpId = readString(formData, "rsvpId");
+  const action = readString(formData, "action");
+  if (!rsvpId) {
+    throw new Error("Missing RSVP id.");
+  }
+
+  const rsvp = await prisma.meetRsvp.findUnique({
+    where: { id: rsvpId },
+    include: {
+      meet: { select: { id: true, slug: true, hostId: true, capacity: true, status: true } },
+    },
+  });
+
+  if (!rsvp || rsvp.meet.hostId !== userId) {
+    throw new Error("Only the host can manage this RSVP.");
+  }
+  if (!["PUBLISHED", "FULL"].includes(rsvp.meet.status)) {
+    throw new Error("Only active meets can update RSVPs.");
+  }
+
+  if (action === "REMOVE") {
+    await prisma.meetRsvp.update({
+      where: { id: rsvp.id },
+      data: { status: "CANCELLED" },
+    });
+    await promoteWaitlistIfSpace(rsvp.meet.id);
+  } else {
+    const status = normalizeHostRsvpStatus(action);
+    if (status === "GOING") {
+      const goingCount = await prisma.meetRsvp.count({
+        where: { meetId: rsvp.meet.id, status: "GOING", id: { not: rsvp.id } },
+      });
+      if (rsvp.meet.capacity && goingCount >= rsvp.meet.capacity) {
+        throw new Error("Capacity is full. Move someone to waitlist first.");
+      }
+    }
+    await prisma.meetRsvp.update({
+      where: { id: rsvp.id },
+      data: { status },
+    });
+  }
+
+  await syncMeetCapacityStatus(rsvp.meet.id);
+  await notifyMeetRsvp(rsvp.meet.id, rsvp.userId, action === "REMOVE" ? "CANCELLED" : normalizeHostRsvpStatus(action));
+
+  revalidatePath("/meets");
+  revalidatePath(`/meets/${rsvp.meet.slug}`);
+  revalidatePath("/garage");
+  const username = await getUsername(userId);
+  if (username) revalidatePath(`/garage/${username}`);
+  redirect(`/meets/${rsvp.meet.slug}#attendees`);
 }
 
 export async function cancelHostedMeetAction(formData: FormData) {
@@ -254,6 +398,11 @@ function normalizeRsvpStatus(value: string) {
   return "GOING";
 }
 
+function normalizeHostRsvpStatus(value: string) {
+  if (value === "MAYBE" || value === "WAITLISTED") return value;
+  return "GOING";
+}
+
 function isPublicImageUrl(value: string) {
   if (!value || value.length > 1200) return false;
   try {
@@ -277,6 +426,50 @@ async function createUniqueMeetSlug(title: string, city: string, startsAt: Date)
     index += 1;
   }
   return slug;
+}
+
+async function syncMeetCapacityStatus(meetId: string) {
+  const meet = await prisma.meet.findUnique({
+    where: { id: meetId },
+    select: { id: true, status: true, capacity: true },
+  });
+  if (!meet || !["PUBLISHED", "FULL"].includes(meet.status) || !meet.capacity) return;
+
+  const goingCount = await prisma.meetRsvp.count({ where: { meetId, status: "GOING" } });
+  const nextStatus = goingCount >= meet.capacity ? "FULL" : "PUBLISHED";
+  if (nextStatus !== meet.status) {
+    await prisma.meet.update({
+      where: { id: meetId },
+      data: { status: nextStatus },
+    });
+  }
+}
+
+async function promoteWaitlistIfSpace(meetId: string) {
+  const meet = await prisma.meet.findUnique({
+    where: { id: meetId },
+    select: { capacity: true },
+  });
+  if (!meet?.capacity) return;
+
+  const goingCount = await prisma.meetRsvp.count({ where: { meetId, status: "GOING" } });
+  const openSpots = meet.capacity - goingCount;
+  if (openSpots <= 0) return;
+
+  const waitlisted = await prisma.meetRsvp.findMany({
+    where: { meetId, status: "WAITLISTED" },
+    orderBy: { createdAt: "asc" },
+    take: openSpots,
+    select: { id: true, userId: true },
+  });
+
+  for (const rsvp of waitlisted) {
+    await prisma.meetRsvp.update({
+      where: { id: rsvp.id },
+      data: { status: "GOING" },
+    });
+    await notifyMeetRsvp(meetId, rsvp.userId, "GOING");
+  }
 }
 
 async function getUsername(userId: string) {

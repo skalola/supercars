@@ -75,8 +75,13 @@ export default async function HostMeetPage() {
         </div>
 
         <label>
-          <span>Location Detail</span>
+          <span>Public Location Note</span>
           <input name="locationDetail" placeholder="Exact address shared after RSVP" />
+        </label>
+
+        <label>
+          <span>Exact Address</span>
+          <input name="exactAddress" placeholder="Shared only with host and RSVP'd attendees" />
         </label>
 
         <label>

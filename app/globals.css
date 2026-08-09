@@ -4074,6 +4074,7 @@ canvas {
 .meet-info-panel,
 .meet-rsvp-panel,
 .meet-cars-panel,
+.meet-host-tools-panel,
 .meet-photos-panel {
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 8px;
@@ -4371,6 +4372,7 @@ canvas {
 .meet-info-panel,
 .meet-rsvp-panel,
 .meet-cars-panel,
+.meet-host-tools-panel,
 .meet-photos-panel {
   display: grid;
   gap: 18px;
@@ -4388,6 +4390,16 @@ canvas {
   background: rgba(10, 12, 14, 0.86);
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.38);
   backdrop-filter: blur(20px);
+}
+
+.meet-host-form.is-compact {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 .meet-host-grid {
@@ -4560,6 +4572,12 @@ canvas {
   font-size: 15px;
 }
 
+.meet-private-note {
+  margin-top: -10px;
+  color: rgba(255, 255, 255, 0.52) !important;
+  font-size: 12px !important;
+}
+
 .meet-car-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -4599,6 +4617,104 @@ canvas {
 
 .meet-photos-panel {
   grid-column: 1 / -1;
+}
+
+.meet-host-tools-panel {
+  grid-column: 1 / -1;
+}
+
+.meet-attendee-panel {
+  display: grid;
+  gap: 14px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.meet-attendee-panel > .meets-secondary-button {
+  justify-self: start;
+  padding: 0 18px;
+}
+
+.meet-attendee-list {
+  display: grid;
+  gap: 10px;
+}
+
+.meet-attendee-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(300px, auto);
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  min-width: 0;
+}
+
+.meet-attendee-row > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.meet-attendee-row strong {
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meet-attendee-row span {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meet-attendee-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff !important;
+  font-size: 11px !important;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.meet-attendee-row form {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.meet-attendee-row button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.meet-attendee-row button[value="REMOVE"] {
+  border-color: rgba(226, 15, 27, 0.5);
+  background: rgba(226, 15, 27, 0.12);
 }
 
 .meet-photo-grid {
@@ -5631,6 +5747,21 @@ canvas {
     grid-template-columns: 1fr;
   }
 
+  .meet-attendee-row {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .meet-attendee-status {
+    justify-self: start;
+  }
+
+  .meet-attendee-row form {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    justify-content: stretch;
+  }
+
   .admin-marketing-shell {
     grid-template-columns: 1fr;
   }
@@ -5901,6 +6032,10 @@ canvas {
   .meet-rsvp-buttons,
   .meet-photo-form {
     display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .meet-attendee-row form {
     grid-template-columns: 1fr;
   }
 

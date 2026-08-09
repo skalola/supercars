@@ -6,6 +6,7 @@ type MeetNotificationType =
   | "MEET_CREATED_HOST"
   | "MEET_RSVP_USER"
   | "MEET_RSVP_HOST"
+  | "MEET_UPDATED_ATTENDEE"
   | "MEET_REMINDER_ATTENDEE"
   | "MEET_CANCELLED_ATTENDEE"
   | "MEET_CANCELLED_HOST";
@@ -113,6 +114,40 @@ export async function notifyMeetCancelled(meetId: string, actorUserId?: string |
       subject: `[SUPERCAR DASH] Meet Cancelled - ${meet.title}`,
       headline: "Meet cancelled",
       body: `${meet.title} in ${meet.city}, ${meet.state} has been cancelled by the host or admin.`,
+      ctaLabel: "View Meet",
+    });
+  }
+}
+
+export async function notifyMeetUpdated(meetId: string, actorUserId?: string | null) {
+  const meet = await getMeetEmailContext(meetId);
+  if (!meet) return;
+
+  const attendees = await prisma.meetRsvp.findMany({
+    where: { meetId, status: { in: ["GOING", "MAYBE", "WAITLISTED"] } },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          email: true,
+          trackerPreference: { select: { eventsTrackerEnabled: true } },
+        },
+      },
+    },
+    take: 500,
+  });
+
+  for (const attendee of attendees) {
+    if (attendee.user.id === actorUserId) continue;
+    await sendMeetNotification({
+      meet,
+      user: attendee.user,
+      type: "MEET_UPDATED_ATTENDEE",
+      subject: `[SUPERCAR DASH] Meet Updated - ${meet.title}`,
+      headline: "Meet details updated",
+      body: `${meet.title} has updated event details. Review the meet page before you arrive.`,
       ctaLabel: "View Meet",
     });
   }
