@@ -37,7 +37,6 @@ export default async function HomePage() {
 
           <div className="garage-home-kpis" aria-label="Garage status">
             <KpiCard label={summary.garageValueLabel} value={formatCurrency(summary.garageValue)} detail="Live priced cars" icon="$" />
-            <KpiCard label="Total Cars" value={summary.totalCars.toLocaleString()} detail="Collection and market count" icon="#" />
             <KpiCard
               label="Most Expensive"
               value={formatCurrency(summary.mostExpensiveValue)}
@@ -45,7 +44,7 @@ export default async function HomePage() {
               icon="M"
               href={summary.mostExpensiveHref}
             />
-            <KpiCard label="Highest HP" value={summary.fastestCarValue} detail={summary.fastestCarLabel} icon="HP" />
+            <KpiCard label="Highest HP" value={summary.fastestCarValue} detail={summary.fastestCarLabel} icon="HP" href={summary.fastestCarHref} />
           </div>
 
           <GarageRail

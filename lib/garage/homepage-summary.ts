@@ -35,6 +35,7 @@ export type HomepageSummary = {
   mostExpensiveHref: string | null;
   mostExpensiveValue: number | null;
   fastestCarLabel: string;
+  fastestCarHref: string | null;
   fastestCarValue: string;
   ownedVehicles: HomepageGarageVehicle[];
   dreamVehicles: HomepageGarageVehicle[];
@@ -161,6 +162,7 @@ async function getSignedInHomepageSummary(userId: string): Promise<HomepageSumma
     mostExpensiveHref: inventoryStats.mostExpensive?.href ?? null,
     mostExpensiveValue: inventoryStats.mostExpensive?.value ?? null,
     fastestCarLabel: highestHorsepowerCar.label,
+    fastestCarHref: highestHorsepowerCar.href,
     fastestCarValue: highestHorsepowerCar.value,
     ownedVehicles,
     dreamVehicles,
@@ -194,6 +196,7 @@ async function getPublicHomepageSummary(): Promise<HomepageSummary> {
     mostExpensiveHref: valueStats.mostExpensive?.href ?? null,
     mostExpensiveValue: valueStats.mostExpensive?.value ?? null,
     fastestCarLabel: highestHorsepowerCar.label,
+    fastestCarHref: highestHorsepowerCar.href,
     fastestCarValue: highestHorsepowerCar.value,
     ownedVehicles: [],
     dreamVehicles: featuredVehicles,
@@ -440,9 +443,10 @@ async function getHighestHorsepowerInventoryCar() {
     .map((listing) => ({ listing, horsepower: parseHorsepower(listing.vehicle?.model.spec?.horsepower) }))
     .filter((item): item is { listing: (typeof rows)[number]; horsepower: number } => item.horsepower !== null)
     .sort((a, b) => b.horsepower - a.horsepower)[0];
-  if (!strongest?.listing.vehicle) return { label: "Horsepower stats pending", value: "Pending" };
+  if (!strongest?.listing.vehicle) return { label: "Horsepower stats pending", href: null, value: "Pending" };
   return {
     label: `${strongest.listing.vehicle.year} ${strongest.listing.vehicle.model.make.name} ${strongest.listing.vehicle.model.name}`,
+    href: `/vehicle/${strongest.listing.vehicle.vin}`,
     value: `${strongest.horsepower.toLocaleString()} hp`,
   };
 }
