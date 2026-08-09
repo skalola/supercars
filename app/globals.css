@@ -938,10 +938,10 @@ canvas {
 }
 
 .garage-meet-stat-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.garage-meet-stat-grid a,
+.garage-meet-stat-grid button,
 .garage-meet-columns article,
 .garage-meet-photo-strip {
   display: grid;
@@ -954,15 +954,18 @@ canvas {
   backdrop-filter: blur(18px);
 }
 
-.garage-meet-stat-grid a {
+.garage-meet-stat-grid button {
   gap: 8px;
   color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
   text-decoration: none;
   transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
 }
 
-.garage-meet-stat-grid a:hover,
-.garage-meet-stat-grid a:focus-visible {
+.garage-meet-stat-grid button:hover,
+.garage-meet-stat-grid button:focus-visible {
   border-color: rgba(226, 15, 27, 0.46);
   background: rgba(226, 15, 27, 0.1);
   transform: translateY(-1px);
@@ -1017,6 +1020,170 @@ canvas {
   color: rgba(255, 255, 255, 0.62);
   font-size: 14px;
   line-height: 1.5;
+}
+
+.garage-activity-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.garage-activity-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.76);
+  cursor: pointer;
+}
+
+.garage-activity-modal-panel {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 18px;
+  width: min(680px, 100%);
+  max-height: min(760px, calc(100vh - 40px));
+  overflow: hidden;
+  padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background:
+    linear-gradient(180deg, rgba(20, 21, 24, 0.98), rgba(5, 5, 6, 0.98)),
+    #080808;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.62);
+  color: #ffffff;
+}
+
+.garage-activity-modal-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.garage-activity-modal-header div {
+  display: grid;
+  gap: 6px;
+}
+
+.garage-activity-modal-header span {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.garage-activity-modal-header h2 {
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(26px, 4vw, 38px);
+  font-weight: 560;
+  line-height: 1;
+}
+
+.garage-activity-modal-header button {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.garage-activity-modal-list {
+  display: grid;
+  gap: 10px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.garage-activity-modal-list a {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.garage-activity-modal-list a:hover,
+.garage-activity-modal-list a:focus-visible {
+  border-color: rgba(226, 15, 27, 0.48);
+  background: rgba(226, 15, 27, 0.1);
+}
+
+.garage-activity-modal-list a > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.garage-activity-modal-list a > div:last-child {
+  justify-items: end;
+}
+
+.garage-activity-modal-list strong {
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 760;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.garage-activity-modal-list span {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 12px;
+}
+
+.garage-activity-modal-list em {
+  color: #ff4a53;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.garage-activity-modal-empty {
+  display: grid;
+  justify-items: start;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.garage-activity-modal-empty a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(226, 15, 27, 0.76);
+  border-radius: 6px;
+  background: rgba(226, 15, 27, 0.14);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 850;
+  text-decoration: none;
+  text-transform: uppercase;
 }
 
 .garage-meet-list {
@@ -6497,6 +6664,34 @@ canvas {
 
   .garage-meet-stat-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .garage-activity-modal {
+    align-items: end;
+    padding: 12px;
+  }
+
+  .garage-activity-modal-panel {
+    width: 100%;
+    max-height: min(720px, calc(100vh - 24px));
+    padding: 18px;
+  }
+
+  .garage-activity-modal-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .garage-activity-modal-header button {
+    width: 100%;
+  }
+
+  .garage-activity-modal-list a {
+    grid-template-columns: 1fr;
+  }
+
+  .garage-activity-modal-list a > div:last-child {
+    justify-items: start;
   }
 
   .garage-meet-photo-strip > div:last-child {
