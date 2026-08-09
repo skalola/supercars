@@ -3,6 +3,7 @@ import { auth, signIn } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import GarageTabs, { type GarageClaimedVehicle, type GarageSavedVehicle } from "./GarageTabs";
+import { getGarageStats } from "./garage-stats";
 
 export default async function GaragePage() {
   const session = await auth();
@@ -45,6 +46,7 @@ export default async function GaragePage() {
         model: {
           include: {
             make: true,
+            spec: true,
             images: {
               orderBy: [{ type: "asc" }, { createdAt: "asc" }],
               take: 1,
@@ -57,6 +59,15 @@ export default async function GaragePage() {
         },
         images: {
           orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+          take: 1,
+        },
+        modifications: true,
+        listings: {
+          where: {
+            status: "ACTIVE",
+            OR: [{ askingPrice: { gte: 10000 } }, { price: { gte: 10000 } }],
+          },
+          select: { askingPrice: true, price: true },
           take: 1,
         },
       },
@@ -108,6 +119,7 @@ export default async function GaragePage() {
       listingTrackerAlertsEnabled: item.listingTrackerAlertsEnabled,
     }));
   const totalVehicles = claimedVehicles.length + savedVehicles.length;
+  const garageStats = getGarageStats(claimedVehicleRows, totalVehicles);
 
   return (
     <main className="garage-page-shell">
@@ -119,16 +131,23 @@ export default async function GaragePage() {
         </div>
         <div className="garage-page-stats" aria-label="Garage summary">
           <article>
-            <span>Claimed</span>
-            <strong>{claimedVehicles.length}</strong>
+            <span>Total Cars</span>
+            <strong>{garageStats.totalCars}</strong>
           </article>
           <article>
-            <span>Saved</span>
-            <strong>{savedVehicles.length}</strong>
+            <span>Total Spent</span>
+            <strong>{garageStats.totalSpent}</strong>
+            <small>Estimated from active listings</small>
           </article>
           <article>
-            <span>Total</span>
-            <strong>{totalVehicles}</strong>
+            <span>Fastest Car</span>
+            <strong>{garageStats.fastestCar}</strong>
+            <small>{garageStats.fastestCarLabel}</small>
+          </article>
+          <article>
+            <span>Spent on Mods</span>
+            <strong>{garageStats.modSpend}</strong>
+            <small>{garageStats.modDetail}</small>
           </article>
         </div>
       </section>
