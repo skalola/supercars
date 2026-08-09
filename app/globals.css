@@ -501,29 +501,18 @@ canvas {
 }
 
 .site-brand {
-  display: grid;
+  display: block;
   grid-column: 2;
   grid-row: 1;
-  justify-items: center;
-  color: #ffffff;
-  font-size: clamp(23px, 2.1vw, 34px);
-  font-style: italic;
-  font-weight: 760;
-  letter-spacing: 0.28em;
-  line-height: 0.88;
+  width: clamp(210px, 16.6vw, 292px);
+  line-height: 0;
   text-decoration: none;
-  white-space: nowrap;
 }
 
-.site-brand strong {
+.site-brand img {
   display: block;
-  color: #e20f1b;
-  font-size: 0.62em;
-  font-style: italic;
-  font-weight: 840;
-  letter-spacing: 0.52em;
-  line-height: 1.05;
-  transform: translateX(0.28em);
+  width: 100%;
+  height: auto;
 }
 
 .site-mobile-menu {
@@ -2488,14 +2477,9 @@ canvas {
     position: absolute;
     left: 50%;
     justify-self: center;
-    max-width: 154px;
-    font-size: 18px;
-    text-align: center;
+    width: 132px;
+    max-width: calc(100vw - 212px);
     transform: translateX(-50%);
-  }
-
-  .site-brand strong {
-    font-size: 0.58em;
   }
 
   .site-mobile-menu {
