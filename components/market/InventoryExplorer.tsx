@@ -86,7 +86,6 @@ export default function InventoryExplorer({
   // Get unique years list from listings for filter
   const uniqueYears = Array.from(new Set(listings.map((l) => l.year))).sort((a, b) => b - a);
   const visibleValue = filteredListings.reduce((sum, listing) => sum + (listing.askingPrice || listing.price || 0), 0);
-  const activeFilters = [selectedMakeId, selectedModelId, selectedYear, minPrice, maxPrice].filter(Boolean).length;
 
   const resetFilters = () => {
     setSelectedMakeId("");
@@ -112,10 +111,6 @@ export default function InventoryExplorer({
           <article>
             <span>Value</span>
             <strong className="market-value-number">{formatFullCurrency(visibleValue)}</strong>
-          </article>
-          <article>
-            <span>Filters</span>
-            <strong>{activeFilters}</strong>
           </article>
         </div>
       </section>
