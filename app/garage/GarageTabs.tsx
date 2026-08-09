@@ -34,11 +34,12 @@ export type GarageSavedVehicle = {
 type GarageTabsProps = {
   claimedVehicles: GarageClaimedVehicle[];
   savedVehicles: GarageSavedVehicle[];
+  isOwner?: boolean;
 };
 
 type ActiveTab = "claimed" | "saved";
 
-export default function GarageTabs({ claimedVehicles, savedVehicles }: GarageTabsProps) {
+export default function GarageTabs({ claimedVehicles, savedVehicles, isOwner = true }: GarageTabsProps) {
   const [activeTab, setActiveTab] = useState<ActiveTab>(claimedVehicles.length > 0 ? "claimed" : "saved");
   const [localSavedVehicles, setLocalSavedVehicles] = useState(savedVehicles);
   const [pendingAlertId, setPendingAlertId] = useState<string | null>(null);
@@ -123,22 +124,26 @@ export default function GarageTabs({ claimedVehicles, savedVehicles }: GarageTab
                   <span style={styles.savedBadge}>Saved</span>
                   <span style={styles.modelPath}>{item.makeName} model</span>
                 </div>
-                <div style={styles.alertPanel} aria-label={`${item.makeName} ${item.modelName} alerts`}>
-                  <AlertToggle
-                    label="Price tracker"
-                    detail="Email me when tracked listings drop in price."
-                    checked={item.priceTrackerAlertsEnabled}
-                    disabled={isPending && pendingAlertId === `${item.id}:price`}
-                    onChange={(checked) => updateAlert(item.id, "price", checked)}
-                  />
-                  <AlertToggle
-                    label="Listing tracker"
-                    detail="Email me when a new matching listing is added."
-                    checked={item.listingTrackerAlertsEnabled}
-                    disabled={isPending && pendingAlertId === `${item.id}:listing`}
-                    onChange={(checked) => updateAlert(item.id, "listing", checked)}
-                  />
-                </div>
+                {isOwner ? (
+                  <div style={styles.alertPanel} aria-label={`${item.makeName} ${item.modelName} alerts`}>
+                    <AlertToggle
+                      label="Price tracker"
+                      detail="Email me when tracked listings drop in price."
+                      checked={item.priceTrackerAlertsEnabled}
+                      disabled={isPending && pendingAlertId === `${item.id}:price`}
+                      onChange={(checked) => updateAlert(item.id, "price", checked)}
+                    />
+                    <AlertToggle
+                      label="Listing tracker"
+                      detail="Email me when a new matching listing is added."
+                      checked={item.listingTrackerAlertsEnabled}
+                      disabled={isPending && pendingAlertId === `${item.id}:listing`}
+                      onChange={(checked) => updateAlert(item.id, "listing", checked)}
+                    />
+                  </div>
+                ) : (
+                  <p style={styles.publicSavedMeta}>Saved to this public garage</p>
+                )}
               </div>
             </article>
           ))}
@@ -452,6 +457,14 @@ const styles: Record<string, React.CSSProperties> = {
     position: "absolute",
     opacity: 0,
     pointerEvents: "none",
+  },
+  publicSavedMeta: {
+    margin: "8px 0 0",
+    paddingTop: "10px",
+    borderTop: "1px solid rgba(255,255,255,0.1)",
+    color: "rgba(255,255,255,0.58)",
+    fontSize: "12px",
+    lineHeight: 1.35,
   },
   emptyPanel: {
     border: "1px solid rgba(255,255,255,0.12)",

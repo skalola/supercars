@@ -39,10 +39,10 @@ export default async function HomePage() {
           </div>
 
           <div className="garage-home-kpis" aria-label="Garage status">
-            <KpiCard label={summary.garageValueLabel} value={formatCurrency(summary.garageValue)} detail="Synced from verified cars" icon="$" />
-            <KpiCard label={summary.nextServiceLabel} value={summary.nextServiceDetail} detail="Maintenance status" icon="S" />
-            <KpiCard label={summary.upcomingMeetLabel} value={summary.upcomingMeetDetail} detail="Real-world club layer" icon="+" />
-            <KpiCard label="Passport" value={summary.passportLabel} detail={summary.passportDetail} icon="V" />
+            <KpiCard label={summary.garageValueLabel} value={formatCurrency(summary.garageValue)} detail="Live priced cars" icon="$" />
+            <KpiCard label="Total Cars" value={summary.totalCars.toLocaleString()} detail="Collection and market count" icon="#" />
+            <KpiCard label="Most Expensive" value={formatCurrency(summary.mostExpensiveValue)} detail={summary.mostExpensiveLabel} icon="M" />
+            <KpiCard label="Fastest Car" value={summary.fastestCarValue} detail={summary.fastestCarLabel} icon="F" />
           </div>
 
           <GarageRail
@@ -74,12 +74,12 @@ export default async function HomePage() {
         <article id="nearby-meets" className="garage-home-panel">
           <div>
             <span>Nearby Meets</span>
-            <Link href="/meets">Open meets</Link>
+            <Link href="/meets">Host event</Link>
           </div>
-          <div className="garage-home-meet-card">
-            <strong>Garage-first meets</strong>
-            <p>Select which car you are bringing, RSVP, and keep event history attached to the Vehicle Passport.</p>
-          </div>
+          <Link href="/meets" className="garage-home-meet-card">
+            <strong>Host a SUPERCAR DASH meet</strong>
+            <p>Create a local drive, concours stop, or private garage night for nearby owners.</p>
+          </Link>
         </article>
 
         <article className="garage-home-panel">
@@ -135,9 +135,9 @@ function GarageRail({
 }) {
   return (
     <div className="garage-home-rail" aria-label="Garage collection">
-      <GarageRailGroup title="Owned" vehicles={ownedVehicles} emptyText="Claim a VIN-backed car" />
-      <GarageRailGroup title="Dream Garage" vehicles={dreamVehicles} emptyText="Save models to track" wide />
-      <GarageRailGroup title="Previously Owned" vehicles={previousVehicles} emptyText="Garage 2.0 history" />
+      <GarageRailGroup title="Owned" vehicles={ownedVehicles} emptyText="Claim your first car" emptyHref="/garage" />
+      <GarageRailGroup title="Dream Garage" vehicles={dreamVehicles} emptyText="Browse live inventory" emptyHref="/inventory" wide carousel />
+      <GarageRailGroup title="Previously Owned" vehicles={previousVehicles} emptyText="Add ownership history" emptyHref="/garage" />
     </div>
   );
 }
@@ -146,39 +146,46 @@ function GarageRailGroup({
   title,
   vehicles,
   emptyText,
+  emptyHref,
   wide = false,
+  carousel = false,
 }: {
   title: string;
   vehicles: HomepageGarageVehicle[];
   emptyText: string;
+  emptyHref: string;
   wide?: boolean;
+  carousel?: boolean;
 }) {
-  const visibleVehicles = vehicles.slice(0, wide ? 3 : 1);
+  const visibleVehicles = vehicles.slice(0, carousel ? 10 : wide ? 3 : 1);
+  const carouselVehicles = carousel && visibleVehicles.length > 1 ? [...visibleVehicles, ...visibleVehicles] : visibleVehicles;
 
   return (
-    <section className={wide ? "garage-home-rail-group wide" : "garage-home-rail-group"}>
+    <section className={`garage-home-rail-group${wide ? " wide" : ""}${carousel ? " is-carousel" : ""}`}>
       <div className="garage-home-rail-heading">
         <span>{title}</span>
       </div>
       {visibleVehicles.length > 0 ? (
         <div className="garage-home-rail-cards">
-          {visibleVehicles.map((vehicle) => (
-            <Link key={vehicle.id} href={vehicle.href} className="garage-home-car-card">
-              <div className="garage-home-car-image">
-                {vehicle.imageUrl ? (
-                  <Image src={vehicle.imageUrl} alt="" fill sizes="(max-width: 760px) 74vw, 260px" unoptimized />
-                ) : null}
-              </div>
-              <div>
-                <span>{vehicle.eyebrow}</span>
-                <strong>{vehicle.label}</strong>
-                <p>{vehicle.meta}</p>
-              </div>
-            </Link>
-          ))}
+          <div className={`garage-home-rail-track${carousel ? "" : " is-static"}`}>
+            {carouselVehicles.map((vehicle, index) => (
+              <Link key={`${vehicle.id}:${index}`} href={vehicle.href} className="garage-home-car-card">
+                <div className="garage-home-car-image">
+                  {vehicle.imageUrl ? (
+                    <Image src={vehicle.imageUrl} alt="" fill sizes="(max-width: 760px) 74vw, 260px" unoptimized />
+                  ) : null}
+                </div>
+                <div>
+                  <span>{vehicle.eyebrow}</span>
+                  <strong>{vehicle.label}</strong>
+                  <p>{vehicle.meta}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
       ) : (
-        <Link href="/garage" className="garage-home-empty-card">
+        <Link href={emptyHref} className="garage-home-empty-card">
           {emptyText}
         </Link>
       )}

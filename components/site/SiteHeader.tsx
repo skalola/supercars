@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { logoutAction } from "@/app/actions/auth-session";
 
@@ -17,24 +16,15 @@ type SiteHeaderProps = {
 const leftNavLinks = [
   { href: "/garage", label: "Garage" },
   { href: "/meets", label: "Meets" },
-  { href: "/make/ferrari", label: "Explore" },
-];
-
-const rightNavLinks = [
-  { href: "/garage", label: "Passport" },
   { href: "/inventory", label: "Market" },
 ];
 
+const rightNavLinks: typeof leftNavLinks = [];
+
 export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, trackersHref, profileImageUrl }: SiteHeaderProps) {
-  const pathname = usePathname();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    setIsMobileOpen(false);
-    setIsAccountOpen(false);
-  }, [pathname]);
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {

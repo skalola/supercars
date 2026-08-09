@@ -316,6 +316,41 @@ canvas {
   margin-top: 10px;
 }
 
+.garage-home-rail-track {
+  display: contents;
+}
+
+.garage-home-rail-group.is-carousel .garage-home-rail-cards {
+  display: block;
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+
+.garage-home-rail-group.is-carousel .garage-home-rail-track {
+  display: flex;
+  gap: 10px;
+  width: max-content;
+  animation: garageRailScroll 44s linear infinite;
+}
+
+.garage-home-rail-group.is-carousel:hover .garage-home-rail-track {
+  animation-play-state: paused;
+}
+
+.garage-home-rail-group.is-carousel .garage-home-car-card {
+  width: 210px;
+}
+
+@keyframes garageRailScroll {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(calc(-50% - 5px));
+  }
+}
+
 .garage-home-car-card,
 .garage-home-empty-card {
   display: grid;
@@ -456,6 +491,8 @@ canvas {
   background:
     linear-gradient(135deg, rgba(214, 20, 28, 0.18), rgba(255, 255, 255, 0.04)),
     #111111;
+  color: #ffffff !important;
+  text-decoration: none;
 }
 
 .garage-home-meet-card strong {
@@ -552,9 +589,9 @@ canvas {
 
 .garage-page-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(92px, 1fr));
+  grid-template-columns: repeat(4, minmax(112px, 1fr));
   gap: 10px;
-  min-width: min(420px, 100%);
+  min-width: min(620px, 100%);
 }
 
 .garage-page-stats article,
@@ -582,8 +619,14 @@ canvas {
 
 .garage-page-stats strong {
   color: #ffffff;
-  font-size: 30px;
+  font-size: clamp(22px, 2vw, 30px);
   line-height: 1;
+}
+
+.garage-page-stats small {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  line-height: 1.25;
 }
 
 .garage-empty-hero {
@@ -4730,9 +4773,27 @@ canvas {
     scroll-snap-type: x mandatory;
   }
 
+  .garage-home-rail-group.is-carousel .garage-home-rail-cards {
+    display: flex;
+    overflow-x: auto;
+    mask-image: none;
+  }
+
+  .garage-home-rail-track,
+  .garage-home-rail-group.is-carousel .garage-home-rail-track {
+    display: flex;
+    gap: 10px;
+    width: auto;
+    animation: none;
+  }
+
   .garage-home-car-card {
     flex: 0 0 min(74vw, 280px);
     scroll-snap-align: start;
+  }
+
+  .garage-home-rail-group.is-carousel .garage-home-car-card {
+    width: auto;
   }
 
   .garage-home-lower {
@@ -5019,7 +5080,8 @@ canvas {
   }
 
   .garage-page-stats {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-width: 0;
   }
 
   .vehicle-passport-hero-content {

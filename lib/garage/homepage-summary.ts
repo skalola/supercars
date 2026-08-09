@@ -1,4 +1,4 @@
-import { getNextMaintenanceRecommendation } from "@/lib/maintenance/recommendations";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { SUPPORTED_MAKES } from "@/lib/supported-makes";
 import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
@@ -20,12 +20,11 @@ export type HomepageSummary = {
   heroVehicleMeta: string;
   garageValue: number | null;
   garageValueLabel: string;
-  nextServiceLabel: string;
-  nextServiceDetail: string;
-  upcomingMeetLabel: string;
-  upcomingMeetDetail: string;
-  passportLabel: string;
-  passportDetail: string;
+  totalCars: number;
+  mostExpensiveLabel: string;
+  mostExpensiveValue: number | null;
+  fastestCarLabel: string;
+  fastestCarValue: string;
   ownedVehicles: HomepageGarageVehicle[];
   dreamVehicles: HomepageGarageVehicle[];
   previousVehicles: HomepageGarageVehicle[];
@@ -35,25 +34,6 @@ export type HomepageSummary = {
 
 type SessionUser = {
   id?: string | null;
-};
-
-type MaintenanceVehicleInput = {
-  mileage: number | null;
-  model: {
-    maintenanceRules: Array<{
-      id: string;
-      serviceName: string;
-      description: string | null;
-      intervalMiles: number | null;
-      intervalMonths: number | null;
-      priority: string;
-    }>;
-  };
-  serviceRecords: Array<{
-    mileage: number | null;
-    serviceDate: Date;
-    description: string | null;
-  }>;
 };
 
 export async function getHomepageSummary(user: SessionUser | undefined | null): Promise<HomepageSummary> {
@@ -66,7 +46,7 @@ export async function getHomepageSummary(user: SessionUser | undefined | null): 
 }
 
 async function getSignedInHomepageSummary(userId: string): Promise<HomepageSummary | null> {
-  const [user, ownedRows, dreamRows] = await Promise.all([
+  const [user, ownedRows, dreamRows, inventoryVehicles] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: { username: true, name: true },
@@ -77,7 +57,7 @@ async function getSignedInHomepageSummary(userId: string): Promise<HomepageSumma
         status: "CLAIMED",
       },
       include: {
-        model: { include: { make: true, images: true, maintenanceRules: true } },
+        model: { include: { make: true, images: true, maintenanceRules: true, spec: true } },
         photos: { orderBy: [{ isHero: "desc" }, { displayOrder: "asc" }, { createdAt: "asc" }] },
         images: { orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] },
         serviceRecords: { orderBy: { serviceDate: "desc" } },
@@ -118,6 +98,7 @@ async function getSignedInHomepageSummary(userId: string): Promise<HomepageSumma
       orderBy: { updatedAt: "desc" },
       take: 8,
     }),
+    getLiveInventoryVehicles(12),
   ]);
 
   if (!user) return null;
@@ -133,7 +114,7 @@ async function getSignedInHomepageSummary(userId: string): Promise<HomepageSumma
     meta: vehicle.mileage !== null ? `${vehicle.mileage.toLocaleString()} mi` : "Mileage pending",
   }));
 
-  const dreamVehicles = dreamRows
+  const savedDreamVehicles = dreamRows
     .filter((item) => !ownedModelIds.has(item.modelId))
     .map((item) => ({
       id: item.id,
@@ -144,10 +125,17 @@ async function getSignedInHomepageSummary(userId: string): Promise<HomepageSumma
       status: "DREAM" as const,
       meta: item.model.years || "Tracked model",
     }));
+  const dreamKeys = new Set(savedDreamVehicles.map((vehicle) => vehicle.href));
+  const dreamVehicles = [
+    ...savedDreamVehicles,
+    ...inventoryVehicles.filter((vehicle) => !dreamKeys.has(vehicle.href)),
+  ].slice(0, 12);
 
   const heroVehicle = ownedVehicles[0] || dreamVehicles[0] || null;
-  const garageValue = calculateOwnedValue(ownedRows);
-  const nextService = getNextServiceCopy(ownedRows[0] ?? null);
+  const ownedValues = getOwnedValues(ownedRows);
+  const garageValue = ownedValues.reduce((sum, item) => sum + item.value, 0) || calculateVehicleListValue(inventoryVehicles);
+  const mostExpensive = getMostExpensiveFromOwned(ownedRows) ?? getMostExpensiveFromCards(inventoryVehicles);
+  const fastestCar = getFastestOwnedVehicle(ownedRows) ?? { label: "Performance stats pending", value: "Pending" };
   const featuredVehicles = [...ownedVehicles, ...dreamVehicles].slice(0, 6);
 
   return {
@@ -157,12 +145,11 @@ async function getSignedInHomepageSummary(userId: string): Promise<HomepageSumma
     heroVehicleMeta: heroVehicle?.meta || "Claim a VIN or save a dream car to begin.",
     garageValue,
     garageValueLabel: ownedVehicles.length > 0 ? "Garage Value" : "Dream Value",
-    nextServiceLabel: nextService.label,
-    nextServiceDetail: nextService.detail,
-    upcomingMeetLabel: "Meets",
-    upcomingMeetDetail: "Meet system coming next",
-    passportLabel: ownedVehicles.length > 0 ? "Verified" : "Ready",
-    passportDetail: ownedVehicles.length > 0 ? `${ownedVehicles.length} passport${ownedVehicles.length === 1 ? "" : "s"}` : "VIN-first profiles",
+    totalCars: ownedVehicles.length || inventoryVehicles.length,
+    mostExpensiveLabel: mostExpensive?.label ?? "Most expensive",
+    mostExpensiveValue: mostExpensive?.value ?? null,
+    fastestCarLabel: fastestCar.label,
+    fastestCarValue: fastestCar.value,
     ownedVehicles,
     dreamVehicles,
     previousVehicles: [],
@@ -172,39 +159,105 @@ async function getSignedInHomepageSummary(userId: string): Promise<HomepageSumma
 }
 
 async function getPublicHomepageSummary(): Promise<HomepageSummary> {
+  const [featuredVehicles, totalCars, valueStats, activityItems] = await Promise.all([
+    getLiveInventoryVehicles(12),
+    prisma.listing.count({
+      where: liveInventoryWhere,
+    }),
+    getLiveInventoryValueStats(),
+    getLatestUserActivity(),
+  ]);
+
+  const fastestCar = await getFastestInventoryCar();
+  const heroVehicle = featuredVehicles[0] || null;
+
+  return {
+    username: null,
+    heroImageUrl: heroVehicle?.imageUrl || null,
+    heroVehicleLabel: heroVehicle?.label || "Your verified collection starts here",
+    heroVehicleMeta: heroVehicle?.meta || "Claim a VIN-backed car or save a dream model.",
+    garageValue: valueStats.totalValue || null,
+    garageValueLabel: "Live Collection Value",
+    totalCars,
+    mostExpensiveLabel: valueStats.mostExpensive?.label ?? "Most expensive",
+    mostExpensiveValue: valueStats.mostExpensive?.value ?? null,
+    fastestCarLabel: fastestCar.label,
+    fastestCarValue: fastestCar.value,
+    ownedVehicles: [],
+    dreamVehicles: featuredVehicles,
+    previousVehicles: [],
+    featuredVehicles,
+    activityItems,
+  };
+}
+
+async function getLiveInventoryValueStats() {
   const listings = await prisma.listing.findMany({
-    where: {
-      status: "ACTIVE",
-      validationStatus: "VALID",
-      priceStatus: { not: "PRICE_INVALID" },
-      imageUrl: { not: null },
+    where: liveInventoryWhere,
+    select: {
+      askingPrice: true,
+      price: true,
       vehicle: {
-        is: {
-          inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
-          model: { make: { name: { in: [...SUPPORTED_MAKES] } } },
+        select: {
+          year: true,
+          model: { select: { name: true, make: { select: { name: true } } } },
         },
       },
-      OR: [{ askingPrice: { gte: 10000 } }, { price: { gte: 10000 } }],
-      NOT: [
-        { source: { is: { type: "AUCTION" } } },
-        { url: { contains: "bringatrailer.com", mode: "insensitive" } },
-      ],
+    },
+    take: 1500,
+  });
+  const pricedListings = listings
+    .map((listing) => ({
+      label: listing.vehicle
+        ? `${listing.vehicle.year} ${listing.vehicle.model.make.name} ${listing.vehicle.model.name}`
+        : "Most expensive",
+      value: listing.askingPrice ?? listing.price ?? 0,
+    }))
+    .filter((listing) => listing.value >= 10000);
+  return {
+    totalValue: pricedListings.reduce((sum, listing) => sum + listing.value, 0),
+    mostExpensive: pricedListings.sort((a, b) => b.value - a.value)[0] ?? null,
+  };
+}
+
+const liveInventoryWhere = {
+  status: "ACTIVE",
+  validationStatus: "VALID",
+  priceStatus: { not: "PRICE_INVALID" },
+  imageUrl: { not: null },
+  vehicle: {
+    is: {
+      inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
+      model: { make: { name: { in: [...SUPPORTED_MAKES] } } },
+    },
+  },
+  OR: [{ askingPrice: { gte: 10000 } }, { price: { gte: 10000 } }],
+  NOT: [
+    { source: { is: { type: "AUCTION" } } },
+    { url: { contains: "bringatrailer.com", mode: "insensitive" } },
+  ],
+} satisfies Prisma.ListingWhereInput;
+
+async function getLiveInventoryVehicles(take: number): Promise<HomepageGarageVehicle[]> {
+  const listings = await prisma.listing.findMany({
+    where: {
+      ...liveInventoryWhere,
     },
     include: {
       vehicle: {
         include: {
           photos: true,
           images: { orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] },
-          model: { include: { make: true, images: true } },
+          model: { include: { make: true, images: true, spec: true } },
         },
       },
       model: { include: { make: true } },
     },
     orderBy: { updatedAt: "desc" },
-    take: 12,
+    take,
   });
 
-  const featuredVehicles = listings
+  return listings
     .filter((listing) => listing.vehicle)
     .map((listing) => {
       const vehicle = listing.vehicle!;
@@ -218,63 +271,122 @@ async function getPublicHomepageSummary(): Promise<HomepageSummary> {
         meta: formatCurrency(listing.askingPrice ?? listing.price),
       };
     })
-    .filter((vehicle) => vehicle.imageUrl)
-    .slice(0, 6);
-
-  const totalValue = listings.reduce((sum, listing) => sum + (listing.askingPrice ?? listing.price ?? 0), 0);
-  const heroVehicle = featuredVehicles[0] || null;
-
-  return {
-    username: null,
-    heroImageUrl: heroVehicle?.imageUrl || null,
-    heroVehicleLabel: heroVehicle?.label || "Your verified collection starts here",
-    heroVehicleMeta: heroVehicle?.meta || "Claim a VIN-backed passport or save a dream model.",
-    garageValue: totalValue || null,
-    garageValueLabel: "Live Collection Value",
-    nextServiceLabel: "Next Service",
-    nextServiceDetail: "Track by VIN",
-    upcomingMeetLabel: "Meets",
-    upcomingMeetDetail: "Coming soon",
-    passportLabel: "VIN-first",
-    passportDetail: "Persistent car identity",
-    ownedVehicles: [],
-    dreamVehicles: featuredVehicles,
-    previousVehicles: [],
-    featuredVehicles,
-    activityItems: [
-      { label: "Claim a vehicle passport", detail: "Turn a VIN into a persistent ownership profile.", href: "/garage" },
-      { label: "Save a dream model", detail: "Track listings and prices from your garage.", href: "/make/ferrari" },
-      { label: "Use ownership services", detail: "Service, transport, insurance, and sale tools stay attached to the car.", href: "/inventory" },
-    ],
-  };
+    .filter((vehicle) => vehicle.imageUrl);
 }
 
-function getNextServiceCopy(vehicle: MaintenanceVehicleInput | null) {
-  if (!vehicle) {
-    return { label: "Next Service", detail: "Add a car to track" };
-  }
-
-  const next = getNextMaintenanceRecommendation({
-    currentMileage: vehicle.mileage,
-    rules: vehicle.model.maintenanceRules,
-    serviceRecords: vehicle.serviceRecords,
-  });
-
-  if (!next) return { label: "Next Service", detail: "Mileage pending" };
-  return {
-    label: next.serviceName,
-    detail: next.remainingMiles !== null ? `${Math.max(0, next.remainingMiles).toLocaleString()} mi remaining` : next.dueText,
-  };
-}
-
-function calculateOwnedValue(
-  vehicles: Array<{ listings: Array<{ askingPrice: number | null; price: number | null }> }>
+function getOwnedValues(
+  vehicles: Array<{ year?: number; model?: { name: string; make: { name: string } }; listings: Array<{ askingPrice: number | null; price: number | null }> }>
 ) {
-  const values = vehicles
+  return vehicles
     .map((vehicle) => vehicle.listings[0]?.askingPrice ?? vehicle.listings[0]?.price ?? null)
-    .filter((value): value is number => Boolean(value && value >= 10000));
-  if (values.length === 0) return null;
-  return values.reduce((sum, value) => sum + value, 0);
+    .map((value, index) => ({ value, vehicle: vehicles[index] }))
+    .filter((item): item is { value: number; vehicle: (typeof vehicles)[number] } => Boolean(item.value && item.value >= 10000));
+}
+
+function calculateVehicleListValue(vehicles: HomepageGarageVehicle[]) {
+  return vehicles.reduce((sum, vehicle) => sum + parseCurrency(vehicle.meta), 0) || null;
+}
+
+function getMostExpensiveFromCards(vehicles: HomepageGarageVehicle[]) {
+  return vehicles
+    .map((vehicle) => ({ label: vehicle.label, value: parseCurrency(vehicle.meta) }))
+    .filter((item) => item.value >= 10000)
+    .sort((a, b) => b.value - a.value)[0] ?? null;
+}
+
+function getMostExpensiveFromOwned(
+  vehicles: Array<{ year: number; model: { name: string; make: { name: string } }; listings: Array<{ askingPrice: number | null; price: number | null }> }>
+) {
+  const highest = getOwnedValues(vehicles).sort((a, b) => b.value - a.value)[0];
+  if (!highest?.vehicle.model) return null;
+  return {
+    label: `${highest.vehicle.year} ${highest.vehicle.model.make.name} ${highest.vehicle.model.name}`,
+    value: highest.value,
+  };
+}
+
+function getFastestOwnedVehicle(
+  vehicles: Array<{ year: number; model: { name: string; make: { name: string }; spec: { topSpeed: string | null } | null } }>
+) {
+  const fastest = vehicles
+    .map((vehicle) => ({ vehicle, mph: parseMph(vehicle.model.spec?.topSpeed) }))
+    .filter((item): item is { vehicle: (typeof vehicles)[number]; mph: number } => item.mph !== null)
+    .sort((a, b) => b.mph - a.mph)[0];
+  if (!fastest) return null;
+  return {
+    label: `${fastest.vehicle.year} ${fastest.vehicle.model.make.name} ${fastest.vehicle.model.name}`,
+    value: `${fastest.mph} mph`,
+  };
+}
+
+async function getFastestInventoryCar() {
+  const rows = await prisma.listing.findMany({
+    where: liveInventoryWhere,
+    include: {
+      vehicle: {
+        include: {
+          model: { include: { make: true, spec: true } },
+        },
+      },
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 80,
+  });
+  const fastest = rows
+    .filter((listing) => listing.vehicle)
+    .map((listing) => ({ listing, mph: parseMph(listing.vehicle?.model.spec?.topSpeed) }))
+    .filter((item): item is { listing: (typeof rows)[number]; mph: number } => item.mph !== null)
+    .sort((a, b) => b.mph - a.mph)[0];
+  if (!fastest?.listing.vehicle) return { label: "Performance stats pending", value: "Pending" };
+  return {
+    label: `${fastest.listing.vehicle.year} ${fastest.listing.vehicle.model.make.name} ${fastest.listing.vehicle.model.name}`,
+    value: `${fastest.mph} mph`,
+  };
+}
+
+async function getLatestUserActivity() {
+  const rows = await prisma.vehicle.findMany({
+    where: {
+      status: "CLAIMED",
+      owner: { is: { username: { not: null } } },
+      model: { make: { name: { in: [...SUPPORTED_MAKES] } } },
+    },
+    include: {
+      owner: { select: { username: true, name: true } },
+      model: { include: { make: true } },
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 3,
+  });
+  const items = rows
+    .filter((vehicle) => vehicle.owner?.username)
+    .map((vehicle) => ({
+      label: vehicle.owner?.name || vehicle.owner?.username || "Member garage",
+      detail: `Added ${vehicle.year} ${vehicle.model.make.name} ${vehicle.model.name}`,
+      href: `/garage/${vehicle.owner!.username}`,
+    }));
+  if (items.length > 0) return items;
+  return [
+    { label: "Claim a vehicle", detail: "Add a VIN-backed car to your public garage.", href: "/garage" },
+    { label: "Save a dream model", detail: "Track listings and prices from your garage.", href: "/inventory" },
+    { label: "Host a meet", detail: "Bring the collection layer into real life.", href: "/meets" },
+  ];
+}
+
+function parseMph(value: string | null | undefined) {
+  if (!value) return null;
+  const match = value.match(/(\d{2,3})/);
+  return match ? Number(match[1]) : null;
+}
+
+function parseCurrency(value: string | null | undefined) {
+  if (!value) return 0;
+  const compactMatch = value.match(/\$?([\d.]+)\s*([MK])/i);
+  if (compactMatch) {
+    const base = Number(compactMatch[1]);
+    return base * (compactMatch[2].toUpperCase() === "M" ? 1000000 : 1000);
+  }
+  return Number(value.replace(/[^0-9.]/g, "")) || 0;
 }
 
 function buildActivityItems(

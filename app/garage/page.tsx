@@ -139,7 +139,7 @@ export default async function GaragePage() {
           <Link href="/inventory">Browse Market</Link>
         </section>
       ) : (
-        <GarageTabs claimedVehicles={claimedVehicles} savedVehicles={savedVehicles} />
+        <GarageTabs claimedVehicles={claimedVehicles} savedVehicles={savedVehicles} isOwner />
       )}
     </main>
   );

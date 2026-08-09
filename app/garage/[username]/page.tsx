@@ -24,18 +24,7 @@ export default async function UserGaragePage({ params }: { params: Promise<{ use
     );
   }
 
-  if (!session?.user || session.user.id !== user.id) {
-    return (
-      <main className="garage-page-shell">
-        <section className="garage-empty-panel">
-          <div className="garage-page-eyebrow">Private Garage</div>
-          <h2>This garage is private</h2>
-          <p>Only the owner can view this collection right now.</p>
-          <Link href="/">Return home</Link>
-        </section>
-      </main>
-    );
-  }
+  const isOwner = session?.user?.id === user.id;
 
   const [claimedVehicleRows, garageItems] = await Promise.all([
     prisma.vehicle.findMany({
@@ -47,6 +36,7 @@ export default async function UserGaragePage({ params }: { params: Promise<{ use
         model: {
           include: {
             make: true,
+            spec: true,
             images: {
               orderBy: [{ type: "asc" }, { createdAt: "asc" }],
               take: 1,
@@ -59,6 +49,15 @@ export default async function UserGaragePage({ params }: { params: Promise<{ use
         },
         images: {
           orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+          take: 1,
+        },
+        modifications: true,
+        listings: {
+          where: {
+            status: "ACTIVE",
+            OR: [{ askingPrice: { gte: 10000 } }, { price: { gte: 10000 } }],
+          },
+          select: { askingPrice: true, price: true },
           take: 1,
         },
       },
@@ -110,6 +109,7 @@ export default async function UserGaragePage({ params }: { params: Promise<{ use
       listingTrackerAlertsEnabled: item.listingTrackerAlertsEnabled,
     }));
   const totalVehicles = claimedVehicles.length + savedVehicles.length;
+  const garageStats = getGarageStats(claimedVehicleRows, totalVehicles);
 
   return (
     <main className="garage-page-shell">
@@ -121,28 +121,75 @@ export default async function UserGaragePage({ params }: { params: Promise<{ use
         </div>
         <div className="garage-page-stats" aria-label="Garage summary">
           <article>
-            <span>Claimed</span>
-            <strong>{claimedVehicles.length}</strong>
+            <span>Total Cars</span>
+            <strong>{garageStats.totalCars}</strong>
           </article>
           <article>
-            <span>Saved</span>
-            <strong>{savedVehicles.length}</strong>
+            <span>Total Spent</span>
+            <strong>{garageStats.totalSpent}</strong>
+            <small>Estimated from active listings</small>
           </article>
           <article>
-            <span>Total</span>
-            <strong>{totalVehicles}</strong>
+            <span>Fastest Car</span>
+            <strong>{garageStats.fastestCar}</strong>
+            <small>{garageStats.fastestCarLabel}</small>
+          </article>
+          <article>
+            <span>Spent on Mods</span>
+            <strong>{garageStats.modSpend}</strong>
+            <small>{garageStats.modDetail}</small>
           </article>
         </div>
       </section>
       {totalVehicles === 0 ? (
         <section className="garage-empty-panel">
           <h2>No vehicles yet</h2>
-          <p>Your claimed vehicles and saved models will appear here.</p>
+          <p>This public garage has not added claimed vehicles or saved models yet.</p>
           <Link href="/inventory">Browse Market</Link>
         </section>
       ) : (
-        <GarageTabs claimedVehicles={claimedVehicles} savedVehicles={savedVehicles} />
+        <GarageTabs claimedVehicles={claimedVehicles} savedVehicles={savedVehicles} isOwner={isOwner} />
       )}
     </main>
   );
+}
+
+function getGarageStats(
+  vehicles: Array<{
+    model: { name: string; make: { name: string }; spec: { topSpeed: string | null } | null };
+    modifications: unknown[];
+    listings: Array<{ askingPrice: number | null; price: number | null }>;
+  }>,
+  totalCars: number
+) {
+  const spent = vehicles.reduce((sum, vehicle) => sum + (vehicle.listings[0]?.askingPrice ?? vehicle.listings[0]?.price ?? 0), 0);
+  const fastest = vehicles
+    .map((vehicle) => ({ vehicle, mph: parseMph(vehicle.model.spec?.topSpeed) }))
+    .filter((item): item is { vehicle: (typeof vehicles)[number]; mph: number } => item.mph !== null)
+    .sort((a, b) => b.mph - a.mph)[0];
+  const modCount = vehicles.reduce((sum, vehicle) => sum + vehicle.modifications.length, 0);
+
+  return {
+    totalCars,
+    totalSpent: spent > 0 ? formatCurrency(spent) : "Pending",
+    fastestCar: fastest ? `${fastest.mph} mph` : "Pending",
+    fastestCarLabel: fastest ? `${fastest.vehicle.model.make.name} ${fastest.vehicle.model.name}` : "Specs not logged",
+    modSpend: "$0",
+    modDetail: modCount > 0 ? `${modCount} mods logged, costs not tracked` : "No mod costs logged",
+  };
+}
+
+function parseMph(value: string | null | undefined) {
+  if (!value) return null;
+  const match = value.match(/(\d{2,3})/);
+  return match ? Number(match[1]) : null;
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+    notation: value >= 1000000 ? "compact" : "standard",
+  }).format(value);
 }
