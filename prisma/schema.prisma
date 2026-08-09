@@ -40,6 +40,7 @@ model Model {
   vehicles            Vehicle[]
   spec                ModelSpec?
   images              ModelImage[]
+  imageCandidates     ModelImageCandidate[]
   variants            ModelVariant[]
   garageItems         GarageItem[]
   maintenanceRules    MaintenanceRule[]
@@ -111,6 +112,38 @@ model ModelImage {
   updatedAt DateTime @updatedAt
 
   @@unique([modelId, url])
+}
+
+model ModelImageCandidate {
+  id             String   @id @default(uuid())
+  modelId        String?
+  makeId         String?
+  makeName       String
+  modelName      String?
+  baseModelName  String?
+  url            String
+  source         String
+  sourceName     String?
+  sourceUrl      String?
+  license        String?
+  attribution    String?
+  attributionUrl String?
+  title          String?
+  category       String?
+  context        String?
+  confidence     Float?
+  reviewStatus   String   @default("UNREVIEWED")
+  matchedModelId String?
+
+  model          Model?   @relation(fields: [modelId], references: [id], onDelete: SetNull)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([source, url, makeName])
+  @@index([makeName])
+  @@index([baseModelName])
+  @@index([matchedModelId])
 }
 
 model Vehicle {

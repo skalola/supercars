@@ -53,6 +53,8 @@
     "backfill-make-metadata": "tsx --env-file .env scripts/backfill-make-metadata.ts",
     "audit-model-catalog": "tsx --env-file .env scripts/audit-model-catalog.ts",
     "ingest-model-catalog-metadata": "tsx --env-file .env scripts/ingest-model-catalog-metadata.ts",
+    "build-model-image-pool": "tsx --env-file .env scripts/build-model-image-candidate-pool.ts",
+    "match-model-image-candidates": "tsx --env-file .env scripts/match-model-image-candidates.ts",
     "migrate:neon:dry": "tsx --env-file .env scripts/migrate-sqlite-to-neon.ts",
     "migrate:neon": "tsx --env-file .env scripts/migrate-sqlite-to-neon.ts --execute",
     "verify:neon": "tsx --env-file .env scripts/verify-neon-migration.ts",
