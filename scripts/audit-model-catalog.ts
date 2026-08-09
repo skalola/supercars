@@ -118,7 +118,7 @@ function buildAuditRow(model: AuditedModel): ModelAuditRow {
       ].some((value) => typeof value === "string" && value.trim().length > 0),
   );
   const hasProductionYears = Boolean(model.years || model.productionStartYear || model.productionEndYear);
-  const hasHeroImage = model.images.length > 0;
+  const hasHeroImage = model.images.some((image) => image.type?.toLowerCase() !== "candidate" && image.reviewStatus !== "NEEDS_REVIEW");
   const hasMarketData = model._count.marketSales > 0 || model._count.marketSnapshots > 0;
   const hasListings = model._count.listings > 0;
   const missing = [
@@ -165,9 +165,13 @@ async function persistAuditStatus(rows: ModelAuditRow[], auditedAt: Date) {
       where: { id: row.modelId },
       data: {
         metadataStatus: row.status,
-        metadataConfidence: row.sourceCandidate?.confidence ?? null,
-        metadataSource: row.sourceCandidate?.sourceName ?? null,
-        metadataSourceUrl: row.sourceCandidate?.sourceUrl || null,
+        ...(row.sourceCandidate
+          ? {
+              metadataConfidence: row.sourceCandidate.confidence,
+              metadataSource: row.sourceCandidate.sourceName,
+              metadataSourceUrl: row.sourceCandidate.sourceUrl || null,
+            }
+          : {}),
         lastMetadataAuditAt: auditedAt,
       },
     });

@@ -11,8 +11,25 @@ import { isListingMatchForModel } from "@/lib/inventory/validate-listing-identit
 
 
 
-function getHeroImage(images: Array<{ url: string; type: string | null; source: string | null }>) {
-  return images.find((image) => image.type === "hero")?.url ?? images[0]?.url ?? null;
+type ModelImageRecord = {
+  id?: string;
+  url: string;
+  type: string | null;
+  source: string | null;
+  sourceUrl?: string | null;
+  sourceName?: string | null;
+  license?: string | null;
+  attribution?: string | null;
+  attributionUrl?: string | null;
+  confidence?: number | null;
+  reviewStatus?: string | null;
+};
+
+function getHeroImage(images: ModelImageRecord[]) {
+  const displayableImages = images.filter(
+    (image) => image.reviewStatus !== "NEEDS_REVIEW" && image.type?.toLowerCase() !== "candidate",
+  );
+  return displayableImages.find((image) => image.type?.toLowerCase() === "hero") ?? displayableImages[0] ?? null;
 }
 
 function getListingImage(listing: any) {
@@ -96,15 +113,7 @@ type ModelDetail = {
     createdAt: Date;
     updatedAt: Date;
   }>;
-  images: Array<{
-    id: string;
-    modelId: string;
-    url: string;
-    source: string | null;
-    type: string | null;
-    createdAt: Date;
-    updatedAt: Date;
-  }>;
+  images: ModelImageRecord[];
   vehicles: Array<{
     id: string;
     vin: string;
@@ -288,6 +297,10 @@ export default async function ModelPage({ params }: ModelPageProps) {
   }) : null;
 
   const heroImage = getHeroImage(modelImages);
+  const heroImageCredit = heroImage
+    ? heroImage.attribution || heroImage.sourceName || heroImage.source || null
+    : null;
+  const heroImageCreditUrl = heroImage?.attributionUrl || heroImage?.sourceUrl || null;
 
   const specs = [
     ["Engine", spec?.engine],
@@ -327,7 +340,7 @@ export default async function ModelPage({ params }: ModelPageProps) {
             }}
           >
             <Image
-              src={heroImage}
+              src={heroImage.url}
               alt={`${model.make.name} ${model.name}`}
               fill
               sizes="(max-width: 768px) 100vw, 75vw"
@@ -335,6 +348,41 @@ export default async function ModelPage({ params }: ModelPageProps) {
               priority
               unoptimized
             />
+            {heroImageCredit ? (
+              <div
+                style={{
+                  position: "absolute",
+                  left: 12,
+                  bottom: 12,
+                  maxWidth: "calc(100% - 24px)",
+                  border: "1px solid rgba(255, 255, 255, 0.14)",
+                  borderRadius: 999,
+                  background: "rgba(0, 0, 0, 0.58)",
+                  color: "rgba(255, 255, 255, 0.78)",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  padding: "6px 10px",
+                  backdropFilter: "blur(12px)",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                Image:{" "}
+                {heroImageCreditUrl ? (
+                  <Link
+                    href={heroImageCreditUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ color: "#ffffff", textDecoration: "none" }}
+                  >
+                    {heroImageCredit}
+                  </Link>
+                ) : (
+                  heroImageCredit
+                )}
+              </div>
+            ) : null}
             <form action={async () => {
               "use server";
               if (!session?.user?.id) {

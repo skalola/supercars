@@ -11,7 +11,6 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import { SUPPORTED_MAKES } from "@/lib/supported-makes";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -98,11 +97,6 @@ export async function getMarketRange(modelId: string): Promise<MarketRange | nul
       vehicle: {
         is: {
           inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
-          model: {
-            make: {
-              name: { in: [...SUPPORTED_MAKES] },
-            },
-          },
         }
       },
       OR: [
@@ -145,11 +139,6 @@ export async function getMarketSupply(modelId: string): Promise<MarketSupply> {
       vehicle: {
         is: {
           inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
-          model: {
-            make: {
-              name: { in: [...SUPPORTED_MAKES] },
-            },
-          },
         }
       },
       OR: [
@@ -314,11 +303,6 @@ export async function getMarketPriceHistory(modelId: string): Promise<MarketPric
         vehicle: {
           is: {
             inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
-            model: {
-              make: {
-                name: { in: [...SUPPORTED_MAKES] },
-              },
-            },
           },
         },
         OR: [
