@@ -11,6 +11,8 @@ const files = {
   garageMeetSummary: read("app/garage/garage-meets.ts"),
   schema: read("prisma/schema.prisma"),
   rateLimit: read("lib/security/action-rate-limit.ts"),
+  uploadStorage: read("lib/media/upload-storage.ts"),
+  packageJson: read("package.json"),
 };
 
 const checks: Array<[string, boolean]> = [
@@ -21,6 +23,7 @@ const checks: Array<[string, boolean]> = [
   ["Attendee management is host-only and rate limited", includesAll(files.meetActions, ["action: \"MEET_ATTENDEE_MANAGE\"", "rsvp.meet.hostId !== userId"])],
   ["Meet cancellation is host-only and rate limited", includesAll(files.meetActions, ["action: \"MEET_CANCEL\"", "Only the host can cancel"])],
   ["Photo upload is completed-only and rate limited", includesAll(files.meetActions, ["action: \"MEET_PHOTO_ADD\"", "meet.status !== \"COMPLETED\""])],
+  ["Meet photos support true file uploads", includesAll(files.meetActions, ["photoFile", "uploadPublicImage", "storedPhotoUrl"])],
   ["Photo upload requires host or active RSVP", includesAll(files.meetActions, ["meet.hostId === userId", "rsvp.status !== \"CANCELLED\""])],
   ["RSVP vehicle ownership is enforced", includesAll(files.meetActions, ["ownerId: userId", "status: \"CLAIMED\""])],
   ["Capacity full/open sync exists", includesAll(files.meetActions, ["syncMeetCapacityStatus", "goingCount >= meet.capacity ? \"FULL\" : \"PUBLISHED\""])],
@@ -33,6 +36,8 @@ const checks: Array<[string, boolean]> = [
   ["Meet serializer includes photos with vehicle links", includesAll(files.meetData, ["photos:", "vehicleHref", "createdAt: photo.createdAt.toISOString()"])],
   ["Garage meet summary includes live stats and photos", includesAll(files.garageMeetSummary, ["stats:", "upcoming:", "completed:", "prisma.meetPhoto.count"])],
   ["Rate-limit helper stores rolling-window counters", includesAll(files.rateLimit, ["actionRateLimit.upsert", "count: { increment: 1 }", "row.count > limit"])],
+  ["Upload storage uses Vercel Blob with dev fallback", includesAll(files.uploadStorage, ["@vercel/blob", "BLOB_READ_WRITE_TOKEN", "process.env.VERCEL", "public", "uploads"])],
+  ["Vercel Blob dependency is installed", files.packageJson.includes("\"@vercel/blob\"")],
   ["Schema contains rate-limit and meet history models", includesAll(files.schema, ["model ActionRateLimit", "model MeetPhoto", "exactAddress", "@@unique([actorKey, action, bucketKey, windowStart])"])],
 ];
 

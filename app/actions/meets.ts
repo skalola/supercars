@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { notifyMeetCancelled, notifyMeetCreated, notifyMeetRsvp, notifyMeetUpdated } from "@/lib/meets/meet-notifications";
+import { isUploadableImageFile, uploadPublicImage } from "@/lib/media/upload-storage";
 import { enforceActionRateLimit } from "@/lib/security/action-rate-limit";
 
 const SUPPORTED_MEET_MAKES = ["Ferrari", "Lamborghini", "McLaren"];
@@ -365,6 +366,7 @@ export async function addMeetPhotoAction(formData: FormData) {
   const userId = session.user.id as string;
   const meetId = readString(formData, "meetId");
   const photoUrl = readString(formData, "photoUrl");
+  const photoFile = formData.get("photoFile");
   const caption = readString(formData, "caption");
   const vehicleId = readString(formData, "vehicleId") || null;
   await enforceActionRateLimit({
@@ -375,8 +377,8 @@ export async function addMeetPhotoAction(formData: FormData) {
     bucketKey: meetId || "UNKNOWN_MEET",
   });
 
-  if (!meetId || !isPublicImageUrl(photoUrl)) {
-    throw new Error("A completed meet and public photo URL are required.");
+  if (!meetId) {
+    throw new Error("A completed meet is required.");
   }
 
   const meet = await prisma.meet.findUnique({
@@ -409,12 +411,23 @@ export async function addMeetPhotoAction(formData: FormData) {
     vehicleVin = vehicle.vin;
   }
 
+  let storedPhotoUrl = photoUrl;
+  if (isUploadableImageFile(photoFile)) {
+    const upload = await uploadPublicImage({
+      file: photoFile,
+      folder: `meets/${meet.id}/photos`,
+    });
+    storedPhotoUrl = upload.url;
+  } else if (!isPublicImageUrl(photoUrl)) {
+    throw new Error("Upload a photo or provide a public photo URL.");
+  }
+
   await prisma.meetPhoto.create({
     data: {
       meetId,
       userId,
       vehicleId,
-      url: photoUrl,
+      url: storedPhotoUrl,
       caption: caption || null,
     },
   });

@@ -5042,7 +5042,7 @@ canvas {
 
 .meet-photo-form {
   display: grid;
-  grid-template-columns: minmax(220px, 1.2fr) minmax(180px, 0.8fr) minmax(220px, 1fr) auto;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 0.7fr) minmax(200px, 0.9fr) minmax(220px, 1fr) auto;
   gap: 12px;
   align-items: end;
   padding-top: 4px;

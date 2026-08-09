@@ -341,8 +341,8 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
             <form action={addMeetPhotoAction} className="meet-photo-form">
               <input type="hidden" name="meetId" value={meet.id} />
               <label>
-                <span>Photo URL</span>
-                <input type="url" name="photoUrl" placeholder="https://..." required />
+                <span>Upload Photo</span>
+                <input type="file" name="photoFile" accept="image/jpeg,image/png,image/webp" />
               </label>
               <label>
                 <span>Vehicle</span>
@@ -358,6 +358,10 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
               <label className="meet-photo-caption-field">
                 <span>Caption</span>
                 <input name="caption" maxLength={180} placeholder="Optional event note" />
+              </label>
+              <label className="meet-photo-url-field">
+                <span>Photo URL</span>
+                <input type="url" name="photoUrl" placeholder="Optional fallback URL" />
               </label>
               <button type="submit">Add Photo</button>
             </form>
