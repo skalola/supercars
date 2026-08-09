@@ -85,6 +85,8 @@ export default function InventoryExplorer({
 
   // Get unique years list from listings for filter
   const uniqueYears = Array.from(new Set(listings.map((l) => l.year))).sort((a, b) => b - a);
+  const visibleValue = filteredListings.reduce((sum, listing) => sum + (listing.askingPrice || listing.price || 0), 0);
+  const activeFilters = [selectedMakeId, selectedModelId, selectedYear, minPrice, maxPrice].filter(Boolean).length;
 
   const resetFilters = () => {
     setSelectedMakeId("");
@@ -95,46 +97,51 @@ export default function InventoryExplorer({
   };
 
   return (
-    <div className="page-shell wide inventory-shell">
+    <div className="market-page-shell">
+      <section className="market-hero">
+        <div>
+          <div className="market-eyebrow">Market</div>
+          <h1>VIN-Backed Supercar Market</h1>
+          <p>Live Ferrari, Lamborghini, and McLaren inventory with verified VINs, prices, photos, and source links.</p>
+        </div>
+        <div className="market-stat-grid" aria-label="Market summary">
+          <article>
+            <span>Listings</span>
+            <strong>{filteredListings.length}</strong>
+          </article>
+          <article>
+            <span>Value</span>
+            <strong>{formatCompactCurrency(visibleValue)}</strong>
+          </article>
+          <article>
+            <span>Filters</span>
+            <strong>{activeFilters}</strong>
+          </article>
+        </div>
+      </section>
+
+      <div className="market-layout">
       {/* Filters Sidebar */}
-      <aside className="inventory-filter-panel" style={{
-        border: "1px solid #e5e7eb",
-        borderRadius: "8px",
-        padding: "24px",
-        backgroundColor: "#fff",
-        height: "fit-content",
-        display: "flex",
-        flexDirection: "column",
-        gap: "20px"
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={{ fontSize: "18px", fontWeight: 800, color: "#111827", margin: 0 }}>Filters</h3>
+      <aside className="market-filter-panel inventory-filter-panel">
+        <div className="market-filter-header">
+          <h3>Filters</h3>
           <button
             onClick={resetFilters}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#2563eb",
-              fontSize: "13px",
-              fontWeight: 600,
-              cursor: "pointer",
-              padding: 0
-            }}
+            className="market-reset-button"
           >
             Reset All
           </button>
         </div>
 
         {/* Make Filter */}
-        <div>
-          <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Make</label>
+        <div className="market-filter-field">
+          <label>Make</label>
           <select
             value={selectedMakeId}
             onChange={(e) => {
               setSelectedMakeId(e.target.value);
               setSelectedModelId(""); // Reset model when make changes
             }}
-            style={{ width: "100%", padding: "10px 12px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "14px", backgroundColor: "#fff", outline: "none" }}
           >
             <option value="">All Makes</option>
             {makes.map((m) => (
@@ -144,12 +151,11 @@ export default function InventoryExplorer({
         </div>
 
         {/* Model Filter */}
-        <div>
-          <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Model</label>
+        <div className="market-filter-field">
+          <label>Model</label>
           <select
             value={selectedModelId}
             onChange={(e) => setSelectedModelId(e.target.value)}
-            style={{ width: "100%", padding: "10px 12px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "14px", backgroundColor: "#fff", outline: "none" }}
           >
             <option value="">All Models</option>
             {filteredModels.map((m) => (
@@ -159,12 +165,11 @@ export default function InventoryExplorer({
         </div>
 
         {/* Year Filter */}
-        <div>
-          <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Year</label>
+        <div className="market-filter-field">
+          <label>Year</label>
           <select
             value={selectedYear}
             onChange={(e) => setSelectedYear(e.target.value)}
-            style={{ width: "100%", padding: "10px 12px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "14px", backgroundColor: "#fff", outline: "none" }}
           >
             <option value="">All Years</option>
             {uniqueYears.map((yr) => (
@@ -174,23 +179,21 @@ export default function InventoryExplorer({
         </div>
 
         {/* Price Range Filters */}
-        <div>
-          <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#475569", marginBottom: "6px", textTransform: "uppercase" }}>Price Range ($)</label>
-          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+        <div className="market-filter-field">
+          <label>Price Range</label>
+          <div className="market-price-inputs">
             <input
               type="number"
               placeholder="Min"
               value={minPrice}
               onChange={(e) => setMinPrice(e.target.value)}
-              style={{ width: "100%", padding: "10px 8px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "14px", outline: "none" }}
             />
-            <span style={{ color: "#94a3b8" }}>&ndash;</span>
+            <span>&ndash;</span>
             <input
               type="number"
               placeholder="Max"
               value={maxPrice}
               onChange={(e) => setMaxPrice(e.target.value)}
-              style={{ width: "100%", padding: "10px 8px", border: "1px solid #cbd5e1", borderRadius: "8px", fontSize: "14px", outline: "none" }}
             />
           </div>
         </div>
@@ -198,25 +201,19 @@ export default function InventoryExplorer({
 
       {/* Main Content Listings Area */}
       <main>
-        <div className="inventory-results-header" style={{ marginBottom: "24px" }}>
-          <h2 style={{ fontSize: "24px", fontWeight: 800, color: "#111827", margin: 0 }}>
+        <div className="market-results-header inventory-results-header">
+          <h2>
             Available Vehicles
           </h2>
-          <span style={{ fontSize: "14px", color: "#64748b", fontWeight: 600 }}>
+          <span>
             {filteredListings.length} {filteredListings.length === 1 ? "listing" : "listings"} found
           </span>
         </div>
 
         {filteredListings.length === 0 ? (
-          <div style={{
-            border: "2px dashed #cbd5e1",
-            borderRadius: "16px",
-            padding: "48px 24px",
-            textAlign: "center",
-            color: "#64748b"
-          }}>
-            <h3 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 6px 0", color: "#1e293b" }}>No listings found</h3>
-            <p style={{ fontSize: "14px", margin: 0 }}>Try adjusting your filters or search criteria.</p>
+          <div className="market-empty-state">
+            <h3>No listings found</h3>
+            <p>Try adjusting your filters or search criteria.</p>
           </div>
         ) : (
           <div className="inventory-card-grid">
@@ -226,106 +223,57 @@ export default function InventoryExplorer({
               return (
                 <div
                   key={lst.id}
-                  style={{
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "8px",
-                    overflow: "hidden",
-                    backgroundColor: "#fff",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between"
-                  }}
+                  className="market-listing-card"
                 >
                   <div>
                     {image ? (
-                      <div style={{ position: "relative", width: "100%", paddingTop: "56.25%", backgroundColor: "#f3f4f6" }}>
+                      <div className="market-listing-image">
                         <Image
                           src={image}
                           alt={`${lst.year} ${lst.model.make.name} ${lst.model.name}`}
                           fill
                           sizes="(max-width: 720px) 100vw, (max-width: 1100px) 50vw, 33vw"
-                          style={{ objectFit: "cover" }}
                           unoptimized
                         />
                       </div>
                     ) : (
-                      <div style={{
-                        width: "100%",
-                        paddingTop: "56.25%",
-                        backgroundColor: "#f3f4f6",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "#9ca3af",
-                        fontSize: "14px",
-                        position: "relative"
-                      }}>
-                        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}>
-                          No image
-                        </div>
+                      <div className="market-listing-image">
+                        <div>No image</div>
                       </div>
                     )}
-                    <div style={{ padding: "16px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px", marginBottom: "8px" }}>
-                        <span style={{
-                          backgroundColor: "#fef3c7",
-                          color: "#d97706",
-                          fontSize: "11px",
-                          fontWeight: "bold",
-                          padding: "2px 6px",
-                          borderRadius: "4px",
-                          textTransform: "uppercase"
-                        }}>
+                    <div className="market-listing-body">
+                      <div className="market-listing-meta-row">
+                        <span className="market-sale-pill">
                           FOR SALE
                         </span>
                         {price !== null && (
-                          <span style={{ fontWeight: 800, color: "#10b981", fontSize: "16px" }}>
+                          <span className="market-listing-price">
                             ${price.toLocaleString()}
                           </span>
                         )}
                       </div>
-                      <h3 style={{ fontSize: "18px", fontWeight: 700, margin: "0 0 6px 0", color: "#111827" }}>
+                      <h3>
                         {lst.year} {lst.model.make.name} {lst.model.name}
                       </h3>
-                      <div style={{ fontSize: "13px", color: "#6b7280" }}>
+                      <div className="market-listing-detail">
                         {lst.mileage !== null ? `${lst.mileage.toLocaleString()} miles` : "Mileage unavailable"}
                       </div>
                     </div>
                   </div>
-                  <div style={{ padding: "16px", paddingTop: 0 }}>
+                  <div className="market-listing-actions">
                     {lst.url ? (
                       <a
                         href={lst.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        style={{
-                          display: "inline-block",
-                          marginBottom: "10px",
-                          color: "#1d4ed8",
-                          fontSize: "12px",
-                          fontWeight: 700,
-                          textDecoration: "underline",
-                          textUnderlineOffset: "3px",
-                        }}
+                        className="market-source-link"
                       >
                         View original listing
                       </a>
                     ) : null}
                     <Link
                       href={`/vehicle/${lst.vehicle?.vin}`}
-                      style={{
-                        display: "block",
-                        textAlign: "center",
-                        backgroundColor: "#2563eb",
-                        color: "#ffffff",
-                        padding: "10px 16px",
-                        borderRadius: "6px",
-                        fontSize: "14px",
-                        fontWeight: 600,
-                        textDecoration: "none",
-                        transition: "background-color 0.2s"
-                      }}
+                      className="market-card-button"
                     >
                       View Vehicle
                     </Link>
@@ -336,6 +284,17 @@ export default function InventoryExplorer({
           </div>
         )}
       </main>
+      </div>
     </div>
   );
+}
+
+function formatCompactCurrency(value: number) {
+  if (!value) return "$0";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 1,
+    notation: value >= 1000000 ? "compact" : "standard",
+  }).format(value);
 }
