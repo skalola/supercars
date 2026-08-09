@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { geocodeLocation } from "@/lib/location/geocode";
 import { getCatalogMakeNames } from "@/lib/makes/catalog";
 import { notifyMeetCancelled, notifyMeetCreated, notifyMeetRsvp, notifyMeetUpdated } from "@/lib/meets/meet-notifications";
 import { isUploadableImageFile, uploadPublicImage } from "@/lib/media/upload-storage";
@@ -45,6 +46,7 @@ export async function createMeetAction(formData: FormData) {
   }
 
   const slug = await createUniqueMeetSlug(title, city, startsAt);
+  const coordinates = await resolveMeetCoordinates(city, state);
   const meet = await prisma.meet.create({
     data: {
       hostId: userId,
@@ -62,6 +64,8 @@ export async function createMeetAction(formData: FormData) {
       capacity,
       description: description || null,
       allowedMakes: JSON.stringify(allowedMakes),
+      latitude: coordinates?.latitude ?? null,
+      longitude: coordinates?.longitude ?? null,
       mapX: estimateMapX(state),
       mapY: estimateMapY(state),
       publishedAt: new Date(),
@@ -208,6 +212,7 @@ export async function updateHostedMeetAction(formData: FormData) {
     throw new Error("Only the host can edit an active meet.");
   }
 
+  const coordinates = await resolveMeetCoordinates(city, state);
   await prisma.meet.update({
     where: { id: meet.id },
     data: {
@@ -223,6 +228,8 @@ export async function updateHostedMeetAction(formData: FormData) {
       description: description || null,
       visibility,
       allowedMakes: JSON.stringify(allowedMakes),
+      latitude: coordinates?.latitude ?? null,
+      longitude: coordinates?.longitude ?? null,
       mapX: estimateMapX(state),
       mapY: estimateMapY(state),
     },
@@ -449,6 +456,10 @@ async function readAllowedCatalogMakes(formData: FormData) {
   const selectedMakes = new Set(formData.getAll("allowedMakes").map((value) => String(value).trim()).filter(Boolean));
   const allowedMakes = catalogMakes.filter((make) => selectedMakes.has(make));
   return allowedMakes.length > 0 ? allowedMakes : catalogMakes;
+}
+
+async function resolveMeetCoordinates(city: string, state: string) {
+  return geocodeLocation(`${city}, ${state}`);
 }
 
 function parseOptionalInt(value: string) {
