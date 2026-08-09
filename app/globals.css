@@ -4347,6 +4347,20 @@ canvas {
   color: rgba(255, 255, 255, 0.66);
 }
 
+.meet-host-cancel-form button {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(226, 15, 27, 0.16);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
 .meet-detail-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.55fr);

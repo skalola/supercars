@@ -127,6 +127,46 @@ export async function rsvpMeetAction(formData: FormData) {
   redirect(`/meets/${meet.slug}`);
 }
 
+export async function cancelHostedMeetAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+
+  const meetId = readString(formData, "meetId");
+  if (!meetId) {
+    throw new Error("Missing meet id.");
+  }
+
+  const meet = await prisma.meet.findFirst({
+    where: {
+      id: meetId,
+      hostId: session.user.id as string,
+      status: { in: ["DRAFT", "PUBLISHED", "FULL"] },
+    },
+    select: { id: true, slug: true },
+  });
+
+  if (!meet) {
+    throw new Error("Only the host can cancel this meet.");
+  }
+
+  await prisma.meet.update({
+    where: { id: meet.id },
+    data: {
+      status: "CANCELLED",
+      cancelledAt: new Date(),
+    },
+  });
+
+  revalidatePath("/meets");
+  revalidatePath(`/meets/${meet.slug}`);
+  revalidatePath("/garage");
+  const username = await getUsername(session.user.id as string);
+  if (username) revalidatePath(`/garage/${username}`);
+  redirect(`/meets/${meet.slug}`);
+}
+
 function readString(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
 }

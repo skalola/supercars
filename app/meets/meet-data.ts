@@ -14,6 +14,7 @@ export type MeetEvent = {
   expectedCars: number;
   capacity: number | null;
   host: string;
+  hostUserId: string | null;
   hostUsername: string | null;
   locationName: string;
   locationDetail: string;
@@ -210,6 +211,7 @@ function serializeMeet(row: MeetRow): MeetEvent {
     expectedCars: goingCount || row.capacity || 0,
     capacity: row.capacity,
     host: row.host.name || row.host.username || "SUPERCAR DASH Member",
+    hostUserId: row.hostId,
     hostUsername: row.host.username,
     locationName: row.locationName,
     locationDetail: row.locationDetail || (row.visibility === "INVITE_ONLY" ? "Shared with approved RSVPs" : "Address shared after RSVP"),
@@ -234,11 +236,12 @@ function serializeMeet(row: MeetRow): MeetEvent {
   };
 }
 
-function createDemoMeet(input: Omit<MeetEvent, "id" | "capacity" | "hostUsername" | "allowedMakes" | "heroImage" | "isDemo" | "cars">): MeetEvent {
+function createDemoMeet(input: Omit<MeetEvent, "id" | "capacity" | "hostUserId" | "hostUsername" | "allowedMakes" | "heroImage" | "isDemo" | "cars">): MeetEvent {
   return {
     ...input,
     id: null,
     capacity: input.expectedCars,
+    hostUserId: null,
     hostUsername: null,
     allowedMakes: ["Ferrari", "Lamborghini", "McLaren"],
     heroImage: "/images/garage-home-hero.png?v=garage-2",

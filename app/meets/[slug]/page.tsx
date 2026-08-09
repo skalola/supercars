@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
 import { rsvpMeetAction } from "@/app/actions/meets";
+import { HostCancelMeetForm } from "@/components/meets/HostCancelMeetForm";
+import { prisma } from "@/lib/prisma";
 import { getMeetBySlug } from "../meet-data";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,7 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
         orderBy: { createdAt: "desc" },
       }).catch(() => [])
     : [];
+  const isHost = Boolean(meet.id && session?.user?.id && meet.hostUserId === session.user.id);
 
   return (
     <main className="meet-detail-shell">
@@ -50,6 +52,9 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
           <p>
             {meet.city}, {meet.state}
           </p>
+          {isHost ? (
+            <HostCancelMeetForm meetId={meet.id || ""} meetTitle={meet.title} />
+          ) : null}
         </aside>
       </section>
 
