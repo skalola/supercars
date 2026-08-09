@@ -3172,6 +3172,26 @@ canvas {
   white-space: nowrap;
 }
 
+.fulfillment-page-shell {
+  gap: 24px;
+}
+
+.fulfillment-page-shell textarea::placeholder {
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.fulfillment-page-shell button {
+  min-height: 44px;
+}
+
+.fulfillment-page-shell details summary {
+  list-style: none;
+}
+
+.fulfillment-page-shell details summary::-webkit-details-marker {
+  display: none;
+}
+
 .directory-panel {
   display: grid;
   gap: 18px;
@@ -3845,6 +3865,15 @@ canvas {
 
   .transaction-center-toolbar {
     width: 100% !important;
+  }
+
+  .fulfillment-page-shell > div,
+  .fulfillment-page-shell > section {
+    width: 100% !important;
+  }
+
+  .fulfillment-main-grid {
+    grid-template-columns: 1fr !important;
   }
 
   .transaction-middle-grid {

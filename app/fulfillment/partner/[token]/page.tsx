@@ -14,13 +14,13 @@ export default async function PartnerFulfillmentPage({ params }: PartnerPageProp
 
   if ("error" in data) {
     return (
-      <div style={styles.container}>
+      <main className="garage-page-shell fulfillment-page-shell" style={styles.container}>
         <div style={styles.card}>
           <div style={styles.badgeError}>Access Error</div>
           <h1 style={styles.heading}>Link Invalid or Expired</h1>
           <p style={styles.subtext}>{data.message}</p>
         </div>
-      </div>
+      </main>
     );
   }
 
@@ -35,13 +35,13 @@ export default async function PartnerFulfillmentPage({ params }: PartnerPageProp
   }
 
   return (
-    <div style={styles.container}>
+    <main className="garage-page-shell fulfillment-page-shell" style={styles.container}>
       <div style={styles.header}>
         <div style={styles.headerTitle}>SUPERCAR DASH FULFILLMENT PORTAL</div>
         <div style={styles.statusBadge}>{request.status}</div>
       </div>
 
-      <div style={styles.mainGrid}>
+      <div className="fulfillment-main-grid" style={styles.mainGrid}>
         {/* Left Column: Scoped Package Details */}
         <div style={styles.card}>
           <div style={styles.sectionTag}>AUTHORIZED SCOPED PACKAGE</div>
@@ -146,7 +146,7 @@ export default async function PartnerFulfillmentPage({ params }: PartnerPageProp
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 
@@ -194,13 +194,8 @@ function formatScopeValue(value: unknown): string {
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    minHeight: "100vh",
-    backgroundColor: "#0F172A",
-    color: "#F8FAFC",
-    fontFamily: "Inter, system-ui, -apple-system, sans-serif",
-    padding: "clamp(18px, 4vw, 32px)",
-    maxWidth: "1200px",
-    margin: "0 auto",
+    backgroundColor: "transparent",
+    color: "#ffffff",
   },
   header: {
     display: "flex",
@@ -208,18 +203,19 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     gap: "16px",
     flexWrap: "wrap",
-    marginBottom: "32px",
+    width: "min(1360px, 100%)",
+    margin: "0 auto 8px",
     paddingBottom: "16px",
-    borderBottom: "1px solid #1E293B",
+    borderBottom: "1px solid rgba(255, 255, 255, 0.12)",
   },
   headerTitle: {
     fontSize: "12px",
     fontWeight: 700,
     letterSpacing: "1.5px",
-    color: "#64748B",
+    color: "rgba(255, 255, 255, 0.58)",
   },
   statusBadge: {
-    backgroundColor: "#1E293B",
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
     color: "#38BDF8",
     padding: "6px 14px",
     borderRadius: "20px",
@@ -232,41 +228,45 @@ const styles: Record<string, React.CSSProperties> = {
     gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
     gap: "24px",
     alignItems: "start",
+    width: "min(1360px, 100%)",
+    margin: "0 auto",
   },
   card: {
-    backgroundColor: "#1E293B",
-    borderRadius: "12px",
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    borderRadius: "8px",
     padding: "clamp(18px, 3vw, 24px)",
-    border: "1px solid #334155",
+    border: "1px solid rgba(255, 255, 255, 0.12)",
+    boxShadow: "0 24px 60px rgba(0, 0, 0, 0.22)",
+    backdropFilter: "blur(18px)",
   },
   sectionTag: {
     fontSize: "11px",
     fontWeight: 700,
     letterSpacing: "1px",
-    color: "#94A3B8",
+    color: "rgba(255, 255, 255, 0.66)",
     marginBottom: "12px",
   },
   title: {
     fontSize: "24px",
     fontWeight: 700,
-    color: "#F8FAFC",
+    color: "#ffffff",
     marginBottom: "8px",
   },
   description: {
     fontSize: "14px",
-    color: "#94A3B8",
+    color: "rgba(255, 255, 255, 0.66)",
     marginBottom: "20px",
   },
   scopeBox: {
-    backgroundColor: "#0F172A",
+    backgroundColor: "rgba(0, 0, 0, 0.22)",
     borderRadius: "8px",
     padding: "clamp(14px, 3vw, 18px)",
-    border: "1px solid #334155",
+    border: "1px solid rgba(255, 255, 255, 0.12)",
   },
   scopeHeader: {
     fontSize: "12px",
     fontWeight: 800,
-    color: "#CBD5E1",
+    color: "rgba(255, 255, 255, 0.78)",
     marginBottom: "14px",
   },
   scopeGrid: {
@@ -276,13 +276,13 @@ const styles: Record<string, React.CSSProperties> = {
   },
   scopeSection: {
     gridColumn: "1 / -1",
-    backgroundColor: "#111C2E",
-    border: "1px solid #26364D",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    border: "1px solid rgba(255, 255, 255, 0.1)",
     borderRadius: "8px",
     padding: "14px",
   },
   scopeSectionTitle: {
-    color: "#F8FAFC",
+    color: "#ffffff",
     fontSize: "15px",
     fontWeight: 800,
     margin: "0 0 12px",
@@ -294,21 +294,21 @@ const styles: Record<string, React.CSSProperties> = {
   },
   scopeItem: {
     minWidth: 0,
-    backgroundColor: "#172236",
-    border: "1px solid #26364D",
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    border: "1px solid rgba(255, 255, 255, 0.1)",
     borderRadius: "8px",
     padding: "12px",
   },
   scopeKey: {
     fontSize: "11px",
-    color: "#94A3B8",
+    color: "rgba(255, 255, 255, 0.66)",
     fontWeight: 800,
     textTransform: "uppercase",
     marginBottom: "6px",
   },
   scopeValue: {
     fontSize: "14px",
-    color: "#F8FAFC",
+    color: "#ffffff",
     fontWeight: 600,
     lineHeight: 1.45,
     overflowWrap: "anywhere",
@@ -316,22 +316,22 @@ const styles: Record<string, React.CSSProperties> = {
   vehicleTitle: {
     fontSize: "20px",
     fontWeight: 700,
-    color: "#F8FAFC",
+    color: "#ffffff",
   },
   vehicleSub: {
     fontSize: "14px",
-    color: "#94A3B8",
+    color: "rgba(255, 255, 255, 0.66)",
     marginTop: "4px",
   },
   vinTag: {
     display: "inline-block",
     marginTop: "12px",
     padding: "4px 8px",
-    backgroundColor: "#0F172A",
+    backgroundColor: "rgba(0, 0, 0, 0.22)",
     borderRadius: "4px",
     fontFamily: "monospace",
     fontSize: "12px",
-    color: "#CBD5E1",
+    color: "rgba(255, 255, 255, 0.78)",
   },
   depositRow: {
     display: "flex",
@@ -342,19 +342,19 @@ const styles: Record<string, React.CSSProperties> = {
   depositAmount: {
     fontSize: "22px",
     fontWeight: 700,
-    color: "#10B981",
+    color: "#86efac",
   },
   holdBadge: {
     backgroundColor: "#065F46",
     color: "#A7F3D0",
     padding: "4px 10px",
-    borderRadius: "12px",
+    borderRadius: "8px",
     fontSize: "11px",
     fontWeight: 700,
   },
   depositNote: {
     fontSize: "12px",
-    color: "#94A3B8",
+    color: "rgba(255, 255, 255, 0.66)",
     lineHeight: "1.5",
   },
   form: {
@@ -365,16 +365,16 @@ const styles: Record<string, React.CSSProperties> = {
   },
   label: {
     fontSize: "13px",
-    color: "#CBD5E1",
+    color: "rgba(255, 255, 255, 0.78)",
     display: "flex",
     flexDirection: "column",
     gap: "6px",
   },
   textarea: {
-    backgroundColor: "#0F172A",
-    border: "1px solid #334155",
+    backgroundColor: "rgba(0, 0, 0, 0.22)",
+    border: "1px solid rgba(255, 255, 255, 0.12)",
     borderRadius: "8px",
-    color: "#F8FAFC",
+    color: "#ffffff",
     padding: "10px",
     fontSize: "13px",
     fontFamily: "inherit",
@@ -387,7 +387,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   acceptButton: {
     flex: 1,
-    backgroundColor: "#10B981",
+    backgroundColor: "#16a34a",
     color: "#FFFFFF",
     padding: "12px",
     borderRadius: "8px",
@@ -397,7 +397,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: "pointer",
   },
   declineButton: {
-    backgroundColor: "#EF4444",
+    backgroundColor: "#dc2626",
     color: "#FFFFFF",
     padding: "12px 16px",
     borderRadius: "8px",
@@ -415,7 +415,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   acceptedBadge: {
     backgroundColor: "#065F46",
-    color: "#34D399",
+    color: "#86efac",
     padding: "8px 24px",
     borderRadius: "20px",
     fontSize: "16px",
@@ -442,11 +442,11 @@ const styles: Record<string, React.CSSProperties> = {
   heading: {
     fontSize: "24px",
     fontWeight: 700,
-    color: "#F8FAFC",
+    color: "#ffffff",
     marginBottom: "8px",
   },
   subtext: {
     fontSize: "13px",
-    color: "#94A3B8",
+    color: "rgba(255, 255, 255, 0.66)",
   },
 };
