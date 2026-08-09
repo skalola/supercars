@@ -32,7 +32,7 @@ export default async function HomePage() {
                 Enter My Garage
                 <span aria-hidden="true">&gt;</span>
               </Link>
-              <Link href="#nearby-meets" className="garage-home-secondary">
+              <Link href="/meets" className="garage-home-secondary">
                 Explore Meets
               </Link>
             </div>
@@ -74,10 +74,10 @@ export default async function HomePage() {
         <article id="nearby-meets" className="garage-home-panel">
           <div>
             <span>Nearby Meets</span>
-            <Link href="/garage">Prepare garage</Link>
+            <Link href="/meets">Open meets</Link>
           </div>
           <div className="garage-home-meet-card">
-            <strong>Meet system coming next</strong>
+            <strong>Garage-first meets</strong>
             <p>Select which car you are bringing, RSVP, and keep event history attached to the Vehicle Passport.</p>
           </div>
         </article>
