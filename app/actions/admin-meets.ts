@@ -71,3 +71,36 @@ export async function deleteMeetAction(meetId: string): Promise<AdminMeetActionR
     return { success: false, message: error instanceof Error ? error.message : "Failed to delete meet." };
   }
 }
+
+export async function deleteMeetPhotoAction(photoId: string): Promise<AdminMeetActionResult> {
+  try {
+    await assertAdmin();
+
+    const photo = await prisma.meetPhoto.findUnique({
+      where: { id: photoId },
+      select: {
+        id: true,
+        meet: { select: { slug: true, title: true } },
+        vehicle: { select: { vin: true } },
+        user: { select: { username: true } },
+      },
+    });
+
+    if (!photo) {
+      return { success: false, message: "Meet photo not found." };
+    }
+
+    await prisma.meetPhoto.delete({ where: { id: photo.id } });
+
+    revalidatePath("/admin/meets");
+    revalidatePath("/meets");
+    revalidatePath(`/meets/${photo.meet.slug}`);
+    if (photo.vehicle?.vin) revalidatePath(`/vehicle/${photo.vehicle.vin}`);
+    revalidatePath("/garage");
+    if (photo.user?.username) revalidatePath(`/garage/${photo.user.username}`);
+
+    return { success: true, message: `Photo removed from ${photo.meet.title}.` };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : "Failed to delete meet photo." };
+  }
+}
