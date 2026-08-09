@@ -1,9 +1,12 @@
 import Link from "next/link";
-import { meetEvents } from "./meet-data";
+import { getUpcomingMeetEvents } from "./meet-data";
 
-const selectedMeet = meetEvents[0];
+export const dynamic = "force-dynamic";
 
-export default function MeetsPage() {
+export default async function MeetsPage() {
+  const meetEvents = await getUpcomingMeetEvents();
+  const selectedMeet = meetEvents[0];
+
   return (
     <main className="meets-page-shell">
       <section className="meets-map-stage" aria-label="Upcoming SUPERCAR DASH meets">
@@ -38,7 +41,7 @@ export default function MeetsPage() {
           ))}
 
           <article className="meets-selected-card">
-            <div className="meets-selected-image" />
+            <div className="meets-selected-image" style={{ backgroundImage: `url("${selectedMeet.heroImage}")` }} />
             <div>
               <span>{selectedMeet.type}</span>
               <h2>{selectedMeet.title}</h2>
@@ -64,7 +67,7 @@ export default function MeetsPage() {
           <div className="meets-upcoming-list">
             {meetEvents.slice(0, 5).map((meet) => (
               <Link key={meet.slug} href={`/meets/${meet.slug}`} className="meets-upcoming-card">
-                <div className="meets-upcoming-image" />
+                <div className="meets-upcoming-image" style={{ backgroundImage: `url("${meet.heroImage}")` }} />
                 <div>
                   <strong>{meet.title}</strong>
                   <span>
@@ -76,7 +79,7 @@ export default function MeetsPage() {
               </Link>
             ))}
           </div>
-          <Link href="#host-a-meet" className="meets-host-button">
+          <Link href="/meets/host" className="meets-host-button">
             <span aria-hidden="true">+</span>
             Host a Meet
           </Link>
@@ -88,8 +91,8 @@ export default function MeetsPage() {
           <span>Host Layer</span>
           <strong>Host a Meet</strong>
         </div>
-        <p>Next we will add the form for event name, date, city, allowed makes, capacity, and whether the meet is public or invite-only.</p>
-        <Link href="/garage">Prepare Garage</Link>
+        <p>Create a city meet, private drive, or garage night and require RSVPs to attach a claimed car from the user&apos;s garage.</p>
+        <Link href="/meets/host">Create Meet</Link>
       </section>
     </main>
   );

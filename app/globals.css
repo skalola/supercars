@@ -629,6 +629,97 @@ canvas {
   line-height: 1.25;
 }
 
+.garage-meet-history {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  width: min(1360px, 100%);
+  margin: 0 auto;
+}
+
+.garage-meet-history article {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(18px);
+}
+
+.garage-meet-history article > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.garage-meet-history article > div:first-child span {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.garage-meet-history article > div:first-child a {
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 12px;
+  font-weight: 850;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.garage-meet-history p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.garage-meet-list {
+  display: grid;
+  gap: 8px;
+}
+
+.garage-meet-list a {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px 12px;
+  align-items: center;
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.garage-meet-list strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.garage-meet-list span {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 12px;
+}
+
+.garage-meet-list em {
+  grid-row: span 2;
+  color: #ff4a53;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
 .garage-empty-hero {
   display: grid;
   min-height: 420px;
@@ -4173,6 +4264,7 @@ canvas {
 }
 
 .meet-detail-hero,
+.meet-host-hero,
 .meet-detail-layout {
   width: min(1500px, 100%);
   margin: 0 auto;
@@ -4190,6 +4282,42 @@ canvas {
   background:
     linear-gradient(90deg, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.24)),
     url("/images/garage-home-hero.png?v=garage-2") center / cover;
+}
+
+.meet-host-hero {
+  display: grid;
+  align-items: end;
+  min-height: clamp(330px, 38vh, 500px);
+  padding: clamp(28px, 5vw, 58px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.84), rgba(0, 0, 0, 0.28)),
+    url("/images/garage-home-hero.png?v=garage-2") center / cover;
+}
+
+.meet-host-hero span {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.meet-host-hero h1 {
+  margin: 8px 0 0;
+  color: #ffffff;
+  font-size: clamp(42px, 6vw, 82px);
+  font-weight: 560;
+  line-height: 0.98;
+}
+
+.meet-host-hero p {
+  max-width: 680px;
+  margin: 14px 0 0;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 15px;
+  line-height: 1.65;
 }
 
 .meet-back-link {
@@ -4231,6 +4359,136 @@ canvas {
   display: grid;
   gap: 18px;
   padding: 20px;
+}
+
+.meet-host-form {
+  display: grid;
+  gap: 18px;
+  width: min(1100px, 100%);
+  margin: 0 auto;
+  padding: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(10, 12, 14, 0.86);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(20px);
+}
+
+.meet-host-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.meet-host-form label,
+.meet-rsvp-form label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.meet-host-form label span,
+.meet-rsvp-form label span,
+.meet-make-fieldset legend {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.meet-host-form input,
+.meet-host-form select,
+.meet-host-form textarea,
+.meet-rsvp-form select {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  outline: none;
+}
+
+.meet-host-form textarea {
+  min-height: 120px;
+  padding-top: 12px;
+  resize: vertical;
+}
+
+.meet-host-form option,
+.meet-rsvp-form option {
+  background: #101010;
+  color: #ffffff;
+}
+
+.meet-make-fieldset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.meet-make-fieldset legend {
+  width: 100%;
+  margin-bottom: 2px;
+}
+
+.meet-make-fieldset label {
+  display: inline-flex;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.meet-host-actions,
+.meet-rsvp-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.meet-host-actions a,
+.meet-host-actions button,
+.meet-rsvp-buttons button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 850;
+  text-decoration: none;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.meet-host-actions a,
+.meet-rsvp-buttons button:not(:first-child) {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.meet-host-actions button,
+.meet-rsvp-buttons button:first-child {
+  border: 1px solid #e20f1b;
+  background: linear-gradient(180deg, #f0222d, #b90913);
+}
+
+.meet-rsvp-form {
+  display: grid;
+  gap: 14px;
 }
 
 .meet-info-panel {
@@ -5172,6 +5430,10 @@ canvas {
     min-width: 0;
   }
 
+  .garage-meet-history {
+    grid-template-columns: 1fr;
+  }
+
   .vehicle-passport-shell {
     padding: 24px 18px 52px;
   }
@@ -5207,6 +5469,8 @@ canvas {
 
   .meets-map-stage,
   .meet-detail-hero,
+  .meet-host-hero,
+  .meet-host-grid,
   .meet-detail-layout {
     grid-template-columns: 1fr;
   }
@@ -5517,8 +5781,15 @@ canvas {
     padding: 24px;
   }
 
+  .meet-host-hero,
+  .meet-host-form {
+    padding: 24px;
+  }
+
   .meet-detail-actions,
-  .meets-selected-actions {
+  .meets-selected-actions,
+  .meet-host-actions,
+  .meet-rsvp-buttons {
     display: grid;
     grid-template-columns: 1fr;
   }

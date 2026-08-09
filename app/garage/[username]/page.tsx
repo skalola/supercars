@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import GarageTabs, { type GarageClaimedVehicle, type GarageSavedVehicle } from "../GarageTabs";
+import { getGarageMeetSummary } from "../garage-meets";
 import { getGarageStats } from "../garage-stats";
 
 export default async function UserGaragePage({ params }: { params: Promise<{ username: string }> }) {
@@ -27,7 +28,7 @@ export default async function UserGaragePage({ params }: { params: Promise<{ use
 
   const isOwner = session?.user?.id === user.id;
 
-  const [claimedVehicleRows, garageItems] = await Promise.all([
+  const [claimedVehicleRows, garageItems, meetSummary] = await Promise.all([
     prisma.vehicle.findMany({
       where: {
         ownerId: user.id,
@@ -79,6 +80,7 @@ export default async function UserGaragePage({ params }: { params: Promise<{ use
       },
       orderBy: { createdAt: "desc" },
     }),
+    getGarageMeetSummary(user.id),
   ]);
 
   const claimedModelIds = new Set(claimedVehicleRows.map((vehicle) => vehicle.modelId));
@@ -151,6 +153,43 @@ export default async function UserGaragePage({ params }: { params: Promise<{ use
       ) : (
         <GarageTabs claimedVehicles={claimedVehicles} savedVehicles={savedVehicles} isOwner={isOwner} />
       )}
+      <GarageMeetHistory meetSummary={meetSummary} isOwner={isOwner} />
     </main>
+  );
+}
+
+function GarageMeetHistory({ meetSummary, isOwner }: { meetSummary: Awaited<ReturnType<typeof getGarageMeetSummary>>; isOwner: boolean }) {
+  return (
+    <section className="garage-meet-history" aria-label="Garage meet history">
+      <article>
+        <div>
+          <span>Hosted</span>
+          {isOwner ? <Link href="/meets/host">Host a Meet</Link> : <Link href="/meets">View Meets</Link>}
+        </div>
+        <GarageMeetList items={meetSummary.hosted} emptyText="Hosted meets will appear here." />
+      </article>
+      <article>
+        <div>
+          <span>Attended</span>
+          <Link href="/meets">Find Meets</Link>
+        </div>
+        <GarageMeetList items={meetSummary.attended} emptyText="RSVP history will appear here." />
+      </article>
+    </section>
+  );
+}
+
+function GarageMeetList({ items, emptyText }: { items: Array<{ title: string; href: string; meta: string; status: string }>; emptyText: string }) {
+  if (items.length === 0) return <p>{emptyText}</p>;
+  return (
+    <div className="garage-meet-list">
+      {items.map((item) => (
+        <Link key={`${item.href}:${item.status}`} href={item.href}>
+          <strong>{item.title}</strong>
+          <span>{item.meta}</span>
+          <em>{item.status}</em>
+        </Link>
+      ))}
+    </div>
   );
 }

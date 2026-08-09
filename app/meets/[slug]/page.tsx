@@ -1,18 +1,27 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getMeetBySlug, meetEvents } from "../meet-data";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { rsvpMeetAction } from "@/app/actions/meets";
+import { getMeetBySlug } from "../meet-data";
 
-export function generateStaticParams() {
-  return meetEvents.map((meet) => ({ slug: meet.slug }));
-}
+export const dynamic = "force-dynamic";
 
 export default async function MeetDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const meet = getMeetBySlug(slug);
+  const [meet, session] = await Promise.all([getMeetBySlug(slug), auth()]);
 
   if (!meet) {
     notFound();
   }
+
+  const garageVehicles = session?.user?.id
+    ? await prisma.vehicle.findMany({
+        where: { ownerId: session.user.id as string, status: "CLAIMED" },
+        include: { model: { include: { make: true } } },
+        orderBy: { createdAt: "desc" },
+      }).catch(() => [])
+    : [];
 
   return (
     <main className="meet-detail-shell">
@@ -75,10 +84,38 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
             <span>RSVP</span>
             <strong>Bring a verified car</strong>
           </div>
-          <p>Selecting a claimed garage vehicle and writing event history back to the owner profile is the next functional layer.</p>
-          <Link href="/garage" className="meets-primary-button">
-            Prepare Garage
-          </Link>
+          {meet.id && session?.user?.id ? (
+            <form action={rsvpMeetAction} className="meet-rsvp-form">
+              <input type="hidden" name="meetId" value={meet.id} />
+              <label>
+                <span>Vehicle</span>
+                <select name="vehicleId" defaultValue="">
+                  <option value="">I&apos;ll choose later</option>
+                  {garageVehicles.map((vehicle) => (
+                    <option key={vehicle.id} value={vehicle.id}>
+                      {vehicle.year} {vehicle.model.make.name} {vehicle.model.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="meet-rsvp-buttons">
+                <button type="submit" name="status" value="GOING">Going</button>
+                <button type="submit" name="status" value="MAYBE">Maybe</button>
+                <button type="submit" name="status" value="CANCELLED">Cancel RSVP</button>
+              </div>
+            </form>
+          ) : meet.id ? (
+            <Link href="/login" className="meets-primary-button">
+              Sign in to RSVP
+            </Link>
+          ) : (
+            <>
+              <p>This preview meet is using demo data. Create a real meet to enable persistent RSVPs.</p>
+              <Link href="/meets/host" className="meets-primary-button">
+                Host a Meet
+              </Link>
+            </>
+          )}
         </article>
 
         <article id="cars" className="meet-cars-panel">
@@ -88,7 +125,7 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
           </div>
           <div className="meet-car-grid">
             {meet.cars.map((car) => (
-              <Link key={`${car.owner}:${car.name}`} href="/garage" className="meet-car-card">
+              <Link key={`${car.owner}:${car.name}`} href={car.ownerHref} className="meet-car-card">
                 <div className="meet-car-image" style={{ backgroundImage: `url("${car.image}")` }} />
                 <div>
                   <span>{car.owner}</span>
