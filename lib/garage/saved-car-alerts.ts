@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { isValidEmail } from "@/lib/fulfillment/partner-registry";
+import { shouldSendMarketingAutomation } from "@/lib/admin/marketing-automation";
 
 type AlertKind = "price" | "listing";
 
@@ -109,18 +110,9 @@ async function sendSavedCarAlertEmail(input: ProviderSendInput) {
   );
 }
 
-async function isAutomationEnabled(key: "price_tracking_alerts" | "listing_tracker_alerts") {
-  const setting = await prisma.globalSetting.findUnique({
-    where: { key },
-    select: { enabled: true },
-  });
-
-  return setting?.enabled === true;
-}
-
 export async function notifySavedCarNewListing(listingId: string) {
-  const enabled = await isAutomationEnabled("listing_tracker_alerts");
-  if (!enabled) return { sent: 0, skipped: "listing_tracker_alerts_disabled" };
+  const gate = await shouldSendMarketingAutomation("listing_tracker_alerts");
+  if (!gate.enabled) return { sent: 0, skipped: gate.skipped };
 
   const listing = await getAlertListing(listingId);
   if (!listing) return { sent: 0, skipped: "listing_not_found" };
@@ -134,8 +126,8 @@ export async function notifySavedCarNewListing(listingId: string) {
 export async function notifySavedCarPriceDrop(listingId: string, previousPrice: number, currentPrice: number) {
   if (currentPrice >= previousPrice) return { sent: 0, skipped: "not_a_price_drop" };
 
-  const enabled = await isAutomationEnabled("price_tracking_alerts");
-  if (!enabled) return { sent: 0, skipped: "price_tracking_alerts_disabled" };
+  const gate = await shouldSendMarketingAutomation("price_tracking_alerts");
+  if (!gate.enabled) return { sent: 0, skipped: gate.skipped };
 
   const listing = await getAlertListing(listingId);
   if (!listing) return { sent: 0, skipped: "listing_not_found" };

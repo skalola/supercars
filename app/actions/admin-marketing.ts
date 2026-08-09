@@ -21,23 +21,41 @@ export async function updateMarketingAutomationSettingAction(key: string, enable
       return { success: false, message: "Unknown marketing automation setting." };
     }
 
-    await prisma.globalSetting.upsert({
+    const actor = session.user?.email || session.user?.id || "ADMIN";
+    const previous = await prisma.globalSetting.findUnique({
       where: { key },
-      update: {
-        enabled,
-        label: setting.label,
-        description: setting.description,
-        category: "MARKETING_AUTOMATION",
-        updatedBy: session.user?.email || session.user?.id || "ADMIN",
-      },
-      create: {
-        key,
-        label: setting.label,
-        description: setting.description,
-        category: "MARKETING_AUTOMATION",
-        enabled,
-        updatedBy: session.user?.email || session.user?.id || "ADMIN",
-      },
+      select: { enabled: true },
+    });
+
+    await prisma.$transaction(async (tx) => {
+      await tx.globalSetting.upsert({
+        where: { key },
+        update: {
+          enabled,
+          label: setting.label,
+          description: setting.description,
+          category: "MARKETING_AUTOMATION",
+          updatedBy: actor,
+        },
+        create: {
+          key,
+          label: setting.label,
+          description: setting.description,
+          category: "MARKETING_AUTOMATION",
+          enabled,
+          updatedBy: actor,
+        },
+      });
+
+      await tx.globalSettingAudit.create({
+        data: {
+          settingKey: key,
+          previousValue: previous?.enabled ?? null,
+          newValue: enabled,
+          actor,
+          note: `${setting.label} ${enabled ? "enabled" : "disabled"} from admin marketing controls.`,
+        },
+      });
     });
 
     revalidatePath("/admin/marketing");

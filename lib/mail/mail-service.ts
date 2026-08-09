@@ -9,6 +9,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { isValidEmail } from "@/lib/fulfillment/partner-registry";
+import { shouldSendMarketingAutomation } from "@/lib/admin/marketing-automation";
 import {
   generateEmailTemplate,
   EmailTemplateType,
@@ -178,12 +179,37 @@ function parseEmailIdentity(value: string): { email: string; name?: string } {
  * Creates an immutable FulfillmentEvent record for every dispatch or dispatch hold.
  */
 export async function sendFulfillmentEmail(input: SendFulfillmentEmailInput): Promise<SendEmailResult> {
-  const emailValid = isValidEmail(input.recipientEmail);
   const request = await prisma.fulfillmentRequest.findUnique({
     where: { id: input.fulfillmentRequestId },
     select: { status: true },
   });
   const currentStatus = request?.status || "SENT";
+  const transactionFlowGate = await shouldSendMarketingAutomation("transaction_flow_alerts");
+
+  if (!transactionFlowGate.enabled) {
+    const holdNote = `Email dispatch HELD for '${input.recipientName}' (${input.templateType}) — Transaction Flow Alerts are disabled in admin marketing controls.`;
+    const event = await prisma.fulfillmentEvent.create({
+      data: {
+        fulfillmentRequestId: input.fulfillmentRequestId,
+        previousStatus: currentStatus,
+        newStatus: currentStatus,
+        actorType: input.actorType || "SYSTEM",
+        note: holdNote,
+      },
+    });
+
+    console.log(`[Mail Service] BLOCKED: ${holdNote}`);
+
+    return {
+      dispatched: false,
+      templateType: input.templateType,
+      eventId: event.id,
+      reason: "TRANSACTION_FLOW_ALERTS_DISABLED",
+      message: "Email dispatch held — Transaction Flow Alerts are disabled.",
+    };
+  }
+
+  const emailValid = isValidEmail(input.recipientEmail);
 
   if (!emailValid || !input.recipientEmail) {
     const holdNote = `Email dispatch HELD for '${input.recipientName}' (${input.templateType}) — Recipient email unresolved. Dispatch blocked to avoid guessed emails.`;

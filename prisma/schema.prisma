@@ -799,9 +799,26 @@ model GlobalSetting {
   enabled     Boolean  @default(false)
   category    String   @default("GENERAL")
   updatedBy   String?
+  audits      GlobalSettingAudit[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([category])
+}
+
+model GlobalSettingAudit {
+  id          String   @id @default(uuid())
+  settingKey  String
+  previousValue Boolean?
+  newValue    Boolean
+  actor       String?
+  note        String?
+
+  setting     GlobalSetting @relation(fields: [settingKey], references: [key], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+
+  @@index([settingKey])
+  @@index([createdAt])
 }

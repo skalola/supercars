@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { isValidEmail } from "@/lib/fulfillment/partner-registry";
 import { getNextMaintenanceRecommendation } from "@/lib/maintenance/recommendations";
+import { shouldSendMarketingAutomation } from "@/lib/admin/marketing-automation";
 
 type ProviderSendInput = {
   to: string;
@@ -28,15 +29,6 @@ function getFromAddress(): string {
     /^SUPERCARDASH\s*</i,
     "SUPERCAR DASH <",
   );
-}
-
-async function isMaintenanceAutomationEnabled() {
-  const setting = await prisma.globalSetting.findUnique({
-    where: { key: "maintenance_alerts" },
-    select: { enabled: true },
-  });
-
-  return setting?.enabled === true;
 }
 
 async function sendTrackerEmail(input: ProviderSendInput) {
@@ -72,8 +64,8 @@ async function sendTrackerEmail(input: ProviderSendInput) {
 }
 
 export async function processMaintenanceTrackerAlerts(options: ProcessMaintenanceTrackerOptions = {}) {
-  const enabled = await isMaintenanceAutomationEnabled();
-  if (!enabled) return { scanned: 0, sent: 0, skipped: "maintenance_alerts_disabled" };
+  const gate = await shouldSendMarketingAutomation("maintenance_alerts");
+  if (!gate.enabled) return { scanned: 0, sent: 0, skipped: gate.skipped };
 
   const users = await prisma.user.findMany({
     where: {

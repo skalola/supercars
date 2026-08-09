@@ -18,7 +18,10 @@ const appUrl = (
   process.env.NEXTAUTH_URL ||
   "https://supercardash.vercel.app"
 ).replace(/\/$/, "");
-const mailFrom = process.env.MAIL_FROM || "SUPERCAR DASH <onboarding@resend.dev>";
+const mailFrom = (process.env.MAIL_FROM || "SUPERCAR DASH <onboarding@resend.dev>").replace(
+  /^SUPERCARDASH\s*</i,
+  "SUPERCAR DASH <",
+);
 
 function escapeHtml(value: string | number | boolean | null | undefined): string {
   return String(value ?? "")
@@ -71,7 +74,7 @@ function buildTrackerEmailPreview({
     <div style="padding:24px;">
       <div style="font-size:12px; color:#666a70; font-weight:800; text-transform:uppercase;">${escapeHtml(eyebrow)}</div>
       <h1 style="margin:6px 0 12px; font-size:22px; line-height:1.2; color:#111111;">${escapeHtml(headline)}</h1>
-      <p style="margin:0 0 18px; color:#34373b; font-size:14px; line-height:1.55;">Hello Shiv, ${escapeHtml(body)}</p>
+      <p style="margin:0 0 18px; color:#34373b; font-size:14px; line-height:1.55;">Hello Sample User, ${escapeHtml(body)}</p>
       <div style="border:1px solid #ededeb; border-radius:8px; padding:14px; background:#fafafa;">
         ${detailsHtml}
       </div>
@@ -87,7 +90,7 @@ function buildTrackerEmailPreview({
 
 ${eyebrow}
 
-Hello Shiv,
+Hello Sample User,
 
 ${body}
 
@@ -117,9 +120,9 @@ export function getMarketingEmailPreviews(): MarketingEmailPreview[] {
     packageTitle: "Qualified buyer purchase request",
     vehicleSummary: "2024 Ferrari Roma Spider (VIN: ZFF02RPA1R0291123)",
     priceOrAmount: 309900,
-    reviewUrl: "/fulfillment/demo-token",
-    acceptUrl: "/fulfillment/demo-token/accept",
-    declineUrl: "/fulfillment/demo-token/decline",
+    reviewUrl: "/fulfillment/sample-token",
+    acceptUrl: "/fulfillment/sample-token/accept",
+    declineUrl: "/fulfillment/sample-token/decline",
     expirationDate: "7 days from issue date",
     additionalDetails: {
       Buyer: "Shiv Kalola",

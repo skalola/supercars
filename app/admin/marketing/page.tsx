@@ -6,11 +6,13 @@ import {
   AdminMarketingSettingRow,
 } from "@/components/admin/AdminMarketingSettingsClient";
 
-function formatDate(value: Date) {
+function formatDateTime(value: Date) {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   }).format(value);
 }
 
@@ -24,8 +26,17 @@ export default async function AdminMarketingPage() {
     label: setting.label,
     description: setting.description,
     enabled: setting.enabled,
-    updatedAt: formatDate(setting.updatedAt),
+    updatedAt: formatDateTime(setting.updatedAt),
     updatedBy: setting.updatedBy,
+    auditCount: setting._count.audits,
+    latestAudit: setting.audits[0]
+      ? {
+          actor: setting.audits[0].actor,
+          createdAt: formatDateTime(setting.audits[0].createdAt),
+          previousValue: setting.audits[0].previousValue,
+          newValue: setting.audits[0].newValue,
+        }
+      : null,
   }));
 
   return (

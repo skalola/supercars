@@ -5,26 +5,31 @@ export const MARKETING_AUTOMATION_SETTINGS = [
     key: "price_tracking_alerts",
     label: "Price Tracking Alerts",
     description: "Send marketplace price movement alerts when automation jobs are enabled.",
+    defaultEnabled: false,
   },
   {
     key: "listing_tracker_alerts",
     label: "Listing Tracker Alerts",
     description: "Send saved-car emails when new matching listings are added.",
+    defaultEnabled: false,
   },
   {
     key: "maintenance_alerts",
     label: "Maintenance Alerts",
     description: "Send service reminder emails based on Vehicle Passport maintenance signals.",
+    defaultEnabled: false,
   },
   {
     key: "transaction_flow_alerts",
     label: "Transaction Flow Alerts",
     description: "Send lifecycle emails for purchase, service, transport, and insurance requests.",
+    defaultEnabled: true,
   },
   {
     key: "welcome_emails",
     label: "Welcome Emails",
     description: "Send onboarding emails after a new user signs in or creates an account.",
+    defaultEnabled: false,
   },
 ] as const;
 
@@ -49,7 +54,16 @@ export async function getMarketingAutomationSettings() {
           label: setting.label,
           description: setting.description,
           category: "MARKETING_AUTOMATION",
-          enabled: false,
+          enabled: setting.defaultEnabled,
+        },
+        include: {
+          audits: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+          _count: {
+            select: { audits: true },
+          },
         },
       })
     )

@@ -11,6 +11,13 @@ export type AdminMarketingSettingRow = {
   enabled: boolean;
   updatedAt: string;
   updatedBy: string | null;
+  auditCount: number;
+  latestAudit: {
+    actor: string | null;
+    createdAt: string;
+    previousValue: boolean | null;
+    newValue: boolean;
+  } | null;
 };
 
 export function AdminMarketingSettingsClient({
@@ -79,6 +86,11 @@ export function AdminMarketingSettingsClient({
                   <span>
                     Last updated {setting.updatedAt}
                     {setting.updatedBy ? ` by ${setting.updatedBy}` : ""}
+                  </span>
+                  <span>
+                    {setting.latestAudit
+                      ? `Audit ${setting.auditCount}: ${setting.latestAudit.previousValue === null ? "created" : setting.latestAudit.previousValue ? "enabled" : "disabled"} -> ${setting.latestAudit.newValue ? "enabled" : "disabled"} by ${setting.latestAudit.actor || "ADMIN"} on ${setting.latestAudit.createdAt}`
+                      : "No toggle audit recorded yet"}
                   </span>
                 </div>
 
