@@ -6,6 +6,7 @@ type MeetNotificationType =
   | "MEET_CREATED_HOST"
   | "MEET_RSVP_USER"
   | "MEET_RSVP_HOST"
+  | "MEET_REMINDER_ATTENDEE"
   | "MEET_CANCELLED_ATTENDEE"
   | "MEET_CANCELLED_HOST";
 
@@ -115,6 +116,31 @@ export async function notifyMeetCancelled(meetId: string, actorUserId?: string |
       ctaLabel: "View Meet",
     });
   }
+}
+
+export async function notifyMeetReminder(meetId: string, userId: string) {
+  const [meet, user] = await Promise.all([getMeetEmailContext(meetId), getMeetUser(userId)]);
+  if (!meet || !user) return;
+
+  const existing = await prisma.meetNotification.findFirst({
+    where: {
+      meetId,
+      userId,
+      notificationType: "MEET_REMINDER_ATTENDEE",
+    },
+    select: { id: true },
+  });
+  if (existing) return;
+
+  await sendMeetNotification({
+    meet,
+    user,
+    type: "MEET_REMINDER_ATTENDEE",
+    subject: `[SUPERCAR DASH] Meet Reminder - ${meet.title}`,
+    headline: "Your meet is coming up",
+    body: `${meet.title} is coming up soon. Review the meet page for location details, roll call, and arrival expectations.`,
+    ctaLabel: "View Meet",
+  });
 }
 
 async function sendMeetNotification({
