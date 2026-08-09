@@ -85,22 +85,21 @@ export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
     (c) => c.contactStatus === "UNRESOLVED_EMAIL" || c.confidence === "UNRESOLVED_EMAIL" || !c.email
   ).length;
   const localLocation = useMemo(() => resolveLocalPartnerLocation(locationFilter), [locationFilter]);
-  const typedLocation = localLocation || geocodedLocation;
+  const typedLocation = locationFilter.trim() ? localLocation || geocodedLocation : null;
   const normalizedLocationFilter = normalizeSearch(locationFilter);
 
   useEffect(() => {
     const query = locationFilter.trim();
-    setGeocodedLocation(null);
-    setLocationMessage("");
 
     if (!query || localLocation) {
-      setIsGeocoding(false);
       return;
     }
 
     const controller = new AbortController();
     const timeout = window.setTimeout(async () => {
       setIsGeocoding(true);
+      setGeocodedLocation(null);
+      setLocationMessage("");
       try {
         const response = await fetch(`/api/location/geocode?q=${encodeURIComponent(query)}`, {
           signal: controller.signal,
@@ -304,49 +303,43 @@ export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
 
   return (
     <div className="page-shell wide">
-      {/* Header */}
-      <div className="page-header" style={styles.header}>
+      <div className="page-header admin-partners-header">
         <div>
-          <div className="eyebrow" style={styles.badgeLabel}>SUPERCARS PARTNER ROUTING REGISTRY</div>
-          <h1 className="page-title compact" style={styles.title}>Partner Contact & Email Resolution Hub</h1>
-          <p className="page-copy" style={styles.subtitle}>
+          <div className="eyebrow admin-partners-eyebrow">SUPERCAR DASH PARTNER ROUTING REGISTRY</div>
+          <h1 className="page-title compact">Partner Contact & Email Resolution Hub</h1>
+          <p className="page-copy admin-partners-copy">
             Audit imported dealer listings, resolve missing business emails, and enforce zero guessed emails across all partner outreach.
           </p>
         </div>
-        <div style={styles.unresolvedAlert}>
+        <div className="admin-partners-alert">
           {unresolvedCount} unresolved partner email{unresolvedCount === 1 ? "" : "s"}
         </div>
       </div>
 
-      {/* Tabs & Search */}
-      <div style={styles.controlsRow}>
-        <div style={styles.tabGroup}>
+      <div className="admin-partners-controls">
+        <div className="admin-partners-tabs">
           <button
+            type="button"
             onClick={() => setFilterTab("UNRESOLVED")}
-            style={{
-              ...styles.tabBtn,
-              ...(filterTab === "UNRESOLVED" ? styles.activeTabBtn : {}),
-            }}
+            className={`admin-partners-tab${filterTab === "UNRESOLVED" ? " is-active" : ""}`}
           >
             Pending Resolution ({unresolvedCount})
           </button>
           <button
+            type="button"
             onClick={() => setFilterTab("ALL")}
-            style={{
-              ...styles.tabBtn,
-              ...(filterTab === "ALL" ? styles.activeTabBtn : {}),
-            }}
+            className={`admin-partners-tab${filterTab === "ALL" ? " is-active" : ""}`}
           >
             All Registered Partners ({contacts.length})
           </button>
         </div>
 
-        <button type="button" onClick={() => setIsAddOpen(true)} style={styles.addVendorBtn}>
+        <button type="button" onClick={() => setIsAddOpen(true)} className="admin-partners-add-button">
           Add Vendor
         </button>
       </div>
 
-      <div className="admin-filter-toolbar" aria-label="Partner filters" style={styles.partnerFilterToolbar}>
+      <div className="admin-filter-toolbar admin-partners-filter-toolbar" aria-label="Partner filters">
         <label>
           <span>Search</span>
           <input
@@ -415,45 +408,42 @@ export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
 
       {statusMessage?.id === "global" && (
         <div
-          style={{
-            ...styles.globalStatus,
-            ...(statusMessage.type === "success" ? styles.globalStatusSuccess : styles.globalStatusError),
-          }}
+          className={`admin-partners-status ${statusMessage.type === "success" ? "is-success" : "is-error"}`}
         >
           {statusMessage.msg}
         </div>
       )}
 
       {isAddOpen && (
-        <div style={styles.modalBackdrop} role="presentation">
-          <div style={styles.modal} role="dialog" aria-modal="true" aria-labelledby="add-vendor-title">
-            <div style={styles.modalHeader}>
+        <div className="admin-partners-modal-backdrop" role="presentation">
+          <div className="admin-partners-modal" role="dialog" aria-modal="true" aria-labelledby="add-vendor-title">
+            <div className="admin-partners-modal-header">
               <div>
                 <div className="eyebrow">Manual Vendor</div>
-                <h2 id="add-vendor-title" style={styles.modalTitle}>Add Vendor</h2>
+                <h2 id="add-vendor-title" className="admin-partners-modal-title">Add Vendor</h2>
               </div>
-              <button type="button" onClick={() => setIsAddOpen(false)} style={styles.closeBtn}>
+              <button type="button" onClick={() => setIsAddOpen(false)} className="admin-partners-secondary-button">
                 Close
               </button>
             </div>
 
-            <div style={styles.modalGrid}>
-              <label style={styles.modalLabel}>
+            <div className="admin-partners-modal-grid">
+              <label className="admin-partners-modal-label">
                 <span>Name</span>
                 <input
                   value={vendorForm.name}
                   onChange={(e) => updateVendorForm("name", e.target.value)}
                   placeholder="Ferrari Miami"
-                  style={styles.modalInput}
+                  className="admin-partners-modal-input"
                 />
               </label>
 
-              <label style={styles.modalLabel}>
+              <label className="admin-partners-modal-label">
                 <span>Service Type</span>
                 <select
                   value={vendorForm.type}
                   onChange={(e) => updateVendorForm("type", e.target.value as PartnerType)}
-                  style={styles.modalInput}
+                  className="admin-partners-modal-input"
                 >
                   <option value="DEALER">Dealer</option>
                   <option value="SERVICE_SHOP">Service</option>
@@ -462,22 +452,22 @@ export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
                 </select>
               </label>
 
-              <label style={styles.modalLabel}>
+              <label className="admin-partners-modal-label">
                 <span>Location</span>
                 <input
                   value={vendorForm.location}
                   onChange={(e) => updateVendorForm("location", e.target.value)}
                   placeholder="Miami, FL"
-                  style={styles.modalInput}
+                  className="admin-partners-modal-input"
                 />
               </label>
 
-              <label style={styles.modalLabel}>
+              <label className="admin-partners-modal-label">
                 <span>Make</span>
                 <select
                   value={vendorForm.makeSpecialization}
                   onChange={(e) => updateVendorForm("makeSpecialization", e.target.value)}
-                  style={styles.modalInput}
+                  className="admin-partners-modal-input"
                 >
                   <option value="ALL">All</option>
                   {SUPPORTED_MAKES.map((make) => (
@@ -486,47 +476,47 @@ export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
                 </select>
               </label>
 
-              <label style={styles.modalLabel}>
+              <label className="admin-partners-modal-label">
                 <span>Email</span>
                 <input
                   type="email"
                   value={vendorForm.email}
                   onChange={(e) => updateVendorForm("email", e.target.value)}
                   placeholder="sales@example.com"
-                  style={styles.modalInput}
+                  className="admin-partners-modal-input"
                 />
               </label>
 
-              <label style={styles.modalLabel}>
+              <label className="admin-partners-modal-label">
                 <span>Phone</span>
                 <input
                   value={vendorForm.phone}
                   onChange={(e) => updateVendorForm("phone", e.target.value)}
                   placeholder="(305) 555-0100"
-                  style={styles.modalInput}
+                  className="admin-partners-modal-input"
                 />
               </label>
 
-              <label style={{ ...styles.modalLabel, gridColumn: "1 / -1" }}>
+              <label className="admin-partners-modal-label is-wide">
                 <span>Website</span>
                 <input
                   value={vendorForm.website}
                   onChange={(e) => updateVendorForm("website", e.target.value)}
                   placeholder="https://example.com"
-                  style={styles.modalInput}
+                  className="admin-partners-modal-input"
                 />
               </label>
             </div>
 
-            <div style={styles.modalActions}>
-              <button type="button" onClick={() => setIsAddOpen(false)} style={styles.cancelBtn}>
+            <div className="admin-partners-modal-actions">
+              <button type="button" onClick={() => setIsAddOpen(false)} className="admin-partners-secondary-button">
                 Cancel
               </button>
               <button
                 type="button"
                 disabled={isPending && processingId === "add-vendor"}
                 onClick={handleAddVendor}
-                style={styles.saveBtn}
+                className="admin-partners-save-button"
               >
                 {isPending && processingId === "add-vendor" ? "Saving..." : "Save Vendor"}
               </button>
@@ -535,22 +525,21 @@ export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
         </div>
       )}
 
-      {/* Table Container */}
-      <div className="mobile-scroll admin-table-shell" style={styles.tableContainer}>
-        <table style={styles.table}>
+      <div className="mobile-scroll admin-table-shell admin-partners-table-shell">
+        <table className="admin-partners-table">
           <thead>
-            <tr style={styles.tableHeaderRow}>
-              <th style={styles.th}>PARTNER NAME & TYPE</th>
-              <th style={styles.th}>SOURCE & DOMAIN</th>
-              <th style={styles.th}>CONFIDENCE LEVEL</th>
-              <th style={styles.th}>HELD DRAFT REQUESTS</th>
-              <th style={styles.th}>ACTIONS</th>
+            <tr>
+              <th>PARTNER NAME & TYPE</th>
+              <th>SOURCE & DOMAIN</th>
+              <th>CONFIDENCE LEVEL</th>
+              <th>HELD DRAFT REQUESTS</th>
+              <th>ACTIONS</th>
             </tr>
           </thead>
           <tbody>
             {filteredContacts.length === 0 ? (
               <tr>
-                <td colSpan={5} style={{ padding: "40px", textAlign: "center", color: "#64748B" }}>
+                <td colSpan={5} className="admin-partners-empty">
                   {filterTab === "UNRESOLVED"
                     ? "All partner emails are fully resolved. Zero guessed emails."
                     : "No partner contacts match the selected filters."}
@@ -564,87 +553,88 @@ export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
                 const msg = statusMessage?.id === c.id ? statusMessage : null;
 
                 return (
-                  <tr key={c.id} style={{ ...styles.tableRow, ...(!c.active ? styles.inactiveRow : {}), ...(isUnresolved ? styles.unresolvedRow : {}) }}>
-                    {/* 1. Partner Name & Type */}
-                    <td style={styles.td}>
-                      <div style={{ fontWeight: 800, fontSize: "14px", color: "#0F172A" }}>{c.name}</div>
-                      <div style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
+                  <tr
+                    key={c.id}
+                    className={[
+                      !c.active ? "is-inactive" : "",
+                      isUnresolved ? "is-unresolved" : "",
+                    ].filter(Boolean).join(" ")}
+                  >
+                    <td>
+                      <div className="admin-partners-name">{c.name}</div>
+                      <div className="admin-partners-badge-row">
                         <span style={getTypeBadgeStyle(c.type)}>{c.type}</span>
                         {c.makeSpecialization && (
-                          <span style={styles.specBadge}>{c.makeSpecialization}</span>
+                          <span className="admin-partners-spec-badge">{c.makeSpecialization}</span>
                         )}
                       </div>
                       {c.location && (
-                        <div style={{ fontSize: "11px", color: "#64748B", marginTop: "4px" }}>
+                        <div className="admin-partners-location">
                           {c.location}
                           {c.distanceMiles !== null ? ` · ${Math.round(c.distanceMiles).toLocaleString()} miles away` : ""}
                         </div>
                       )}
                     </td>
 
-                    {/* 2. Source & Domain */}
-                    <td style={styles.td}>
+                    <td>
                       <span style={getSourceBadgeStyle(c.contactSource)}>
                         {c.contactSource.replace("_", " ")}
                       </span>
                       {c.website && (
-                        <div style={{ marginTop: "4px" }}>
-                          <a href={c.website} target="_blank" rel="noopener noreferrer" style={styles.linkText}>
+                        <div className="admin-partners-website">
+                          <a href={c.website} target="_blank" rel="noopener noreferrer">
                             {c.sourceDomain || c.website}
                           </a>
                         </div>
                       )}
                       {c.marketSource && (
-                        <div style={{ fontSize: "11px", color: "#64748B", marginTop: "2px" }}>
+                        <div className="admin-partners-source-note">
                           Listing Source: {c.marketSource.name}
                         </div>
                       )}
                     </td>
 
-                    {/* 3. Confidence Level */}
-                    <td style={styles.td}>
+                    <td>
                       <span style={getConfidenceBadgeStyle(c.confidence)}>
                         {c.confidence}
                       </span>
                       {c.email ? (
-                        <div style={{ fontSize: "12px", color: "#10B981", fontWeight: 600, marginTop: "4px" }}>
+                        <div className="admin-partners-email">
                           {c.email}
                         </div>
                       ) : (
-                        <div style={{ fontSize: "11px", color: "#EF4444", fontWeight: 800, marginTop: "4px" }}>
+                        <div className="admin-partners-missing-email">
                           NO VALID EMAIL
                         </div>
                       )}
                       {c.phone && (
-                        <div style={{ fontSize: "12px", color: "#475569", fontWeight: 600, marginTop: "4px" }}>
+                        <div className="admin-partners-phone">
                           {c.phone}
                         </div>
                       )}
                     </td>
 
-                    {/* 4. Held Draft Requests */}
-                    <td style={styles.td}>
+                    <td>
                       {c.heldRequestCount > 0 ? (
-                        <span style={styles.heldCountBadge}>
+                        <span className="admin-partners-held-badge">
                           {c.heldRequestCount} request{c.heldRequestCount === 1 ? "" : "s"} held in DRAFT
                         </span>
                       ) : (
-                        <span style={{ fontSize: "12px", color: "#94A3B8" }}>0 Held Requests</span>
+                        <span className="admin-partners-zero-held">0 Held Requests</span>
                       )}
                     </td>
 
-                    {/* 5. Email Resolution Form */}
-                    <td style={styles.td}>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxWidth: "260px" }}>
+                    <td>
+                      <div className="admin-partners-actions">
                         <input
                           type="email"
                           placeholder="Enter verified business email..."
                           value={emailInputs[c.id] || ""}
                           onChange={(e) => setEmailInputs((prev) => ({ ...prev, [c.id]: e.target.value }))}
-                          style={styles.emailInput}
+                          className="admin-partners-email-input"
                         />
 
-                        <div style={{ display: "flex", gap: "6px" }}>
+                        <div className="admin-partners-resolution-row">
                           <select
                             value={confidenceInputs[c.id] || "MANUAL_REVIEW"}
                             onChange={(e) =>
@@ -653,7 +643,7 @@ export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
                                 [c.id]: e.target.value as PartnerConfidence,
                               }))
                             }
-                            style={styles.selectInput}
+                            className="admin-partners-confidence-select"
                           >
                             <option value="VERIFIED">VERIFIED</option>
                             <option value="PUBLIC_SOURCE">PUBLIC_SOURCE</option>
@@ -663,7 +653,7 @@ export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
                           <button
                             disabled={isBusy}
                             onClick={() => handleResolve(c.id)}
-                            style={styles.resolveBtn}
+                            className="admin-partners-resolve-button"
                           >
                             {isBusy ? "Saving..." : "Resolve & Dispatch"}
                           </button>
@@ -672,18 +662,14 @@ export function AdminPartnersClient({ contacts }: AdminPartnersClientProps) {
                         <button
                           disabled={isRemoving || !c.active}
                           onClick={() => handleRemoveVendor(c)}
-                          style={styles.removeBtn}
+                          className="admin-partners-remove-button"
                         >
                           {isRemoving ? "Removing..." : c.active ? "Remove Vendor" : "Inactive"}
                         </button>
 
                         {msg && (
                           <div
-                            style={{
-                              fontSize: "11px",
-                              fontWeight: 700,
-                              color: msg.type === "success" ? "#10B981" : "#EF4444",
-                            }}
+                            className={`admin-partners-row-message ${msg.type === "success" ? "is-success" : "is-error"}`}
                           >
                             {msg.msg}
                           </div>
@@ -936,299 +922,3 @@ function getConfidenceBadgeStyle(confidence: string): React.CSSProperties {
       return { backgroundColor: "#EF4444", color: "#FFFFFF", padding: "2px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: 800 };
   }
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: "24px",
-    borderBottom: "1px solid var(--line)",
-    paddingBottom: "16px",
-  },
-  badgeLabel: {
-    fontSize: "11px",
-    fontWeight: 800,
-    color: "#2563EB",
-    letterSpacing: "1.5px",
-    textTransform: "uppercase",
-  },
-  title: {
-  },
-  subtitle: {
-    fontSize: "14px",
-  },
-  unresolvedAlert: {
-    backgroundColor: "#FEF2F2",
-    color: "#DC2626",
-    border: "1px solid #FECACA",
-    padding: "10px 16px",
-    borderRadius: "8px",
-    fontSize: "13px",
-    fontWeight: 800,
-  },
-  controlsRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: "16px",
-    marginBottom: "20px",
-    flexWrap: "wrap",
-  },
-  tabGroup: {
-    display: "flex",
-    gap: "8px",
-    flexWrap: "wrap",
-  },
-  tabBtn: {
-    padding: "8px 14px",
-    borderRadius: "6px",
-    border: "1px solid #E2E8F0",
-    backgroundColor: "#FFFFFF",
-    color: "#475569",
-    fontWeight: 600,
-    fontSize: "13px",
-    cursor: "pointer",
-  },
-  activeTabBtn: {
-    backgroundColor: "#0F172A",
-    color: "#FFFFFF",
-    border: "1px solid #0F172A",
-  },
-  searchInput: {
-    width: "min(100%, 320px)",
-    padding: "8px 12px",
-    borderRadius: "6px",
-    border: "1px solid #CBD5E1",
-    fontSize: "13px",
-  },
-  tableContainer: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: "10px",
-    border: "1px solid #E2E8F0",
-    overflowX: "auto",
-    boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-  },
-  table: {
-    width: "100%",
-    minWidth: "920px",
-    borderCollapse: "collapse",
-    textAlign: "left",
-  },
-  tableHeaderRow: {
-    backgroundColor: "#F8FAFC",
-    borderBottom: "1px solid #E2E8F0",
-  },
-  th: {
-    padding: "12px 14px",
-    fontSize: "11px",
-    fontWeight: 800,
-    color: "#64748B",
-    letterSpacing: "0.5px",
-  },
-  tableRow: {
-    borderBottom: "1px solid #F1F5F9",
-  },
-  unresolvedRow: {
-    backgroundColor: "#FFFBFA",
-  },
-  inactiveRow: {
-    opacity: 0.62,
-  },
-  td: {
-    padding: "12px 14px",
-    verticalAlign: "top",
-  },
-  specBadge: {
-    backgroundColor: "#F1F5F9",
-    color: "#334155",
-    padding: "2px 6px",
-    borderRadius: "4px",
-    fontSize: "10px",
-    fontWeight: 700,
-  },
-  linkText: {
-    fontSize: "11px",
-    color: "#2563EB",
-    textDecoration: "none",
-  },
-  heldCountBadge: {
-    backgroundColor: "#FEF2F2",
-    color: "#DC2626",
-    padding: "4px 8px",
-    borderRadius: "4px",
-    fontSize: "11px",
-    fontWeight: 800,
-    display: "inline-block",
-  },
-  emailInput: {
-    padding: "6px 10px",
-    borderRadius: "4px",
-    border: "1px solid #CBD5E1",
-    fontSize: "12px",
-    width: "100%",
-  },
-  selectInput: {
-    padding: "6px",
-    borderRadius: "4px",
-    border: "1px solid #CBD5E1",
-    fontSize: "11px",
-    fontWeight: 600,
-    backgroundColor: "#FFFFFF",
-  },
-  resolveBtn: {
-    backgroundColor: "#10B981",
-    color: "#FFFFFF",
-    border: "none",
-    padding: "6px 12px",
-    borderRadius: "4px",
-    fontSize: "11px",
-    fontWeight: 800,
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-  },
-  removeBtn: {
-    alignSelf: "flex-start",
-    backgroundColor: "#FFFFFF",
-    color: "#B42318",
-    border: "1px solid rgba(180, 35, 24, 0.35)",
-    padding: "6px 10px",
-    borderRadius: "4px",
-    fontSize: "11px",
-    fontWeight: 800,
-    cursor: "pointer",
-  },
-  rightControls: {
-    display: "flex",
-    gap: "10px",
-    flexWrap: "wrap",
-    justifyContent: "flex-end",
-  },
-  addVendorBtn: {
-    backgroundColor: "#0F172A",
-    color: "#FFFFFF",
-    border: "1px solid #0F172A",
-    padding: "8px 14px",
-    borderRadius: "6px",
-    fontSize: "13px",
-    fontWeight: 800,
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-  },
-  partnerFilterToolbar: {
-    gridTemplateColumns: "minmax(220px, 1.4fr) minmax(150px, 0.8fr) minmax(180px, 1fr) minmax(140px, 0.8fr) minmax(130px, 0.75fr) auto",
-    marginBottom: "16px",
-  },
-  globalStatus: {
-    marginBottom: "16px",
-    padding: "12px 14px",
-    borderRadius: "8px",
-    fontSize: "13px",
-    fontWeight: 800,
-  },
-  globalStatusSuccess: {
-    backgroundColor: "#ECFDF3",
-    border: "1px solid rgba(8, 127, 91, 0.24)",
-    color: "#087F5B",
-  },
-  globalStatusError: {
-    backgroundColor: "#FEF2F2",
-    border: "1px solid #FECACA",
-    color: "#B42318",
-  },
-  modalBackdrop: {
-    position: "fixed",
-    inset: 0,
-    zIndex: 100,
-    display: "grid",
-    placeItems: "center",
-    padding: "18px",
-    backgroundColor: "rgba(17, 17, 17, 0.42)",
-  },
-  modal: {
-    width: "min(680px, 100%)",
-    maxHeight: "calc(100vh - 36px)",
-    overflowY: "auto",
-    backgroundColor: "#FFFFFF",
-    borderRadius: "10px",
-    border: "1px solid #E2E8F0",
-    boxShadow: "0 24px 80px rgba(15, 23, 42, 0.18)",
-    padding: "22px",
-  },
-  modalHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: "18px",
-    marginBottom: "18px",
-  },
-  modalTitle: {
-    margin: "6px 0 0",
-    color: "#0F172A",
-    fontSize: "28px",
-    fontWeight: 800,
-    lineHeight: 1,
-  },
-  closeBtn: {
-    backgroundColor: "#FFFFFF",
-    color: "#0F172A",
-    border: "1px solid #CBD5E1",
-    padding: "8px 12px",
-    borderRadius: "6px",
-    fontSize: "12px",
-    fontWeight: 800,
-    cursor: "pointer",
-  },
-  modalGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: "12px",
-  },
-  modalLabel: {
-    display: "grid",
-    gap: "6px",
-    color: "#64748B",
-    fontSize: "11px",
-    fontWeight: 800,
-    textTransform: "uppercase",
-  },
-  modalInput: {
-    width: "100%",
-    minHeight: "42px",
-    padding: "0 12px",
-    border: "1px solid #CBD5E1",
-    borderRadius: "6px",
-    backgroundColor: "#FFFFFF",
-    color: "#0F172A",
-    fontSize: "13px",
-    fontWeight: 600,
-    textTransform: "none",
-  },
-  modalActions: {
-    display: "flex",
-    justifyContent: "flex-end",
-    gap: "10px",
-    marginTop: "18px",
-  },
-  cancelBtn: {
-    minHeight: "38px",
-    padding: "0 14px",
-    border: "1px solid #CBD5E1",
-    borderRadius: "6px",
-    backgroundColor: "#FFFFFF",
-    color: "#0F172A",
-    cursor: "pointer",
-    fontSize: "13px",
-    fontWeight: 800,
-  },
-  saveBtn: {
-    minHeight: "38px",
-    padding: "0 14px",
-    border: "1px solid #0F172A",
-    borderRadius: "6px",
-    backgroundColor: "#0F172A",
-    color: "#FFFFFF",
-    cursor: "pointer",
-    fontSize: "13px",
-    fontWeight: 800,
-  },
-};
