@@ -936,10 +936,10 @@ canvas {
 }
 
 .garage-meet-stat-grid {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.garage-meet-stat-grid article,
+.garage-meet-stat-grid a,
 .garage-meet-columns article,
 .garage-meet-photo-strip {
   display: grid;
@@ -952,8 +952,18 @@ canvas {
   backdrop-filter: blur(18px);
 }
 
-.garage-meet-stat-grid article {
+.garage-meet-stat-grid a {
   gap: 8px;
+  color: #ffffff;
+  text-decoration: none;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.garage-meet-stat-grid a:hover,
+.garage-meet-stat-grid a:focus-visible {
+  border-color: rgba(226, 15, 27, 0.46);
+  background: rgba(226, 15, 27, 0.1);
+  transform: translateY(-1px);
 }
 
 .garage-meet-stat-grid span {
@@ -6342,10 +6352,6 @@ canvas {
 
   .garage-meet-stat-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .garage-meet-stat-grid article:last-child {
-    grid-column: 1 / -1;
   }
 
   .garage-meet-photo-strip > div:last-child {
