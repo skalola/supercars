@@ -3155,6 +3155,23 @@ canvas {
   align-items: start;
 }
 
+.transaction-page-shell {
+  gap: 18px;
+}
+
+.transaction-center-toolbar input::placeholder {
+  color: rgba(255, 255, 255, 0.48);
+}
+
+.transaction-row,
+.transaction-row * {
+  min-width: 0;
+}
+
+.transaction-row-action {
+  white-space: nowrap;
+}
+
 .directory-panel {
   display: grid;
   gap: 18px;
@@ -3826,6 +3843,10 @@ canvas {
     gap: 16px !important;
   }
 
+  .transaction-center-toolbar {
+    width: 100% !important;
+  }
+
   .transaction-middle-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
@@ -4127,6 +4148,10 @@ canvas {
 
   .transaction-middle-grid {
     grid-template-columns: 1fr !important;
+  }
+
+  .transaction-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 
   .transaction-detail-card-grid {

@@ -134,28 +134,28 @@ export function TransactionCenterClient({ userId, transactions }: TransactionCen
   }
 
   return (
-    <main className="page-shell">
-      <section className="page-header" style={styles.header}>
+    <main className="garage-page-shell transaction-page-shell">
+      <section className="garage-page-header transaction-center-header" style={styles.header}>
         <div>
-          <div className="eyebrow">Transactions</div>
-          <h1 className="page-title compact" style={styles.title}>Your SUPERCARS Requests</h1>
-          <p className="page-copy" style={styles.subtitle}>Purchases, service bookings, insurance quotes, and transport requests in one place.</p>
+          <div className="garage-page-eyebrow">Transactions</div>
+          <h1 style={styles.title}>Your SUPERCAR DASH Requests</h1>
+          <p style={styles.subtitle}>Purchases, service bookings, insurance quotes, and transport requests in one place.</p>
         </div>
         {!userId && (
-          <Link href="/login" className="site-button" style={styles.primaryAction}>
+          <Link href="/login" className="garage-primary-button" style={styles.primaryAction}>
             Sign in
           </Link>
         )}
       </section>
 
-      <section style={styles.summaryGrid} aria-label="Transaction summary">
+      <section className="transaction-summary-grid" style={styles.summaryGrid} aria-label="Transaction summary">
         <SummaryStat label="Total" value={summary.total.toLocaleString()} />
         <SummaryStat label="Active" value={summary.active.toLocaleString()} tone="blue" />
         <SummaryStat label="Needs Review" value={summary.attention.toLocaleString()} tone="red" />
         <SummaryStat label="Captured" value={`$${summary.captured.toLocaleString()}`} tone="green" />
       </section>
 
-      <section className="transaction-toolbar" style={styles.toolbar}>
+      <section className="transaction-toolbar transaction-center-toolbar" style={styles.toolbar}>
         <div style={styles.tabContainer}>
           {tabs.map((tab) => {
             const active = activeTab === tab.id;
@@ -196,7 +196,7 @@ export function TransactionCenterClient({ userId, transactions }: TransactionCen
           </Link>
         </section>
       ) : (
-        <section style={styles.list}>
+        <section className="transaction-list" style={styles.list}>
           {filteredTransactions.map((tx) => (
             <TransactionRow key={tx.id} tx={tx} />
           ))}
@@ -355,10 +355,10 @@ function formatDate(value: string | Date): string {
 }
 
 function toneColor(tone?: "blue" | "green" | "red"): string {
-  if (tone === "blue") return "#2563EB";
-  if (tone === "green") return "#059669";
-  if (tone === "red") return "#DC2626";
-  return "#0F172A";
+  if (tone === "blue") return "#93c5fd";
+  if (tone === "green") return "#86efac";
+  if (tone === "red") return "#fca5a5";
+  return "#ffffff";
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -369,7 +369,6 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     gap: "20px",
     alignItems: "flex-start",
-    marginBottom: "22px",
   },
   eyebrow: {
     fontSize: "12px",
@@ -380,43 +379,47 @@ const styles: Record<string, React.CSSProperties> = {
   },
   title: {
     lineHeight: 1.1,
+    margin: "8px 0 0",
   },
   subtitle: {
     fontSize: "14px",
+    maxWidth: "680px",
+    color: "rgba(255, 255, 255, 0.66)",
+    lineHeight: 1.65,
+    margin: "14px 0 0",
   },
   primaryAction: {
-    backgroundColor: "#0F172A",
-    color: "#FFFFFF",
-    borderRadius: "6px",
-    padding: "10px 16px",
-    textDecoration: "none",
-    fontSize: "13px",
-    fontWeight: 750,
+    flex: "0 0 auto",
   },
   secondaryAction: {
-    display: "inline-block",
-    backgroundColor: "#0F172A",
+    display: "inline-flex",
+    alignItems: "center",
+    minHeight: "42px",
+    backgroundColor: "#e20f1b",
     color: "#FFFFFF",
     borderRadius: "6px",
-    padding: "10px 16px",
+    padding: "0 16px",
     textDecoration: "none",
     fontSize: "13px",
-    fontWeight: 750,
+    fontWeight: 850,
+    textTransform: "uppercase",
   },
   summaryGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
     gap: "10px",
-    marginBottom: "18px",
+    width: "min(1360px, 100%)",
+    margin: "0 auto",
   },
   summaryItem: {
-    border: "1px solid #E2E8F0",
+    border: "1px solid rgba(255, 255, 255, 0.12)",
     borderRadius: "8px",
     padding: "14px",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    backdropFilter: "blur(18px)",
   },
   summaryLabel: {
-    color: "#64748B",
+    color: "rgba(255, 255, 255, 0.58)",
     fontSize: "12px",
     fontWeight: 750,
   },
@@ -430,7 +433,8 @@ const styles: Record<string, React.CSSProperties> = {
     gridTemplateColumns: "1fr minmax(260px, 360px)",
     gap: "14px",
     alignItems: "center",
-    marginBottom: "16px",
+    width: "min(1360px, 100%)",
+    margin: "0 auto",
   },
   tabContainer: {
     display: "flex",
@@ -444,9 +448,9 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "6px",
     borderWidth: "1px",
     borderStyle: "solid",
-    borderColor: "#CBD5E1",
-    backgroundColor: "#FFFFFF",
-    color: "#334155",
+    borderColor: "rgba(255, 255, 255, 0.14)",
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    color: "rgba(255, 255, 255, 0.78)",
     fontWeight: 750,
     fontSize: "13px",
     cursor: "pointer",
@@ -456,16 +460,16 @@ const styles: Record<string, React.CSSProperties> = {
     whiteSpace: "nowrap",
   },
   activeTabBtn: {
-    backgroundColor: "#111827",
-    borderColor: "#111827",
+    backgroundColor: "#e20f1b",
+    borderColor: "#e20f1b",
     color: "#FFFFFF",
   },
   tabBadge: {
     minWidth: "20px",
     height: "20px",
     borderRadius: "999px",
-    backgroundColor: "#F1F5F9",
-    color: "#475569",
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    color: "rgba(255, 255, 255, 0.72)",
     fontSize: "11px",
     fontWeight: 800,
     display: "inline-flex",
@@ -474,7 +478,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "0 6px",
   },
   activeTabBadge: {
-    backgroundColor: "#334155",
+    backgroundColor: "rgba(255, 255, 255, 0.18)",
     color: "#FFFFFF",
   },
   searchWrap: {
@@ -485,15 +489,18 @@ const styles: Record<string, React.CSSProperties> = {
     width: "100%",
     height: "40px",
     borderRadius: "6px",
-    border: "1px solid #CBD5E1",
+    border: "1px solid rgba(255, 255, 255, 0.16)",
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    color: "#ffffff",
     padding: "0 12px",
     fontSize: "14px",
   },
   clearBtn: {
     borderRadius: "6px",
-    border: "1px solid #CBD5E1",
+    border: "1px solid rgba(255, 255, 255, 0.16)",
     padding: "0 12px",
-    backgroundColor: "#F8FAFC",
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    color: "#ffffff",
     fontWeight: 750,
     cursor: "pointer",
   },
@@ -501,16 +508,20 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     flexDirection: "column",
     gap: "10px",
+    width: "min(1360px, 100%)",
+    margin: "0 auto",
   },
   row: {
     display: "grid",
     gridTemplateColumns: "minmax(260px, 1.25fr) minmax(520px, 2.5fr) 72px",
     gap: "18px",
     alignItems: "center",
-    border: "1px solid #E2E8F0",
+    border: "1px solid rgba(255, 255, 255, 0.12)",
     borderRadius: "8px",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    color: "#ffffff",
     padding: "14px",
+    boxShadow: "0 24px 60px rgba(0, 0, 0, 0.22)",
   },
   vehicleBlock: {
     display: "flex",
@@ -523,14 +534,14 @@ const styles: Record<string, React.CSSProperties> = {
     height: "54px",
     borderRadius: "6px",
     objectFit: "cover",
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
   },
   thumbnailPlaceholder: {
     width: "72px",
     height: "54px",
     borderRadius: "6px",
-    backgroundColor: "#F1F5F9",
-    color: "#475569",
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    color: "rgba(255, 255, 255, 0.58)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -541,20 +552,20 @@ const styles: Record<string, React.CSSProperties> = {
     minWidth: 0,
   },
   vehicleTitle: {
-    color: "#0F172A",
+    color: "#ffffff",
     fontSize: "14px",
     fontWeight: 850,
     lineHeight: 1.25,
   },
   vehicleMeta: {
-    color: "#64748B",
+    color: "rgba(255, 255, 255, 0.62)",
     fontSize: "12px",
     marginTop: "2px",
   },
   vinLink: {
     display: "inline-block",
     marginTop: "4px",
-    color: "#2563EB",
+    color: "rgba(255, 255, 255, 0.78)",
     fontSize: "12px",
     textDecoration: "none",
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
@@ -565,20 +576,20 @@ const styles: Record<string, React.CSSProperties> = {
     gap: "12px",
   },
   cellLabel: {
-    color: "#64748B",
+    color: "rgba(255, 255, 255, 0.58)",
     fontSize: "11px",
     fontWeight: 800,
     textTransform: "uppercase",
     marginBottom: "3px",
   },
   cellValue: {
-    color: "#111827",
+    color: "#ffffff",
     fontSize: "13px",
     fontWeight: 800,
     lineHeight: 1.25,
   },
   cellSub: {
-    color: "#64748B",
+    color: "rgba(255, 255, 255, 0.58)",
     fontSize: "12px",
     marginTop: "3px",
     lineHeight: 1.25,
@@ -595,7 +606,7 @@ const styles: Record<string, React.CSSProperties> = {
   rowAction: {
     height: "36px",
     borderRadius: "6px",
-    backgroundColor: "#111827",
+    backgroundColor: "#e20f1b",
     color: "#FFFFFF",
     textDecoration: "none",
     fontWeight: 800,
@@ -605,20 +616,22 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "center",
   },
   emptyState: {
-    border: "1px solid #E2E8F0",
+    border: "1px solid rgba(255, 255, 255, 0.12)",
     borderRadius: "8px",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
     padding: "44px 24px",
     textAlign: "center",
+    width: "min(1360px, 100%)",
+    margin: "0 auto",
   },
   emptyTitle: {
-    color: "#0F172A",
+    color: "#ffffff",
     fontSize: "20px",
     fontWeight: 850,
     margin: "0 0 6px",
   },
   emptyText: {
-    color: "#64748B",
+    color: "rgba(255, 255, 255, 0.66)",
     margin: "0 0 18px",
   },
 };

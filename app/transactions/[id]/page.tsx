@@ -70,7 +70,7 @@ export default async function TransactionDetailPage({ params }: TransactionPageP
         : "Transaction not found";
 
     return (
-    <main className="page-shell" style={styles.container}>
+    <main className="garage-page-shell transaction-page-shell" style={styles.container}>
       <section style={styles.emptyPanel}>
           <div style={styles.errorBadge}>Unavailable</div>
           <h1 style={styles.title}>{title}</h1>
@@ -90,7 +90,7 @@ export default async function TransactionDetailPage({ params }: TransactionPageP
     : null;
 
   return (
-    <main className="page-shell" style={styles.container}>
+    <main className="garage-page-shell transaction-page-shell" style={styles.container}>
       <section className="transaction-detail-header" style={styles.header}>
         <div>
           <Link href="/transactions" style={styles.backLink}>
@@ -466,45 +466,46 @@ function formatDateTime(value: string | Date): string {
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    color: "#0F172A",
+    color: "#ffffff",
   },
   header: {
     marginBottom: "22px",
   },
   backLink: {
     display: "inline-block",
-    color: "#2563EB",
+    color: "rgba(255, 255, 255, 0.72)",
     fontSize: "13px",
     fontWeight: 750,
     textDecoration: "none",
     marginBottom: "14px",
   },
   eyebrow: {
-    color: "#64748B",
+    color: "rgba(255, 255, 255, 0.58)",
     fontSize: "12px",
     fontWeight: 850,
     textTransform: "uppercase",
     letterSpacing: "0.06em",
   },
   title: {
-    color: "#0F172A",
+    color: "#ffffff",
     fontSize: "30px",
     lineHeight: 1.1,
     fontWeight: 850,
     margin: "4px 0 8px",
   },
   subtitle: {
-    color: "#475569",
+    color: "rgba(255, 255, 255, 0.66)",
     margin: 0,
     fontSize: "15px",
   },
   statusPanel: {
     minWidth: "190px",
-    border: "1px solid #E2E8F0",
+    border: "1px solid rgba(255, 255, 255, 0.12)",
     borderRadius: "8px",
     padding: "14px",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
     textAlign: "right",
+    backdropFilter: "blur(18px)",
   },
   statusBadge: {
     display: "inline-flex",
@@ -516,7 +517,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 850,
   },
   statusCaption: {
-    color: "#64748B",
+    color: "rgba(255, 255, 255, 0.62)",
     fontSize: "12px",
     marginTop: "6px",
   },
@@ -535,17 +536,21 @@ const styles: Record<string, React.CSSProperties> = {
     gap: "14px",
   },
   panel: {
-    border: "1px solid #E2E8F0",
+    border: "1px solid rgba(255, 255, 255, 0.12)",
     borderRadius: "8px",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    color: "#ffffff",
     padding: "18px",
+    boxShadow: "0 24px 60px rgba(0, 0, 0, 0.22)",
+    backdropFilter: "blur(18px)",
   },
   emptyPanel: {
-    border: "1px solid #E2E8F0",
+    border: "1px solid rgba(255, 255, 255, 0.12)",
     borderRadius: "8px",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
     padding: "36px",
     maxWidth: "560px",
+    boxShadow: "0 24px 60px rgba(0, 0, 0, 0.22)",
   },
   errorBadge: {
     display: "inline-block",
@@ -558,7 +563,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: "12px",
   },
   panelLabel: {
-    color: "#64748B",
+    color: "rgba(255, 255, 255, 0.58)",
     fontSize: "11px",
     fontWeight: 850,
     textTransform: "uppercase",
@@ -566,14 +571,14 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: "9px",
   },
   panelTitle: {
-    color: "#0F172A",
+    color: "#ffffff",
     fontSize: "18px",
     fontWeight: 850,
     margin: "0 0 8px",
     lineHeight: 1.25,
   },
   vehicleTitle: {
-    color: "#0F172A",
+    color: "#ffffff",
     fontSize: "20px",
     fontWeight: 850,
     margin: "0 0 4px",
@@ -581,20 +586,20 @@ const styles: Record<string, React.CSSProperties> = {
   vinLink: {
     display: "inline-block",
     marginTop: "10px",
-    color: "#2563EB",
+    color: "rgba(255, 255, 255, 0.78)",
     textDecoration: "none",
     fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
     fontSize: "13px",
     fontWeight: 750,
   },
   muted: {
-    color: "#64748B",
+    color: "rgba(255, 255, 255, 0.66)",
     fontSize: "14px",
     lineHeight: 1.5,
     margin: 0,
   },
   mutedStrong: {
-    color: "#475569",
+    color: "rgba(255, 255, 255, 0.76)",
     fontSize: "14px",
     fontWeight: 750,
   },
@@ -604,20 +609,20 @@ const styles: Record<string, React.CSSProperties> = {
   scopedList: {
     marginTop: "14px",
     paddingTop: "14px",
-    borderTop: "1px solid #E2E8F0",
+    borderTop: "1px solid rgba(255, 255, 255, 0.1)",
   },
   detailItem: {
     minWidth: 0,
   },
   detailLabel: {
-    color: "#64748B",
+    color: "rgba(255, 255, 255, 0.58)",
     fontSize: "11px",
     fontWeight: 850,
     textTransform: "uppercase",
     marginBottom: "3px",
   },
   detailValue: {
-    color: "#111827",
+    color: "#ffffff",
     fontSize: "13px",
     fontWeight: 750,
     lineHeight: 1.35,
@@ -641,17 +646,17 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: "4px",
   },
   timelineTitle: {
-    color: "#111827",
+    color: "#ffffff",
     fontSize: "14px",
     fontWeight: 850,
   },
   timelineMeta: {
-    color: "#64748B",
+    color: "rgba(255, 255, 255, 0.58)",
     fontSize: "12px",
     marginTop: "2px",
   },
   moneyValue: {
-    color: "#059669",
+    color: "#86efac",
     fontSize: "24px",
     fontWeight: 850,
     marginBottom: "8px",
@@ -662,8 +667,8 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     borderRadius: "999px",
     padding: "0 10px",
-    backgroundColor: "#F1F5F9",
-    color: "#334155",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    color: "#ffffff",
     fontSize: "12px",
     fontWeight: 850,
     marginBottom: "10px",
@@ -678,18 +683,18 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "space-between",
     gap: "12px",
     alignItems: "center",
-    borderBottom: "1px solid #F1F5F9",
+    borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
     paddingBottom: "10px",
   },
   partyName: {
-    color: "#111827",
+    color: "#ffffff",
     fontSize: "13px",
     fontWeight: 850,
   },
   partyBadge: {
     flex: "0 0 auto",
-    backgroundColor: "#F1F5F9",
-    color: "#475569",
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    color: "rgba(255, 255, 255, 0.76)",
     borderRadius: "999px",
     padding: "4px 8px",
     fontSize: "11px",
@@ -699,15 +704,15 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     justifyContent: "space-between",
     gap: "12px",
-    color: "#111827",
+    color: "#ffffff",
     fontSize: "14px",
     padding: "9px 0",
-    borderBottom: "1px solid #F1F5F9",
+    borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
   },
   primaryAction: {
     display: "inline-block",
     marginTop: "18px",
-    backgroundColor: "#111827",
+    backgroundColor: "#e20f1b",
     color: "#FFFFFF",
     borderRadius: "6px",
     padding: "10px 14px",
@@ -722,7 +727,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: "100%",
     border: 0,
     borderRadius: "6px",
-    backgroundColor: "#111827",
+    backgroundColor: "#e20f1b",
     color: "#FFFFFF",
     padding: "11px 14px",
     fontSize: "13px",
