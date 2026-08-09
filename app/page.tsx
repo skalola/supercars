@@ -75,21 +75,6 @@ export default async function HomePage() {
             <p>Create a local drive, concours stop, or private garage night for nearby owners.</p>
           </Link>
         </article>
-
-        <article className="garage-home-panel">
-          <div>
-            <span>Ownership Activity</span>
-            <Link href="/garage">Manage</Link>
-          </div>
-          <div className="garage-home-activity-list">
-            {summary.activityItems.map((item) => (
-              <Link key={`${item.href}:${item.label}`} href={item.href}>
-                <strong>{item.label}</strong>
-                <span>{item.detail}</span>
-              </Link>
-            ))}
-          </div>
-        </article>
       </section>
     </main>
   );
