@@ -8,18 +8,19 @@ datasource db {
 }
 
 model Make {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  slug      String   @unique
-  logoUrl   String?
-  region    String?
-  models    Model[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String              @id @default(uuid())
+  name              String              @unique
+  slug              String              @unique
+  logoUrl           String?
+  region            String?
+  models            Model[]
+  partCompatibility PartCompatibility[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
 }
 
 model Model {
-  id                  String      @id @default(uuid())
+  id                  String    @id @default(uuid())
   makeId              String
   name                String
   slug                String
@@ -30,53 +31,54 @@ model Model {
   bodyStyle           String?
   productionCount     Int?
   description         String?
-  metadataStatus      String      @default("UNREVIEWED")
+  metadataStatus      String    @default("UNREVIEWED")
   metadataConfidence  Float?
   metadataSource      String?
   metadataSourceUrl   String?
   lastMetadataAuditAt DateTime?
 
-  make                Make        @relation(fields: [makeId], references: [id])
-  vehicles            Vehicle[]
-  spec                ModelSpec?
-  images              ModelImage[]
-  imageCandidates     ModelImageCandidate[]
-  variants            ModelVariant[]
-  garageItems         GarageItem[]
-  carClubs            CarClubModel[]
-  maintenanceRules    MaintenanceRule[]
-  listings            Listing[]
-  marketSales         MarketSale[]
-  marketSnapshots     MarketSnapshot[]
+  make              Make                  @relation(fields: [makeId], references: [id])
+  vehicles          Vehicle[]
+  spec              ModelSpec?
+  images            ModelImage[]
+  imageCandidates   ModelImageCandidate[]
+  variants          ModelVariant[]
+  garageItems       GarageItem[]
+  carClubs          CarClubModel[]
+  maintenanceRules  MaintenanceRule[]
+  listings          Listing[]
+  marketSales       MarketSale[]
+  marketSnapshots   MarketSnapshot[]
+  partCompatibility PartCompatibility[]
 
-  createdAt           DateTime    @default(now())
-  updatedAt           DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([makeId, slug])
 }
 
 model ModelSpec {
-  id            String   @id @default(uuid())
-  modelId       String   @unique
-  engine        String?
-  displacement  String?
-  cylinders     String?
-  horsepower    String?
-  torque        String?
-  transmission  String?
-  drivetrain    String?
-  topSpeed      String?
-  zeroToSixty   String?
-  weight        String?
+  id           String  @id @default(uuid())
+  modelId      String  @unique
+  engine       String?
+  displacement String?
+  cylinders    String?
+  horsepower   String?
+  torque       String?
+  transmission String?
+  drivetrain   String?
+  topSpeed     String?
+  zeroToSixty  String?
+  weight       String?
 
-  model         Model    @relation(fields: [modelId], references: [id])
+  model Model @relation(fields: [modelId], references: [id])
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model ModelVariant {
-  id                  String   @id @default(uuid())
+  id                  String  @id @default(uuid())
   modelId             String
   name                String
   slug                String
@@ -85,29 +87,29 @@ model ModelVariant {
   productionCount     Int?
   description         String?
 
-  model               Model    @relation(fields: [modelId], references: [id])
+  model Model @relation(fields: [modelId], references: [id])
 
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([modelId, slug])
 }
 
 model ModelImage {
-  id        String   @id @default(uuid())
-  modelId   String
-  url       String
-  source    String?
-  type      String?
-  sourceUrl String?
-  sourceName String?
-  license String?
-  attribution String?
+  id             String  @id @default(uuid())
+  modelId        String
+  url            String
+  source         String?
+  type           String?
+  sourceUrl      String?
+  sourceName     String?
+  license        String?
+  attribution    String?
   attributionUrl String?
-  confidence Float?
-  reviewStatus String @default("UNREVIEWED")
+  confidence     Float?
+  reviewStatus   String  @default("UNREVIEWED")
 
-  model     Model    @relation(fields: [modelId], references: [id])
+  model Model @relation(fields: [modelId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -116,7 +118,7 @@ model ModelImage {
 }
 
 model ModelImageCandidate {
-  id             String   @id @default(uuid())
+  id             String  @id @default(uuid())
   modelId        String?
   makeId         String?
   makeName       String
@@ -133,13 +135,13 @@ model ModelImageCandidate {
   category       String?
   context        String?
   confidence     Float?
-  reviewStatus   String   @default("UNREVIEWED")
+  reviewStatus   String  @default("UNREVIEWED")
   matchedModelId String?
 
-  model          Model?   @relation(fields: [modelId], references: [id], onDelete: SetNull)
+  model Model? @relation(fields: [modelId], references: [id], onDelete: SetNull)
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([source, url, makeName])
   @@index([makeName])
@@ -148,43 +150,43 @@ model ModelImageCandidate {
 }
 
 model Vehicle {
-  id           String @id @default(uuid())
-  vin          String @unique
-  modelId      String
-  year         Int
+  id      String @id @default(uuid())
+  vin     String @unique
+  modelId String
+  year    Int
 
   // Identity
-  trim         String?
-  series       String?
-  manufacturer String?
+  trim              String?
+  series            String?
+  manufacturer      String?
   destinationMarket String?
-  
+
   // Details
-  color        String?
-  mileage      Int?
-  bodyStyle    String?
-  vehicleType  String?
-  doors        String?
-  fuelType     String?
-  
+  color       String?
+  mileage     Int?
+  bodyStyle   String?
+  vehicleType String?
+  doors       String?
+  fuelType    String?
+
   // Engine & Performance
-  engine       String?
+  engine              String?
   engineConfiguration String?
-  engineCylinders String?
-  displacement String?
-  turbo        String?
-  transmission String?
-  transmissionSpeeds String?
-  drivetrain   String?
-  engineHP     String?
-  engineKW     String?
-  engineManufacturer String?
-  
+  engineCylinders     String?
+  displacement        String?
+  turbo               String?
+  transmission        String?
+  transmissionSpeeds  String?
+  drivetrain          String?
+  engineHP            String?
+  engineKW            String?
+  engineManufacturer  String?
+
   // Manufacturing
   plantCountry String?
   plantCity    String?
   plantState   String?
-  
+
   // Safety
   abs                  String?
   esc                  String?
@@ -199,52 +201,54 @@ model Vehicle {
   seatBeltsAll         String?
 
   // Others
-  gvwr         String?
-  brakeSystem  String?
+  gvwr                 String?
+  brakeSystem          String?
   electrificationLevel String?
-  
-  status       String @default("UNCLAIMED")
-  ownerId      String?
 
-  model        Model @relation(fields: [modelId], references: [id])
-  owner        User?   @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  images       VehicleImage[]
-  profile      VehicleProfile?
-  modifications VehicleModification[]
-  serviceRecords ServiceRecord[]
-  awards       VehicleAward[]
-  photos       VehiclePhoto[]
-  documents    VehicleDocument[]
-  listings     Listing[]
-  vinDiscovery VinDiscovery?
-  insuranceRequests InsuranceRequest[]
-  deliveryRequests  DeliveryRequest[]
-  fulfillmentRequests FulfillmentRequest[]
+  status  String  @default("UNCLAIMED")
+  ownerId String?
+
+  model                  Model                  @relation(fields: [modelId], references: [id])
+  owner                  User?                  @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  images                 VehicleImage[]
+  profile                VehicleProfile?
+  modifications          VehicleModification[]
+  installedParts         VehicleInstalledPart[]
+  serviceRecords         ServiceRecord[]
+  awards                 VehicleAward[]
+  photos                 VehiclePhoto[]
+  documents              VehicleDocument[]
+  listings               Listing[]
+  vinDiscovery           VinDiscovery?
+  insuranceRequests      InsuranceRequest[]
+  deliveryRequests       DeliveryRequest[]
+  fulfillmentRequests    FulfillmentRequest[]
   trackerAlertDeliveries TrackerAlertDelivery[]
-  meetRsvps             MeetRsvp[]
-  meetPhotos            MeetPhoto[]
+  meetRsvps              MeetRsvp[]
+  meetPhotos             MeetPhoto[]
+  partAffiliateClicks    PartAffiliateClick[]
 
-  mileageStatus         String?  @default("COMPLETE")
-  vinIdentityStatus     String?  @default("VALID")
+  mileageStatus             String? @default("COMPLETE")
+  vinIdentityStatus         String? @default("VALID")
   vinIdentityClassification String? // VALID | MODEL_NAMING_VARIATION | TRIM_VARIATION | TRUE_IDENTITY_CONFLICT | YEAR_CONFLICT | MAKE_CONFLICT
-  imageValidationStatus String?  @default("VALID_IMAGE")
-  inventoryStatus       String?  @default("ACTIVE")
+  imageValidationStatus     String? @default("VALID_IMAGE")
+  inventoryStatus           String? @default("ACTIVE")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model VehicleImage {
-  id          String   @id @default(uuid())
-  vehicleId   String
-  url         String
-  alt         String?
-  isPrimary   Boolean  @default(false)
-  validationStatus String @default("VALID")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String   @id @default(uuid())
+  vehicleId        String
+  url              String
+  alt              String?
+  isPrimary        Boolean  @default(false)
+  validationStatus String   @default("VALID")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 }
 
 model User {
@@ -256,39 +260,41 @@ model User {
   image         String?
   role          String?   @default("USER")
 
-  accounts      Account[]
-  sessions      Session[]
-  trackerPreference UserTrackerPreference?
+  accounts               Account[]
+  sessions               Session[]
+  trackerPreference      UserTrackerPreference?
   trackerAlertDeliveries TrackerAlertDelivery[]
-  garageItems   GarageItem[]
-  vehicles      Vehicle[]
-  listings      Listing[]
-  purchases         Purchase[]
-  insuranceRequests InsuranceRequest[]
-  deliveryRequests  DeliveryRequest[]
-  fulfillmentRequests FulfillmentRequest[]
-  hostedMeets        Meet[]
-  meetRsvps          MeetRsvp[]
-  meetPhotos         MeetPhoto[]
-  meetNotifications  MeetNotification[]
-  createdCarClubs     CarClub[]       @relation("CarClubCreator")
-  carClubMemberships  CarClubMember[]
+  garageItems            GarageItem[]
+  vehicles               Vehicle[]
+  listings               Listing[]
+  purchases              Purchase[]
+  insuranceRequests      InsuranceRequest[]
+  deliveryRequests       DeliveryRequest[]
+  fulfillmentRequests    FulfillmentRequest[]
+  hostedMeets            Meet[]
+  meetRsvps              MeetRsvp[]
+  meetPhotos             MeetPhoto[]
+  meetNotifications      MeetNotification[]
+  createdCarClubs        CarClub[]              @relation("CarClubCreator")
+  carClubMemberships     CarClubMember[]
+  vehicleInstalledParts  VehicleInstalledPart[]
+  partAffiliateClicks    PartAffiliateClick[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model UserTrackerPreference {
-  id                         String   @id @default(cuid())
-  userId                     String   @unique
-  listingTrackerEnabled      Boolean  @default(false)
-  priceTrackerEnabled        Boolean  @default(false)
-  maintenanceTrackerEnabled  Boolean  @default(false)
-  eventsTrackerEnabled       Boolean  @default(false)
-  createdAt                  DateTime @default(now())
-  updatedAt                  DateTime @updatedAt
+  id                        String   @id @default(cuid())
+  userId                    String   @unique
+  listingTrackerEnabled     Boolean  @default(false)
+  priceTrackerEnabled       Boolean  @default(false)
+  maintenanceTrackerEnabled Boolean  @default(false)
+  eventsTrackerEnabled      Boolean  @default(false)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 
-  user                       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ActionRateLimit {
@@ -300,8 +306,8 @@ model ActionRateLimit {
   expiresAt   DateTime
   count       Int      @default(1)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([actorKey, action, bucketKey, windowStart])
   @@index([expiresAt])
@@ -317,8 +323,8 @@ model TrackerAlertDelivery {
   alertKey  String
   sentAt    DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   @@unique([userId, alertType, alertKey])
   @@index([vehicleId, alertType])
@@ -326,18 +332,18 @@ model TrackerAlertDelivery {
 }
 
 model Account {
-  id                 String  @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?
-  access_token       String?
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?
-  session_state      String?
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -354,19 +360,19 @@ model Session {
 }
 
 model GarageItem {
-  id                         String    @id @default(cuid())
-  userId                     String
-  modelId                    String
-  priceTrackerAlertsEnabled  Boolean   @default(false)
-  listingTrackerAlertsEnabled Boolean  @default(false)
-  priceTrackerBaseline       Float?
-  lastPriceAlertAt           DateTime?
-  lastListingAlertAt         DateTime?
-  createdAt                  DateTime  @default(now())
-  updatedAt                  DateTime  @updatedAt
+  id                          String    @id @default(cuid())
+  userId                      String
+  modelId                     String
+  priceTrackerAlertsEnabled   Boolean   @default(false)
+  listingTrackerAlertsEnabled Boolean   @default(false)
+  priceTrackerBaseline        Float?
+  lastPriceAlertAt            DateTime?
+  lastListingAlertAt          DateTime?
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
 
-  user                       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  model                      Model     @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  model Model @relation(fields: [modelId], references: [id], onDelete: Cascade)
 
   @@unique([userId, modelId])
   @@index([modelId, priceTrackerAlertsEnabled])
@@ -378,16 +384,16 @@ model GarageItem {
 // ──────────────────────────────────────────────
 
 model Meet {
-  id             String   @id @default(uuid())
-  slug           String   @unique
+  id             String    @id @default(uuid())
+  slug           String    @unique
   hostId         String
   clubId         String?
   title          String
   type           String
   /// Status: DRAFT | PUBLISHED | FULL | CANCELLED | COMPLETED | HIDDEN
-  status         String   @default("DRAFT")
+  status         String    @default("DRAFT")
   /// Visibility: PUBLIC | INVITE_ONLY
-  visibility     String   @default("PUBLIC")
+  visibility     String    @default("PUBLIC")
   startsAt       DateTime
   endsAt         DateTime?
   city           String
@@ -401,19 +407,19 @@ model Meet {
   mapY           Float?
   capacity       Int?
   description    String?
-  allowedMakes   String   @default("[]")
+  allowedMakes   String    @default("[]")
   heroImageUrl   String?
   publishedAt    DateTime?
   completedAt    DateTime?
   cancelledAt    DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  host           User     @relation(fields: [hostId], references: [id], onDelete: Cascade)
-  club           CarClub? @relation(fields: [clubId], references: [id], onDelete: SetNull)
-  rsvps          MeetRsvp[]
-  photos         MeetPhoto[]
-  notifications  MeetNotification[]
+  host          User               @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  club          CarClub?           @relation(fields: [clubId], references: [id], onDelete: SetNull)
+  rsvps         MeetRsvp[]
+  photos        MeetPhoto[]
+  notifications MeetNotification[]
 
   @@index([status, startsAt])
   @@index([city, state])
@@ -436,10 +442,10 @@ model CarClub {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  creator     User     @relation("CarClubCreator", fields: [creatorId], references: [id], onDelete: Cascade)
-  members     CarClubMember[]
-  models      CarClubModel[]
-  meets       Meet[]
+  creator User            @relation("CarClubCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  members CarClubMember[]
+  models  CarClubModel[]
+  meets   Meet[]
 
   @@index([creatorId])
   @@index([city, state])
@@ -447,17 +453,17 @@ model CarClub {
 }
 
 model CarClubMember {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   clubId    String
   userId    String
-  role      String   @default("MEMBER")
-  status    String   @default("PENDING")
+  role      String    @default("MEMBER")
+  status    String    @default("PENDING")
   joinedAt  DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  club      CarClub  @relation(fields: [clubId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  club CarClub @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  user User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([clubId, userId])
   @@index([clubId, status])
@@ -470,8 +476,8 @@ model CarClubModel {
   modelId   String
   createdAt DateTime @default(now())
 
-  club      CarClub  @relation(fields: [clubId], references: [id], onDelete: Cascade)
-  model     Model    @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  club  CarClub @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  model Model   @relation(fields: [modelId], references: [id], onDelete: Cascade)
 
   @@unique([clubId, modelId])
   @@index([modelId])
@@ -488,9 +494,9 @@ model MeetRsvp {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  meet      Meet     @relation(fields: [meetId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  meet    Meet     @relation(fields: [meetId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
 
   @@unique([meetId, userId])
   @@index([userId, status])
@@ -506,9 +512,9 @@ model MeetPhoto {
   caption   String?
   createdAt DateTime @default(now())
 
-  meet      Meet     @relation(fields: [meetId], references: [id], onDelete: Cascade)
-  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  meet    Meet     @relation(fields: [meetId], references: [id], onDelete: Cascade)
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  vehicle Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
 
   @@index([meetId])
   @@index([vehicleId])
@@ -527,8 +533,8 @@ model MeetNotification {
   reason            String?
   createdAt         DateTime @default(now())
 
-  meet              Meet     @relation(fields: [meetId], references: [id], onDelete: Cascade)
-  user              User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  meet Meet  @relation(fields: [meetId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([meetId, notificationType])
   @@index([userId, notificationType])
@@ -545,47 +551,235 @@ model VehicleProfile {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  vehicle        Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 }
 
 model VehicleModification {
-  id             String   @id @default(uuid())
-  vehicleId      String
-  name           String
-  brand          String?
-  description    String?
-  installedDate  String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String   @id @default(uuid())
+  vehicleId     String
+  name          String
+  brand         String?
+  description   String?
+  installedDate String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  vehicle        Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicle        Vehicle               @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  catalogInstall VehicleInstalledPart?
+}
+
+// ──────────────────────────────────────────────
+// Parts Catalog Foundation
+// ──────────────────────────────────────────────
+
+model PartCategory {
+  id           String  @id @default(uuid())
+  name         String
+  slug         String  @unique
+  description  String?
+  displayOrder Int     @default(0)
+  active       Boolean @default(true)
+
+  parts          PerformancePart[]
+  installedParts VehicleInstalledPart[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, displayOrder])
+}
+
+model PartBrand {
+  id         String  @id @default(uuid())
+  name       String
+  slug       String  @unique
+  logoUrl    String?
+  websiteUrl String?
+  country    String?
+  active     Boolean @default(true)
+
+  parts PerformancePart[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, name])
+}
+
+model AffiliatePartner {
+  id               String  @id @default(uuid())
+  name             String
+  slug             String  @unique
+  network          String?
+  websiteUrl       String?
+  status           String  @default("INACTIVE")
+  commissionLabel  String?
+  trackingTemplate String?
+  disclosure       String?
+  active           Boolean @default(false)
+
+  parts  PerformancePart[]
+  clicks PartAffiliateClick[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, active])
+}
+
+model PerformancePart {
+  id                 String  @id @default(uuid())
+  categoryId         String
+  brandId            String
+  affiliatePartnerId String?
+  name               String
+  slug               String
+  partNumber         String?
+  description        String?
+  imageUrl           String?
+  sourceUrl          String?
+  sourceName         String?
+  sourceConfidence   String  @default("MANUAL_REVIEW")
+  status             String  @default("DRAFT")
+
+  retailPriceCents  Int?
+  currency          String    @default("USD")
+  retailerName      String?
+  retailerSku       String?
+  affiliateUrl      String?
+  commissionRateBps Int?
+  trackingStatus    String    @default("NOT_CONFIGURED")
+  lastCheckedAt     DateTime?
+
+  estimatedHpGain     Int?
+  estimatedTorqueGain Int?
+  gainBasis           String?
+  installComplexity   String?
+  notes               String?
+
+  category         PartCategory           @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  brand            PartBrand              @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  affiliatePartner AffiliatePartner?      @relation(fields: [affiliatePartnerId], references: [id], onDelete: SetNull)
+  compatibility    PartCompatibility[]
+  installedParts   VehicleInstalledPart[]
+  clicks           PartAffiliateClick[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([brandId, slug])
+  @@index([categoryId, status])
+  @@index([brandId, status])
+  @@index([trackingStatus])
+}
+
+model PartCompatibility {
+  id         String  @id @default(uuid())
+  partId     String
+  makeId     String?
+  modelId    String?
+  yearStart  Int?
+  yearEnd    Int?
+  trim       String?
+  engine     String?
+  notes      String?
+  confidence String  @default("MANUAL_REVIEW")
+
+  part  PerformancePart @relation(fields: [partId], references: [id], onDelete: Cascade)
+  make  Make?           @relation(fields: [makeId], references: [id], onDelete: SetNull)
+  model Model?          @relation(fields: [modelId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([partId, makeId, modelId, yearStart, yearEnd, trim, engine])
+  @@index([makeId, modelId])
+  @@index([partId])
+}
+
+model VehicleInstalledPart {
+  id                   String  @id @default(uuid())
+  vehicleId            String
+  partId               String?
+  legacyModificationId String? @unique
+  categoryId           String?
+  userId               String?
+  installStatus        String  @default("INSTALLED")
+  installedDate        String?
+  notes                String?
+  customName           String?
+  customBrandName      String?
+  hpGainOverride       Int?
+  torqueGainOverride   Int?
+  verificationStatus   String  @default("OWNER_REPORTED")
+
+  vehicle            Vehicle              @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  part               PerformancePart?     @relation(fields: [partId], references: [id], onDelete: SetNull)
+  legacyModification VehicleModification? @relation(fields: [legacyModificationId], references: [id], onDelete: SetNull)
+  category           PartCategory?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  user               User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  clicks             PartAffiliateClick[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([vehicleId, installStatus])
+  @@index([partId])
+  @@index([categoryId])
+  @@index([userId])
+}
+
+model PartAffiliateClick {
+  id                     String   @id @default(uuid())
+  partId                 String
+  affiliatePartnerId     String?
+  vehicleId              String?
+  vehicleInstalledPartId String?
+  userId                 String?
+  outboundUrl            String
+  clickRef               String   @unique @default(uuid())
+  sourcePath             String?
+  ipHash                 String?
+  userAgentHash          String?
+  createdAt              DateTime @default(now())
+
+  part                 PerformancePart       @relation(fields: [partId], references: [id], onDelete: Cascade)
+  affiliatePartner     AffiliatePartner?     @relation(fields: [affiliatePartnerId], references: [id], onDelete: SetNull)
+  vehicle              Vehicle?              @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  vehicleInstalledPart VehicleInstalledPart? @relation(fields: [vehicleInstalledPartId], references: [id], onDelete: SetNull)
+  user                 User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([partId, createdAt])
+  @@index([affiliatePartnerId, createdAt])
+  @@index([vehicleId, createdAt])
+  @@index([userId, createdAt])
 }
 
 model ServiceRecord {
-  id             String   @id @default(uuid())
-  vehicleId      String
-  serviceDate    DateTime
-  mileage        Int?
-  shopName       String?
-  description    String?
-  cost           Float?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id          String   @id @default(uuid())
+  vehicleId   String
+  serviceDate DateTime
+  mileage     Int?
+  shopName    String?
+  description String?
+  cost        Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  vehicle        Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 }
 
 model VehicleAward {
-  id             String   @id @default(uuid())
-  vehicleId      String
-  title          String
-  eventName      String?
-  awardDate      DateTime?
-  description    String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id          String    @id @default(uuid())
+  vehicleId   String
+  title       String
+  eventName   String?
+  awardDate   DateTime?
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  vehicle        Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 }
 
 model VehiclePhoto {
@@ -597,7 +791,7 @@ model VehiclePhoto {
   isHero       Boolean  @default(false)
   createdAt    DateTime @default(now())
 
-  vehicle      Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 }
 
 model VehicleDocument {
@@ -608,7 +802,7 @@ model VehicleDocument {
   filePath     String
   createdAt    DateTime @default(now())
 
-  vehicle      Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 }
 
 model MaintenanceRule {
@@ -623,7 +817,7 @@ model MaintenanceRule {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  model          Model?   @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  model Model? @relation(fields: [modelId], references: [id], onDelete: Cascade)
 }
 
 // ──────────────────────────────────────────────
@@ -640,10 +834,10 @@ model MarketSource {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  listings  Listing[]
-  sales     MarketSale[]
+  listings            Listing[]
+  sales               MarketSale[]
   vinDiscoverySources VinDiscoverySource[]
-  partnerContact PartnerContact?
+  partnerContact      PartnerContact?
 }
 
 model Listing {
@@ -668,22 +862,22 @@ model Listing {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  model       Model         @relation(fields: [modelId], references: [id])
-  source      MarketSource? @relation(fields: [sourceId], references: [id])
+  model  Model         @relation(fields: [modelId], references: [id])
+  source MarketSource? @relation(fields: [sourceId], references: [id])
 
   // Local marketplace fields
   vehicleId   String?
   sellerId    String?
   askingPrice Float?
 
-  vehicle     Vehicle?      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  seller      User?         @relation(fields: [sellerId], references: [id], onDelete: Cascade)
-  purchases   Purchase[]
+  vehicle             Vehicle?             @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  seller              User?                @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  purchases           Purchase[]
   fulfillmentRequests FulfillmentRequest[]
 
-  priceStatus      String?   @default("VALID_PRICE")
-  freshnessStatus  String?   @default("ACTIVE")
-  sourceConfidence String?   @default("MEDIUM")
+  priceStatus      String? @default("VALID_PRICE")
+  freshnessStatus  String? @default("ACTIVE")
+  sourceConfidence String? @default("MEDIUM")
 
   @@unique([sourceId, externalListingId])
 }
@@ -698,26 +892,26 @@ model VinDiscovery {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  vehicle         Vehicle?             @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
-  sources         VinDiscoverySource[]
+  vehicle Vehicle?             @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  sources VinDiscoverySource[]
 }
 
 model VinDiscoverySource {
-  id              String   @id @default(uuid())
-  discoveryId     String
-  sourceId        String?
-  sourceName      String
-  sourceKey       String
-  url             String?
+  id                String   @id @default(uuid())
+  discoveryId       String
+  sourceId          String?
+  sourceName        String
+  sourceKey         String
+  url               String?
   externalListingId String?
-  firstDiscovered DateTime @default(now())
-  lastSeen        DateTime @default(now())
-  active          Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  firstDiscovered   DateTime @default(now())
+  lastSeen          DateTime @default(now())
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  discovery       VinDiscovery @relation(fields: [discoveryId], references: [id], onDelete: Cascade)
-  source          MarketSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  discovery VinDiscovery  @relation(fields: [discoveryId], references: [id], onDelete: Cascade)
+  source    MarketSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
 
   @@unique([discoveryId, sourceKey])
   @@index([sourceName, active])
@@ -737,8 +931,8 @@ model MarketSale {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  model     Model        @relation(fields: [modelId], references: [id])
-  source    MarketSource @relation(fields: [sourceId], references: [id])
+  model  Model        @relation(fields: [modelId], references: [id])
+  source MarketSource @relation(fields: [sourceId], references: [id])
 }
 
 model MarketSnapshot {
@@ -754,37 +948,37 @@ model MarketSnapshot {
   averageMileage     Float?
   createdAt          DateTime @default(now())
 
-  model              Model    @relation(fields: [modelId], references: [id])
+  model Model @relation(fields: [modelId], references: [id])
 }
 
 model Purchase {
-  id               String            @id @default(uuid())
-  listingId        String
-  buyerId          String
-  amount           Float
-  status           String            @default("PENDING") // PENDING, COMPLETED, CANCELLED
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  id        String   @id @default(uuid())
+  listingId String
+  buyerId   String
+  amount    Float
+  status    String   @default("PENDING") // PENDING, COMPLETED, CANCELLED
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  listing          Listing           @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  buyer            User              @relation(fields: [buyerId], references: [id], onDelete: Cascade)
-  insuranceRequest InsuranceRequest?
-  deliveryRequest  DeliveryRequest?
+  listing             Listing              @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyer               User                 @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  insuranceRequest    InsuranceRequest?
+  deliveryRequest     DeliveryRequest?
   fulfillmentRequests FulfillmentRequest[]
 }
 
 model InsuranceRequest {
-  id          String   @id @default(uuid())
-  purchaseId  String   @unique
-  userId      String
-  vehicleId   String
-  status      String   @default("NOT_STARTED") // NOT_STARTED, REQUESTED, QUOTE_STARTED, COMPLETED
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(uuid())
+  purchaseId String   @unique
+  userId     String
+  vehicleId  String
+  status     String   @default("NOT_STARTED") // NOT_STARTED, REQUESTED, QUOTE_STARTED, COMPLETED
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  purchase    Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle  Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 }
 
 model DeliveryRequest {
@@ -802,9 +996,9 @@ model DeliveryRequest {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  purchase        Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  vehicle         Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle  Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 }
 
 // ──────────────────────────────────────────────
@@ -812,53 +1006,53 @@ model DeliveryRequest {
 // ──────────────────────────────────────────────
 
 model FulfillmentRequest {
-  id                     String   @id @default(uuid())
+  id                     String @id @default(uuid())
   /// Type: DEALER_PURCHASE | INSURANCE_QUOTE | TRANSPORT_QUOTE | SERVICE_BOOKING
   requestType            String
   /// Status: DRAFT | READY_TO_SEND | SENT | VIEWED | ACCEPTED | DECLINED | EXPIRED | CANCELLED | COMPLETED
-  status                 String   @default("DRAFT")
-  publicTransactionToken String   @unique @default(uuid())
+  status                 String @default("DRAFT")
+  publicTransactionToken String @unique @default(uuid())
 
   /// Payment Status: NOT_REQUIRED | AUTHORIZATION_PENDING | AUTHORIZED | CAPTURE_PENDING | CAPTURED | REFUNDED | VOIDED | FAILED | CANCELLED
-  paymentStatus              String    @default("NOT_REQUIRED")
-  cancellationReason         String?
-  cancelledByActor           String?
-  expectedPlatformFee        Float     @default(0)
-  expectedPartnerCommission  Float     @default(0)
-  collectedAmount            Float     @default(0)
-  refundableAmount           Float     @default(0)
-  partnerAcceptedAt          DateTime?
-  completedAt                DateTime?
+  paymentStatus             String    @default("NOT_REQUIRED")
+  cancellationReason        String?
+  cancelledByActor          String?
+  expectedPlatformFee       Float     @default(0)
+  expectedPartnerCommission Float     @default(0)
+  collectedAmount           Float     @default(0)
+  refundableAmount          Float     @default(0)
+  partnerAcceptedAt         DateTime?
+  completedAt               DateTime?
   /// Payout Status: UNSETTLED | PENDING_RECONCILIATION | RECONCILED | PAYOUT_COMPLETED
-  payoutStatus               String    @default("UNSETTLED")
+  payoutStatus              String    @default("UNSETTLED")
 
-  buyerId                String?
-  vehicleId              String?
-  listingId              String?
-  purchaseId             String?
-  notes                  String?
+  buyerId    String?
+  vehicleId  String?
+  listingId  String?
+  purchaseId String?
+  notes      String?
 
-  buyer                  User?     @relation(fields: [buyerId], references: [id], onDelete: SetNull)
-  vehicle                Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
-  listing                Listing?  @relation(fields: [listingId], references: [id], onDelete: SetNull)
-  purchase               Purchase? @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
+  buyer    User?     @relation(fields: [buyerId], references: [id], onDelete: SetNull)
+  vehicle  Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  listing  Listing?  @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  purchase Purchase? @relation(fields: [purchaseId], references: [id], onDelete: SetNull)
 
-  parties                FulfillmentParty[]
-  packages               FulfillmentPackage[]
-  events                 FulfillmentEvent[]
-  fees                   FulfillmentFee[]
-  depositIntents         DepositIntent[]
-  partnerTokens          PartnerDecisionToken[]
+  parties        FulfillmentParty[]
+  packages       FulfillmentPackage[]
+  events         FulfillmentEvent[]
+  fees           FulfillmentFee[]
+  depositIntents DepositIntent[]
+  partnerTokens  PartnerDecisionToken[]
 
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([requestType, status])
   @@index([publicTransactionToken])
 }
 
 model FulfillmentParty {
-  id                   String   @id @default(uuid())
+  id                   String  @id @default(uuid())
   fulfillmentRequestId String
   /// Type: BUYER | SELLER | DEALER | INSURANCE_CARRIER | TRANSPORT_PROVIDER | SERVICE_CENTER | PLATFORM
   partyType            String
@@ -871,64 +1065,64 @@ model FulfillmentParty {
   roleDescription      String?
   partnerContactId     String?
 
-  fulfillmentRequest   FulfillmentRequest @relation(fields: [fulfillmentRequestId], references: [id], onDelete: Cascade)
-  partnerContact       PartnerContact?    @relation(fields: [partnerContactId], references: [id], onDelete: SetNull)
+  fulfillmentRequest FulfillmentRequest @relation(fields: [fulfillmentRequestId], references: [id], onDelete: Cascade)
+  partnerContact     PartnerContact?    @relation(fields: [partnerContactId], references: [id], onDelete: SetNull)
 
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([fulfillmentRequestId])
 }
 
 model FulfillmentPackage {
-  id                   String   @id @default(uuid())
+  id                   String  @id @default(uuid())
   fulfillmentRequestId String
   title                String
   description          String?
   /// JSON-encoded string holding the scoped partner data package
   scope                String
 
-  fulfillmentRequest   FulfillmentRequest @relation(fields: [fulfillmentRequestId], references: [id], onDelete: Cascade)
+  fulfillmentRequest FulfillmentRequest @relation(fields: [fulfillmentRequestId], references: [id], onDelete: Cascade)
 
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([fulfillmentRequestId])
 }
 
 model FulfillmentEvent {
-  id                   String   @id @default(uuid())
+  id                   String  @id @default(uuid())
   fulfillmentRequestId String
   previousStatus       String?
   newStatus            String
   /// ActorType: BUYER | PARTNER | SYSTEM | ADMIN
-  actorType            String   @default("SYSTEM")
+  actorType            String  @default("SYSTEM")
   actorId              String?
   note                 String?
   metadata             String?
 
-  fulfillmentRequest   FulfillmentRequest @relation(fields: [fulfillmentRequestId], references: [id], onDelete: Cascade)
+  fulfillmentRequest FulfillmentRequest @relation(fields: [fulfillmentRequestId], references: [id], onDelete: Cascade)
 
-  createdAt            DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([fulfillmentRequestId])
 }
 
 model FulfillmentFee {
-  id                   String   @id @default(uuid())
+  id                   String  @id @default(uuid())
   fulfillmentRequestId String
   /// FeeType: COMMISSION | SERVICE_FEE | TRANSPORT_FEE | REFERRAL_FEE | DEPOSIT
   feeType              String
   amount               Float
-  currency             String   @default("USD")
+  currency             String  @default("USD")
   /// Status: ESTIMATED | AUTHORIZED | CAPTURED | REFUNDED | WAIVED
-  status               String   @default("ESTIMATED")
+  status               String  @default("ESTIMATED")
   description          String?
 
-  fulfillmentRequest   FulfillmentRequest @relation(fields: [fulfillmentRequestId], references: [id], onDelete: Cascade)
+  fulfillmentRequest FulfillmentRequest @relation(fields: [fulfillmentRequestId], references: [id], onDelete: Cascade)
 
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([fulfillmentRequestId])
 }
@@ -946,10 +1140,10 @@ model DepositIntent {
   capturedAt           DateTime?
   releasedAt           DateTime?
 
-  fulfillmentRequest   FulfillmentRequest @relation(fields: [fulfillmentRequestId], references: [id], onDelete: Cascade)
+  fulfillmentRequest FulfillmentRequest @relation(fields: [fulfillmentRequestId], references: [id], onDelete: Cascade)
 
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([fulfillmentRequestId])
 }
@@ -967,10 +1161,10 @@ model PartnerDecisionToken {
   /// Action: ACCEPTED | DECLINED | EXPIRED
   actionTaken          String?
 
-  fulfillmentRequest   FulfillmentRequest @relation(fields: [fulfillmentRequestId], references: [id], onDelete: Cascade)
+  fulfillmentRequest FulfillmentRequest @relation(fields: [fulfillmentRequestId], references: [id], onDelete: Cascade)
 
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([token])
   @@index([fulfillmentRequestId])
@@ -981,40 +1175,40 @@ model PartnerDecisionToken {
 // ──────────────────────────────────────────────
 
 model PartnerContact {
-  id                  String   @id @default(uuid())
-  name                String
+  id                 String    @id @default(uuid())
+  name               String
   /// Type: DEALER | INSURER | TRANSPORTER | SERVICE_SHOP
-  type                String
-  email               String?
-  phone               String?
-  website             String?
-  sourceDomain        String?
-  makeSpecialization  String?  @default("ALL") // Ferrari | Lamborghini | ALL
-  location            String?
-  streetAddress       String?
-  city                String?
-  state               String?
-  postalCode          String?
-  country             String?  @default("US")
-  latitude            Float?
-  longitude           Float?
-  active              Boolean  @default(true)
+  type               String
+  email              String?
+  phone              String?
+  website            String?
+  sourceDomain       String?
+  makeSpecialization String?   @default("ALL") // Ferrari | Lamborghini | ALL
+  location           String?
+  streetAddress      String?
+  city               String?
+  state              String?
+  postalCode         String?
+  country            String?   @default("US")
+  latitude           Float?
+  longitude          Float?
+  active             Boolean   @default(true)
   /// ContactSource: IMPORTED_LISTING | PUBLIC_WEBSITE | MANUALLY_VERIFIED
-  contactSource       String   @default("PUBLIC_WEBSITE")
+  contactSource      String    @default("PUBLIC_WEBSITE")
   /// Confidence: VERIFIED | PUBLIC_SOURCE | MANUAL_REVIEW | UNRESOLVED_EMAIL
-  confidence          String   @default("PUBLIC_SOURCE")
+  confidence         String    @default("PUBLIC_SOURCE")
   /// ContactStatus: RESOLVED | UNRESOLVED_EMAIL
-  contactStatus       String   @default("RESOLVED")
-  coverage            String   @default("LOCAL") // LOCAL | NATIONAL
-  lastVerifiedAt      DateTime?
+  contactStatus      String    @default("RESOLVED")
+  coverage           String    @default("LOCAL") // LOCAL | NATIONAL
+  lastVerifiedAt     DateTime?
 
-  marketSourceId      String?  @unique
-  marketSource        MarketSource? @relation(fields: [marketSourceId], references: [id], onDelete: SetNull)
+  marketSourceId String?       @unique
+  marketSource   MarketSource? @relation(fields: [marketSourceId], references: [id], onDelete: SetNull)
 
-  fulfillmentParties  FulfillmentParty[]
+  fulfillmentParties FulfillmentParty[]
 
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([name])
   @@index([type, makeSpecialization])
@@ -1028,31 +1222,31 @@ model PartnerContact {
 // ──────────────────────────────────────────────
 
 model GlobalSetting {
-  key         String   @id
+  key         String               @id
   label       String
   description String?
-  enabled     Boolean  @default(false)
-  category    String   @default("GENERAL")
+  enabled     Boolean              @default(false)
+  category    String               @default("GENERAL")
   updatedBy   String?
   audits      GlobalSettingAudit[]
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([category])
 }
 
 model GlobalSettingAudit {
-  id          String   @id @default(uuid())
-  settingKey  String
+  id            String   @id @default(uuid())
+  settingKey    String
   previousValue Boolean?
-  newValue    Boolean
-  actor       String?
-  note        String?
+  newValue      Boolean
+  actor         String?
+  note          String?
 
-  setting     GlobalSetting @relation(fields: [settingKey], references: [key], onDelete: Cascade)
+  setting GlobalSetting @relation(fields: [settingKey], references: [key], onDelete: Cascade)
 
-  createdAt   DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([settingKey])
   @@index([createdAt])
