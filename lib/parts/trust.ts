@@ -29,12 +29,12 @@ export function auditPerformancePartTrust(part: PerformancePartTrustInput): Perf
   if (part.status !== "ACTIVE") issues.push("Part is not active");
   if (!part.sourceUrl) issues.push("Missing original source URL");
   if (part.sourceConfidence !== "SOURCE_VERIFIED") issues.push("Source is not verified");
+  if (!part.imageUrl) issues.push("Missing product image");
   if (part.compatibility.length === 0) issues.push("Missing make/model compatibility");
 
   const hasScopedFitment = part.compatibility.some((fitment) => fitment.makeId || fitment.modelId);
   if (part.compatibility.length > 0 && !hasScopedFitment) issues.push("Compatibility is unscoped");
 
-  if (!part.imageUrl) warnings.push("Missing product image");
   if (part.retailPriceCents === null) warnings.push("Missing retail price");
   if (part.estimatedHpGain === null && part.estimatedTorqueGain === null) warnings.push("Missing performance gain estimate");
 
