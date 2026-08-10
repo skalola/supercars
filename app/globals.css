@@ -8034,13 +8034,6 @@ canvas {
   outline: none;
 }
 
-.club-list-header a em {
-  color: rgba(226, 15, 27, 0.92);
-  font-size: 9px;
-  font-style: normal;
-  letter-spacing: 0.04em;
-}
-
 .club-list-row {
   min-height: 58px;
   background: rgba(255, 255, 255, 0.035);

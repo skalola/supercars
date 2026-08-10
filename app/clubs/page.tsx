@@ -99,11 +99,9 @@ export default async function ClubsPage({
               <span>Model</span>
               <Link href={getSortHref("members", activeSort, activeDirection)} className={activeSort === "members" ? "is-active" : ""}>
                 Members
-                <em>{activeSort === "members" ? getDirectionLabel(activeDirection) : "Sort"}</em>
               </Link>
               <Link href={getSortHref("meets", activeSort, activeDirection)} className={activeSort === "meets" ? "is-active" : ""}>
                 Meets
-                <em>{activeSort === "meets" ? getDirectionLabel(activeDirection) : "Sort"}</em>
               </Link>
             </div>
             {clubs.length > 0 ? (
@@ -194,10 +192,6 @@ function resolveSortDirection(value: string | undefined): SortDirection {
 function getSortHref(sortKey: ClubSortKey, activeSort: ClubSortKey, activeDirection: SortDirection) {
   const nextDirection = activeSort === sortKey && activeDirection === "desc" ? "asc" : "desc";
   return `/clubs?sort=${sortKey}&dir=${nextDirection}#club-grid`;
-}
-
-function getDirectionLabel(direction: SortDirection) {
-  return direction === "asc" ? "Low" : "High";
 }
 
 function compareClubs(
