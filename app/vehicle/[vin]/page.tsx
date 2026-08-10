@@ -14,6 +14,7 @@ import { AddToFavoritesButton } from "@/components/garage/AddToFavoritesButton";
 import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
 import { isValidEmail } from "@/lib/fulfillment/partner-registry";
 import { emailMatchesWebsiteDomain } from "@/lib/directory/contact-domain-policy";
+import { calculateModifiedPerformance } from "@/lib/parts/performance";
 import type { CSSProperties } from "react";
 
 type VehiclePageProps = {
@@ -32,6 +33,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
         include: {
           make: true,
           images: true,
+          spec: true,
         },
       },
       images: {
@@ -39,6 +41,21 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
       },
       profile: true,
       modifications: {
+        include: {
+          catalogInstall: true,
+        },
+        orderBy: { createdAt: "desc" },
+      },
+      installedParts: {
+        include: {
+          part: {
+            include: {
+              category: true,
+              brand: true,
+            },
+          },
+          category: true,
+        },
         orderBy: { createdAt: "desc" },
       },
       serviceRecords: {
@@ -169,6 +186,12 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
   ]);
 
   const makeName = vehicle.model.make.name;
+  const performanceSummary = calculateModifiedPerformance({
+    stockHorsepower: vehicle.engineHP || vehicle.model.spec?.horsepower,
+    stockTorque: vehicle.model.spec?.torque,
+    installedParts: vehicle.installedParts || [],
+  });
+  const unlinkedModifications = (vehicle.modifications || []).filter((mod: any) => !mod.catalogInstall);
   const serviceShopNames = serviceShops
     .filter((shop) => isValidEmail(shop.email) && emailMatchesWebsiteDomain(shop.email, shop.website))
     .filter((shop) => {
@@ -1082,29 +1105,65 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
             <div style={{ border: "1px solid #e5e7eb", borderRadius: "12px", backgroundColor: "#ffffff", padding: "16px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
                 <span style={{ fontSize: "18px" }}>⚡</span>
-                <span style={{ fontWeight: 700, color: "#111827", fontSize: "16px" }}>Modifications</span>
+                <span style={{ fontWeight: 700, color: "#111827", fontSize: "16px" }}>Parts & Performance</span>
               </div>
 
-              {!vehicle.modifications || vehicle.modifications.length === 0 ? (
-                <span style={{ fontSize: "13px", color: "#9ca3af", fontStyle: "italic" }}>No records yet.</span>
-              ) : (
-                <div style={{ display: "grid", gap: "12px" }}>
-                  {vehicle.modifications.map((mod: any) => (
-                    <div key={mod.id} style={{ padding: "12px", border: "1px solid #f3f4f6", borderRadius: "8px", backgroundColor: "#fafafa" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px", marginBottom: "4px" }}>
-                        <span style={{ fontWeight: 600, color: "#111827" }}>{mod.name}</span>
-                        {mod.installedDate && <span style={{ fontSize: "13px", color: "#6b7280" }}>Installed: {mod.installedDate}</span>}
-                      </div>
-                      {mod.brand && <p style={{ margin: "2px 0", fontSize: "13px", color: "#4b5563" }}>Brand: {mod.brand}</p>}
-                      {mod.description && (
-                        <p style={{ margin: "6px 0 0 0", fontSize: "13px", color: "#6b7280", lineHeight: 1.4 }}>
-                          {mod.description}
-                        </p>
-                      )}
-                    </div>
-                  ))}
+              <div style={{ display: "grid", gap: "12px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px" }}>
+                  <PassportMetric label="Stock HP" value={formatPerformanceMetric(performanceSummary.stockHorsepower, "hp")} />
+                  <PassportMetric label="Estimated HP" value={formatPerformanceMetric(performanceSummary.modifiedHorsepower, "hp")} accent={performanceSummary.hpGain > 0 ? `+${performanceSummary.hpGain} hp` : undefined} />
+                  <PassportMetric label="Stock Torque" value={formatPerformanceMetric(performanceSummary.stockTorque, "lb-ft")} />
+                  <PassportMetric label="Estimated Torque" value={formatPerformanceMetric(performanceSummary.modifiedTorque, "lb-ft")} accent={performanceSummary.torqueGain > 0 ? `+${performanceSummary.torqueGain} lb-ft` : undefined} />
                 </div>
-              )}
+
+                {vehicle.installedParts && vehicle.installedParts.length > 0 ? (
+                  vehicle.installedParts.map((installedPart: any) => {
+                    const label = installedPart.part?.name || installedPart.customName || "Owner-reported part";
+                    const brand = installedPart.part?.brand?.name || installedPart.customBrandName;
+                    const category = installedPart.part?.category?.name || installedPart.category?.name;
+                    const hpGain = installedPart.hpGainOverride ?? installedPart.part?.estimatedHpGain;
+                    const torqueGain = installedPart.torqueGainOverride ?? installedPart.part?.estimatedTorqueGain;
+
+                    return (
+                      <div key={installedPart.id} style={{ padding: "12px", border: "1px solid #f3f4f6", borderRadius: "8px", backgroundColor: "#fafafa" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", fontSize: "14px", marginBottom: "4px" }}>
+                          <span style={{ fontWeight: 700, color: "#111827" }}>{label}</span>
+                          <span style={{ fontSize: "12px", color: "#6b7280", fontWeight: 700 }}>{installedPart.part ? "Catalog" : "Manual"}</span>
+                        </div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", fontSize: "13px", color: "#4b5563" }}>
+                          {brand && <span>Brand: {brand}</span>}
+                          {category && <span>Category: {category}</span>}
+                          {installedPart.installedDate && <span>Installed: {installedPart.installedDate}</span>}
+                          {hpGain !== null && hpGain !== undefined && <span>+{hpGain} hp</span>}
+                          {torqueGain !== null && torqueGain !== undefined && <span>+{torqueGain} lb-ft</span>}
+                        </div>
+                        {installedPart.notes && (
+                          <p style={{ margin: "6px 0 0 0", fontSize: "13px", color: "#6b7280", lineHeight: 1.4 }}>
+                            {installedPart.notes}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <span style={{ fontSize: "13px", color: "#9ca3af", fontStyle: "italic" }}>No parts logged yet.</span>
+                )}
+
+                {unlinkedModifications.map((mod: any) => (
+                  <div key={mod.id} style={{ padding: "12px", border: "1px solid #f3f4f6", borderRadius: "8px", backgroundColor: "#fafafa" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px", marginBottom: "4px" }}>
+                      <span style={{ fontWeight: 600, color: "#111827" }}>{mod.name}</span>
+                      {mod.installedDate && <span style={{ fontSize: "13px", color: "#6b7280" }}>Installed: {mod.installedDate}</span>}
+                    </div>
+                    {mod.brand && <p style={{ margin: "2px 0", fontSize: "13px", color: "#4b5563" }}>Brand: {mod.brand}</p>}
+                    {mod.description && (
+                      <p style={{ margin: "6px 0 0 0", fontSize: "13px", color: "#6b7280", lineHeight: 1.4 }}>
+                        {mod.description}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* 7. Awards */}
@@ -1291,4 +1350,18 @@ function buildVehicleGalleryImages(vehicle: any, resolvedHeroImage: string | nul
   });
 
   return gallery;
+}
+
+function PassportMetric({ label, value, accent }: { label: string; value: string; accent?: string }) {
+  return (
+    <div style={{ minWidth: 0, padding: "10px", border: "1px solid #f3f4f6", borderRadius: "8px", backgroundColor: "#ffffff" }}>
+      <span style={{ display: "block", color: "#6b7280", fontSize: "10px", fontWeight: 800, textTransform: "uppercase" }}>{label}</span>
+      <strong style={{ display: "block", marginTop: "5px", color: "#111827", fontSize: "16px", lineHeight: 1.05 }}>{value}</strong>
+      {accent && <span style={{ display: "block", marginTop: "4px", color: "#b91c1c", fontSize: "11px", fontWeight: 800 }}>{accent}</span>}
+    </div>
+  );
+}
+
+function formatPerformanceMetric(value: number | null, unit: string) {
+  return value === null ? "Unknown" : `${value.toLocaleString()} ${unit}`;
 }

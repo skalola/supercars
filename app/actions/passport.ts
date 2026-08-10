@@ -22,6 +22,11 @@ function safeRevalidatePath(vin: string) {
   }
 }
 
+function cleanNumber(value?: number | null) {
+  if (value === null || value === undefined || Number.isNaN(value)) return null;
+  return Number.isFinite(value) ? value : null;
+}
+
 async function verifyOwnership(vin: string) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const session = (globalThis as any).mockSession !== undefined ? (globalThis as any).mockSession : await auth();
@@ -83,22 +88,114 @@ export async function addVehicleModification(
     brand?: string;
     description?: string;
     installedDate?: string;
+    categoryId?: string | null;
+    hpGainOverride?: number | null;
+    torqueGainOverride?: number | null;
   }
 ) {
-  const { vehicleId } = await verifyOwnership(vin);
+  const { userId, vehicleId } = await verifyOwnership(vin);
 
   if (!data.name || data.name.trim() === "") {
     throw new Error("Modification name is required.");
   }
 
-  await prisma.vehicleModification.create({
-    data: {
-      vehicleId,
-      name: data.name,
-      brand: data.brand || null,
-      description: data.description || null,
-      installedDate: data.installedDate || null,
+  await prisma.$transaction(async (tx) => {
+    const modification = await tx.vehicleModification.create({
+      data: {
+        vehicleId,
+        name: data.name.trim(),
+        brand: data.brand || null,
+        description: data.description || null,
+        installedDate: data.installedDate || null,
+      },
+    });
+
+    await tx.vehicleInstalledPart.create({
+      data: {
+        vehicleId,
+        userId,
+        legacyModificationId: modification.id,
+        categoryId: data.categoryId || null,
+        customName: data.name.trim(),
+        customBrandName: data.brand || null,
+        installedDate: data.installedDate || null,
+        notes: data.description || null,
+        hpGainOverride: cleanNumber(data.hpGainOverride),
+        torqueGainOverride: cleanNumber(data.torqueGainOverride),
+        verificationStatus: "OWNER_REPORTED",
+      },
+    });
+  });
+
+  safeRevalidatePath(vin);
+}
+
+export async function addVehicleInstalledPart(
+  vin: string,
+  data: {
+    partId: string;
+    installedDate?: string;
+    notes?: string;
+    hpGainOverride?: number | null;
+    torqueGainOverride?: number | null;
+  }
+) {
+  const { userId, vehicleId } = await verifyOwnership(vin);
+
+  if (!data.partId) {
+    throw new Error("Choose a catalog part.");
+  }
+
+  const part = await prisma.performancePart.findUnique({
+    where: { id: data.partId },
+    include: {
+      brand: true,
+      category: true,
     },
+  });
+
+  if (!part || part.status === "INACTIVE") {
+    throw new Error("Catalog part is unavailable.");
+  }
+
+  const existingInstall = await prisma.vehicleInstalledPart.findFirst({
+    where: {
+      vehicleId,
+      partId: part.id,
+      installStatus: "INSTALLED",
+    },
+    select: { id: true },
+  });
+
+  if (existingInstall) {
+    throw new Error("This part is already installed on the vehicle.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const modification = await tx.vehicleModification.create({
+      data: {
+        vehicleId,
+        name: part.name,
+        brand: part.brand.name,
+        description: data.notes || part.description || part.category.name,
+        installedDate: data.installedDate || null,
+      },
+    });
+
+    await tx.vehicleInstalledPart.create({
+      data: {
+        vehicleId,
+        userId,
+        partId: part.id,
+        legacyModificationId: modification.id,
+        categoryId: part.categoryId,
+        installedDate: data.installedDate || null,
+        notes: data.notes || null,
+        hpGainOverride: cleanNumber(data.hpGainOverride),
+        torqueGainOverride: cleanNumber(data.torqueGainOverride),
+        verificationStatus: "OWNER_REPORTED",
+      },
+    });
   });
 
   safeRevalidatePath(vin);

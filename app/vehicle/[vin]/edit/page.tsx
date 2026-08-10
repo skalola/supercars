@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import VehicleEditorForm from "./VehicleEditorForm";
+import { getCompatiblePerformancePartsForVehicle } from "@/lib/parts/compatibility";
 
 type EditPageProps = {
   params: Promise<{ vin: string }>;
@@ -20,10 +21,36 @@ export default async function VehicleEditPage({ params }: EditPageProps) {
       model: {
         include: {
           make: true,
+          spec: true,
         },
       },
       profile: true,
       modifications: {
+        include: {
+          catalogInstall: {
+            include: {
+              part: {
+                include: {
+                  category: true,
+                  brand: true,
+                },
+              },
+              category: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      },
+      installedParts: {
+        include: {
+          part: {
+            include: {
+              category: true,
+              brand: true,
+            },
+          },
+          category: true,
+        },
         orderBy: { createdAt: "desc" },
       },
       serviceRecords: {
@@ -45,6 +72,17 @@ export default async function VehicleEditPage({ params }: EditPageProps) {
   if (!vehicle || vehicle.ownerId !== userId || vehicle.status !== "CLAIMED") {
     redirect(`/vehicle/${vin}`);
   }
+
+  const [partCategories, compatibleParts] = await Promise.all([
+    prisma.partCategory.findMany({
+      where: { active: true },
+      orderBy: [
+        { displayOrder: "asc" },
+        { name: "asc" },
+      ],
+    }),
+    getCompatiblePerformancePartsForVehicle(vehicle),
+  ]);
 
   return (
     <main style={{ maxWidth: 800, margin: "40px auto", padding: 24, fontFamily: "system-ui" }}>
@@ -73,7 +111,7 @@ export default async function VehicleEditPage({ params }: EditPageProps) {
       </div>
 
       <div style={{ backgroundColor: "#ffffff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "24px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
-        <VehicleEditorForm vehicle={vehicle} />
+        <VehicleEditorForm vehicle={vehicle} partCategories={partCategories} compatibleParts={compatibleParts} />
       </div>
     </main>
   );

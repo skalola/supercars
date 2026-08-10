@@ -8,9 +8,11 @@ import { useRouter } from "next/navigation";
 import {
   updateVehicleProfile,
   addVehicleModification,
+  addVehicleInstalledPart,
   addServiceRecord,
   addVehicleAward
 } from "@/app/actions/passport";
+import { calculateModifiedPerformance } from "@/lib/parts/performance";
 import {
   uploadVehiclePhoto,
   deleteVehiclePhoto,
@@ -22,9 +24,11 @@ import {
 
 type VehicleEditorProps = {
   vehicle: any;
+  partCategories: any[];
+  compatibleParts: any[];
 };
 
-export default function VehicleEditorForm({ vehicle }: VehicleEditorProps) {
+export default function VehicleEditorForm({ vehicle, partCategories, compatibleParts }: VehicleEditorProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"info" | "modifications" | "service" | "awards" | "photos" | "documents">("info");
   const [loading, setLoading] = useState(false);
@@ -42,6 +46,14 @@ export default function VehicleEditorForm({ vehicle }: VehicleEditorProps) {
   const [modBrand, setModBrand] = useState("");
   const [modDesc, setModDesc] = useState("");
   const [modDate, setModDate] = useState("");
+  const [modCategoryId, setModCategoryId] = useState("");
+  const [modHpGain, setModHpGain] = useState<number | "">("");
+  const [modTorqueGain, setModTorqueGain] = useState<number | "">("");
+  const [catalogPartId, setCatalogPartId] = useState("");
+  const [catalogPartDate, setCatalogPartDate] = useState("");
+  const [catalogPartNotes, setCatalogPartNotes] = useState("");
+  const [catalogHpOverride, setCatalogHpOverride] = useState<number | "">("");
+  const [catalogTorqueOverride, setCatalogTorqueOverride] = useState<number | "">("");
 
   // 3. Add Service Record State
   const [srvDate, setSrvDate] = useState("");
@@ -229,15 +241,50 @@ export default function VehicleEditorForm({ vehicle }: VehicleEditorProps) {
         brand: modBrand,
         description: modDesc,
         installedDate: modDate,
+        categoryId: modCategoryId || null,
+        hpGainOverride: modHpGain === "" ? null : Number(modHpGain),
+        torqueGainOverride: modTorqueGain === "" ? null : Number(modTorqueGain),
       });
       showSuccess("Modification added successfully!");
       setModName("");
       setModBrand("");
       setModDesc("");
       setModDate("");
+      setModCategoryId("");
+      setModHpGain("");
+      setModTorqueGain("");
       router.refresh();
     } catch (err: any) {
       showError(err.message || "Could not add modification.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleAddCatalogPart(e: React.FormEvent) {
+    e.preventDefault();
+    if (!catalogPartId) {
+      showError("Choose a catalog part to install.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await addVehicleInstalledPart(vehicle.vin, {
+        partId: catalogPartId,
+        installedDate: catalogPartDate,
+        notes: catalogPartNotes,
+        hpGainOverride: catalogHpOverride === "" ? null : Number(catalogHpOverride),
+        torqueGainOverride: catalogTorqueOverride === "" ? null : Number(catalogTorqueOverride),
+      });
+      showSuccess("Catalog part added successfully!");
+      setCatalogPartId("");
+      setCatalogPartDate("");
+      setCatalogPartNotes("");
+      setCatalogHpOverride("");
+      setCatalogTorqueOverride("");
+      router.refresh();
+    } catch (err: any) {
+      showError(err.message || "Could not add catalog part.");
     } finally {
       setLoading(false);
     }
@@ -348,6 +395,14 @@ export default function VehicleEditorForm({ vehicle }: VehicleEditorProps) {
     transition: "background-color 0.2s"
   };
 
+  const performanceSummary = calculateModifiedPerformance({
+    stockHorsepower: vehicle.engineHP || vehicle.model?.spec?.horsepower,
+    stockTorque: vehicle.model?.spec?.torque,
+    installedParts: vehicle.installedParts || [],
+  });
+
+  const unlinkedModifications = (vehicle.modifications || []).filter((mod: any) => !mod.catalogInstall);
+
   return (
     <div style={{ fontFamily: "system-ui" }}>
       {/* Navigation Tabs */}
@@ -401,14 +456,55 @@ export default function VehicleEditorForm({ vehicle }: VehicleEditorProps) {
 
       {activeTab === "modifications" && (
         <div style={sectionStyle}>
-          {/* List of modifications */}
           <div>
-            <h3 style={{ fontSize: "18px", fontWeight: 600, marginBottom: "12px" }}>Current Modifications</h3>
-            {vehicle.modifications?.length === 0 ? (
-              <p style={{ color: "#6b7280", fontStyle: "italic" }}>No modifications listed yet.</p>
+            <h3 style={{ fontSize: "18px", fontWeight: 600, marginBottom: "12px" }}>Performance Summary</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "12px" }}>
+              <MetricCard label="Stock HP" value={formatMetric(performanceSummary.stockHorsepower, "hp")} />
+              <MetricCard label="Estimated HP" value={formatMetric(performanceSummary.modifiedHorsepower, "hp")} accent={performanceSummary.hpGain > 0 ? `+${performanceSummary.hpGain} hp` : undefined} />
+              <MetricCard label="Stock Torque" value={formatMetric(performanceSummary.stockTorque, "lb-ft")} />
+              <MetricCard label="Estimated Torque" value={formatMetric(performanceSummary.modifiedTorque, "lb-ft")} accent={performanceSummary.torqueGain > 0 ? `+${performanceSummary.torqueGain} lb-ft` : undefined} />
+            </div>
+          </div>
+
+          <div>
+            <h3 style={{ fontSize: "18px", fontWeight: 600, marginBottom: "12px" }}>Installed Parts</h3>
+            {vehicle.installedParts?.length === 0 ? (
+              <p style={{ color: "#6b7280", fontStyle: "italic" }}>No structured parts installed yet.</p>
             ) : (
               <div style={{ display: "grid", gap: "12px" }}>
-                {vehicle.modifications.map((mod: any) => (
+                {vehicle.installedParts.map((installedPart: any) => {
+                  const label = installedPart.part?.name || installedPart.customName || "Owner-reported part";
+                  const brand = installedPart.part?.brand?.name || installedPart.customBrandName;
+                  const category = installedPart.part?.category?.name || installedPart.category?.name;
+                  const hpGain = installedPart.hpGainOverride ?? installedPart.part?.estimatedHpGain;
+                  const torqueGain = installedPart.torqueGainOverride ?? installedPart.part?.estimatedTorqueGain;
+
+                  return (
+                    <div key={installedPart.id} style={{ padding: "16px", border: "1px solid #e5e7eb", borderRadius: "8px", backgroundColor: "#fafafa" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", marginBottom: "4px" }}>
+                        <span style={{ fontWeight: 700 }}>{label}</span>
+                        <span style={{ fontSize: "12px", color: "#6b7280", fontWeight: 700 }}>{installedPart.part ? "Catalog" : "Manual"}</span>
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", fontSize: "13px", color: "#4b5563" }}>
+                        {brand && <span>Brand: {brand}</span>}
+                        {category && <span>Category: {category}</span>}
+                        {installedPart.installedDate && <span>Installed: {installedPart.installedDate}</span>}
+                        {hpGain !== null && hpGain !== undefined && <span>+{hpGain} hp</span>}
+                        {torqueGain !== null && torqueGain !== undefined && <span>+{torqueGain} lb-ft</span>}
+                      </div>
+                      {installedPart.notes && <p style={{ fontSize: "14px", color: "#6b7280", margin: "8px 0 0 0" }}>{installedPart.notes}</p>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {unlinkedModifications.length > 0 && (
+            <div>
+              <h3 style={{ fontSize: "18px", fontWeight: 600, marginBottom: "12px" }}>Legacy Modification Notes</h3>
+              <div style={{ display: "grid", gap: "12px" }}>
+                {unlinkedModifications.map((mod: any) => (
                   <div key={mod.id} style={{ padding: "16px", border: "1px solid #e5e7eb", borderRadius: "8px", backgroundColor: "#fafafa" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
                       <span style={{ fontWeight: 600 }}>{mod.name}</span>
@@ -419,15 +515,52 @@ export default function VehicleEditorForm({ vehicle }: VehicleEditorProps) {
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Add Modification Form */}
-          <form onSubmit={handleAddModification} style={{ borderTop: "1px solid #e5e7eb", paddingTop: "24px", display: "grid", gap: "16px" }}>
-            <h3 style={{ fontSize: "18px", fontWeight: 600 }}>Add New Modification</h3>
+          <form onSubmit={handleAddCatalogPart} style={{ borderTop: "1px solid #e5e7eb", paddingTop: "24px", display: "grid", gap: "16px" }}>
+            <h3 style={{ fontSize: "18px", fontWeight: 600 }}>Install Catalog Part</h3>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
               <div>
-                <label style={labelStyle}>Modification Name *</label>
+                <label style={labelStyle}>Catalog Part</label>
+                <select value={catalogPartId} onChange={(e) => setCatalogPartId(e.target.value)} style={inputStyle}>
+                  <option value="">Choose a compatible part</option>
+                  {compatibleParts.map((part: any) => (
+                    <option key={part.id} value={part.id}>
+                      {part.category.name} · {part.brand.name} · {part.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Installed Date / Year</label>
+                <input value={catalogPartDate} onChange={(e) => setCatalogPartDate(e.target.value)} placeholder="e.g. June 2024 or 2024" style={inputStyle} />
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+              <div>
+                <label style={labelStyle}>HP Override</label>
+                <input type="number" value={catalogHpOverride} onChange={(e) => setCatalogHpOverride(e.target.value === "" ? "" : Number(e.target.value))} placeholder="Optional dyno estimate" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Torque Override</label>
+                <input type="number" value={catalogTorqueOverride} onChange={(e) => setCatalogTorqueOverride(e.target.value === "" ? "" : Number(e.target.value))} placeholder="Optional dyno estimate" style={inputStyle} />
+              </div>
+            </div>
+            <div>
+              <label style={labelStyle}>Notes</label>
+              <input value={catalogPartNotes} onChange={(e) => setCatalogPartNotes(e.target.value)} placeholder="Install notes, tune map, shop, or dyno context" style={inputStyle} />
+            </div>
+            <button type="submit" disabled={loading || compatibleParts.length === 0} style={{ ...btnStyle, justifySelf: "start" }}>
+              {loading ? "Adding..." : compatibleParts.length === 0 ? "No Catalog Parts Yet" : "Add Catalog Part"}
+            </button>
+          </form>
+
+          <form onSubmit={handleAddModification} style={{ borderTop: "1px solid #e5e7eb", paddingTop: "24px", display: "grid", gap: "16px" }}>
+            <h3 style={{ fontSize: "18px", fontWeight: 600 }}>Add Manual Part / Modification</h3>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+              <div>
+                <label style={labelStyle}>Part / Modification Name *</label>
                 <input required value={modName} onChange={(e) => setModName(e.target.value)} placeholder="e.g. Capristo Exhaust" style={inputStyle} />
               </div>
               <div>
@@ -437,16 +570,37 @@ export default function VehicleEditorForm({ vehicle }: VehicleEditorProps) {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
               <div>
+                <label style={labelStyle}>Category</label>
+                <select value={modCategoryId} onChange={(e) => setModCategoryId(e.target.value)} style={inputStyle}>
+                  <option value="">Choose Category</option>
+                  {partCategories.map((category: any) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <label style={labelStyle}>Installed Date / Year</label>
                 <input value={modDate} onChange={(e) => setModDate(e.target.value)} placeholder="e.g. June 2024 or 2024" style={inputStyle} />
               </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
               <div>
-                <label style={labelStyle}>Description</label>
-                <input value={modDesc} onChange={(e) => setModDesc(e.target.value)} placeholder="e.g. Valved stainless steel system" style={inputStyle} />
+                <label style={labelStyle}>Estimated HP Gain</label>
+                <input type="number" value={modHpGain} onChange={(e) => setModHpGain(e.target.value === "" ? "" : Number(e.target.value))} placeholder="e.g. 20" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Estimated Torque Gain</label>
+                <input type="number" value={modTorqueGain} onChange={(e) => setModTorqueGain(e.target.value === "" ? "" : Number(e.target.value))} placeholder="e.g. 18" style={inputStyle} />
               </div>
             </div>
+            <div>
+              <label style={labelStyle}>Description</label>
+              <input value={modDesc} onChange={(e) => setModDesc(e.target.value)} placeholder="e.g. Valved stainless steel system" style={inputStyle} />
+            </div>
             <button type="submit" disabled={loading} style={{ ...btnStyle, justifySelf: "start" }}>
-              {loading ? "Adding..." : "Add Modification"}
+              {loading ? "Adding..." : "Add Manual Part"}
             </button>
           </form>
         </div>
@@ -784,4 +938,18 @@ export default function VehicleEditorForm({ vehicle }: VehicleEditorProps) {
       )}
     </div>
   );
+}
+
+function MetricCard({ label, value, accent }: { label: string; value: string; accent?: string }) {
+  return (
+    <div style={{ minWidth: 0, padding: "14px", border: "1px solid #e5e7eb", borderRadius: "8px", backgroundColor: "#fafafa" }}>
+      <span style={{ display: "block", color: "#6b7280", fontSize: "11px", fontWeight: 800, textTransform: "uppercase" }}>{label}</span>
+      <strong style={{ display: "block", marginTop: "6px", color: "#111827", fontSize: "20px", lineHeight: 1 }}>{value}</strong>
+      {accent && <span style={{ display: "block", marginTop: "6px", color: "#b91c1c", fontSize: "12px", fontWeight: 800 }}>{accent}</span>}
+    </div>
+  );
+}
+
+function formatMetric(value: number | null, unit: string) {
+  return value === null ? "Unknown" : `${value.toLocaleString()} ${unit}`;
 }
