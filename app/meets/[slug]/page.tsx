@@ -111,6 +111,12 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
               Cars Attending
             </Link>
           </div>
+          {meet.club ? (
+            <Link href={`/clubs/${meet.club.slug}`} className="meet-club-hero-badge">
+              <span>Hosted by Club</span>
+              <strong>{meet.club.name}</strong>
+            </Link>
+          ) : null}
         </div>
         <aside className="meet-status-card">
           <span>{meet.status}</span>

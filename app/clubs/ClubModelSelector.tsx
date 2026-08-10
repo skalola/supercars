@@ -3,10 +3,18 @@
 import { useMemo, useState } from "react";
 import type { MakeOption, ModelOption } from "@/lib/makes/catalog";
 
-export default function ClubModelSelector({ makes, models }: { makes: MakeOption[]; models: ModelOption[] }) {
+export default function ClubModelSelector({
+  makes,
+  models,
+  initialModelIds = [],
+}: {
+  makes: MakeOption[];
+  models: ModelOption[];
+  initialModelIds?: string[];
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedMakeIds, setSelectedMakeIds] = useState<Set<string>>(() => new Set());
-  const [selectedModelIds, setSelectedModelIds] = useState<Set<string>>(() => new Set());
+  const [selectedModelIds, setSelectedModelIds] = useState<Set<string>>(() => new Set(initialModelIds));
 
   const groups = useMemo(
     () =>

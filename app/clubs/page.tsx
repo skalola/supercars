@@ -7,12 +7,43 @@ import ClubModelSelector from "./ClubModelSelector";
 
 export const dynamic = "force-dynamic";
 
-export default async function ClubsPage() {
-  const [session, catalog, clubs] = await Promise.all([
+export default async function ClubsPage({ searchParams }: { searchParams?: Promise<{ make?: string; model?: string; location?: string; sort?: string }> }) {
+  const resolvedSearchParams = (await searchParams) || {};
+  const selectedMakeId = resolvedSearchParams.make || "";
+  const selectedModelId = resolvedSearchParams.model || "";
+  const locationQuery = (resolvedSearchParams.location || "").trim();
+  const sort = resolvedSearchParams.sort || "members";
+
+  const [session, catalog] = await Promise.all([
     auth(),
     getMakeModelCatalogOptions(),
-    prisma.carClub.findMany({
-      where: { status: "ACTIVE", visibility: "PUBLIC" },
+  ]);
+  const clubs = await prisma.carClub.findMany({
+    where: {
+      status: "ACTIVE",
+      visibility: "PUBLIC",
+      ...(selectedModelId || selectedMakeId
+        ? {
+            models: {
+              some: {
+                model: {
+                  ...(selectedModelId ? { id: selectedModelId } : {}),
+                  ...(selectedMakeId ? { makeId: selectedMakeId } : {}),
+                },
+              },
+            },
+          }
+        : {}),
+      ...(locationQuery
+        ? {
+            OR: [
+              { city: { contains: locationQuery, mode: "insensitive" } },
+              { state: { contains: locationQuery, mode: "insensitive" } },
+              { name: { contains: locationQuery, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    },
       include: {
         creator: { select: { name: true, username: true } },
         members: { where: { status: "ACTIVE" }, select: { id: true } },
@@ -34,10 +65,14 @@ export default async function ClubsPage() {
         },
       },
       orderBy: { updatedAt: "desc" },
-      take: 36,
-    }).catch(() => []),
-  ]);
+      take: 80,
+    }).catch(() => []);
 
+  const sortedClubs = [...clubs].sort((a, b) => {
+    if (sort === "meets") return b._count.meets - a._count.meets || b._count.members - a._count.members || a.name.localeCompare(b.name);
+    if (sort === "newest") return b.updatedAt.getTime() - a.updatedAt.getTime();
+    return b._count.members - a._count.members || b._count.meets - a._count.meets || a.name.localeCompare(b.name);
+  });
   const clubsByMembers = [...clubs]
     .sort((a, b) => b._count.members - a._count.members || b._count.meets - a._count.meets || a.name.localeCompare(b.name))
     .slice(0, 10);
@@ -116,7 +151,7 @@ export default async function ClubsPage() {
 
           <div className="clubs-grid">
             {clubs.length > 0 ? (
-              clubs.map((club) => (
+              sortedClubs.map((club) => (
                 <Link key={club.id} href={`/clubs/${club.slug}`} className="club-card">
                   <div className="club-card-image-grid">
                     {club.models.slice(0, 3).map(({ model }) => (
@@ -150,6 +185,49 @@ export default async function ClubsPage() {
         </div>
 
         <aside id="create-club" className="club-create-panel">
+          <form action="/clubs" className="club-filter-panel">
+            <div className="meets-panel-title">
+              <span>Discovery</span>
+              <strong>Filter Clubs</strong>
+            </div>
+            <label>
+              <span>Make</span>
+              <select name="make" defaultValue={selectedMakeId}>
+                <option value="">All makes</option>
+                {catalog.makes.map((make) => (
+                  <option key={make.id} value={make.id}>{make.name}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Model</span>
+              <select name="model" defaultValue={selectedModelId}>
+                <option value="">All models</option>
+                {catalog.models.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.make.name} {model.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Location</span>
+              <input name="location" defaultValue={locationQuery} placeholder="City or state" />
+            </label>
+            <label>
+              <span>Sort</span>
+              <select name="sort" defaultValue={sort}>
+                <option value="members">Most members</option>
+                <option value="meets">Most meets</option>
+                <option value="newest">Newest</option>
+              </select>
+            </label>
+            <div className="club-filter-actions">
+              <button type="submit">Apply</button>
+              <Link href="/clubs">Reset</Link>
+            </div>
+          </form>
+
           <div className="meets-panel-title">
             <span>Creator Tools</span>
             <strong>Start a Club</strong>

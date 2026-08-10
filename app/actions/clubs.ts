@@ -41,17 +41,7 @@ export async function createCarClubAction(formData: FormData) {
     throw new Error("City and state are required.");
   }
 
-  const modelFilters = [
-    ...(modelIds.length ? [{ id: { in: modelIds } }] : []),
-    ...(makeIds.length ? [{ makeId: { in: makeIds } }] : []),
-  ];
-  const validModels = modelFilters.length
-    ? await prisma.model.findMany({
-        where: { OR: modelFilters },
-        select: { id: true },
-      })
-    : [];
-  const validModelIds = uniqueStrings(validModels.map((model) => model.id));
+  const validModelIds = await resolveModelIds(modelIds, makeIds);
 
   const slug = await createUniqueClubSlug(name, city, state);
   const club = await prisma.carClub.create({
@@ -175,6 +165,16 @@ export async function manageClubMemberAction(formData: FormData) {
       where: { id: memberId },
       data: { status: "REMOVED", joinedAt: null },
     });
+  } else if (action === "PROMOTE") {
+    await prisma.carClubMember.update({
+      where: { id: memberId },
+      data: { role: "MODERATOR" },
+    });
+  } else if (action === "DEMOTE") {
+    await prisma.carClubMember.update({
+      where: { id: memberId },
+      data: { role: MEMBER_ROLE },
+    });
   } else {
     throw new Error("Unsupported club member action.");
   }
@@ -182,6 +182,95 @@ export async function manageClubMemberAction(formData: FormData) {
   revalidatePath("/clubs");
   revalidatePath(`/clubs/${membership.club.slug}`);
   redirect(`/clubs/${membership.club.slug}#members`);
+}
+
+export async function updateClubProfileAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+
+  const userId = session.user.id as string;
+  const clubId = readString(formData, "clubId");
+  const name = readString(formData, "name");
+  const city = readString(formData, "city");
+  const state = readString(formData, "state").toUpperCase();
+  const description = readString(formData, "description");
+  const visibility = readString(formData, "visibility") === "PRIVATE" ? "PRIVATE" : "PUBLIC";
+
+  if (!clubId || !name || !city || !state) {
+    throw new Error("Club id, name, city, and state are required.");
+  }
+
+  const canModerate = await canModerateClub(clubId, userId);
+  if (!canModerate) throw new Error("Only club moderators can update this club.");
+
+  const club = await prisma.carClub.findUnique({
+    where: { id: clubId },
+    select: { id: true, slug: true, name: true, city: true, state: true },
+  });
+  if (!club) throw new Error("Club not found.");
+
+  const nextSlug = name !== club.name || city !== club.city || state !== club.state
+    ? await createUniqueClubSlug(name, city, state, club.id)
+    : club.slug;
+
+  await prisma.carClub.update({
+    where: { id: club.id },
+    data: {
+      name,
+      slug: nextSlug,
+      city,
+      state,
+      description: description || null,
+      visibility,
+    },
+  });
+
+  revalidatePath("/clubs");
+  revalidatePath(`/clubs/${club.slug}`);
+  revalidatePath(`/clubs/${nextSlug}`);
+  redirect(`/clubs/${nextSlug}#club-settings`);
+}
+
+export async function updateClubModelsAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+
+  const userId = session.user.id as string;
+  const clubId = readString(formData, "clubId");
+  if (!clubId) throw new Error("Missing club id.");
+
+  const canModerate = await canModerateClub(clubId, userId);
+  if (!canModerate) throw new Error("Only club moderators can update linked models.");
+
+  const club = await prisma.carClub.findUnique({
+    where: { id: clubId },
+    select: { id: true, slug: true },
+  });
+  if (!club) throw new Error("Club not found.");
+
+  const modelIds = uniqueStrings(formData.getAll("modelIds").map((value) => String(value)));
+  const makeIds = uniqueStrings(formData.getAll("makeIds").map((value) => String(value)));
+  const validModelIds = await resolveModelIds(modelIds, makeIds);
+
+  await prisma.$transaction([
+    prisma.carClubModel.deleteMany({ where: { clubId } }),
+    ...(validModelIds.length
+      ? [
+          prisma.carClubModel.createMany({
+            data: validModelIds.map((modelId) => ({ clubId, modelId })),
+            skipDuplicates: true,
+          }),
+        ]
+      : []),
+  ]);
+
+  revalidatePath("/clubs");
+  revalidatePath(`/clubs/${club.slug}`);
+  redirect(`/clubs/${club.slug}#club-settings`);
 }
 
 export async function leaveClubAction(formData: FormData) {
@@ -225,7 +314,21 @@ async function canModerateClub(clubId: string, userId: string) {
   return Boolean(member?.status === ACTIVE_MEMBER_STATUS && ["OWNER", "MODERATOR"].includes(member.role));
 }
 
-async function createUniqueClubSlug(name: string, city: string, state: string) {
+async function resolveModelIds(modelIds: string[], makeIds: string[]) {
+  const modelFilters = [
+    ...(modelIds.length ? [{ id: { in: modelIds } }] : []),
+    ...(makeIds.length ? [{ makeId: { in: makeIds } }] : []),
+  ];
+  const validModels = modelFilters.length
+    ? await prisma.model.findMany({
+        where: { OR: modelFilters },
+        select: { id: true },
+      })
+    : [];
+  return uniqueStrings(validModels.map((model) => model.id));
+}
+
+async function createUniqueClubSlug(name: string, city: string, state: string, currentClubId?: string) {
   const base = `${name}-${city}-${state}`
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
@@ -233,7 +336,9 @@ async function createUniqueClubSlug(name: string, city: string, state: string) {
     .slice(0, 80);
   let slug = base || "club";
   let index = 2;
-  while (await prisma.carClub.findUnique({ where: { slug }, select: { id: true } })) {
+  while (true) {
+    const existing = await prisma.carClub.findUnique({ where: { slug }, select: { id: true } });
+    if (!existing || existing.id === currentClubId) break;
     slug = `${base}-${index}`;
     index += 1;
   }

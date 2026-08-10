@@ -5367,6 +5367,32 @@ canvas {
   color: rgba(255, 255, 255, 0.66);
 }
 
+.meet-club-hero-badge {
+  display: inline-grid;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(226, 15, 27, 0.46);
+  border-radius: 8px;
+  background: rgba(226, 15, 27, 0.12);
+  color: #ffffff;
+  text-decoration: none;
+  backdrop-filter: blur(18px);
+}
+
+.meet-club-hero-badge span {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.meet-club-hero-badge strong {
+  color: #ffffff;
+  font-size: 15px;
+}
+
 .meet-host-cancel-form button {
   width: 100%;
   min-height: 42px;
@@ -8006,12 +8032,15 @@ canvas {
 }
 
 .club-form,
-.club-form label {
+.club-filter-panel,
+.club-form label,
+.club-filter-panel label {
   display: grid;
   gap: 10px;
 }
 
-.club-form {
+.club-form,
+.club-filter-panel {
   gap: 16px;
 }
 
@@ -8023,7 +8052,9 @@ canvas {
 
 .club-form input,
 .club-form select,
-.club-form textarea {
+.club-form textarea,
+.club-filter-panel input,
+.club-filter-panel select {
   width: 100%;
   min-height: 46px;
   padding: 0 12px;
@@ -8043,6 +8074,43 @@ canvas {
 .club-form option {
   background: #101010;
   color: #ffffff;
+}
+
+.club-filter-panel {
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.club-filter-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+}
+
+.club-filter-actions button,
+.club-filter-actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 850;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.club-filter-actions button {
+  border: 1px solid #e20f1b;
+  background: linear-gradient(180deg, #f0222d, #b90913);
+  cursor: pointer;
+}
+
+.club-filter-actions a {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .club-model-dropdown {
@@ -8355,6 +8423,145 @@ canvas {
   padding: 0 12px;
 }
 
+.club-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.club-settings-grid .club-form {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.admin-club-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.admin-club-card {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.admin-club-card-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+}
+
+.admin-club-card-header div,
+.admin-club-owner,
+.admin-club-transfer label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.admin-club-card-header span,
+.admin-club-metrics span,
+.admin-club-owner span,
+.admin-club-transfer span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-club-card-header h2 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.admin-club-card-header p,
+.admin-club-owner strong {
+  margin: 0;
+  color: var(--muted);
+}
+
+.admin-club-card-header a,
+.admin-club-transfer button,
+.admin-club-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.admin-club-card-header a {
+  border: 1px solid var(--line);
+}
+
+.admin-club-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-club-metrics div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.admin-club-metrics strong {
+  color: var(--foreground);
+  font-size: 24px;
+}
+
+.admin-club-transfer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.admin-club-transfer select {
+  min-height: 42px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.admin-club-transfer button,
+.admin-club-actions button {
+  border: 1px solid var(--line);
+  background: var(--background);
+  cursor: pointer;
+}
+
+.admin-club-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
 @media (max-width: 1100px) {
   .clubs-layout,
   .club-detail-layout,
@@ -8414,6 +8621,12 @@ canvas {
   }
 
   .club-model-group > div {
+    grid-template-columns: 1fr;
+  }
+
+  .club-settings-grid,
+  .admin-club-grid,
+  .admin-club-transfer {
     grid-template-columns: 1fr;
   }
 }

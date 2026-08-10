@@ -1,14 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
-import { leaveClubAction, manageClubMemberAction, requestJoinClubAction } from "@/app/actions/clubs";
+import { leaveClubAction, manageClubMemberAction, requestJoinClubAction, updateClubModelsAction, updateClubProfileAction } from "@/app/actions/clubs";
+import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
 import { prisma } from "@/lib/prisma";
+import ClubConfirmButton from "../ClubConfirmButton";
+import ClubModelSelector from "../ClubModelSelector";
 
 export const dynamic = "force-dynamic";
 
 export default async function ClubDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [club, session] = await Promise.all([
+  const [club, session, catalog] = await Promise.all([
     prisma.carClub.findUnique({
       where: { slug },
       include: {
@@ -30,6 +33,7 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
       },
     }),
     auth(),
+    getMakeModelCatalogOptions(),
   ]);
 
   if (!club || club.status !== "ACTIVE") {
@@ -166,6 +170,56 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
               <span>Moderator Console</span>
               <strong>Membership Requests</strong>
             </div>
+            <div id="club-settings" className="club-settings-grid">
+              <form action={updateClubProfileAction} className="club-form">
+                <input type="hidden" name="clubId" value={club.id} />
+                <div className="meets-panel-title">
+                  <span>Club Profile</span>
+                  <strong>Edit Details</strong>
+                </div>
+                <label>
+                  <span>Club Name</span>
+                  <input name="name" defaultValue={club.name} required />
+                </label>
+                <div className="club-form-grid">
+                  <label>
+                    <span>City</span>
+                    <input name="city" defaultValue={club.city || ""} required />
+                  </label>
+                  <label>
+                    <span>State</span>
+                    <input name="state" defaultValue={club.state || ""} maxLength={2} required />
+                  </label>
+                </div>
+                <label>
+                  <span>Visibility</span>
+                  <select name="visibility" defaultValue={club.visibility}>
+                    <option value="PUBLIC">Public</option>
+                    <option value="PRIVATE">Private Approval</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Description</span>
+                  <textarea name="description" rows={4} defaultValue={club.description || ""} />
+                </label>
+                <button type="submit">Save Club</button>
+              </form>
+
+              <form action={updateClubModelsAction} className="club-form">
+                <input type="hidden" name="clubId" value={club.id} />
+                <div className="meets-panel-title">
+                  <span>Model Links</span>
+                  <strong>Edit Makes & Models</strong>
+                </div>
+                <ClubModelSelector
+                  makes={catalog.makes}
+                  models={catalog.models}
+                  initialModelIds={club.models.map(({ modelId }) => modelId)}
+                />
+                <button type="submit">Save Models</button>
+              </form>
+            </div>
+
             {pendingMembers.length > 0 ? (
               <div className="club-moderation-list">
                 {pendingMembers.map((member) => (
@@ -177,7 +231,9 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
                     <form action={manageClubMemberAction}>
                       <input type="hidden" name="memberId" value={member.id} />
                       <button type="submit" name="action" value="APPROVE">Approve</button>
-                      <button type="submit" name="action" value="DECLINE">Decline</button>
+                      <ClubConfirmButton name="action" value="DECLINE" message="Decline this club request?">
+                        Decline
+                      </ClubConfirmButton>
                     </form>
                   </div>
                 ))}
@@ -197,7 +253,18 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
                     </div>
                     <form action={manageClubMemberAction}>
                       <input type="hidden" name="memberId" value={member.id} />
-                      <button type="submit" name="action" value="REMOVE">Remove</button>
+                      {member.role === "MODERATOR" ? (
+                        <ClubConfirmButton name="action" value="DEMOTE" message="Demote this moderator to member?">
+                          Demote
+                        </ClubConfirmButton>
+                      ) : (
+                        <ClubConfirmButton name="action" value="PROMOTE" message="Promote this member to moderator?">
+                          Promote
+                        </ClubConfirmButton>
+                      )}
+                      <ClubConfirmButton name="action" value="REMOVE" message="Remove this member from the club?">
+                        Remove
+                      </ClubConfirmButton>
                     </form>
                   </div>
                 ))}
