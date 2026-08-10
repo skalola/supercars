@@ -6,6 +6,7 @@ import { HostCancelMeetForm } from "@/components/meets/HostCancelMeetForm";
 import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
 import { projectContiguousUsToPercent } from "@/lib/maps/us-projection";
 import { prisma } from "@/lib/prisma";
+import { CountryMapGraphic } from "../CountryMapGraphic";
 import { getMeetBySlug } from "../meet-data";
 
 export const dynamic = "force-dynamic";
@@ -139,7 +140,13 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
             <strong>{meet.locationName}</strong>
           </div>
           <div className="meet-location-map">
-            <span style={{ left: `${mapPoint.x}%`, top: `${mapPoint.y}%` }} />
+            <CountryMapGraphic countryCode="US">
+              <span
+                className="meet-location-pin"
+                style={{ left: `${mapPoint.x}%`, top: `${mapPoint.y}%` }}
+                aria-label={`${meet.title} in ${meet.city}, ${meet.state}`}
+              />
+            </CountryMapGraphic>
           </div>
           <p>{displayedLocationDetail}</p>
           {privateMeetContext?.exactAddress ? (

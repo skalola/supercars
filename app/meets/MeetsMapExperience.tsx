@@ -5,6 +5,7 @@ import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
 import type { MakeOption } from "@/lib/makes/catalog";
 import { projectContiguousUsToPercent, type MapPoint } from "@/lib/maps/us-projection";
+import { CountryMapGraphic } from "./CountryMapGraphic";
 import type { MeetEvent } from "./meet-data";
 
 type MeetsMapExperienceProps = {
@@ -209,42 +210,12 @@ export function MeetsMapExperience({ meetEvents, makeOptions }: MeetsMapExperien
   );
 }
 
-function CountryMapGraphic({ countryCode, children }: { countryCode: "US"; children: React.ReactNode }) {
-  const map = countryMapAssets[countryCode];
-
-  return (
-    <div className="meets-map-svg meets-real-map" role="img" aria-label={map.label}>
-      <span className="meets-real-map-image" aria-hidden="true" style={{ backgroundImage: `url("${map.src}")` }} />
-      {map.glows.map(([x, y]) => (
-        <span key={`${x}:${y}`} className="meets-map-glow" style={{ left: `${x}%`, top: `${y}%` }} />
-      ))}
-      {children}
-    </div>
-  );
-}
-
 function getMeetMapPoint(meet: MeetEvent): MapPoint {
   if (meet.latitude !== null && meet.longitude !== null) {
     return projectContiguousUsToPercent(meet.latitude, meet.longitude);
   }
   return { x: meet.mapX, y: meet.mapY };
 }
-
-const countryMapAssets = {
-  US: {
-    label: "United States meet map",
-    src: "/maps/us-contiguous-48.svg",
-    glows: [
-      [20.7, 14.4],
-      [19.9, 55.4],
-      [60.4, 37.7],
-      [66, 60.9],
-      [70.4, 55.3],
-      [73.9, 82.5],
-      [77.3, 36.3],
-    ] as Array<[number, number]>,
-  },
-};
 
 function calculateDistanceMiles(lat1: number, lon1: number, lat2: number, lon2: number) {
   const earthRadiusMiles = 3958.8;

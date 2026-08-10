@@ -5586,8 +5586,17 @@ canvas {
   background-size: 36px 36px, 36px 36px, auto, auto;
 }
 
-.meet-location-map span {
+.meet-location-map .meets-real-map {
+  width: min(92%, 640px);
+}
+
+.meet-location-map .meets-real-map-image {
+  opacity: 0.62;
+}
+
+.meet-location-pin {
   position: absolute;
+  z-index: 2;
   width: 32px;
   height: 32px;
   border: 3px solid #ffffff;
