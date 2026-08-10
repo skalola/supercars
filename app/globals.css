@@ -7797,6 +7797,7 @@ canvas {
 .club-detail-hero span,
 .club-stat-grid span,
 .club-meet-row span,
+.club-meet-row time,
 .club-member-card p,
 .club-moderation-row span,
 .club-model-card span,
@@ -8241,7 +8242,7 @@ canvas {
 
 .club-stat-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   width: min(1500px, 100%);
   margin: 0 auto;
@@ -8460,8 +8461,47 @@ canvas {
 
 .club-meet-row {
   display: grid;
-  gap: 6px;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
   padding: 14px;
+}
+
+.club-meet-list.is-primary {
+  gap: 10px;
+}
+
+.club-meet-list.is-primary .club-meet-row {
+  min-height: 76px;
+  background:
+    linear-gradient(90deg, rgba(226, 15, 27, 0.11), rgba(255, 255, 255, 0.045)),
+    rgba(255, 255, 255, 0.035);
+}
+
+.club-meet-row time {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid rgba(226, 15, 27, 0.32);
+  border-radius: 6px;
+  background: rgba(226, 15, 27, 0.1);
+  color: rgba(255, 255, 255, 0.86);
+  text-align: center;
+}
+
+.club-meet-row div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.club-meet-row strong,
+.club-meet-row p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .club-status-pill {
@@ -8736,6 +8776,17 @@ canvas {
   .club-edit-modal-content > .club-form,
   .club-edit-section {
     padding: 14px;
+  }
+
+  .club-meet-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .club-meet-row time {
+    justify-content: flex-start;
+    min-height: 38px;
+    width: fit-content;
   }
 
   .club-list-header {

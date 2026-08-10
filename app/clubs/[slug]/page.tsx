@@ -28,9 +28,9 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
           orderBy: { createdAt: "asc" },
         },
         meets: {
-          where: { status: { in: ["PUBLISHED", "FULL", "COMPLETED"] } },
+          where: { status: { in: ["PUBLISHED", "FULL"] }, startsAt: { gte: new Date() } },
           orderBy: { startsAt: "asc" },
-          take: 8,
+          take: 12,
         },
       },
     }),
@@ -51,8 +51,12 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
   );
   const activeMembers = club.members.filter((member) => member.status === "ACTIVE");
   const pendingMembers = club.members.filter((member) => member.status === "PENDING");
-  const isAllMakesModelsClub = club.models.length === 0;
-  const fastest = await getFastestClubCar(activeMembers.map((member) => member.userId));
+  const memberUserIds = activeMembers.map((member) => member.userId);
+  const [fastest, mostModified] = await Promise.all([
+    getFastestClubCar(memberUserIds),
+    getMostModifiedClubCar(memberUserIds),
+  ]);
+  const nextMeet = club.meets[0] ?? null;
   const heroImage = club.models[0]?.model.images[0]?.url || club.models[0]?.model.make.logoUrl || "/images/garage-home-hero.png?v=garage-2";
 
   return (
@@ -93,26 +97,46 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
 
       <section className="club-stat-grid">
         <div>
-          <span>Total Members</span>
-          <strong>{activeMembers.length}</strong>
-        </div>
-        <div>
-          <span>Location</span>
-          <strong>{club.city}, {club.state}</strong>
-        </div>
-        <div>
           <span>Fastest Car</span>
           <strong>{fastest ? `${fastest.horsepower.toLocaleString()} hp` : "Pending"}</strong>
           <p>{fastest?.label || "No member horsepower logged yet"}</p>
         </div>
         <div>
-          <span>Linked Models</span>
-          <strong>{isAllMakesModelsClub ? "All" : club.models.length}</strong>
+          <span>Most Mods</span>
+          <strong>{mostModified ? mostModified.modCount.toLocaleString() : "Pending"}</strong>
+          <p>{mostModified?.label || "No member modifications logged yet"}</p>
+        </div>
+        <div>
+          <span>Next Event Date</span>
+          <strong>{nextMeet ? formatMeetDay(nextMeet.startsAt) : "Pending"}</strong>
+          <p>{nextMeet ? nextMeet.title : "No upcoming club meets"}</p>
         </div>
       </section>
 
       <section className="club-detail-layout">
         <div className="club-detail-main">
+          <article className="club-panel">
+            <div className="meets-panel-title">
+              <span>Club Meets</span>
+              <strong>Upcoming Events</strong>
+            </div>
+            <div className="club-meet-list is-primary">
+              {club.meets.length > 0 ? (
+                club.meets.map((meet) => (
+                  <Link key={meet.id} href={`/meets/${meet.slug}`} className="club-meet-row">
+                    <time dateTime={meet.startsAt.toISOString()}>{formatMeetDate(meet.startsAt)}</time>
+                    <div>
+                      <strong>{meet.title}</strong>
+                      <p>{meet.city}, {meet.state}</p>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <p className="meet-empty-note">No upcoming club-hosted meets yet.</p>
+              )}
+            </div>
+          </article>
+
           <article className="club-panel">
             <div className="meets-panel-title">
               <span>Model Network</span>
@@ -129,26 +153,6 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
                 ))
               ) : (
                 <p className="meet-empty-note">This club is open to all makes and models.</p>
-              )}
-            </div>
-          </article>
-
-          <article className="club-panel">
-            <div className="meets-panel-title">
-              <span>Meet Link</span>
-              <strong>Club Events</strong>
-            </div>
-            <div className="club-meet-list">
-              {club.meets.length > 0 ? (
-                club.meets.map((meet) => (
-                  <Link key={meet.id} href={`/meets/${meet.slug}`} className="club-meet-row">
-                    <span>{meet.city}, {meet.state}</span>
-                    <strong>{meet.title}</strong>
-                    <p>{new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(meet.startsAt)}</p>
-                  </Link>
-                ))
-              ) : (
-                <p className="meet-empty-note">No club-hosted meets yet.</p>
               )}
             </div>
           </article>
@@ -309,6 +313,39 @@ async function getFastestClubCar(userIds: string[]) {
     })
     .filter((item): item is { horsepower: number; label: string } => Boolean(item))
     .sort((a, b) => b.horsepower - a.horsepower)[0] ?? null;
+}
+
+async function getMostModifiedClubCar(userIds: string[]) {
+  if (userIds.length === 0) return null;
+  const vehicles = await prisma.vehicle.findMany({
+    where: { ownerId: { in: userIds }, status: "CLAIMED" },
+    include: {
+      model: { include: { make: true } },
+      modifications: { select: { id: true } },
+    },
+    take: 250,
+  });
+
+  return vehicles
+    .map((vehicle) => ({
+      modCount: vehicle.modifications.length,
+      label: `${vehicle.year} ${vehicle.model.make.name} ${vehicle.model.name}`,
+    }))
+    .filter((item) => item.modCount > 0)
+    .sort((a, b) => b.modCount - a.modCount)[0] ?? null;
+}
+
+function formatMeetDay(date: Date) {
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
+}
+
+function formatMeetDate(date: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
 }
 
 function parseHorsepower(value: string | null | undefined) {
