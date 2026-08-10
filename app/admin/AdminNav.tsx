@@ -11,6 +11,7 @@ const adminTabs = [
   { href: "/admin/clubs", label: "Clubs" },
   { href: "/admin/users", label: "Users" },
   { href: "/admin/listings", label: "Listings" },
+  { href: "/admin/parts", label: "Parts" },
   { href: "/admin/marketing", label: "Marketing" },
 ];
 

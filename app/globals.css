@@ -6584,8 +6584,97 @@ canvas {
   text-transform: none;
 }
 
+.admin-modal-grid textarea,
+.admin-modal-textarea {
+  width: 100%;
+  min-height: 96px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  color: var(--foreground);
+  font: inherit;
+  resize: vertical;
+  text-transform: none;
+}
+
 .admin-modal-wide {
   grid-column: 1 / -1;
+}
+
+.admin-parts-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-parts-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.admin-parts-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-parts-kpi-card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+}
+
+.admin-parts-kpi-card span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.admin-parts-kpi-card strong {
+  color: var(--foreground);
+  font-size: clamp(22px, 3vw, 34px);
+  line-height: 1;
+}
+
+.admin-parts-filter-toolbar {
+  grid-template-columns: minmax(220px, 1.4fr) repeat(3, minmax(150px, 0.8fr)) auto;
+}
+
+.admin-parts-table {
+  min-width: 1180px;
+}
+
+.admin-parts-table td {
+  vertical-align: top;
+}
+
+.admin-parts-fitment-pill {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 4px 4px 0;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--foreground);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.admin-parts-modal-wide {
+  width: min(960px, 100%);
+}
+
+.admin-parts-modal-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .directory-tabs {
@@ -7715,6 +7804,27 @@ canvas {
   }
 
   .admin-modal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-parts-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-parts-actions {
+    justify-content: stretch;
+    width: 100%;
+  }
+
+  .admin-parts-actions button {
+    flex: 1 1 140px;
+  }
+
+  .admin-parts-filter-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-parts-modal-grid {
     grid-template-columns: 1fr;
   }
 

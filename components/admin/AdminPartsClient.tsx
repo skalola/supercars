@@ -1,0 +1,653 @@
+"use client";
+
+import { useMemo, useState, useTransition } from "react";
+import type { ReactNode } from "react";
+import {
+  addPartBrandAction,
+  addPartCategoryAction,
+  addPerformancePartAction,
+} from "@/app/actions/admin-parts";
+import type { MakeOption, ModelOption } from "@/lib/makes/catalog";
+
+export type AdminPartCategoryRow = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  partCount: number;
+};
+
+export type AdminPartBrandRow = {
+  id: string;
+  name: string;
+  slug: string;
+  websiteUrl: string | null;
+  country: string | null;
+  partCount: number;
+};
+
+export type AdminAffiliatePartnerRow = {
+  id: string;
+  name: string;
+  status: string;
+  network: string | null;
+  active: boolean;
+  partCount: number;
+};
+
+export type AdminPerformancePartRow = {
+  id: string;
+  name: string;
+  partNumber: string | null;
+  status: string;
+  sourceConfidence: string;
+  trackingStatus: string;
+  retailPrice: string;
+  estimatedHpGain: string;
+  estimatedTorqueGain: string;
+  categoryName: string;
+  brandName: string;
+  sourceUrl: string | null;
+  compatibility: string[];
+  updatedAt: string;
+};
+
+type AdminPartsClientProps = {
+  categories: AdminPartCategoryRow[];
+  brands: AdminPartBrandRow[];
+  affiliatePartners: AdminAffiliatePartnerRow[];
+  parts: AdminPerformancePartRow[];
+  makes: MakeOption[];
+  models: ModelOption[];
+};
+
+type PartFormState = {
+  name: string;
+  categoryId: string;
+  brandId: string;
+  partNumber: string;
+  description: string;
+  imageUrl: string;
+  sourceUrl: string;
+  sourceName: string;
+  status: string;
+  sourceConfidence: string;
+  retailPrice: string;
+  retailerName: string;
+  retailerSku: string;
+  estimatedHpGain: string;
+  estimatedTorqueGain: string;
+  gainBasis: string;
+  installComplexity: string;
+  notes: string;
+  makeId: string;
+  modelId: string;
+  yearStart: string;
+  yearEnd: string;
+  trim: string;
+  engine: string;
+};
+
+const emptyPartForm: PartFormState = {
+  name: "",
+  categoryId: "",
+  brandId: "",
+  partNumber: "",
+  description: "",
+  imageUrl: "",
+  sourceUrl: "",
+  sourceName: "",
+  status: "MANUAL_REVIEW",
+  sourceConfidence: "MANUAL_REVIEW",
+  retailPrice: "",
+  retailerName: "",
+  retailerSku: "",
+  estimatedHpGain: "",
+  estimatedTorqueGain: "",
+  gainBasis: "",
+  installComplexity: "SHOP_RECOMMENDED",
+  notes: "",
+  makeId: "",
+  modelId: "",
+  yearStart: "",
+  yearEnd: "",
+  trim: "",
+  engine: "",
+};
+
+export function AdminPartsClient({
+  categories,
+  brands,
+  affiliatePartners,
+  parts,
+  makes,
+  models,
+}: AdminPartsClientProps) {
+  const [isPending, startTransition] = useTransition();
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [activeModal, setActiveModal] = useState<"category" | "brand" | "part" | null>(null);
+  const [categoryName, setCategoryName] = useState("");
+  const [categoryDescription, setCategoryDescription] = useState("");
+  const [brandName, setBrandName] = useState("");
+  const [brandWebsite, setBrandWebsite] = useState("");
+  const [brandCountry, setBrandCountry] = useState("");
+  const [partForm, setPartForm] = useState<PartFormState>(emptyPartForm);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [brandFilter, setBrandFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+
+  const filteredModels = useMemo(
+    () => models.filter((model) => !partForm.makeId || model.makeId === partForm.makeId),
+    [models, partForm.makeId]
+  );
+
+  const filteredParts = parts.filter((part) => {
+    if (categoryFilter && part.categoryName !== categoryFilter) return false;
+    if (brandFilter && part.brandName !== brandFilter) return false;
+    if (statusFilter && part.status !== statusFilter) return false;
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const haystack = [
+        part.name,
+        part.partNumber,
+        part.categoryName,
+        part.brandName,
+        part.sourceConfidence,
+        part.trackingStatus,
+        ...part.compatibility,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+
+    return true;
+  });
+
+  const resetFilters = () => {
+    setSearchQuery("");
+    setCategoryFilter("");
+    setBrandFilter("");
+    setStatusFilter("");
+  };
+
+  const updatePartForm = (field: keyof PartFormState, value: string) => {
+    setPartForm((prev) => ({
+      ...prev,
+      [field]: value,
+      ...(field === "makeId" ? { modelId: "" } : {}),
+    }));
+  };
+
+  const saveCategory = () => {
+    if (!categoryName.trim()) {
+      setMessage({ type: "error", text: "Category name is required." });
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await addPartCategoryAction({
+        name: categoryName,
+        description: categoryDescription,
+      });
+      setMessage({ type: result.success ? "success" : "error", text: result.message });
+      if (result.success) {
+        setCategoryName("");
+        setCategoryDescription("");
+        setActiveModal(null);
+      }
+    });
+  };
+
+  const saveBrand = () => {
+    if (!brandName.trim()) {
+      setMessage({ type: "error", text: "Brand name is required." });
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await addPartBrandAction({
+        name: brandName,
+        websiteUrl: brandWebsite,
+        country: brandCountry,
+      });
+      setMessage({ type: result.success ? "success" : "error", text: result.message });
+      if (result.success) {
+        setBrandName("");
+        setBrandWebsite("");
+        setBrandCountry("");
+        setActiveModal(null);
+      }
+    });
+  };
+
+  const savePart = () => {
+    if (!partForm.name.trim() || !partForm.categoryId || !partForm.brandId) {
+      setMessage({ type: "error", text: "Part name, category, and brand are required." });
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await addPerformancePartAction({
+        ...partForm,
+        retailPrice: toOptionalNumber(partForm.retailPrice),
+        estimatedHpGain: toOptionalNumber(partForm.estimatedHpGain),
+        estimatedTorqueGain: toOptionalNumber(partForm.estimatedTorqueGain),
+        yearStart: toOptionalNumber(partForm.yearStart),
+        yearEnd: toOptionalNumber(partForm.yearEnd),
+      });
+      setMessage({ type: result.success ? "success" : "error", text: result.message });
+      if (result.success) {
+        setPartForm(emptyPartForm);
+        setActiveModal(null);
+      }
+    });
+  };
+
+  return (
+    <section className="surface-panel admin-management-panel admin-parts-panel">
+      <div className="admin-management-panel-header">
+        <div>
+          <p className="eyebrow">Parts Catalog</p>
+          <h2>Performance Parts Foundation</h2>
+        </div>
+        <div className="admin-parts-actions">
+          <button type="button" className="admin-secondary-button" onClick={() => setActiveModal("category")}>
+            Add Category
+          </button>
+          <button type="button" className="admin-secondary-button" onClick={() => setActiveModal("brand")}>
+            Add Brand
+          </button>
+          <button type="button" className="admin-primary-button" onClick={() => setActiveModal("part")}>
+            Add Part
+          </button>
+        </div>
+      </div>
+
+      <div className="admin-parts-kpi-grid" aria-label="Parts catalog summary">
+        <SummaryCard label="Categories" value={categories.length.toLocaleString()} />
+        <SummaryCard label="Brands" value={brands.length.toLocaleString()} />
+        <SummaryCard label="Parts Captured" value={parts.length.toLocaleString()} />
+        <SummaryCard label="Affiliate Candidates" value={affiliatePartners.length.toLocaleString()} />
+      </div>
+
+      {message && <div className={`admin-action-message ${message.type}`}>{message.text}</div>}
+
+      <div className="admin-filter-toolbar admin-parts-filter-toolbar" aria-label="Parts filters">
+        <label>
+          <span>Search</span>
+          <input
+            type="search"
+            placeholder="Part, brand, category, fitment"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
+        </label>
+        <label>
+          <span>Category</span>
+          <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+            <option value="">All Categories</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.name}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Brand</span>
+          <select value={brandFilter} onChange={(event) => setBrandFilter(event.target.value)}>
+            <option value="">All Brands</option>
+            {brands.map((brand) => (
+              <option key={brand.id} value={brand.name}>
+                {brand.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Status</span>
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            <option value="">All Statuses</option>
+            <option value="DRAFT">Draft</option>
+            <option value="MANUAL_REVIEW">Manual Review</option>
+            <option value="ACTIVE">Active</option>
+            <option value="INACTIVE">Inactive</option>
+          </select>
+        </label>
+        <button type="button" onClick={resetFilters}>
+          Reset
+        </button>
+      </div>
+
+      <div className="mobile-scroll admin-management-table-shell admin-parts-table-shell">
+        <table className="admin-management-table admin-parts-table">
+          <thead>
+            <tr>
+              <th>Part</th>
+              <th>Category</th>
+              <th>Brand</th>
+              <th>Status</th>
+              <th>Price</th>
+              <th>Gain</th>
+              <th>Compatibility</th>
+              <th>Tracking</th>
+              <th>Source</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredParts.length === 0 ? (
+              <tr>
+                <td colSpan={10} className="admin-management-empty">
+                  No performance parts match the selected filters.
+                </td>
+              </tr>
+            ) : (
+              filteredParts.map((part) => (
+                <tr key={part.id}>
+                  <td data-label="Part">
+                    <strong>{part.name}</strong>
+                    {part.partNumber ? <span className="admin-listing-identifier">{part.partNumber}</span> : null}
+                  </td>
+                  <td data-label="Category">{part.categoryName}</td>
+                  <td data-label="Brand">{part.brandName}</td>
+                  <td data-label="Status">
+                    <span className={`admin-status-pill ${part.status === "ACTIVE" ? "" : "is-muted"}`}>
+                      {part.status}
+                    </span>
+                    <span className="admin-listing-identifier">{part.sourceConfidence}</span>
+                  </td>
+                  <td data-label="Price">{part.retailPrice}</td>
+                  <td data-label="Gain">
+                    <span>{part.estimatedHpGain}</span>
+                    <span className="admin-listing-identifier">{part.estimatedTorqueGain}</span>
+                  </td>
+                  <td data-label="Compatibility">
+                    {part.compatibility.length > 0 ? (
+                      part.compatibility.map((item) => (
+                        <span key={item} className="admin-parts-fitment-pill">
+                          {item}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="admin-listing-identifier">Universal / unscoped</span>
+                    )}
+                  </td>
+                  <td data-label="Tracking">{part.trackingStatus}</td>
+                  <td data-label="Source">
+                    {part.sourceUrl ? (
+                      <a href={part.sourceUrl} target="_blank" rel="noopener noreferrer">
+                        Open source
+                      </a>
+                    ) : (
+                      <span className="admin-listing-identifier">No source</span>
+                    )}
+                  </td>
+                  <td data-label="Updated">{part.updatedAt}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {activeModal === "category" && (
+        <AdminModal title="Add Category" onClose={() => setActiveModal(null)}>
+          <div className="admin-modal-grid">
+            <label className="admin-modal-wide">
+              Name
+              <input value={categoryName} onChange={(event) => setCategoryName(event.target.value)} />
+            </label>
+            <label className="admin-modal-wide">
+              Description
+              <textarea
+                className="admin-modal-textarea"
+                value={categoryDescription}
+                onChange={(event) => setCategoryDescription(event.target.value)}
+              />
+            </label>
+          </div>
+          <ModalActions disabled={isPending} onCancel={() => setActiveModal(null)} onSave={saveCategory} />
+        </AdminModal>
+      )}
+
+      {activeModal === "brand" && (
+        <AdminModal title="Add Brand" onClose={() => setActiveModal(null)}>
+          <div className="admin-modal-grid">
+            <label>
+              Name
+              <input value={brandName} onChange={(event) => setBrandName(event.target.value)} />
+            </label>
+            <label>
+              Country
+              <input value={brandCountry} onChange={(event) => setBrandCountry(event.target.value)} />
+            </label>
+            <label className="admin-modal-wide">
+              Website
+              <input value={brandWebsite} onChange={(event) => setBrandWebsite(event.target.value)} placeholder="https://..." />
+            </label>
+          </div>
+          <ModalActions disabled={isPending} onCancel={() => setActiveModal(null)} onSave={saveBrand} />
+        </AdminModal>
+      )}
+
+      {activeModal === "part" && (
+        <AdminModal title="Add Performance Part" onClose={() => setActiveModal(null)} isWide>
+          <div className="admin-modal-grid admin-parts-modal-grid">
+            <label className="admin-modal-wide">
+              Part Name
+              <input value={partForm.name} onChange={(event) => updatePartForm("name", event.target.value)} />
+            </label>
+            <label>
+              Category
+              <select value={partForm.categoryId} onChange={(event) => updatePartForm("categoryId", event.target.value)}>
+                <option value="">Choose Category</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Brand
+              <select value={partForm.brandId} onChange={(event) => updatePartForm("brandId", event.target.value)}>
+                <option value="">Choose Brand</option>
+                {brands.map((brand) => (
+                  <option key={brand.id} value={brand.id}>
+                    {brand.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Part Number
+              <input value={partForm.partNumber} onChange={(event) => updatePartForm("partNumber", event.target.value)} />
+            </label>
+            <label>
+              Status
+              <select value={partForm.status} onChange={(event) => updatePartForm("status", event.target.value)}>
+                <option value="MANUAL_REVIEW">Manual Review</option>
+                <option value="DRAFT">Draft</option>
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+              </select>
+            </label>
+            <label>
+              Source Confidence
+              <select value={partForm.sourceConfidence} onChange={(event) => updatePartForm("sourceConfidence", event.target.value)}>
+                <option value="MANUAL_REVIEW">Manual Review</option>
+                <option value="SOURCE_VERIFIED">Source Verified</option>
+                <option value="LOW_CONFIDENCE">Low Confidence</option>
+              </select>
+            </label>
+            <label>
+              Retail Price
+              <input type="number" min="0" step="0.01" value={partForm.retailPrice} onChange={(event) => updatePartForm("retailPrice", event.target.value)} />
+            </label>
+            <label>
+              HP Gain
+              <input type="number" value={partForm.estimatedHpGain} onChange={(event) => updatePartForm("estimatedHpGain", event.target.value)} />
+            </label>
+            <label>
+              Torque Gain
+              <input type="number" value={partForm.estimatedTorqueGain} onChange={(event) => updatePartForm("estimatedTorqueGain", event.target.value)} />
+            </label>
+            <label>
+              Install Complexity
+              <select value={partForm.installComplexity} onChange={(event) => updatePartForm("installComplexity", event.target.value)}>
+                <option value="SHOP_RECOMMENDED">Shop Recommended</option>
+                <option value="DIY">DIY</option>
+                <option value="PRO_ONLY">Pro Only</option>
+              </select>
+            </label>
+            <label className="admin-modal-wide">
+              Gain Basis
+              <input value={partForm.gainBasis} onChange={(event) => updatePartForm("gainBasis", event.target.value)} placeholder="Dyno, manufacturer estimate, owner reported..." />
+            </label>
+            <label>
+              Make Compatibility
+              <select value={partForm.makeId} onChange={(event) => updatePartForm("makeId", event.target.value)}>
+                <option value="">All / Unscoped</option>
+                {makes.map((make) => (
+                  <option key={make.id} value={make.id}>
+                    {make.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Model Compatibility
+              <select
+                value={partForm.modelId}
+                onChange={(event) => updatePartForm("modelId", event.target.value)}
+                disabled={!partForm.makeId}
+              >
+                <option value="">{partForm.makeId ? "All Models" : "Choose make first"}</option>
+                {filteredModels.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Year Start
+              <input type="number" value={partForm.yearStart} onChange={(event) => updatePartForm("yearStart", event.target.value)} />
+            </label>
+            <label>
+              Year End
+              <input type="number" value={partForm.yearEnd} onChange={(event) => updatePartForm("yearEnd", event.target.value)} />
+            </label>
+            <label>
+              Trim
+              <input value={partForm.trim} onChange={(event) => updatePartForm("trim", event.target.value)} />
+            </label>
+            <label>
+              Engine
+              <input value={partForm.engine} onChange={(event) => updatePartForm("engine", event.target.value)} />
+            </label>
+            <label>
+              Retailer Name
+              <input value={partForm.retailerName} onChange={(event) => updatePartForm("retailerName", event.target.value)} />
+            </label>
+            <label>
+              Retailer SKU
+              <input value={partForm.retailerSku} onChange={(event) => updatePartForm("retailerSku", event.target.value)} />
+            </label>
+            <label className="admin-modal-wide">
+              Source URL
+              <input value={partForm.sourceUrl} onChange={(event) => updatePartForm("sourceUrl", event.target.value)} placeholder="Original manufacturer or retailer page" />
+            </label>
+            <label>
+              Source Name
+              <input value={partForm.sourceName} onChange={(event) => updatePartForm("sourceName", event.target.value)} />
+            </label>
+            <label>
+              Image URL
+              <input value={partForm.imageUrl} onChange={(event) => updatePartForm("imageUrl", event.target.value)} />
+            </label>
+            <label className="admin-modal-wide">
+              Description
+              <textarea className="admin-modal-textarea" value={partForm.description} onChange={(event) => updatePartForm("description", event.target.value)} />
+            </label>
+            <label className="admin-modal-wide">
+              Notes
+              <textarea className="admin-modal-textarea" value={partForm.notes} onChange={(event) => updatePartForm("notes", event.target.value)} />
+            </label>
+          </div>
+          <ModalActions disabled={isPending} onCancel={() => setActiveModal(null)} onSave={savePart} />
+        </AdminModal>
+      )}
+    </section>
+  );
+}
+
+function SummaryCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="admin-parts-kpi-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function AdminModal({
+  title,
+  children,
+  onClose,
+  isWide = false,
+}: {
+  title: string;
+  children: ReactNode;
+  onClose: () => void;
+  isWide?: boolean;
+}) {
+  return (
+    <div className="admin-modal-backdrop" role="presentation">
+      <div className={`admin-modal-panel ${isWide ? "admin-parts-modal-wide" : ""}`} role="dialog" aria-modal="true" aria-labelledby="admin-parts-modal-title">
+        <div className="admin-modal-header">
+          <div>
+            <p className="eyebrow">Parts Catalog</p>
+            <h2 id="admin-parts-modal-title">{title}</h2>
+          </div>
+          <button type="button" className="admin-secondary-button" onClick={onClose}>
+            Close
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ModalActions({
+  disabled,
+  onCancel,
+  onSave,
+}: {
+  disabled: boolean;
+  onCancel: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <div className="admin-modal-actions">
+      <button type="button" className="admin-secondary-button" onClick={onCancel} disabled={disabled}>
+        Cancel
+      </button>
+      <button type="button" className="admin-primary-button" onClick={onSave} disabled={disabled}>
+        {disabled ? "Saving" : "Save"}
+      </button>
+    </div>
+  );
+}
+
+function toOptionalNumber(value: string) {
+  if (!value.trim()) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
