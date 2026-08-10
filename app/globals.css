@@ -7605,6 +7605,12 @@ canvas {
   gap: 12px;
 }
 
+.admin-parts-analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .admin-parts-kpi-card {
   display: grid;
   gap: 8px;
@@ -7626,6 +7632,89 @@ canvas {
   color: var(--foreground);
   font-size: clamp(22px, 3vw, 34px);
   line-height: 1;
+}
+
+.admin-parts-affiliate-insights {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(320px, 1.2fr);
+  gap: 12px;
+}
+
+.admin-affiliate-insight-panel,
+.admin-affiliate-recent-panel {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+}
+
+.admin-affiliate-panel-heading h3 {
+  margin: 4px 0 0;
+  color: var(--foreground);
+  font-size: 18px;
+}
+
+.admin-affiliate-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.admin-affiliate-row-list,
+.admin-affiliate-click-list {
+  display: grid;
+  gap: 9px;
+}
+
+.admin-affiliate-row-list > div,
+.admin-affiliate-click-list a {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  text-decoration: none;
+}
+
+.admin-affiliate-row-list > div {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.admin-affiliate-row-list > div > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.admin-affiliate-row-list strong,
+.admin-affiliate-click-list strong {
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-affiliate-row-list span,
+.admin-affiliate-click-list span,
+.admin-affiliate-click-list em,
+.admin-affiliate-click-list small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-affiliate-row-list > div > div:last-child {
+  text-align: right;
 }
 
 .admin-parts-filter-toolbar {
@@ -8913,6 +9002,19 @@ canvas {
 
   .admin-parts-kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-parts-analytics-grid,
+  .admin-parts-affiliate-insights {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-affiliate-row-list > div {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-affiliate-row-list > div > div:last-child {
+    text-align: left;
   }
 
   .admin-parts-actions {

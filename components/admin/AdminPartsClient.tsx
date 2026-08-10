@@ -64,11 +64,41 @@ export type AdminPerformancePartRow = {
   updatedAt: string;
 };
 
+export type AdminAffiliateAnalyticsRow = {
+  label: string;
+  detail: string;
+  clicks: number;
+  estimatedCommissionLabel: string;
+};
+
+export type AdminRecentAffiliateClickRow = {
+  id: string;
+  partName: string;
+  brandName: string;
+  categoryName: string;
+  affiliatePartnerName: string | null;
+  sourcePath: string | null;
+  outboundUrl: string;
+  userLabel: string;
+  clickedAt: string;
+};
+
+type AdminAffiliateAnalytics = {
+  totalClicks: number;
+  recentClickCount: number;
+  configuredParts: number;
+  estimatedCommissionLabel: string;
+  topParts: AdminAffiliateAnalyticsRow[];
+  topBrands: AdminAffiliateAnalyticsRow[];
+  recentClicks: AdminRecentAffiliateClickRow[];
+};
+
 type AdminPartsClientProps = {
   categories: AdminPartCategoryRow[];
   brands: AdminPartBrandRow[];
   affiliatePartners: AdminAffiliatePartnerRow[];
   parts: AdminPerformancePartRow[];
+  affiliateAnalytics: AdminAffiliateAnalytics;
   makes: MakeOption[];
   models: ModelOption[];
 };
@@ -150,6 +180,7 @@ export function AdminPartsClient({
   brands,
   affiliatePartners,
   parts,
+  affiliateAnalytics,
   makes,
   models,
 }: AdminPartsClientProps) {
@@ -387,6 +418,38 @@ export function AdminPartsClient({
         <SummaryCard label="Brands" value={brands.length.toLocaleString()} />
         <SummaryCard label="Parts Captured" value={parts.length.toLocaleString()} />
         <SummaryCard label="Affiliate Candidates" value={affiliatePartners.length.toLocaleString()} />
+      </div>
+
+      <div className="admin-parts-analytics-grid" aria-label="Affiliate click analytics">
+        <SummaryCard label="Total Clicks" value={affiliateAnalytics.totalClicks.toLocaleString()} />
+        <SummaryCard label="30 Day Clicks" value={affiliateAnalytics.recentClickCount.toLocaleString()} />
+        <SummaryCard label="Configured Parts" value={affiliateAnalytics.configuredParts.toLocaleString()} />
+        <SummaryCard label="Estimated Commission" value={affiliateAnalytics.estimatedCommissionLabel} />
+      </div>
+
+      <div className="admin-parts-affiliate-insights">
+        <AffiliateInsightPanel title="Top Parts" rows={affiliateAnalytics.topParts} />
+        <AffiliateInsightPanel title="Top Brands" rows={affiliateAnalytics.topBrands} />
+        <div className="admin-affiliate-recent-panel">
+          <div className="admin-affiliate-panel-heading">
+            <p className="eyebrow">Recent Clicks</p>
+            <h3>Outbound Activity</h3>
+          </div>
+          {affiliateAnalytics.recentClicks.length === 0 ? (
+            <p className="admin-affiliate-empty">No affiliate clicks logged yet.</p>
+          ) : (
+            <div className="admin-affiliate-click-list">
+              {affiliateAnalytics.recentClicks.slice(0, 8).map((click) => (
+                <a key={click.id} href={click.outboundUrl} target="_blank" rel="noopener noreferrer">
+                  <strong>{click.partName}</strong>
+                  <span>{click.brandName} · {click.categoryName}</span>
+                  <em>{click.clickedAt} · {click.affiliatePartnerName ?? "No partner"} · {click.userLabel}</em>
+                  {click.sourcePath ? <small>{click.sourcePath}</small> : null}
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {message && <div className={`admin-action-message ${message.type}`}>{message.text}</div>}
@@ -835,6 +898,35 @@ function SummaryCard({ label, value }: { label: string; value: string }) {
     <div className="admin-parts-kpi-card">
       <span>{label}</span>
       <strong>{value}</strong>
+    </div>
+  );
+}
+
+function AffiliateInsightPanel({ title, rows }: { title: string; rows: AdminAffiliateAnalyticsRow[] }) {
+  return (
+    <div className="admin-affiliate-insight-panel">
+      <div className="admin-affiliate-panel-heading">
+        <p className="eyebrow">Affiliate</p>
+        <h3>{title}</h3>
+      </div>
+      {rows.length === 0 ? (
+        <p className="admin-affiliate-empty">No clicks yet.</p>
+      ) : (
+        <div className="admin-affiliate-row-list">
+          {rows.map((row) => (
+            <div key={row.label}>
+              <div>
+                <strong>{row.label}</strong>
+                <span>{row.detail}</span>
+              </div>
+              <div>
+                <strong>{row.clicks.toLocaleString()}</strong>
+                <span>{row.estimatedCommissionLabel}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,10 +1,13 @@
-import { AdminPartsClient, type AdminAffiliatePartnerRow, type AdminPartBrandRow, type AdminPartCategoryRow, type AdminPerformancePartRow } from "@/components/admin/AdminPartsClient";
+import { AdminPartsClient, type AdminAffiliateAnalyticsRow, type AdminAffiliatePartnerRow, type AdminPartBrandRow, type AdminPartCategoryRow, type AdminPerformancePartRow, type AdminRecentAffiliateClickRow } from "@/components/admin/AdminPartsClient";
 import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
 import { isAffiliateTrackingReady } from "@/lib/parts/affiliate-tracking";
 import { prisma } from "@/lib/prisma";
 
 export default async function AdminPartsPage() {
-  const [categories, brands, affiliatePartners, parts, catalog] = await Promise.all([
+  const recentWindowStart = new Date();
+  recentWindowStart.setDate(recentWindowStart.getDate() - 30);
+
+  const [categories, brands, affiliatePartners, parts, recentClicks, totalClicks, recentClickCount, catalog] = await Promise.all([
     prisma.partCategory.findMany({
       include: {
         _count: {
@@ -57,6 +60,29 @@ export default async function AdminPartsPage() {
         { name: "asc" },
       ],
       take: 500,
+    }),
+    prisma.partAffiliateClick.findMany({
+      include: {
+        part: {
+          include: {
+            brand: true,
+            category: true,
+          },
+        },
+        affiliatePartner: true,
+        user: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 25,
+    }),
+    prisma.partAffiliateClick.count(),
+    prisma.partAffiliateClick.count({
+      where: { createdAt: { gte: recentWindowStart } },
     }),
     getMakeModelCatalogOptions(),
   ]);
@@ -118,6 +144,30 @@ export default async function AdminPartsPage() {
     }).format(part.updatedAt),
   }));
 
+  const analyticsRows = buildAffiliateAnalyticsRows(parts);
+  const recentClickRows: AdminRecentAffiliateClickRow[] = recentClicks.map((click) => ({
+    id: click.id,
+    partName: click.part.name,
+    brandName: click.part.brand.name,
+    categoryName: click.part.category.name,
+    affiliatePartnerName: click.affiliatePartner?.name ?? null,
+    sourcePath: click.sourcePath,
+    outboundUrl: click.outboundUrl,
+    userLabel: click.user?.name || click.user?.email || "Anonymous",
+    clickedAt: new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(click.createdAt),
+  }));
+
+  const configuredParts = parts.filter((part) => isAffiliateTrackingReady(part)).length;
+  const estimatedCommissionCents = parts.reduce((sum, part) => {
+    if (!part.commissionRateBps || !part.retailPriceCents || part._count.clicks === 0) return sum;
+    return sum + Math.round((part.retailPriceCents * part.commissionRateBps * part._count.clicks) / 10000);
+  }, 0);
+
   return (
     <main className="page-shell wide">
       <section className="page-header">
@@ -135,11 +185,72 @@ export default async function AdminPartsPage() {
         brands={brandRows}
         affiliatePartners={affiliatePartnerRows}
         parts={partRows}
+        affiliateAnalytics={{
+          totalClicks,
+          recentClickCount,
+          configuredParts,
+          estimatedCommissionLabel: formatCents(estimatedCommissionCents),
+          topParts: analyticsRows.topParts,
+          topBrands: analyticsRows.topBrands,
+          recentClicks: recentClickRows,
+        }}
         makes={catalog.makes}
         models={catalog.models}
       />
     </main>
   );
+}
+
+function buildAffiliateAnalyticsRows(parts: Array<{
+  name: string;
+  retailPriceCents: number | null;
+  commissionRateBps: number | null;
+  brand: { name: string };
+  category: { name: string };
+  affiliatePartner: { name: string } | null;
+  _count: { clicks: number };
+}>) {
+  const topParts: AdminAffiliateAnalyticsRow[] = parts
+    .filter((part) => part._count.clicks > 0)
+    .map((part) => ({
+      label: part.name,
+      detail: [part.brand.name, part.category.name, part.affiliatePartner?.name].filter(Boolean).join(" · "),
+      clicks: part._count.clicks,
+      estimatedCommissionLabel: formatCents(estimateCommissionCents(part.retailPriceCents, part.commissionRateBps, part._count.clicks)),
+    }))
+    .sort((a, b) => b.clicks - a.clicks)
+    .slice(0, 6);
+
+  const brandMap = parts.reduce((map, part) => {
+    const current = map.get(part.brand.name) ?? {
+      label: part.brand.name,
+      detail: "Brand",
+      clicks: 0,
+      estimatedCommissionCents: 0,
+    };
+    current.clicks += part._count.clicks;
+    current.estimatedCommissionCents += estimateCommissionCents(part.retailPriceCents, part.commissionRateBps, part._count.clicks);
+    map.set(part.brand.name, current);
+    return map;
+  }, new Map<string, { label: string; detail: string; clicks: number; estimatedCommissionCents: number }>());
+
+  const topBrands: AdminAffiliateAnalyticsRow[] = Array.from(brandMap.values())
+    .filter((row) => row.clicks > 0)
+    .map((row) => ({
+      label: row.label,
+      detail: row.detail,
+      clicks: row.clicks,
+      estimatedCommissionLabel: formatCents(row.estimatedCommissionCents),
+    }))
+    .sort((a, b) => b.clicks - a.clicks)
+    .slice(0, 6);
+
+  return { topParts, topBrands };
+}
+
+function estimateCommissionCents(retailPriceCents: number | null, commissionRateBps: number | null, clicks: number) {
+  if (!retailPriceCents || !commissionRateBps || clicks <= 0) return 0;
+  return Math.round((retailPriceCents * commissionRateBps * clicks) / 10000);
 }
 
 function formatCents(value: number | null) {
