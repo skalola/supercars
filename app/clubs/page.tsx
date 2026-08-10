@@ -7,13 +7,7 @@ import ClubModelSelector from "./ClubModelSelector";
 
 export const dynamic = "force-dynamic";
 
-export default async function ClubsPage({ searchParams }: { searchParams?: Promise<{ make?: string; model?: string; location?: string; sort?: string }> }) {
-  const resolvedSearchParams = (await searchParams) || {};
-  const selectedMakeId = resolvedSearchParams.make || "";
-  const selectedModelId = resolvedSearchParams.model || "";
-  const locationQuery = (resolvedSearchParams.location || "").trim();
-  const sort = resolvedSearchParams.sort || "members";
-
+export default async function ClubsPage() {
   const [session, catalog] = await Promise.all([
     auth(),
     getMakeModelCatalogOptions(),
@@ -22,27 +16,6 @@ export default async function ClubsPage({ searchParams }: { searchParams?: Promi
     where: {
       status: "ACTIVE",
       visibility: "PUBLIC",
-      ...(selectedModelId || selectedMakeId
-        ? {
-            models: {
-              some: {
-                model: {
-                  ...(selectedModelId ? { id: selectedModelId } : {}),
-                  ...(selectedMakeId ? { makeId: selectedMakeId } : {}),
-                },
-              },
-            },
-          }
-        : {}),
-      ...(locationQuery
-        ? {
-            OR: [
-              { city: { contains: locationQuery, mode: "insensitive" } },
-              { state: { contains: locationQuery, mode: "insensitive" } },
-              { name: { contains: locationQuery, mode: "insensitive" } },
-            ],
-          }
-        : {}),
     },
       include: {
         creator: { select: { name: true, username: true } },
@@ -68,17 +41,17 @@ export default async function ClubsPage({ searchParams }: { searchParams?: Promi
       take: 80,
     }).catch(() => []);
 
-  const sortedClubs = [...clubs].sort((a, b) => {
-    if (sort === "meets") return b._count.meets - a._count.meets || b._count.members - a._count.members || a.name.localeCompare(b.name);
-    if (sort === "newest") return b.updatedAt.getTime() - a.updatedAt.getTime();
-    return b._count.members - a._count.members || b._count.meets - a._count.meets || a.name.localeCompare(b.name);
-  });
-  const clubsByMembers = [...clubs]
+  const sortedClubs = [...clubs]
     .sort((a, b) => b._count.members - a._count.members || b._count.meets - a._count.meets || a.name.localeCompare(b.name))
-    .slice(0, 10);
-  const clubsByMeets = [...clubs]
-    .sort((a, b) => b._count.meets - a._count.meets || b._count.members - a._count.members || a.name.localeCompare(b.name))
-    .slice(0, 10);
+    .map((club) => {
+      const makeNames = Array.from(new Set(club.models.map(({ model }) => model.make.name))).slice(0, 3);
+      const modelNames = club.models.map(({ model }) => model.name).slice(0, 4);
+      return {
+        ...club,
+        makeLabel: makeNames.length > 0 ? makeNames.join(", ") : "All makes",
+        modelLabel: modelNames.length > 0 ? modelNames.join(", ") : "All models",
+      };
+    });
 
   return (
     <main className="clubs-shell">
@@ -101,77 +74,27 @@ export default async function ClubsPage({ searchParams }: { searchParams?: Promi
             <strong>Browse the Grid</strong>
           </div>
 
-          <div className="club-leaderboard" aria-label="Club leaderboards">
-            <article>
-              <div className="meets-panel-title">
-                <span>Most Members</span>
-                <strong>Largest Clubs</strong>
-              </div>
-              <div className="club-rank-list">
-                {clubsByMembers.length > 0 ? (
-                  clubsByMembers.map((club, index) => (
-                    <Link key={club.id} href={`/clubs/${club.slug}`} className="club-rank-row">
-                      <em>{String(index + 1).padStart(2, "0")}</em>
-                      <div>
-                        <strong>{club.name}</strong>
-                        <span>{club.city}, {club.state}</span>
-                      </div>
-                      <p>{club._count.members} members</p>
-                    </Link>
-                  ))
-                ) : (
-                  <p className="meet-empty-note">No member activity yet.</p>
-                )}
-              </div>
-            </article>
-
-            <article>
-              <div className="meets-panel-title">
-                <span>Most Meets</span>
-                <strong>Most Active Clubs</strong>
-              </div>
-              <div className="club-rank-list">
-                {clubsByMeets.length > 0 ? (
-                  clubsByMeets.map((club, index) => (
-                    <Link key={club.id} href={`/clubs/${club.slug}`} className="club-rank-row">
-                      <em>{String(index + 1).padStart(2, "0")}</em>
-                      <div>
-                        <strong>{club.name}</strong>
-                        <span>{club.city}, {club.state}</span>
-                      </div>
-                      <p>{club._count.meets} meets</p>
-                    </Link>
-                  ))
-                ) : (
-                  <p className="meet-empty-note">No club-hosted meets yet.</p>
-                )}
-              </div>
-            </article>
-          </div>
-
-          <div className="clubs-grid">
+          <div className="club-list" role="table" aria-label="Existing clubs">
+            <div className="club-list-header" role="row">
+              <span>Name</span>
+              <span>Location</span>
+              <span>Make</span>
+              <span>Model</span>
+              <span>Most Members</span>
+              <span>Most Meets</span>
+            </div>
             {clubs.length > 0 ? (
               sortedClubs.map((club) => (
-                <Link key={club.id} href={`/clubs/${club.slug}`} className="club-card">
-                  <div className="club-card-image-grid">
-                    {club.models.slice(0, 3).map(({ model }) => (
-                      <div
-                        key={model.id}
-                        className="club-card-image"
-                        style={{ backgroundImage: `url("${model.images[0]?.url || model.make.logoUrl || "/images/garage-home-hero.png?v=garage-2"}")` }}
-                      />
-                    ))}
+                <Link key={club.id} href={`/clubs/${club.slug}`} className="club-list-row" role="row">
+                  <div data-label="Name">
+                    <strong>{club.name}</strong>
+                    <span>{club.description || "Driver club"}</span>
                   </div>
-                  <div className="club-card-copy">
-                    <span>{club.city}, {club.state}</span>
-                    <h2>{club.name}</h2>
-                    <p>{club.description || "A SUPERCAR DASH owner club for model-specific meets, members, and garage activity."}</p>
-                  </div>
-                  <div className="club-card-stats">
-                    <span>{club._count.members} members</span>
-                    <span>{club._count.models} models</span>
-                    <span>{club._count.meets} meets</span>
-                  </div>
+                  <span data-label="Location">{club.city}, {club.state}</span>
+                  <span data-label="Make">{club.makeLabel}</span>
+                  <span data-label="Model">{club.modelLabel}</span>
+                  <strong data-label="Most Members">{club._count.members}</strong>
+                  <strong data-label="Most Meets">{club._count.meets}</strong>
                 </Link>
               ))
             ) : (
@@ -185,49 +108,6 @@ export default async function ClubsPage({ searchParams }: { searchParams?: Promi
         </div>
 
         <aside id="create-club" className="club-create-panel">
-          <form action="/clubs" className="club-filter-panel">
-            <div className="meets-panel-title">
-              <span>Discovery</span>
-              <strong>Filter Clubs</strong>
-            </div>
-            <label>
-              <span>Make</span>
-              <select name="make" defaultValue={selectedMakeId}>
-                <option value="">All makes</option>
-                {catalog.makes.map((make) => (
-                  <option key={make.id} value={make.id}>{make.name}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Model</span>
-              <select name="model" defaultValue={selectedModelId}>
-                <option value="">All models</option>
-                {catalog.models.map((model) => (
-                  <option key={model.id} value={model.id}>
-                    {model.make.name} {model.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              <span>Location</span>
-              <input name="location" defaultValue={locationQuery} placeholder="City or state" />
-            </label>
-            <label>
-              <span>Sort</span>
-              <select name="sort" defaultValue={sort}>
-                <option value="members">Most members</option>
-                <option value="meets">Most meets</option>
-                <option value="newest">Newest</option>
-              </select>
-            </label>
-            <div className="club-filter-actions">
-              <button type="submit">Apply</button>
-              <Link href="/clubs">Reset</Link>
-            </div>
-          </form>
-
           <div className="meets-panel-title">
             <span>Creator Tools</span>
             <strong>Start a Club</strong>

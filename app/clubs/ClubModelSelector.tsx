@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import type { MakeOption, ModelOption } from "@/lib/makes/catalog";
 
 export default function ClubModelSelector({
@@ -12,22 +13,18 @@ export default function ClubModelSelector({
   models: ModelOption[];
   initialModelIds?: string[];
 }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [openMenu, setOpenMenu] = useState<"make" | "model" | null>(null);
   const [selectedMakeIds, setSelectedMakeIds] = useState<Set<string>>(() => new Set());
   const [selectedModelIds, setSelectedModelIds] = useState<Set<string>>(() => new Set(initialModelIds));
 
-  const groups = useMemo(
-    () =>
-      makes
-        .map((make) => ({
-          make,
-          models: models.filter((model) => model.makeId === make.id),
-        }))
-        .filter((group) => group.models.length > 0),
-    [makes, models],
+  const selectedMakeLabels = useMemo(
+    () => makes.filter((make) => selectedMakeIds.has(make.id)).map((make) => make.name),
+    [makes, selectedMakeIds],
   );
-
-  const selectedCount = selectedMakeIds.size + selectedModelIds.size;
+  const selectedModelLabels = useMemo(
+    () => models.filter((model) => selectedModelIds.has(model.id)).map((model) => `${model.make.name} ${model.name}`),
+    [models, selectedModelIds],
+  );
 
   function toggleMake(makeId: string) {
     setSelectedMakeIds((current) => {
@@ -54,7 +51,7 @@ export default function ClubModelSelector({
   }
 
   return (
-    <div className={`club-model-dropdown${isOpen ? " is-open" : ""}`}>
+    <div className="club-model-selectors">
       {[...selectedMakeIds].map((makeId) => (
         <input key={`make:${makeId}`} type="hidden" name="makeIds" value={makeId} />
       ))}
@@ -62,42 +59,59 @@ export default function ClubModelSelector({
         <input key={`model:${modelId}`} type="hidden" name="modelIds" value={modelId} />
       ))}
 
-      <button type="button" className="club-model-dropdown-button" aria-expanded={isOpen} onClick={() => setIsOpen((open) => !open)}>
-        <span>Linked Models</span>
-        <strong>{selectedCount > 0 ? `${selectedCount} selected` : "Select makes or models"}</strong>
-      </button>
+      <MultiSelectDropdown
+        label="Make"
+        summary={selectedMakeLabels.length > 0 ? selectedMakeLabels.join(", ") : "All or selected makes"}
+        isOpen={openMenu === "make"}
+        onToggle={() => setOpenMenu((menu) => (menu === "make" ? null : "make"))}
+      >
+        {makes.map((make) => (
+          <label key={make.id} className="club-multi-option">
+            <input type="checkbox" checked={selectedMakeIds.has(make.id)} onChange={() => toggleMake(make.id)} />
+            <span>{make.name}</span>
+          </label>
+        ))}
+      </MultiSelectDropdown>
 
-      {isOpen ? (
-        <div className="club-model-dropdown-panel">
-          {groups.map((group) => {
-            const makeSelected = selectedMakeIds.has(group.make.id);
-            return (
-              <details key={group.make.id} className="club-model-group" open={makeSelected}>
-                <summary>
-                  <label onClick={(event) => event.stopPropagation()}>
-                    <input type="checkbox" checked={makeSelected} onChange={() => toggleMake(group.make.id)} />
-                    <span>{group.make.name}</span>
-                  </label>
-                  <em>{makeSelected ? "All models" : `${group.models.length} models`}</em>
-                </summary>
-                <div>
-                  {group.models.map((model) => (
-                    <label key={model.id} className={makeSelected ? "is-covered" : ""}>
-                      <input
-                        type="checkbox"
-                        checked={makeSelected || selectedModelIds.has(model.id)}
-                        disabled={makeSelected}
-                        onChange={() => toggleModel(model.id)}
-                      />
-                      <span>{model.name}</span>
-                    </label>
-                  ))}
-                </div>
-              </details>
-            );
-          })}
-        </div>
-      ) : null}
+      <MultiSelectDropdown
+        label="Model"
+        summary={selectedModelLabels.length > 0 ? selectedModelLabels.join(", ") : "All or selected models"}
+        isOpen={openMenu === "model"}
+        onToggle={() => setOpenMenu((menu) => (menu === "model" ? null : "model"))}
+      >
+        {models.map((model) => (
+          <label key={model.id} className="club-multi-option">
+            <input type="checkbox" checked={selectedModelIds.has(model.id)} onChange={() => toggleModel(model.id)} />
+            <span>
+              {model.make.name} {model.name}
+            </span>
+          </label>
+        ))}
+      </MultiSelectDropdown>
+    </div>
+  );
+}
+
+function MultiSelectDropdown({
+  label,
+  summary,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  label: string;
+  summary: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className={`club-multi-select${isOpen ? " is-open" : ""}`}>
+      <button type="button" aria-expanded={isOpen} onClick={onToggle}>
+        <span>{label}</span>
+        <strong>{summary}</strong>
+      </button>
+      {isOpen ? <div className="club-multi-menu">{children}</div> : null}
     </div>
   );
 }
