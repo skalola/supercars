@@ -90,6 +90,7 @@ async function main() {
           },
           {
             baseModelName: candidate.baseModelName,
+            source: candidate.source,
             title: candidate.title,
             context: candidate.context,
             category: candidate.category,
@@ -171,26 +172,33 @@ async function main() {
 
 function scoreCandidateForModel(
   model: { makeName: string; modelName: string },
-  candidate: { baseModelName: string | null; title: string | null; context: string | null; category: string | null },
+  candidate: { baseModelName: string | null; source: string; title: string | null; context: string | null; category: string | null },
 ) {
   const targetBase = canonicalBaseModelName(model.modelName, model.makeName);
   const candidateBase = candidate.baseModelName || canonicalBaseModelName(candidate.title || candidate.context || "", model.makeName);
   const context = `${candidate.title || ""} ${candidate.category || ""} ${candidate.context || ""}`;
+  const cleanMatchText = candidate.source === "OPENVERSE_POOL"
+    ? `${candidate.title || ""} ${candidate.category || ""}`
+    : `${candidate.title || ""} ${candidate.category || ""} ${candidate.baseModelName || ""}`;
   if (hasConflictingMake(context, model.makeName, model.modelName)) return 0;
-  if (/\b(rc|radio controlled|controlled mode car|model car|toy|diecast|scale model|lego|headlight|taillight|tail light|lamp|leuchte|patent)\b/i.test(context)) return 0;
+  if (hasConflictingChassisCode(context, model.modelName)) return 0;
+  if (candidate.source === "OPENVERSE_POOL" && !openverseHasRequiredModelTokens(cleanMatchText, model.modelName)) return 0;
+  if (/\b(rc|radio controlled|controlled mode car|model car|toy car|toyota model car|diecast|scale model|lego|headlight|taillight|tail light|lamp|leuchte|patent|exhaust|silencer)\b/i.test(context)) return 0;
 
-  const exactScore = scoreTitleMatch(context, model.makeName, model.modelName);
-  const contextBase = canonicalBaseModelName(context, model.makeName);
+  const exactScore = scoreTitleMatch(cleanMatchText, model.makeName, model.modelName);
+  const contextBase = canonicalBaseModelName(cleanMatchText, model.makeName);
   const trustedCandidateBase = candidateBase && contextSupportsBase(contextBase, candidateBase, targetBase) ? candidateBase : contextBase;
   const baseScore = scoreBaseModelFallback(targetBase, trustedCandidateBase);
   let score = Math.max(exactScore, baseScore);
-
+  if (candidate.source.startsWith("COMMONS_") && exactScore >= 50 && hasMakeAndBaseMatch(cleanMatchText, model.makeName, targetBase, candidateBase)) {
+    score = Math.max(score, 88);
+  }
   const normalizedContext = normalizeCatalogText(context);
   const normalizedTargetBase = normalizeCatalogText(targetBase);
   if (normalizedTargetBase && normalizedContext.includes(normalizedTargetBase) && !hasExtraDistinctiveModelTokens(contextBase, targetBase)) {
     score += 6;
   }
-  if (/logo|badge|emblem|interior|wheel|engine|toy|diecast|scale model/i.test(context)) {
+  if (/\b(logo|badge|emblem|interior|wheel|engine|toy car|toyota model car|diecast|scale model)\b/i.test(cleanMatchText)) {
     score -= 45;
   }
 
@@ -205,6 +213,43 @@ function hasConflictingMake(context: string, makeName: string, modelName: string
     const normalizedAlias = normalizeCatalogText(make);
     return normalizedAlias !== normalizedMake && !normalizedModel.includes(` ${normalizedAlias} `) && normalizedContext.includes(` ${normalizedAlias} `);
   });
+}
+
+function hasMakeAndBaseMatch(value: string, makeName: string, targetBase: string, candidateBase: string) {
+  const normalizedValue = ` ${normalizeCatalogText(value)} `;
+  const normalizedMake = normalizeCatalogText(makeName);
+  const normalizedTargetBase = normalizeCatalogText(targetBase);
+  const normalizedCandidateBase = normalizeCatalogText(candidateBase);
+  if (!normalizedMake || !normalizedTargetBase) return false;
+  if (!normalizedValue.includes(` ${normalizedMake} `)) return false;
+  const compactValue = normalizedValue.replace(/\s+/g, "");
+  const compactTarget = normalizedTargetBase.replace(/\s+/g, "");
+  const compactCandidate = normalizedCandidateBase.replace(/\s+/g, "");
+  return (
+    ` ${normalizedCandidateBase} `.includes(` ${normalizedTargetBase} `) ||
+    normalizedValue.includes(` ${normalizedTargetBase} `) ||
+    (compactTarget.length >= 2 && compactCandidate.includes(compactTarget)) ||
+    (compactTarget.length >= 2 && compactValue.includes(compactTarget))
+  );
+}
+
+function openverseHasRequiredModelTokens(value: string, modelName: string) {
+  const normalizedValue = ` ${normalizeCatalogText(value)} `;
+  const compactValue = normalizedValue.replace(/\s+/g, "");
+  const highSignalTokens = normalizeCatalogText(modelName)
+    .split(" ")
+    .filter((token) => ["dtm", "gt3", "gt4", "gt500", "gt300", "vgt", "trophy", "hemi", "pikes", "peak"].includes(token) || /^[rs][0-9]+$/.test(token) || /^[0-9]{3}$/.test(token));
+  if (highSignalTokens.length > 0) {
+    return highSignalTokens.every((token) => normalizedValue.includes(` ${token} `) || compactValue.includes(token));
+  }
+  const requiredTokens = normalizeCatalogText(modelName)
+    .split(" ")
+    .filter((token) => token.length >= 3)
+    .filter((token) => !["coupe", "sedan", "roadster", "safety", "car", "touring", "racing", "edition", "limited", "premium", "performance"].includes(token));
+  if (requiredTokens.length === 0) return true;
+  const strongestTokens = requiredTokens.filter((token) => /[0-9]/.test(token) || token.length >= 4);
+  const tokensToCheck = strongestTokens.length > 0 ? strongestTokens : requiredTokens;
+  return tokensToCheck.some((token) => normalizedValue.includes(` ${token} `) || compactValue.includes(token));
 }
 
 function contextSupportsBase(contextBase: string, candidateBase: string, targetBase: string) {
@@ -223,6 +268,23 @@ function hasExtraDistinctiveModelTokens(contextBase: string, targetBase: string)
 
 function isShortOrGeneric(token: string) {
   return token.length <= 1 || ["car", "auto", "vehicle", "classic", "race", "racing", "sports", "sport"].includes(token);
+}
+
+function hasConflictingChassisCode(context: string, modelName: string) {
+  const normalizedContext = normalizeCatalogText(context);
+  const normalizedModel = normalizeCatalogText(modelName);
+  const groups = [
+    ["s13", "s14", "s15"],
+    ["r32", "r33", "r34", "r35"],
+    ["na", "nb", "nc", "nd"],
+    ["ae86", "zn6", "zn8"],
+  ];
+
+  return groups.some((group) => {
+    const expected = group.find((code) => normalizedModel.includes(code));
+    if (!expected) return false;
+    return group.some((code) => code !== expected && normalizedContext.includes(code) && !normalizedContext.includes(expected));
+  });
 }
 
 function hasSpecs(spec: {

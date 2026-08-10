@@ -10,6 +10,7 @@ type CliOptions = {
   limitMakes: number;
   categoryLimit: number;
   filesPerCategory: number;
+  directSearchLimit: number;
   openverseLimit: number;
   delayMs: number;
 };
@@ -28,6 +29,15 @@ type CommonsCategoryMembersResponse = {
     categorymembers?: Array<{
       title: string;
       ns: number;
+    }>;
+  };
+};
+
+type CommonsFileSearchResponse = {
+  query?: {
+    search?: Array<{
+      title: string;
+      snippet?: string;
     }>;
   };
 };
@@ -108,6 +118,40 @@ async function main() {
       }
     }
 
+    const directQueries = buildDirectSearchQueries(
+      make.name,
+      missingModels.map((model) => model.name),
+      baseFamilies,
+    ).slice(0, options.directSearchLimit);
+    for (const query of directQueries) {
+      const files = await searchCommonsFiles(query).catch((error) => {
+        console.warn(`[model-image-pool] Commons file search failed for ${query}:`, error instanceof Error ? error.message : error);
+        return [];
+      });
+      for (const file of files.slice(0, options.filesPerCategory)) {
+        const metadata = await fetchCommonsImageMetadata(file.title).catch(() => null);
+        if (!metadata?.imageUrl || !metadata.license) continue;
+        const title = file.title.replace(/^File:/i, "");
+        const result = await upsertCandidate({
+          makeName: make.name,
+          url: metadata.imageUrl,
+          source: "COMMONS_FILE_POOL",
+          sourceName: "Wikimedia Commons File Pool",
+          sourceUrl: metadata.sourceUrl || commonsFileUrl(file.title),
+          license: metadata.license,
+          attribution: metadata.attribution,
+          attributionUrl: metadata.attributionUrl,
+          title,
+          category: null,
+          context: `${query} ${title} ${file.snippet || ""}`,
+          baseModelName: inferBestBaseFamily(`${query} ${title} ${file.snippet || ""}`, baseFamilies),
+        });
+        candidatesCreated += result.created ? 1 : 0;
+        candidatesUpdated += result.created ? 0 : 1;
+      }
+      await sleep(options.delayMs);
+    }
+
     for (const family of baseFamilies.slice(0, options.openverseLimit)) {
       const results = await searchOpenverse(`${make.name} ${family} car`).catch(() => []);
       for (const item of results) {
@@ -136,6 +180,27 @@ async function main() {
   console.log(`[model-image-pool] Categories scanned: ${categoriesScanned}`);
   console.log(`[model-image-pool] Candidates created: ${candidatesCreated}`);
   console.log(`[model-image-pool] Candidates updated: ${candidatesUpdated}`);
+}
+
+async function searchCommonsFiles(query: string) {
+  const params = new URLSearchParams({
+    action: "query",
+    list: "search",
+    srsearch: `${query} filetype:bitmap`,
+    srnamespace: "6",
+    srlimit: "12",
+    format: "json",
+    origin: "*",
+  });
+  const response = await fetch(`https://commons.wikimedia.org/w/api.php?${params.toString()}`, {
+    headers: { "User-Agent": "SUPERCAR-DASH-model-image-pool/1.0 (contact: support@supercars.market)" },
+  });
+  if (!response.ok) throw new Error(`Commons file search HTTP ${response.status}`);
+  const data = (await response.json()) as CommonsFileSearchResponse;
+  return (data.query?.search || [])
+    .filter((item) => isLikelyVehicleFile(item.title))
+    .filter((item) => scoreContext(`${item.title} ${item.snippet || ""}`, query) >= 45)
+    .sort((a, b) => scoreContext(`${b.title} ${b.snippet || ""}`, query) - scoreContext(`${a.title} ${a.snippet || ""}`, query));
 }
 
 async function upsertCandidate(input: {
@@ -249,6 +314,28 @@ function buildBaseFamilies(modelNames: string[], makeName: string) {
     .map(([base]) => base);
 }
 
+function buildDirectSearchQueries(makeName: string, modelNames: string[], baseFamilies: string[]) {
+  const queries = new Set<string>();
+  for (const modelName of modelNames) {
+    queries.add(`${makeName} ${stripGameVariantTerms(modelName)}`.trim());
+    const base = canonicalBaseModelName(modelName, makeName);
+    if (base) queries.add(`${makeName} ${base}`.trim());
+  }
+  for (const family of baseFamilies) {
+    queries.add(`${makeName} ${family}`.trim());
+  }
+  return Array.from(queries).filter((query) => query.length >= makeName.length + 3);
+}
+
+function stripGameVariantTerms(value: string) {
+  return value
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\b(gr\.?\s?[134b]|group\s?[134b]|vgt|vision gran turismo|safety car|race car|rally car|road car|touring car)\b/gi, " ")
+    .replace(/\b(gt500|gt300|gt3|gt4|gte|super gt|dtm|endurance model|sprint model)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function inferBestBaseFamily(context: string, families: string[]) {
   const normalizedContext = normalizeCatalogText(context);
   return families
@@ -280,6 +367,10 @@ function commonsCategoryUrl(title: string) {
   return `https://commons.wikimedia.org/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`;
 }
 
+function commonsFileUrl(title: string) {
+  return `https://commons.wikimedia.org/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`;
+}
+
 function parseOptions(args: string[]): CliOptions {
   const getValue = (name: string) => args.find((arg) => arg.startsWith(`--${name}=`))?.split("=").slice(1).join("=");
   return {
@@ -287,6 +378,7 @@ function parseOptions(args: string[]): CliOptions {
     limitMakes: Math.max(1, Number(getValue("limit-makes")) || 6),
     categoryLimit: Math.max(1, Number(getValue("category-limit")) || 12),
     filesPerCategory: Math.max(1, Number(getValue("files-per-category")) || 8),
+    directSearchLimit: Math.max(0, Number(getValue("direct-search-limit")) || 20),
     openverseLimit: Math.max(0, Number(getValue("openverse-limit")) || 8),
     delayMs: Math.max(0, Number(getValue("delay-ms")) || 1200),
   };

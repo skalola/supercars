@@ -47,7 +47,7 @@ export function scoreBaseModelFallback(targetBase: string, sourceBase: string) {
   const sourcePhrase = ` ${sourceBase} `;
   const targetPhrase = ` ${targetBase} `;
   if (targetPhrase.includes(sourcePhrase) && sourceBase.length >= 4) return 90;
-  if (sourcePhrase.includes(targetPhrase) && targetBase.length >= 4 && sourceDistinctiveTokens.length <= targetDistinctiveTokens.length + 1) return 84;
+  if (sourcePhrase.includes(targetPhrase) && targetBase.length >= 2 && sourceDistinctiveTokens.length <= targetDistinctiveTokens.length + 2) return 88;
 
   const sharedTokens = sourceTokens.filter((token) => targetTokens.includes(token));
   const sharedRatio = sharedTokens.length / Math.max(sourceTokens.length, targetTokens.length);
