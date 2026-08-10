@@ -25,6 +25,18 @@ export default function ClubModelSelector({
     () => models.filter((model) => selectedModelIds.has(model.id)).map((model) => `${model.make.name} ${model.name}`),
     [models, selectedModelIds],
   );
+  const allMakesSelected = makes.length > 0 && selectedMakeIds.size === makes.length;
+  const allModelsSelected = models.length > 0 && selectedModelIds.size === models.length;
+  const makeSummary = allMakesSelected
+    ? "All makes selected"
+    : selectedMakeLabels.length > 0
+      ? selectedMakeLabels.join(", ")
+      : "All or selected makes";
+  const modelSummary = allModelsSelected
+    ? "All models selected"
+    : selectedModelLabels.length > 0
+      ? selectedModelLabels.join(", ")
+      : "All or selected models";
 
   function toggleMake(makeId: string) {
     setSelectedMakeIds((current) => {
@@ -36,6 +48,10 @@ export default function ClubModelSelector({
       }
       return next;
     });
+  }
+
+  function toggleAllMakes() {
+    setSelectedMakeIds((current) => (current.size === makes.length ? new Set() : new Set(makes.map((make) => make.id))));
   }
 
   function toggleModel(modelId: string) {
@@ -50,6 +66,10 @@ export default function ClubModelSelector({
     });
   }
 
+  function toggleAllModels() {
+    setSelectedModelIds((current) => (current.size === models.length ? new Set() : new Set(models.map((model) => model.id))));
+  }
+
   return (
     <div className="club-model-selectors">
       {[...selectedMakeIds].map((makeId) => (
@@ -61,10 +81,14 @@ export default function ClubModelSelector({
 
       <MultiSelectDropdown
         label="Make"
-        summary={selectedMakeLabels.length > 0 ? selectedMakeLabels.join(", ") : "All or selected makes"}
+        summary={makeSummary}
         isOpen={openMenu === "make"}
         onToggle={() => setOpenMenu((menu) => (menu === "make" ? null : "make"))}
       >
+        <label className="club-multi-option is-select-all">
+          <input type="checkbox" checked={allMakesSelected} onChange={toggleAllMakes} />
+          <span>Select all makes</span>
+        </label>
         {makes.map((make) => (
           <label key={make.id} className="club-multi-option">
             <input type="checkbox" checked={selectedMakeIds.has(make.id)} onChange={() => toggleMake(make.id)} />
@@ -75,10 +99,14 @@ export default function ClubModelSelector({
 
       <MultiSelectDropdown
         label="Model"
-        summary={selectedModelLabels.length > 0 ? selectedModelLabels.join(", ") : "All or selected models"}
+        summary={modelSummary}
         isOpen={openMenu === "model"}
         onToggle={() => setOpenMenu((menu) => (menu === "model" ? null : "model"))}
       >
+        <label className="club-multi-option is-select-all">
+          <input type="checkbox" checked={allModelsSelected} onChange={toggleAllModels} />
+          <span>Select all models</span>
+        </label>
         {models.map((model) => (
           <label key={model.id} className="club-multi-option">
             <input type="checkbox" checked={selectedModelIds.has(model.id)} onChange={() => toggleModel(model.id)} />

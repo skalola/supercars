@@ -49,6 +49,7 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
   );
   const activeMembers = club.members.filter((member) => member.status === "ACTIVE");
   const pendingMembers = club.members.filter((member) => member.status === "PENDING");
+  const isAllMakesModelsClub = club.models.length === 0;
   const fastest = await getFastestClubCar(activeMembers.map((member) => member.userId));
   const heroImage = club.models[0]?.model.images[0]?.url || club.models[0]?.model.make.logoUrl || "/images/garage-home-hero.png?v=garage-2";
 
@@ -101,7 +102,7 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
         </div>
         <div>
           <span>Linked Models</span>
-          <strong>{club.models.length}</strong>
+          <strong>{isAllMakesModelsClub ? "All" : club.models.length}</strong>
         </div>
       </section>
 
@@ -121,7 +122,7 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
                 </Link>
               ))
             ) : (
-              <p className="meet-empty-note">No linked models yet.</p>
+              <p className="meet-empty-note">This club is open to all makes and models.</p>
             )}
           </div>
         </article>

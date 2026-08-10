@@ -7848,7 +7848,6 @@ canvas {
   margin: 0 auto;
 }
 
-.club-browser-panel,
 .club-model-grid,
 .club-member-grid,
 .club-meet-list,
@@ -7857,7 +7856,6 @@ canvas {
   gap: 14px;
 }
 
-.club-browser-panel,
 .club-create-panel,
 .club-panel,
 .club-empty-state,
@@ -7866,11 +7864,6 @@ canvas {
   border-radius: 8px;
   background: rgba(12, 13, 15, 0.86);
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.28);
-}
-
-.club-browser-panel {
-  min-width: 0;
-  padding: 20px;
 }
 
 .club-list {
@@ -8003,7 +7996,7 @@ canvas {
 
 .club-model-selectors {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 10px;
 }
 
@@ -8014,12 +8007,15 @@ canvas {
 
 .club-multi-select > button {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+  grid-template-areas:
+    "label icon"
+    "summary icon";
+  grid-template-columns: minmax(0, 1fr) 16px;
+  gap: 4px 10px;
   align-items: center;
   width: 100%;
-  min-height: 46px;
-  padding: 0 12px;
+  min-height: 58px;
+  padding: 8px 12px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);
@@ -8029,6 +8025,7 @@ canvas {
 }
 
 .club-multi-select > button span {
+  grid-area: label;
   color: rgba(255, 255, 255, 0.58);
   font-size: 11px;
   font-weight: 850;
@@ -8037,6 +8034,7 @@ canvas {
 }
 
 .club-multi-select > button strong {
+  grid-area: summary;
   min-width: 0;
   overflow: hidden;
   color: #ffffff;
@@ -8048,6 +8046,8 @@ canvas {
 
 .club-multi-select > button::after {
   content: "";
+  grid-area: icon;
+  justify-self: end;
   width: 8px;
   height: 8px;
   border-right: 2px solid rgba(255, 255, 255, 0.82);
@@ -8074,6 +8074,20 @@ canvas {
   border-radius: 8px;
   background: rgba(5, 5, 6, 0.98);
   box-shadow: 0 24px 72px rgba(0, 0, 0, 0.45);
+}
+
+.club-multi-option.is-select-all {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(12, 13, 15, 0.98);
+}
+
+.club-multi-option.is-select-all span {
+  color: #ffffff;
+  font-weight: 850;
 }
 
 .club-multi-option {
@@ -8560,6 +8574,12 @@ canvas {
     font-weight: 850;
     letter-spacing: 0.08em;
     text-transform: uppercase;
+  }
+
+  .club-multi-menu {
+    position: static;
+    max-height: 320px;
+    margin-top: 8px;
   }
 
   .club-moderation-row {
