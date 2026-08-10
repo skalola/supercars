@@ -98,17 +98,33 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
       </section>
 
       <section className="club-stat-grid">
-        <div>
-          <span>Fastest Car</span>
-          <strong>{fastest ? `${fastest.horsepower.toLocaleString()} hp` : "Pending"}</strong>
-          <p>{fastest?.label || "No member horsepower logged yet"}</p>
-        </div>
-        <div>
-          <span>Most Mods</span>
-          <strong>{mostModified ? mostModified.modCount.toLocaleString() : "Pending"}</strong>
-          <p>{mostModified?.label || "No member modifications logged yet"}</p>
-        </div>
-        <div>
+        {fastest ? (
+          <Link href={`/vehicle/${fastest.vin}`} className="club-stat-card is-clickable">
+            <span>Fastest Car</span>
+            <strong>{fastest.horsepower.toLocaleString()} hp</strong>
+            <p>{fastest.label}</p>
+          </Link>
+        ) : (
+          <div className="club-stat-card">
+            <span>Fastest Car</span>
+            <strong>Pending</strong>
+            <p>No member horsepower logged yet</p>
+          </div>
+        )}
+        {mostModified ? (
+          <Link href={`/vehicle/${mostModified.vin}`} className="club-stat-card is-clickable">
+            <span>Most Mods</span>
+            <strong>{mostModified.modCount.toLocaleString()}</strong>
+            <p>{mostModified.label}</p>
+          </Link>
+        ) : (
+          <div className="club-stat-card">
+            <span>Most Mods</span>
+            <strong>Pending</strong>
+            <p>No member modifications logged yet</p>
+          </div>
+        )}
+        <div className="club-stat-card">
           <span>Next Event Date</span>
           <strong>{nextMeet ? formatMeetDay(nextMeet.startsAt) : "Pending"}</strong>
           <p>{nextMeet ? nextMeet.title : "No upcoming club meets"}</p>
@@ -292,12 +308,13 @@ async function getFastestClubCar(userIds: string[]) {
       const horsepower = parseHorsepower(vehicle.engineHP) ?? parseHorsepower(vehicle.model.spec?.horsepower);
       return horsepower
         ? {
+            vin: vehicle.vin,
             horsepower,
             label: `${vehicle.year} ${vehicle.model.make.name} ${vehicle.model.name}`,
           }
         : null;
     })
-    .filter((item): item is { horsepower: number; label: string } => Boolean(item))
+    .filter((item): item is { vin: string; horsepower: number; label: string } => Boolean(item))
     .sort((a, b) => b.horsepower - a.horsepower)[0] ?? null;
 }
 
@@ -314,6 +331,7 @@ async function getMostModifiedClubCar(userIds: string[]) {
 
   return vehicles
     .map((vehicle) => ({
+      vin: vehicle.vin,
       modCount: vehicle.modifications.length,
       label: `${vehicle.year} ${vehicle.model.make.name} ${vehicle.model.name}`,
     }))

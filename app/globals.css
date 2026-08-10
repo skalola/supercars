@@ -7929,7 +7929,7 @@ canvas {
 .club-create-panel,
 .club-panel,
 .club-empty-state,
-.club-stat-grid > div {
+.club-stat-card {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   background: rgba(12, 13, 15, 0.86);
@@ -8284,11 +8284,25 @@ canvas {
   margin: 0 auto;
 }
 
-.club-stat-grid > div {
+.club-stat-card {
   display: grid;
   gap: 8px;
   min-width: 0;
   padding: 18px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.club-stat-card.is-clickable {
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.club-stat-card.is-clickable:hover,
+.club-stat-card.is-clickable:focus-visible {
+  border-color: rgba(226, 15, 27, 0.52);
+  background: rgba(226, 15, 27, 0.1);
+  outline: none;
+  transform: translateY(-1px);
 }
 
 .club-stat-grid strong {
