@@ -37,7 +37,12 @@ export default async function ClubsPage() {
     }).catch(() => []),
   ]);
 
-  const modelOptions = catalog.models.slice(0, 180);
+  const modelGroups = catalog.makes
+    .map((make) => ({
+      make,
+      models: catalog.models.filter((model) => model.makeId === make.id).slice(0, 40),
+    }))
+    .filter((group) => group.models.length > 0);
   const clubsByMembers = [...clubs]
     .sort((a, b) => b._count.members - a._count.members || b._count.meets - a._count.meets || a.name.localeCompare(b.name))
     .slice(0, 10);
@@ -59,87 +64,94 @@ export default async function ClubsPage() {
         </div>
       </section>
 
-      <section className="club-leaderboard" aria-label="Club leaderboards">
-        <article>
-          <div className="meets-panel-title">
-            <span>Most Members</span>
-            <strong>Largest Clubs</strong>
-          </div>
-          <div className="club-rank-list">
-            {clubsByMembers.length > 0 ? (
-              clubsByMembers.map((club, index) => (
-                <Link key={club.id} href={`/clubs/${club.slug}`} className="club-rank-row">
-                  <em>{String(index + 1).padStart(2, "0")}</em>
-                  <div>
-                    <strong>{club.name}</strong>
-                    <span>{club.city}, {club.state}</span>
-                  </div>
-                  <p>{club._count.members} members</p>
-                </Link>
-              ))
-            ) : (
-              <p className="meet-empty-note">No member activity yet.</p>
-            )}
-          </div>
-        </article>
-
-        <article>
-          <div className="meets-panel-title">
-            <span>Most Meets</span>
-            <strong>Most Active Clubs</strong>
-          </div>
-          <div className="club-rank-list">
-            {clubsByMeets.length > 0 ? (
-              clubsByMeets.map((club, index) => (
-                <Link key={club.id} href={`/clubs/${club.slug}`} className="club-rank-row">
-                  <em>{String(index + 1).padStart(2, "0")}</em>
-                  <div>
-                    <strong>{club.name}</strong>
-                    <span>{club.city}, {club.state}</span>
-                  </div>
-                  <p>{club._count.meets} meets</p>
-                </Link>
-              ))
-            ) : (
-              <p className="meet-empty-note">No club-hosted meets yet.</p>
-            )}
-          </div>
-        </article>
-      </section>
-
       <section className="clubs-layout">
-        <div id="club-grid" className="clubs-grid">
-          {clubs.length > 0 ? (
-            clubs.map((club) => (
-              <Link key={club.id} href={`/clubs/${club.slug}`} className="club-card">
-                <div className="club-card-image-grid">
-                  {club.models.slice(0, 3).map(({ model }) => (
-                    <div
-                      key={model.id}
-                      className="club-card-image"
-                      style={{ backgroundImage: `url("${model.images[0]?.url || model.make.logoUrl || "/images/garage-home-hero.png?v=garage-2"}")` }}
-                    />
-                  ))}
-                </div>
-                <div className="club-card-copy">
-                  <span>{club.city}, {club.state}</span>
-                  <h2>{club.name}</h2>
-                  <p>{club.description || "A SUPERCAR DASH owner club for model-specific meets, members, and garage activity."}</p>
-                </div>
-                <div className="club-card-stats">
-                  <span>{club._count.members} members</span>
-                  <span>{club._count.models} models</span>
-                  <span>{club._count.meets} meets</span>
-                </div>
-              </Link>
-            ))
-          ) : (
-            <div className="club-empty-state">
-              <span>Club Grid</span>
-              <strong>No clubs yet.</strong>
-              <p>Create the first model-led driver club and attach future meets to it.</p>
-            </div>
-          )}
+        <div id="club-grid" className="club-browser-panel">
+          <div className="meets-panel-title">
+            <span>Existing Clubs</span>
+            <strong>Browse the Grid</strong>
+          </div>
+
+          <div className="club-leaderboard" aria-label="Club leaderboards">
+            <article>
+              <div className="meets-panel-title">
+                <span>Most Members</span>
+                <strong>Largest Clubs</strong>
+              </div>
+              <div className="club-rank-list">
+                {clubsByMembers.length > 0 ? (
+                  clubsByMembers.map((club, index) => (
+                    <Link key={club.id} href={`/clubs/${club.slug}`} className="club-rank-row">
+                      <em>{String(index + 1).padStart(2, "0")}</em>
+                      <div>
+                        <strong>{club.name}</strong>
+                        <span>{club.city}, {club.state}</span>
+                      </div>
+                      <p>{club._count.members} members</p>
+                    </Link>
+                  ))
+                ) : (
+                  <p className="meet-empty-note">No member activity yet.</p>
+                )}
+              </div>
+            </article>
+
+            <article>
+              <div className="meets-panel-title">
+                <span>Most Meets</span>
+                <strong>Most Active Clubs</strong>
+              </div>
+              <div className="club-rank-list">
+                {clubsByMeets.length > 0 ? (
+                  clubsByMeets.map((club, index) => (
+                    <Link key={club.id} href={`/clubs/${club.slug}`} className="club-rank-row">
+                      <em>{String(index + 1).padStart(2, "0")}</em>
+                      <div>
+                        <strong>{club.name}</strong>
+                        <span>{club.city}, {club.state}</span>
+                      </div>
+                      <p>{club._count.meets} meets</p>
+                    </Link>
+                  ))
+                ) : (
+                  <p className="meet-empty-note">No club-hosted meets yet.</p>
+                )}
+              </div>
+            </article>
+          </div>
+
+          <div className="clubs-grid">
+            {clubs.length > 0 ? (
+              clubs.map((club) => (
+                <Link key={club.id} href={`/clubs/${club.slug}`} className="club-card">
+                  <div className="club-card-image-grid">
+                    {club.models.slice(0, 3).map(({ model }) => (
+                      <div
+                        key={model.id}
+                        className="club-card-image"
+                        style={{ backgroundImage: `url("${model.images[0]?.url || model.make.logoUrl || "/images/garage-home-hero.png?v=garage-2"}")` }}
+                      />
+                    ))}
+                  </div>
+                  <div className="club-card-copy">
+                    <span>{club.city}, {club.state}</span>
+                    <h2>{club.name}</h2>
+                    <p>{club.description || "A SUPERCAR DASH owner club for model-specific meets, members, and garage activity."}</p>
+                  </div>
+                  <div className="club-card-stats">
+                    <span>{club._count.members} members</span>
+                    <span>{club._count.models} models</span>
+                    <span>{club._count.meets} meets</span>
+                  </div>
+                </Link>
+              ))
+            ) : (
+              <div className="club-empty-state">
+                <span>Club Grid</span>
+                <strong>No clubs yet.</strong>
+                <p>Create the first model-led driver club and attach future meets to it.</p>
+              </div>
+            )}
+          </div>
         </div>
 
         <aside id="create-club" className="club-create-panel">
@@ -177,11 +189,21 @@ export default async function ClubsPage() {
               </label>
               <fieldset className="club-model-picker">
                 <legend>Linked Models</legend>
-                {modelOptions.map((model) => (
-                  <label key={model.id}>
-                    <input name="modelIds" type="checkbox" value={model.id} />
-                    <span>{model.make.name} {model.name}</span>
-                  </label>
+                {modelGroups.map((group, index) => (
+                  <details key={group.make.id} className="club-model-group" open={index < 3}>
+                    <summary>
+                      <span>{group.make.name}</span>
+                      <em>{group.models.length}</em>
+                    </summary>
+                    <div>
+                      {group.models.map((model) => (
+                        <label key={model.id}>
+                          <input name="modelIds" type="checkbox" value={model.id} />
+                          <span>{model.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </details>
                 ))}
               </fieldset>
               <button type="submit">Create Club</button>
