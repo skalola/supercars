@@ -82,7 +82,7 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
               ) : viewerMembership?.status === "PENDING" ? (
                 <span className="club-status-pill">Request Pending</span>
               ) : viewerMembership?.status === "ACTIVE" ? (
-                <span className="club-status-pill">Member</span>
+                null
               ) : (
                 <form action={requestJoinClubAction}>
                   <input type="hidden" name="clubId" value={club.id} />
