@@ -16,6 +16,7 @@ import { isValidEmail } from "@/lib/fulfillment/partner-registry";
 import { emailMatchesWebsiteDomain } from "@/lib/directory/contact-domain-policy";
 import { calculateModifiedPerformance } from "@/lib/parts/performance";
 import { isAffiliateTrackingReady } from "@/lib/parts/affiliate-tracking";
+import { getPartDetailPath } from "@/lib/parts/routes";
 import type { CSSProperties } from "react";
 
 type VehiclePageProps = {
@@ -1290,6 +1291,9 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
                                 ) : (
                                   <span>No source</span>
                                 )}
+                                <a href={getPartDetailPath(part)}>
+                                  View Details
+                                </a>
                                 {trackingReady ? (
                                   <a href={`/out/parts/${part.id}?source=/vehicle/${vehicle.vin}`} rel="nofollow sponsored">
                                     Shop Partner
@@ -1487,6 +1491,9 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
                         ) : (
                           <span>No source</span>
                         )}
+                        <a href={getPartDetailPath(part)}>
+                          View Details
+                        </a>
                         {trackingReady ? (
                           <a href={`/out/parts/${part.id}?source=/vehicle/${vehicle.vin}`} rel="nofollow sponsored">
                             Shop Partner

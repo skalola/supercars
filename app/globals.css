@@ -6772,6 +6772,16 @@ canvas {
   line-height: 1.12;
 }
 
+.parts-card h3 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.parts-card h3 a:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
 .parts-card-sku,
 .parts-card-description {
   margin: 0;
@@ -6832,6 +6842,292 @@ canvas {
   border-color: #111111;
   background: #111111;
   color: #ffffff;
+}
+
+.part-detail-shell {
+  min-height: 100vh;
+  padding: clamp(28px, 5vw, 64px) clamp(16px, 4vw, 48px);
+  background:
+    linear-gradient(180deg, rgba(5, 5, 5, 0.96), rgba(15, 15, 14, 0.94) 46%, rgba(247, 247, 245, 1) 46%),
+    #050505;
+  color: #ffffff;
+}
+
+.part-detail-hero,
+.part-detail-grid {
+  width: min(1220px, 100%);
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.part-detail-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(320px, 0.72fr);
+  gap: clamp(18px, 4vw, 42px);
+  align-items: stretch;
+  padding-top: clamp(18px, 4vw, 48px);
+}
+
+.part-detail-media {
+  display: grid;
+  overflow: hidden;
+  min-height: clamp(320px, 44vw, 560px);
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius);
+  background: #111111;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+}
+
+.part-detail-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.part-detail-media span {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 13px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.part-detail-summary {
+  display: grid;
+  gap: 18px;
+  align-content: center;
+  min-width: 0;
+}
+
+.part-detail-back {
+  width: fit-content;
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 12px;
+  font-weight: 850;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.part-detail-back:hover {
+  color: #ffffff;
+}
+
+.part-detail-summary h1 {
+  max-width: 660px;
+  margin: 8px 0 12px;
+  color: #ffffff;
+  font-size: clamp(40px, 6.5vw, 82px);
+  line-height: 0.95;
+}
+
+.part-detail-summary p {
+  max-width: 680px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: clamp(15px, 1.6vw, 18px);
+  line-height: 1.55;
+}
+
+.part-detail-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px);
+}
+
+.part-detail-brand-row img {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+}
+
+.part-detail-brand-row div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.part-detail-brand-row span,
+.part-detail-brand-row em {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.part-detail-brand-row strong {
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.part-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.part-detail-actions a,
+.part-detail-actions button,
+.part-detail-actions > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 850;
+  text-decoration: none;
+}
+
+.part-detail-actions a[rel~="sponsored"] {
+  border-color: #ffffff;
+  background: #ffffff;
+  color: #111111;
+}
+
+.part-detail-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.part-detail-disclosure {
+  color: rgba(255, 255, 255, 0.5) !important;
+  font-size: 11px !important;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.part-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-top: clamp(22px, 4vw, 44px);
+  color: var(--foreground);
+}
+
+.part-detail-panel {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: clamp(16px, 3vw, 24px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: var(--shadow-subtle);
+}
+
+.part-detail-panel:first-child {
+  grid-row: span 2;
+}
+
+.part-detail-panel h2 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: clamp(24px, 3vw, 38px);
+  line-height: 1;
+}
+
+.part-detail-spec-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.part-detail-spec-tile {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+}
+
+.part-detail-spec-tile span,
+.part-detail-source-list dt {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.part-detail-spec-tile strong {
+  color: var(--foreground);
+  font-size: 15px;
+  line-height: 1.15;
+}
+
+.part-detail-note,
+.part-detail-muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.part-detail-fitment-list {
+  display: grid;
+  gap: 9px;
+}
+
+.part-detail-fitment-list div {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+}
+
+.part-detail-fitment-list strong {
+  color: var(--foreground);
+  font-size: 14px;
+}
+
+.part-detail-fitment-list span,
+.part-detail-source-list dd {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.part-detail-source-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.part-detail-source-list div {
+  display: grid;
+  gap: 4px;
+}
+
+.part-detail-source-list dd {
+  margin: 0;
+}
+
+.part-detail-source-list a {
+  color: var(--foreground);
+  font-weight: 850;
+  text-decoration: none;
+}
+
+.part-detail-source-list a:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 
 .model-detail-shell {
@@ -9788,5 +10084,22 @@ canvas {
   .vehicle-parts-recommendation-placeholder {
     width: 100%;
     height: 160px;
+  }
+
+  .part-detail-hero,
+  .part-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .part-detail-panel:first-child {
+    grid-row: auto;
+  }
+
+  .part-detail-spec-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .part-detail-summary h1 {
+    font-size: clamp(38px, 13vw, 58px);
   }
 }

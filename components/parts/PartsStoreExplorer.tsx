@@ -26,6 +26,7 @@ export type PartsStorePartRow = {
   id: string;
   name: string;
   partNumber: string | null;
+  detailPath: string;
   description: string | null;
   imageUrl: string | null;
   sourceUrl: string | null;
@@ -207,7 +208,9 @@ export function PartsStoreExplorer({ categories, brands, parts }: PartsStoreExpl
                       {part.brandLogoUrl ? <img src={part.brandLogoUrl} alt="" loading="lazy" /> : null}
                       <span>{part.brandName}</span>
                     </div>
-                    <h3>{part.name}</h3>
+                    <h3>
+                      <a href={part.detailPath}>{part.name}</a>
+                    </h3>
                     {part.partNumber ? <p className="parts-card-sku">Part #{part.partNumber}</p> : null}
                     {part.description ? <p className="parts-card-description">{part.description}</p> : null}
                     <div className="parts-card-meta">
@@ -223,13 +226,7 @@ export function PartsStoreExplorer({ categories, brands, parts }: PartsStoreExpl
                       )}
                     </div>
                     <div className="parts-card-actions">
-                      {part.sourceUrl ? (
-                        <a href={part.sourceUrl} target="_blank" rel="noopener noreferrer">
-                          Review Source
-                        </a>
-                      ) : (
-                        <span>No source link</span>
-                      )}
+                      <a href={part.detailPath}>View Details</a>
                       {part.trackingEnabled ? (
                         <a href={`/out/parts/${part.id}?source=/parts`} rel="nofollow sponsored">
                           Shop Partner{part.affiliatePartnerName ? `: ${part.affiliatePartnerName}` : ""}

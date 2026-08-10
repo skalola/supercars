@@ -1,5 +1,6 @@
 import { PartsStoreExplorer, type PartsBrandRow, type PartsCategoryRow, type PartsStorePartRow } from "@/components/parts/PartsStoreExplorer";
 import { isAffiliateTrackingReady } from "@/lib/parts/affiliate-tracking";
+import { getPartDetailPath } from "@/lib/parts/routes";
 import { prisma } from "@/lib/prisma";
 
 export default async function PartsPage() {
@@ -78,6 +79,7 @@ export default async function PartsPage() {
     id: part.id,
     name: part.name,
     partNumber: part.partNumber,
+    detailPath: getPartDetailPath(part),
     description: part.description,
     imageUrl: part.imageUrl,
     sourceUrl: part.sourceUrl,
