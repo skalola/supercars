@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { ReactNode } from "react";
 import type { MakeOption, ModelOption } from "@/lib/makes/catalog";
 
@@ -17,25 +17,17 @@ export default function ClubModelSelector({
   const [selectedMakeIds, setSelectedMakeIds] = useState<Set<string>>(() => new Set());
   const [selectedModelIds, setSelectedModelIds] = useState<Set<string>>(() => new Set(initialModelIds));
 
-  const selectedMakeLabels = useMemo(
-    () => makes.filter((make) => selectedMakeIds.has(make.id)).map((make) => make.name),
-    [makes, selectedMakeIds],
-  );
-  const selectedModelLabels = useMemo(
-    () => models.filter((model) => selectedModelIds.has(model.id)).map((model) => `${model.make.name} ${model.name}`),
-    [models, selectedModelIds],
-  );
   const allMakesSelected = makes.length > 0 && selectedMakeIds.size === makes.length;
   const allModelsSelected = models.length > 0 && selectedModelIds.size === models.length;
   const makeSummary = allMakesSelected
     ? "All makes selected"
-    : selectedMakeLabels.length > 0
-      ? selectedMakeLabels.join(", ")
+    : selectedMakeIds.size > 0
+      ? `${selectedMakeIds.size} ${selectedMakeIds.size === 1 ? "make" : "makes"} selected`
       : "All or selected makes";
   const modelSummary = allModelsSelected
     ? "All models selected"
-    : selectedModelLabels.length > 0
-      ? selectedModelLabels.join(", ")
+    : selectedModelIds.size > 0
+      ? `${selectedModelIds.size} ${selectedModelIds.size === 1 ? "model" : "models"} selected`
       : "All or selected models";
 
   function toggleMake(makeId: string) {

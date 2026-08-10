@@ -68,37 +68,43 @@ export default async function ClubsPage() {
       </section>
 
       <section className="clubs-layout">
-        <div id="club-grid" className="club-list" role="table" aria-label="Existing clubs">
-          <div className="club-list-header" role="row">
-            <span>Name</span>
-            <span>Location</span>
-            <span>Make</span>
-            <span>Model</span>
-            <span>Most Members</span>
-            <span>Most Meets</span>
+        <section className="club-list-section" aria-label="Existing clubs">
+          <div className="club-list-title">
+            <span>Existing Clubs</span>
+            <strong>{sortedClubs.length} active</strong>
           </div>
-          {clubs.length > 0 ? (
-            sortedClubs.map((club) => (
-              <Link key={club.id} href={`/clubs/${club.slug}`} className="club-list-row" role="row">
-                <div data-label="Name">
-                  <strong>{club.name}</strong>
-                  <span>{club.description || "Driver club"}</span>
-                </div>
-                <span data-label="Location">{club.city}, {club.state}</span>
-                <span data-label="Make">{club.makeLabel}</span>
-                <span data-label="Model">{club.modelLabel}</span>
-                <strong data-label="Most Members">{club._count.members}</strong>
-                <strong data-label="Most Meets">{club._count.meets}</strong>
-              </Link>
-            ))
-          ) : (
-            <div className="club-empty-state">
-              <span>Club Grid</span>
-              <strong>No clubs yet.</strong>
-              <p>Create the first model-led driver club and attach future meets to it.</p>
+          <div id="club-grid" className="club-list" role="table">
+            <div className="club-list-header" role="row">
+              <span>Name</span>
+              <span>Location</span>
+              <span>Make</span>
+              <span>Model</span>
+              <span>Members</span>
+              <span>Meets</span>
             </div>
-          )}
-        </div>
+            {clubs.length > 0 ? (
+              sortedClubs.map((club) => (
+                <Link key={club.id} href={`/clubs/${club.slug}`} className="club-list-row" role="row">
+                  <div data-label="Name">
+                    <strong>{club.name}</strong>
+                    <span>{club.description || "Driver club"}</span>
+                  </div>
+                  <span data-label="Location">{club.city}, {club.state}</span>
+                  <span data-label="Make">{club.makeLabel}</span>
+                  <span data-label="Model">{club.modelLabel}</span>
+                  <strong data-label="Members">{club._count.members}</strong>
+                  <strong data-label="Meets">{club._count.meets}</strong>
+                </Link>
+              ))
+            ) : (
+              <div className="club-empty-state">
+                <span>Club Grid</span>
+                <strong>No clubs yet.</strong>
+                <p>Create the first model-led driver club and attach future meets to it.</p>
+              </div>
+            )}
+          </div>
+        </section>
 
         <aside id="create-club" className="club-create-panel">
           <div className="meets-panel-title">
