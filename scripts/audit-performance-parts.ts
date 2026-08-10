@@ -3,8 +3,28 @@ import { auditPerformancePartTrust } from "@/lib/parts/trust";
 
 const prisma = new PrismaClient();
 
+const TARGET_PERFORMANCE_MAKE_SLUGS = [
+  "acura",
+  "amg",
+  "audi",
+  "bmw",
+  "chevrolet",
+  "dodge",
+  "ferrari",
+  "honda",
+  "lamborghini",
+  "mazda",
+  "mclaren",
+  "mitsubishi",
+  "nissan",
+  "porsche",
+  "subaru",
+  "toyota",
+];
+
 async function main() {
-  const parts = await prisma.performancePart.findMany({
+  const [parts, targetMakes] = await Promise.all([
+    prisma.performancePart.findMany({
     include: {
       brand: true,
       category: true,
@@ -24,7 +44,18 @@ async function main() {
       { category: { name: "asc" } },
       { name: "asc" },
     ],
-  });
+    }),
+    prisma.make.findMany({
+      where: { slug: { in: TARGET_PERFORMANCE_MAKE_SLUGS } },
+      include: {
+        models: {
+          select: { id: true, name: true, slug: true },
+          orderBy: { name: "asc" },
+        },
+      },
+      orderBy: { name: "asc" },
+    }),
+  ]);
 
   const audits = parts.map((part) => ({
     part,
@@ -59,6 +90,7 @@ async function main() {
   console.log(`  Unscoped compatibility: ${unscopedCompatibility.length}`);
 
   printCoverageByMake(audits);
+  printTargetModelCoverage(audits, targetMakes);
   printReviewList("Needs review", needsReview);
   printReviewList("Missing images", missingImage);
   printReviewList("Missing prices", missingPrice);
@@ -84,6 +116,41 @@ function printCoverageByMake(audits: Array<{
   console.log("Coverage by make");
   for (const [makeName, count] of Array.from(coverage.entries()).sort((a, b) => a[0].localeCompare(b[0]))) {
     console.log(`  ${makeName}: ${count}`);
+  }
+}
+
+function printTargetModelCoverage(
+  audits: Array<{
+    audit: { publicEligible: boolean };
+    part: {
+      compatibility: Array<{
+        modelId: string | null;
+      }>;
+    };
+  }>,
+  targetMakes: Array<{
+    name: string;
+    models: Array<{
+      id: string;
+      name: string;
+    }>;
+  }>
+) {
+  const coveredModelIds = new Set<string>();
+  for (const { audit, part } of audits) {
+    if (!audit.publicEligible) continue;
+    for (const fitment of part.compatibility) {
+      if (fitment.modelId) coveredModelIds.add(fitment.modelId);
+    }
+  }
+
+  console.log("");
+  console.log("Target model coverage");
+  for (const make of targetMakes) {
+    const coveredModels = make.models.filter((model) => coveredModelIds.has(model.id));
+    const percent = make.models.length === 0 ? 0 : Math.round((coveredModels.length / make.models.length) * 100);
+    const preview = coveredModels.slice(0, 6).map((model) => model.name).join(", ");
+    console.log(`  ${make.name}: ${coveredModels.length}/${make.models.length} models (${percent}%)${preview ? ` | ${preview}` : ""}`);
   }
 }
 
