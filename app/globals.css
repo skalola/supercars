@@ -7839,6 +7839,14 @@ canvas {
   display: contents;
 }
 
+.club-detail-logo {
+  width: min(210px, 52vw);
+  max-height: 74px;
+  margin-bottom: 18px;
+  object-fit: contain;
+  object-position: left center;
+}
+
 .clubs-layout,
 .club-detail-layout {
   display: grid;
@@ -7940,12 +7948,6 @@ canvas {
   outline-offset: -1px;
 }
 
-.club-list-row div {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
 .club-list-row strong {
   overflow: hidden;
   color: #ffffff;
@@ -7953,6 +7955,24 @@ canvas {
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.club-list-name-cell {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.club-list-name-cell img {
+  width: 42px;
+  height: 42px;
+  padding: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.38);
+  object-fit: contain;
 }
 
 .club-list-row span {
@@ -8087,6 +8107,11 @@ canvas {
   border-right: 2px solid rgba(255, 255, 255, 0.82);
   border-bottom: 2px solid rgba(255, 255, 255, 0.82);
   transform: rotate(45deg) translateY(-2px);
+}
+
+.club-multi-select > button:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
 }
 
 .club-multi-select.is-open > button::after {

@@ -425,6 +425,7 @@ model CarClub {
   id          String   @id @default(uuid())
   name        String
   slug        String   @unique
+  logoUrl     String?
   description String?
   city        String?
   state       String?

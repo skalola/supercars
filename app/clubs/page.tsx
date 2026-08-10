@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import ClubModelSelector from "./ClubModelSelector";
 
 export const dynamic = "force-dynamic";
+const DEFAULT_CLUB_LOGO = "/images/supercar-dash-wordmark.svg";
 
 export default async function ClubsPage() {
   const [session, catalog] = await Promise.all([
@@ -85,9 +86,9 @@ export default async function ClubsPage() {
             {clubs.length > 0 ? (
               sortedClubs.map((club) => (
                 <Link key={club.id} href={`/clubs/${club.slug}`} className="club-list-row" role="row">
-                  <div data-label="Name">
+                  <div className="club-list-name-cell" data-label="Name">
+                    <img src={club.logoUrl || DEFAULT_CLUB_LOGO} alt="" />
                     <strong>{club.name}</strong>
-                    <span>{club.description || "Driver club"}</span>
                   </div>
                   <span data-label="Location">{club.city}, {club.state}</span>
                   <span data-label="Make">{club.makeLabel}</span>
@@ -134,6 +135,10 @@ export default async function ClubsPage() {
                   <option value="PUBLIC">Public</option>
                   <option value="PRIVATE">Private Approval</option>
                 </select>
+              </label>
+              <label>
+                <span>Club Logo</span>
+                <input name="logoFile" type="file" accept="image/jpeg,image/png,image/webp" />
               </label>
               <label>
                 <span>Description</span>

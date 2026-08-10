@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 
 export const DEFAULT_CAR_CLUB_SLUG = "supercar-dash";
+export const DEFAULT_CAR_CLUB_LOGO = "/images/supercar-dash-wordmark.svg";
 
 export async function ensureDefaultClubMembership(userId: string) {
   const club = await ensureDefaultClub(userId);
@@ -40,6 +41,7 @@ export async function ensureDefaultClub(fallbackCreatorId: string) {
     where: { slug: DEFAULT_CAR_CLUB_SLUG },
     update: {
       name: "Supercar Dash",
+      logoUrl: DEFAULT_CAR_CLUB_LOGO,
       description: "The default SUPERCAR DASH club for every driver, open to all makes and models.",
       city: "Nationwide",
       state: "US",
@@ -50,6 +52,7 @@ export async function ensureDefaultClub(fallbackCreatorId: string) {
     create: {
       name: "Supercar Dash",
       slug: DEFAULT_CAR_CLUB_SLUG,
+      logoUrl: DEFAULT_CAR_CLUB_LOGO,
       description: "The default SUPERCAR DASH club for every driver, open to all makes and models.",
       city: "Nationwide",
       state: "US",

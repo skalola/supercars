@@ -1,0 +1,1 @@
+ALTER TABLE "CarClub" ADD COLUMN "logoUrl" TEXT;

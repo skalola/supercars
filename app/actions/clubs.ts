@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { isUploadableImageFile, uploadPublicImage } from "@/lib/media/upload-storage";
 import { prisma } from "@/lib/prisma";
 import { enforceActionRateLimit } from "@/lib/security/action-rate-limit";
 
@@ -44,10 +45,12 @@ export async function createCarClubAction(formData: FormData) {
   const validModelIds = await resolveModelIds(modelIds, makeIds);
 
   const slug = await createUniqueClubSlug(name, city, state);
+  const logoUrl = await resolveClubLogoUrl(formData, `clubs/${slug}/logos`);
   const club = await prisma.carClub.create({
     data: {
       name,
       slug,
+      logoUrl,
       description: description || null,
       city,
       state,
@@ -197,6 +200,7 @@ export async function updateClubProfileAction(formData: FormData) {
   const state = readString(formData, "state").toUpperCase();
   const description = readString(formData, "description");
   const visibility = readString(formData, "visibility") === "PRIVATE" ? "PRIVATE" : "PUBLIC";
+  const logoFile = formData.get("logoFile");
 
   if (!clubId || !name || !city || !state) {
     throw new Error("Club id, name, city, and state are required.");
@@ -207,7 +211,7 @@ export async function updateClubProfileAction(formData: FormData) {
 
   const club = await prisma.carClub.findUnique({
     where: { id: clubId },
-    select: { id: true, slug: true, name: true, city: true, state: true },
+    select: { id: true, slug: true, name: true, city: true, state: true, logoUrl: true },
   });
   if (!club) throw new Error("Club not found.");
 
@@ -215,11 +219,16 @@ export async function updateClubProfileAction(formData: FormData) {
     ? await createUniqueClubSlug(name, city, state, club.id)
     : club.slug;
 
+  const logoUrl = isUploadableImageFile(logoFile)
+    ? (await uploadPublicImage({ file: logoFile, folder: `clubs/${club.id}/logos` })).url
+    : club.logoUrl;
+
   await prisma.carClub.update({
     where: { id: club.id },
     data: {
       name,
       slug: nextSlug,
+      logoUrl,
       city,
       state,
       description: description || null,
@@ -351,4 +360,11 @@ function readString(formData: FormData, key: string) {
 
 function uniqueStrings(values: string[]) {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+}
+
+async function resolveClubLogoUrl(formData: FormData, folder: string) {
+  const logoFile = formData.get("logoFile");
+  if (!isUploadableImageFile(logoFile)) return null;
+  const upload = await uploadPublicImage({ file: logoFile, folder });
+  return upload.url;
 }

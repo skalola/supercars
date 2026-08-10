@@ -8,6 +8,7 @@ import ClubConfirmButton from "../ClubConfirmButton";
 import ClubModelSelector from "../ClubModelSelector";
 
 export const dynamic = "force-dynamic";
+const DEFAULT_CLUB_LOGO = "/images/supercar-dash-wordmark.svg";
 
 export default async function ClubDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -58,6 +59,7 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
       <section className="club-detail-hero" style={{ backgroundImage: `linear-gradient(90deg, rgba(0,0,0,.88), rgba(0,0,0,.32)), url("${heroImage}")` }}>
         <div>
           <Link href="/clubs" className="meet-back-link">&lt; Back to Clubs</Link>
+          <img className="club-detail-logo" src={club.logoUrl || DEFAULT_CLUB_LOGO} alt="" />
           <span>{club.city}, {club.state}</span>
           <h1>{club.name}</h1>
           <p>{club.description || "A SUPERCAR DASH driver club connected to model pages, public meets, and member garages."}</p>
@@ -198,6 +200,10 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
                     <option value="PUBLIC">Public</option>
                     <option value="PRIVATE">Private Approval</option>
                   </select>
+                </label>
+                <label>
+                  <span>Club Logo</span>
+                  <input name="logoFile" type="file" accept="image/jpeg,image/png,image/webp" />
                 </label>
                 <label>
                   <span>Description</span>
