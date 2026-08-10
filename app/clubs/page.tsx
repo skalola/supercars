@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { createCarClubAction } from "@/app/actions/clubs";
 import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
 import { prisma } from "@/lib/prisma";
+import ClubModelSelector from "./ClubModelSelector";
 
 export const dynamic = "force-dynamic";
 
@@ -37,12 +38,6 @@ export default async function ClubsPage() {
     }).catch(() => []),
   ]);
 
-  const modelGroups = catalog.makes
-    .map((make) => ({
-      make,
-      models: catalog.models.filter((model) => model.makeId === make.id).slice(0, 40),
-    }))
-    .filter((group) => group.models.length > 0);
   const clubsByMembers = [...clubs]
     .sort((a, b) => b._count.members - a._count.members || b._count.meets - a._count.meets || a.name.localeCompare(b.name))
     .slice(0, 10);
@@ -187,25 +182,7 @@ export default async function ClubsPage() {
                 <span>Description</span>
                 <textarea name="description" rows={4} placeholder="Model focus, meet style, and membership expectations." />
               </label>
-              <fieldset className="club-model-picker">
-                <legend>Linked Models</legend>
-                {modelGroups.map((group, index) => (
-                  <details key={group.make.id} className="club-model-group" open={index < 3}>
-                    <summary>
-                      <span>{group.make.name}</span>
-                      <em>{group.models.length}</em>
-                    </summary>
-                    <div>
-                      {group.models.map((model) => (
-                        <label key={model.id}>
-                          <input name="modelIds" type="checkbox" value={model.id} />
-                          <span>{model.name}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </details>
-                ))}
-              </fieldset>
+              <ClubModelSelector makes={catalog.makes} models={catalog.models} />
               <button type="submit">Create Club</button>
             </form>
           ) : (

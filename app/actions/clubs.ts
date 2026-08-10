@@ -32,6 +32,7 @@ export async function createCarClubAction(formData: FormData) {
   const description = readString(formData, "description");
   const visibility = readString(formData, "visibility") === "PRIVATE" ? "PRIVATE" : "PUBLIC";
   const modelIds = uniqueStrings(formData.getAll("modelIds").map((value) => String(value)));
+  const makeIds = uniqueStrings(formData.getAll("makeIds").map((value) => String(value)));
 
   if (!name || name.length < 3) {
     throw new Error("Club name must be at least 3 characters.");
@@ -40,13 +41,17 @@ export async function createCarClubAction(formData: FormData) {
     throw new Error("City and state are required.");
   }
 
-  const validModels = modelIds.length
+  const modelFilters = [
+    ...(modelIds.length ? [{ id: { in: modelIds } }] : []),
+    ...(makeIds.length ? [{ makeId: { in: makeIds } }] : []),
+  ];
+  const validModels = modelFilters.length
     ? await prisma.model.findMany({
-        where: { id: { in: modelIds } },
+        where: { OR: modelFilters },
         select: { id: true },
       })
     : [];
-  const validModelIds = validModels.map((model) => model.id);
+  const validModelIds = uniqueStrings(validModels.map((model) => model.id));
 
   const slug = await createUniqueClubSlug(name, city, state);
   const club = await prisma.carClub.create({
