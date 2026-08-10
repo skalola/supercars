@@ -35,6 +35,7 @@ export async function createMeetAction(formData: FormData) {
   const visibility = readString(formData, "visibility") === "INVITE_ONLY" ? "INVITE_ONLY" : "PUBLIC";
   const capacity = parseOptionalInt(readString(formData, "capacity"));
   const allowedMakes = await readAllowedCatalogMakes(formData);
+  const clubId = await readHostableClubId(formData, userId);
 
   if (!title || !startsAtInput || !city || !state || !locationName) {
     throw new Error("Title, date/time, city, state, and location name are required.");
@@ -50,6 +51,7 @@ export async function createMeetAction(formData: FormData) {
   const meet = await prisma.meet.create({
     data: {
       hostId: userId,
+      clubId,
       slug,
       title,
       type,
@@ -189,6 +191,7 @@ export async function updateHostedMeetAction(formData: FormData) {
   const description = readString(formData, "description");
   const visibility = readString(formData, "visibility") === "INVITE_ONLY" ? "INVITE_ONLY" : "PUBLIC";
   const allowedMakes = await readAllowedCatalogMakes(formData);
+  const clubId = await readHostableClubId(formData, userId);
 
   if (!meetId || !title || !startsAtInput || !city || !state || !locationName) {
     throw new Error("Meet id, title, date/time, city, state, and location name are required.");
@@ -227,6 +230,7 @@ export async function updateHostedMeetAction(formData: FormData) {
       exactAddress: exactAddress || null,
       description: description || null,
       visibility,
+      clubId,
       allowedMakes: JSON.stringify(allowedMakes),
       latitude: coordinates?.latitude ?? null,
       longitude: coordinates?.longitude ?? null,
@@ -456,6 +460,36 @@ async function readAllowedCatalogMakes(formData: FormData) {
   const selectedMakes = new Set(formData.getAll("allowedMakes").map((value) => String(value).trim()).filter(Boolean));
   const allowedMakes = catalogMakes.filter((make) => selectedMakes.has(make));
   return allowedMakes.length > 0 ? allowedMakes : catalogMakes;
+}
+
+async function readHostableClubId(formData: FormData, userId: string) {
+  const clubId = readString(formData, "clubId");
+  if (!clubId) return null;
+
+  const club = await prisma.carClub.findFirst({
+    where: {
+      id: clubId,
+      status: "ACTIVE",
+      OR: [
+        { creatorId: userId },
+        {
+          members: {
+            some: {
+              userId,
+              status: "ACTIVE",
+              role: { in: ["OWNER", "MODERATOR"] },
+            },
+          },
+        },
+      ],
+    },
+    select: { id: true },
+  });
+
+  if (!club) {
+    throw new Error("Only a club owner or moderator can attach this meet to a club.");
+  }
+  return club.id;
 }
 
 async function resolveMeetCoordinates(city: string, state: string) {

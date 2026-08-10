@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { createMeetAction } from "@/app/actions/meets";
 import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,29 @@ export default async function HostMeetPage() {
   if (!session?.user?.id) {
     redirect("/login");
   }
-  const { makes } = await getMakeModelCatalogOptions();
+  const userId = session.user.id as string;
+  const [{ makes }, hostableClubs] = await Promise.all([
+    getMakeModelCatalogOptions(),
+    prisma.carClub.findMany({
+      where: {
+        status: "ACTIVE",
+        OR: [
+          { creatorId: userId },
+          {
+            members: {
+              some: {
+                userId,
+                status: "ACTIVE",
+                role: { in: ["OWNER", "MODERATOR"] },
+              },
+            },
+          },
+        ],
+      },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, city: true, state: true },
+    }).catch(() => []),
+  ]);
 
   return (
     <main className="meet-detail-shell">
@@ -72,6 +95,17 @@ export default async function HostMeetPage() {
             <select name="visibility" defaultValue="PUBLIC">
               <option value="PUBLIC">Public</option>
               <option value="INVITE_ONLY">Invite Only</option>
+            </select>
+          </label>
+          <label>
+            <span>Club</span>
+            <select name="clubId" defaultValue="">
+              <option value="">No club attached</option>
+              {hostableClubs.map((club) => (
+                <option key={club.id} value={club.id}>
+                  {club.name} · {club.city}, {club.state}
+                </option>
+              ))}
             </select>
           </label>
         </div>

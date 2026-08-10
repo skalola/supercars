@@ -18,6 +18,7 @@ type SiteHeaderProps = {
 const leftNavLinks = [
   { href: "/garage", label: "Garage" },
   { href: "/meets", label: "Meets" },
+  { href: "/clubs", label: "Clubs" },
   { href: "/inventory", label: "Market" },
 ];
 

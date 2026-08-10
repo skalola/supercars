@@ -16,6 +16,7 @@ export type MeetEvent = {
   host: string;
   hostUserId: string | null;
   hostUsername: string | null;
+  club: { name: string; slug: string } | null;
   locationName: string;
   locationDetail: string;
   description: string;
@@ -210,6 +211,7 @@ export async function getMeetBySlug(slug: string) {
 
 const meetInclude = {
   host: { select: { username: true, name: true } },
+  club: { select: { name: true, slug: true } },
   rsvps: {
     where: { status: { in: ["GOING", "MAYBE", "WAITLISTED"] } },
     include: {
@@ -259,6 +261,7 @@ function serializeMeet(row: MeetRow): MeetEvent {
     host: row.host.name || row.host.username || "SUPERCAR DASH Member",
     hostUserId: row.hostId,
     hostUsername: row.host.username,
+    club: row.club ? { name: row.club.name, slug: row.club.slug } : null,
     locationName: row.locationName,
     locationDetail: row.locationDetail || (row.visibility === "INVITE_ONLY" ? "Shared with approved RSVPs" : "Address shared after RSVP"),
     description: row.description || "A SUPERCAR DASH owner meet built around verified garage profiles.",
@@ -302,6 +305,7 @@ function createDemoMeet(
     | "capacity"
     | "hostUserId"
     | "hostUsername"
+    | "club"
     | "allowedMakes"
     | "latitude"
     | "longitude"
@@ -317,6 +321,7 @@ function createDemoMeet(
     capacity: input.expectedCars,
     hostUserId: null,
     hostUsername: null,
+    club: null,
     allowedMakes: ["Ferrari", "Lamborghini", "McLaren"],
     latitude: estimateLatitude(input.city, input.state),
     longitude: estimateLongitude(input.city, input.state),

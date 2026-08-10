@@ -44,6 +44,7 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
           description: true,
           visibility: true,
           allowedMakes: true,
+          clubId: true,
           hostId: true,
           rsvps: {
             where: isHost ? { status: { not: "CANCELLED" } } : { userId: viewerUserId, status: { in: ["GOING", "MAYBE", "WAITLISTED"] } },
@@ -68,6 +69,27 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
   const mapPoint = meet.latitude !== null && meet.longitude !== null
     ? projectContiguousUsToPercent(meet.latitude, meet.longitude)
     : { x: meet.mapX, y: meet.mapY };
+  const hostableClubs = isHost && viewerUserId
+    ? await prisma.carClub.findMany({
+        where: {
+          status: "ACTIVE",
+          OR: [
+            { creatorId: viewerUserId },
+            {
+              members: {
+                some: {
+                  userId: viewerUserId,
+                  status: "ACTIVE",
+                  role: { in: ["OWNER", "MODERATOR"] },
+                },
+              },
+            },
+          ],
+        },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true, city: true, state: true },
+      }).catch(() => [])
+    : [];
   const attendeeRows = isHost ? privateMeetContext?.rsvps || [] : [];
   const attendeeCsv = buildRosterCsv(attendeeRows);
 
@@ -124,6 +146,14 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
               <span>Host</span>
               <strong>{meet.host}</strong>
             </div>
+            {meet.club ? (
+              <div>
+                <span>Club</span>
+                <strong>
+                  <Link href={`/clubs/${meet.club.slug}`}>{meet.club.name}</Link>
+                </strong>
+              </div>
+            ) : null}
             <div>
               <span>Expected Cars</span>
               <strong>{meet.expectedCars}</strong>
@@ -241,6 +271,17 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
                   <select name="visibility" defaultValue={privateMeetContext.visibility}>
                     <option value="PUBLIC">Public</option>
                     <option value="INVITE_ONLY">Invite Only</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Club</span>
+                  <select name="clubId" defaultValue={privateMeetContext.clubId || ""}>
+                    <option value="">No club attached</option>
+                    {hostableClubs.map((club) => (
+                      <option key={club.id} value={club.id}>
+                        {club.name} · {club.city}, {club.state}
+                      </option>
+                    ))}
                   </select>
                 </label>
               </div>

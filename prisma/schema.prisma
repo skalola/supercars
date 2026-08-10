@@ -43,6 +43,7 @@ model Model {
   imageCandidates     ModelImageCandidate[]
   variants            ModelVariant[]
   garageItems         GarageItem[]
+  carClubs            CarClubModel[]
   maintenanceRules    MaintenanceRule[]
   listings            Listing[]
   marketSales         MarketSale[]
@@ -270,6 +271,8 @@ model User {
   meetRsvps          MeetRsvp[]
   meetPhotos         MeetPhoto[]
   meetNotifications  MeetNotification[]
+  createdCarClubs     CarClub[]       @relation("CarClubCreator")
+  carClubMemberships  CarClubMember[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -378,6 +381,7 @@ model Meet {
   id             String   @id @default(uuid())
   slug           String   @unique
   hostId         String
+  clubId         String?
   title          String
   type           String
   /// Status: DRAFT | PUBLISHED | FULL | CANCELLED | COMPLETED | HIDDEN
@@ -406,6 +410,7 @@ model Meet {
   updatedAt      DateTime @updatedAt
 
   host           User     @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  club           CarClub? @relation(fields: [clubId], references: [id], onDelete: SetNull)
   rsvps          MeetRsvp[]
   photos         MeetPhoto[]
   notifications  MeetNotification[]
@@ -413,6 +418,62 @@ model Meet {
   @@index([status, startsAt])
   @@index([city, state])
   @@index([hostId, startsAt])
+  @@index([clubId, startsAt])
+}
+
+model CarClub {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  city        String?
+  state       String?
+  country     String?  @default("US")
+  visibility  String   @default("PUBLIC")
+  status      String   @default("ACTIVE")
+  creatorId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  creator     User     @relation("CarClubCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  members     CarClubMember[]
+  models      CarClubModel[]
+  meets       Meet[]
+
+  @@index([creatorId])
+  @@index([city, state])
+  @@index([status, visibility])
+}
+
+model CarClubMember {
+  id        String   @id @default(uuid())
+  clubId    String
+  userId    String
+  role      String   @default("MEMBER")
+  status    String   @default("PENDING")
+  joinedAt  DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  club      CarClub  @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, userId])
+  @@index([clubId, status])
+  @@index([userId, status])
+}
+
+model CarClubModel {
+  id        String   @id @default(uuid())
+  clubId    String
+  modelId   String
+  createdAt DateTime @default(now())
+
+  club      CarClub  @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  model     Model    @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@unique([clubId, modelId])
+  @@index([modelId])
 }
 
 model MeetRsvp {

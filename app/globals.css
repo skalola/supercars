@@ -7592,3 +7592,429 @@ canvas {
     grid-template-columns: 1fr !important;
   }
 }
+
+.clubs-shell,
+.club-detail-shell {
+  display: grid;
+  gap: 24px;
+  padding: clamp(24px, 4vw, 52px) clamp(18px, 5vw, 72px) 68px;
+  background: #050506;
+}
+
+.clubs-hero,
+.club-detail-hero {
+  display: grid;
+  align-items: end;
+  width: min(1500px, 100%);
+  min-height: clamp(360px, 48vh, 620px);
+  margin: 0 auto;
+  padding: clamp(28px, 5vw, 64px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.88), rgba(0, 0, 0, 0.28)),
+    url("/images/garage-home-hero.png?v=garage-2") center / cover;
+}
+
+.clubs-hero span,
+.club-detail-hero span,
+.club-card-copy span,
+.club-card-stats span,
+.club-stat-grid span,
+.club-meet-row span,
+.club-member-card p,
+.club-moderation-row span,
+.club-model-card span,
+.club-form label span,
+.club-model-picker legend {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.clubs-hero h1,
+.club-detail-hero h1 {
+  max-width: 760px;
+  margin: 8px 0 0;
+  color: #ffffff;
+  font-size: clamp(44px, 7vw, 94px);
+  font-weight: 560;
+  line-height: 0.96;
+}
+
+.clubs-hero p,
+.club-detail-hero p {
+  max-width: 680px;
+  margin: 16px 0 0;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.clubs-hero-actions,
+.club-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.club-detail-actions form {
+  display: contents;
+}
+
+.clubs-layout,
+.club-detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.36fr);
+  gap: 18px;
+  width: min(1500px, 100%);
+  margin: 0 auto;
+}
+
+.clubs-grid,
+.club-model-grid,
+.club-member-grid,
+.club-meet-list,
+.club-moderation-list {
+  display: grid;
+  gap: 14px;
+}
+
+.clubs-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.club-card,
+.club-create-panel,
+.club-panel,
+.club-empty-state,
+.club-stat-grid > div {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(12, 13, 15, 0.86);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.28);
+}
+
+.club-card {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.club-card:hover {
+  border-color: rgba(226, 15, 27, 0.58);
+  background: rgba(226, 15, 27, 0.08);
+}
+
+.club-card-image-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 1px;
+  min-height: 170px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.club-card-image {
+  background: rgba(255, 255, 255, 0.05) center / cover no-repeat;
+}
+
+.club-card-copy,
+.club-create-panel,
+.club-panel,
+.club-empty-state {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+}
+
+.club-card-copy h2,
+.club-empty-state strong,
+.club-panel .meets-panel-title strong {
+  margin: 0;
+  color: #ffffff;
+}
+
+.club-card-copy p,
+.club-empty-state p,
+.club-stat-grid p,
+.club-meet-row p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.66);
+  line-height: 1.55;
+}
+
+.club-card-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.club-card-stats span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  background: rgba(0, 0, 0, 0.34);
+  text-align: center;
+}
+
+.club-form,
+.club-form label {
+  display: grid;
+  gap: 10px;
+}
+
+.club-form {
+  gap: 16px;
+}
+
+.club-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 96px;
+  gap: 12px;
+}
+
+.club-form input,
+.club-form select,
+.club-form textarea {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  outline: none;
+}
+
+.club-form textarea {
+  min-height: 120px;
+  padding-top: 12px;
+  resize: vertical;
+}
+
+.club-form option {
+  background: #101010;
+  color: #ffffff;
+}
+
+.club-form > button,
+.club-moderation-row button {
+  min-height: 44px;
+  border: 1px solid #e20f1b;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #f0222d, #b90913);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.club-model-picker {
+  display: grid;
+  gap: 8px;
+  max-height: 260px;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+}
+
+.club-model-picker label {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+}
+
+.club-detail-hero {
+  background-position: center;
+  background-size: cover;
+}
+
+.club-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  width: min(1500px, 100%);
+  margin: 0 auto;
+}
+
+.club-stat-grid > div {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 18px;
+}
+
+.club-stat-grid strong {
+  overflow-wrap: anywhere;
+  color: #ffffff;
+  font-size: clamp(22px, 3vw, 34px);
+  line-height: 1.05;
+}
+
+.club-panel.is-wide {
+  grid-column: 1 / -1;
+}
+
+.club-model-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.club-model-card,
+.club-member-card,
+.club-meet-row,
+.club-moderation-row {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.club-model-card {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.club-model-card div {
+  min-height: 128px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.06) center / cover no-repeat;
+}
+
+.club-model-card strong,
+.club-meet-row strong,
+.club-member-card strong,
+.club-moderation-row strong {
+  color: #ffffff;
+}
+
+.club-member-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.club-member-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+}
+
+.club-member-card img,
+.club-member-card > span {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  object-fit: cover;
+}
+
+.club-meet-row {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+}
+
+.club-status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.club-moderation-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+}
+
+.club-moderation-row form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.club-moderation-row button {
+  padding: 0 12px;
+}
+
+@media (max-width: 1100px) {
+  .clubs-layout,
+  .club-detail-layout,
+  .clubs-grid,
+  .club-model-grid,
+  .club-member-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .club-create-panel {
+    grid-column: 1 / -1;
+  }
+
+  .club-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .clubs-shell,
+  .club-detail-shell {
+    padding-inline: 14px;
+  }
+
+  .clubs-layout,
+  .club-detail-layout,
+  .clubs-grid,
+  .club-model-grid,
+  .club-member-grid,
+  .club-stat-grid,
+  .club-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .clubs-hero,
+  .club-detail-hero {
+    min-height: 430px;
+    padding: 24px;
+  }
+
+  .club-card-image-grid {
+    min-height: 150px;
+  }
+
+  .club-moderation-row {
+    grid-template-columns: 1fr;
+  }
+
+  .club-moderation-row form {
+    justify-content: stretch;
+  }
+
+  .club-moderation-row button {
+    flex: 1 1 120px;
+  }
+}
