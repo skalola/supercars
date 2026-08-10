@@ -7818,6 +7818,18 @@ canvas {
   line-height: 0.96;
 }
 
+.club-detail-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 860px;
+  margin-top: 8px;
+}
+
+.club-detail-title h1 {
+  margin: 0;
+}
+
 .clubs-hero p,
 .club-detail-hero p {
   max-width: 680px;
@@ -7840,11 +7852,14 @@ canvas {
 }
 
 .club-detail-logo {
-  width: min(210px, 52vw);
-  max-height: 74px;
-  margin-bottom: 18px;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  padding: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.36);
   object-fit: contain;
-  object-position: left center;
 }
 
 .clubs-layout,
@@ -7959,18 +7974,18 @@ canvas {
 
 .club-list-name-cell {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 9px;
   align-items: center;
   min-width: 0;
 }
 
 .club-list-name-cell img {
-  width: 42px;
-  height: 42px;
-  padding: 7px;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
+  border-radius: 7px;
   background: rgba(0, 0, 0, 0.38);
   object-fit: contain;
 }
@@ -8495,6 +8510,17 @@ canvas {
   .club-detail-hero {
     min-height: 430px;
     padding: 24px;
+  }
+
+  .club-detail-title {
+    gap: 10px;
+  }
+
+  .club-detail-logo {
+    width: 34px;
+    height: 34px;
+    padding: 5px;
+    border-radius: 7px;
   }
 
   .club-list-header {

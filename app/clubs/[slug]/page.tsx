@@ -59,9 +59,11 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
       <section className="club-detail-hero" style={{ backgroundImage: `linear-gradient(90deg, rgba(0,0,0,.88), rgba(0,0,0,.32)), url("${heroImage}")` }}>
         <div>
           <Link href="/clubs" className="meet-back-link">&lt; Back to Clubs</Link>
-          <img className="club-detail-logo" src={club.logoUrl || DEFAULT_CLUB_LOGO} alt="" />
           <span>{club.city}, {club.state}</span>
-          <h1>{club.name}</h1>
+          <div className="club-detail-title">
+            <img className="club-detail-logo" src={club.logoUrl || DEFAULT_CLUB_LOGO} alt="" />
+            <h1>{club.name}</h1>
+          </div>
           <p>{club.description || "A SUPERCAR DASH driver club connected to model pages, public meets, and member garages."}</p>
           <div className="club-detail-actions">
             {viewerUserId ? (
