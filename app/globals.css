@@ -7832,6 +7832,17 @@ canvas {
   margin: 0;
 }
 
+.club-detail-title > div {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.club-detail-location {
+  display: inline-flex;
+  width: fit-content;
+}
+
 .clubs-hero p,
 .club-detail-hero p {
   max-width: 680px;
