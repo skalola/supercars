@@ -7843,6 +7843,48 @@ canvas {
   width: fit-content;
 }
 
+.club-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+.club-detail-creator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  color: rgba(255, 255, 255, 0.78);
+  text-decoration: none;
+}
+
+.club-detail-creator:hover,
+.club-detail-creator:focus-visible {
+  color: #ffffff;
+  outline: none;
+}
+
+.club-detail-creator img,
+.club-detail-creator > span {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  object-fit: cover;
+}
+
+.club-detail-creator em {
+  color: inherit;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .clubs-hero p,
 .club-detail-hero p {
   max-width: 680px;

@@ -57,6 +57,9 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
     getMostModifiedClubCar(memberUserIds),
   ]);
   const nextMeet = club.meets[0] ?? null;
+  const creatorName = club.creator.name || club.creator.username || "SUPERCAR DASH Member";
+  const creatorHref = club.creator.username ? `/garage/${club.creator.username}` : null;
+  const locationLabel = [club.city, club.state].filter(Boolean).join(", ");
   const heroImage = club.models[0]?.model.images[0]?.url || club.models[0]?.model.make.logoUrl || "/images/garage-home-hero.png?v=garage-2";
 
   return (
@@ -68,7 +71,20 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
             <img className="club-detail-logo" src={club.logoUrl || DEFAULT_CLUB_LOGO} alt="" />
             <div>
               <h1>{club.name}</h1>
-              <span className="club-detail-location">{club.city}, {club.state}</span>
+              <div className="club-detail-meta">
+                {creatorHref ? (
+                  <Link href={creatorHref} className="club-detail-creator">
+                    {club.creator.image ? <img src={club.creator.image} alt="" referrerPolicy="no-referrer" /> : <span />}
+                    <em>Created by {creatorName}</em>
+                  </Link>
+                ) : (
+                  <span className="club-detail-creator">
+                    {club.creator.image ? <img src={club.creator.image} alt="" referrerPolicy="no-referrer" /> : <span />}
+                    <em>Created by {creatorName}</em>
+                  </span>
+                )}
+                {locationLabel ? <span className="club-detail-location">{locationLabel}</span> : null}
+              </div>
             </div>
           </div>
           <p>{club.description || "A SUPERCAR DASH driver club connected to model pages, public meets, and member garages."}</p>
