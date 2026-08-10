@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { MakeOption, ModelOption } from "@/lib/makes/catalog";
 
@@ -163,13 +163,51 @@ function MultiSelectDropdown({
   disabled?: boolean;
   children: ReactNode;
 }) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [openDirection, setOpenDirection] = useState<"down" | "up">("down");
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const updateDirection = () => {
+      const rect = rootRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      setOpenDirection(spaceBelow < 300 && spaceAbove > spaceBelow ? "up" : "down");
+    };
+
+    updateDirection();
+    window.addEventListener("resize", updateDirection);
+    window.addEventListener("scroll", updateDirection, true);
+    return () => {
+      window.removeEventListener("resize", updateDirection);
+      window.removeEventListener("scroll", updateDirection, true);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onToggle();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [isOpen, onToggle]);
+
   return (
-    <div className={`club-multi-select${isOpen ? " is-open" : ""}`}>
+    <div ref={rootRef} className={`club-multi-select${isOpen ? " is-open" : ""}${openDirection === "up" ? " is-up" : ""}`}>
       <button type="button" aria-expanded={isOpen} disabled={disabled} onClick={onToggle}>
         <span>{label}</span>
         <strong>{summary}</strong>
       </button>
-      {isOpen ? <div className="club-multi-menu">{children}</div> : null}
+      {isOpen ? (
+        <>
+          <button type="button" className="club-multi-backdrop" aria-label={`Close ${label} selector`} onClick={onToggle} />
+          <div className="club-multi-menu" role="listbox" aria-label={`${label} selector`}>
+            {children}
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }
