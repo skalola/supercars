@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
-import { addMeetPhotoAction, manageMeetRsvpAction, rsvpMeetAction, updateHostedMeetAction } from "@/app/actions/meets";
+import { addMeetPhotoAction, manageMeetRsvpAction, updateHostedMeetAction } from "@/app/actions/meets";
 import { HostCancelMeetForm } from "@/components/meets/HostCancelMeetForm";
 import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
 import { projectContiguousUsToPercent } from "@/lib/maps/us-projection";
@@ -105,10 +105,7 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
           <h1>{meet.title}</h1>
           <p>{meet.description}</p>
           <div className="meet-detail-actions">
-            <Link href="#rsvp" className="meets-primary-button">
-              RSVP
-            </Link>
-            <Link href="#cars" className="meets-secondary-button">
+            <Link href="#cars" className="meets-primary-button">
               Cars Attending
             </Link>
           </div>
@@ -176,45 +173,6 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
               <strong>{meet.allowedMakes.join(" · ")}</strong>
             </div>
           </div>
-        </article>
-
-        <article id="rsvp" className="meet-rsvp-panel">
-          <div className="meets-panel-title">
-            <span>RSVP</span>
-            <strong>Bring a verified car</strong>
-          </div>
-          {meet.id && session?.user?.id ? (
-            <form action={rsvpMeetAction} className="meet-rsvp-form">
-              <input type="hidden" name="meetId" value={meet.id} />
-              <label>
-                <span>Vehicle</span>
-                <select name="vehicleId" defaultValue="">
-                  <option value="">I&apos;ll choose later</option>
-                  {garageVehicles.map((vehicle) => (
-                    <option key={vehicle.id} value={vehicle.id}>
-                      {vehicle.year} {vehicle.model.make.name} {vehicle.model.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="meet-rsvp-buttons">
-                <button type="submit" name="status" value="GOING">Going</button>
-                <button type="submit" name="status" value="MAYBE">Maybe</button>
-                <button type="submit" name="status" value="CANCELLED">Cancel RSVP</button>
-              </div>
-            </form>
-          ) : meet.id ? (
-            <Link href="/login" className="meets-primary-button">
-              Sign in to RSVP
-            </Link>
-          ) : (
-            <>
-              <p>This preview meet is using demo data. Create a real meet to enable persistent RSVPs.</p>
-              <Link href="/meets/host" className="meets-primary-button">
-                Host a Meet
-              </Link>
-            </>
-          )}
         </article>
 
         <article id="cars" className="meet-cars-panel">

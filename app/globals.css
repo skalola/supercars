@@ -5569,10 +5569,6 @@ canvas {
   gap: 14px;
 }
 
-.meet-info-panel {
-  grid-row: span 2;
-}
-
 .meet-location-map {
   position: relative;
   min-height: 300px;
@@ -5636,6 +5632,10 @@ canvas {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+}
+
+.meet-cars-panel .meet-car-grid {
+  grid-template-columns: 1fr;
 }
 
 .meet-car-card {
