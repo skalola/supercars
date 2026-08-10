@@ -43,9 +43,31 @@ type AddPerformancePartInput = {
   engine?: string | null;
 };
 
+type UpdatePerformancePartAffiliateInput = {
+  partId: string;
+  affiliatePartnerId?: string | null;
+  affiliateUrl?: string | null;
+  trackingStatus: string;
+  commissionRateBps?: number | null;
+};
+
+type UpdateAffiliatePartnerInput = {
+  partnerId: string;
+  status: string;
+  active: boolean;
+  network?: string | null;
+  websiteUrl?: string | null;
+  commissionLabel?: string | null;
+  trackingTemplate?: string | null;
+  disclosure?: string | null;
+};
+
 const partStatuses = new Set(["DRAFT", "MANUAL_REVIEW", "ACTIVE", "INACTIVE"]);
 const confidenceStatuses = new Set(["MANUAL_REVIEW", "SOURCE_VERIFIED", "LOW_CONFIDENCE"]);
 const installComplexities = new Set(["DIY", "SHOP_RECOMMENDED", "PRO_ONLY"]);
+const trackingStatuses = new Set(["NOT_CONFIGURED", "CONFIGURED", "DISABLED", "NEEDS_REVIEW"]);
+const affiliatePartnerStatuses = new Set(["CANDIDATE", "APPROVED", "ACTIVE", "INACTIVE", "REJECTED"]);
+const activeAffiliatePartnerStatuses = new Set(["APPROVED", "ACTIVE"]);
 
 export async function addPartCategoryAction(input: AddPartCategoryInput) {
   try {
@@ -244,6 +266,98 @@ export async function addPerformancePartAction(input: AddPerformancePartInput) {
   }
 }
 
+export async function updatePerformancePartAffiliateAction(input: UpdatePerformancePartAffiliateInput) {
+  try {
+    await assertAdmin();
+
+    const part = await prisma.performancePart.findUnique({
+      where: { id: input.partId },
+      select: { id: true, brand: { select: { slug: true } }, slug: true },
+    });
+    if (!part) {
+      return { success: false, message: "Choose a valid performance part." };
+    }
+
+    const trackingStatus = normalizeEnum(input.trackingStatus, trackingStatuses, "NOT_CONFIGURED");
+    const affiliatePartnerId = cleanText(input.affiliatePartnerId);
+    const affiliateUrl = cleanUrl(input.affiliateUrl);
+    const commissionRateBps = cleanBasisPoints(input.commissionRateBps);
+
+    if (trackingStatus === "CONFIGURED") {
+      if (!affiliatePartnerId) {
+        return { success: false, message: "Choose an affiliate partner before configuring tracking." };
+      }
+      if (!affiliateUrl) {
+        return { success: false, message: "Affiliate URL is required before configuring tracking." };
+      }
+    }
+
+    if (affiliatePartnerId) {
+      const partner = await prisma.affiliatePartner.findUnique({
+        where: { id: affiliatePartnerId },
+        select: { id: true },
+      });
+      if (!partner) {
+        return { success: false, message: "Choose a valid affiliate partner." };
+      }
+    }
+
+    await prisma.performancePart.update({
+      where: { id: part.id },
+      data: {
+        affiliatePartnerId,
+        affiliateUrl,
+        commissionRateBps,
+        trackingStatus,
+        lastCheckedAt: trackingStatus === "CONFIGURED" ? new Date() : null,
+      },
+    });
+
+    revalidateParts();
+    revalidatePath(`/parts/${part.brand.slug}/${part.slug}`);
+    return { success: true, message: "Affiliate tracking updated." };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : "Failed to update affiliate tracking." };
+  }
+}
+
+export async function updateAffiliatePartnerAction(input: UpdateAffiliatePartnerInput) {
+  try {
+    await assertAdmin();
+
+    const partner = await prisma.affiliatePartner.findUnique({
+      where: { id: input.partnerId },
+      select: { id: true, name: true },
+    });
+    if (!partner) {
+      return { success: false, message: "Choose a valid affiliate partner." };
+    }
+
+    const status = normalizeEnum(input.status, affiliatePartnerStatuses, "CANDIDATE");
+    if (input.active && !activeAffiliatePartnerStatuses.has(status)) {
+      return { success: false, message: "Partner must be Approved or Active before it can be enabled." };
+    }
+
+    await prisma.affiliatePartner.update({
+      where: { id: partner.id },
+      data: {
+        status,
+        active: input.active,
+        network: cleanText(input.network),
+        websiteUrl: cleanUrl(input.websiteUrl),
+        commissionLabel: cleanText(input.commissionLabel),
+        trackingTemplate: cleanText(input.trackingTemplate),
+        disclosure: cleanText(input.disclosure),
+      },
+    });
+
+    revalidateParts();
+    return { success: true, message: `Updated ${partner.name}.` };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : "Failed to update affiliate partner." };
+  }
+}
+
 async function getNextCategoryDisplayOrder() {
   const latest = await prisma.partCategory.findFirst({
     orderBy: { displayOrder: "desc" },
@@ -262,6 +376,15 @@ function cleanUrl(value?: string | null) {
   if (!cleaned) return null;
   if (cleaned.startsWith("http://") || cleaned.startsWith("https://")) return cleaned;
   return `https://${cleaned}`;
+}
+
+function cleanBasisPoints(value?: number | null) {
+  const cleaned = cleanNumber(value);
+  if (cleaned === null) return null;
+  if (cleaned < 0 || cleaned > 10000) {
+    throw new Error("Commission rate must be between 0 and 10000 basis points.");
+  }
+  return Math.round(cleaned);
 }
 
 function cleanNumber(value?: number | null) {

@@ -6,6 +6,8 @@ import {
   addPartBrandAction,
   addPartCategoryAction,
   addPerformancePartAction,
+  updateAffiliatePartnerAction,
+  updatePerformancePartAffiliateAction,
 } from "@/app/actions/admin-parts";
 import type { MakeOption, ModelOption } from "@/lib/makes/catalog";
 
@@ -31,6 +33,10 @@ export type AdminAffiliatePartnerRow = {
   name: string;
   status: string;
   network: string | null;
+  websiteUrl: string | null;
+  commissionLabel: string | null;
+  trackingTemplate: string | null;
+  disclosure: string | null;
   active: boolean;
   partCount: number;
 };
@@ -47,7 +53,10 @@ export type AdminPerformancePartRow = {
   estimatedTorqueGain: string;
   categoryName: string;
   brandName: string;
+  affiliatePartnerId: string | null;
   affiliatePartnerName: string | null;
+  affiliateUrl: string | null;
+  commissionRateBps: number | null;
   affiliateReady: boolean;
   clickCount: number;
   sourceUrl: string | null;
@@ -91,6 +100,24 @@ type PartFormState = {
   engine: string;
 };
 
+type AffiliatePartFormState = {
+  affiliatePartnerId: string;
+  affiliateUrl: string;
+  trackingStatus: string;
+  commissionRateBps: string;
+};
+
+type AffiliatePartnerFormState = {
+  partnerId: string;
+  status: string;
+  active: boolean;
+  network: string;
+  websiteUrl: string;
+  commissionLabel: string;
+  trackingTemplate: string;
+  disclosure: string;
+};
+
 const emptyPartForm: PartFormState = {
   name: "",
   categoryId: "",
@@ -128,13 +155,23 @@ export function AdminPartsClient({
 }: AdminPartsClientProps) {
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [activeModal, setActiveModal] = useState<"category" | "brand" | "part" | null>(null);
+  const [activeModal, setActiveModal] = useState<"category" | "brand" | "part" | "affiliatePart" | "affiliatePartners" | null>(null);
   const [categoryName, setCategoryName] = useState("");
   const [categoryDescription, setCategoryDescription] = useState("");
   const [brandName, setBrandName] = useState("");
   const [brandWebsite, setBrandWebsite] = useState("");
   const [brandCountry, setBrandCountry] = useState("");
   const [partForm, setPartForm] = useState<PartFormState>(emptyPartForm);
+  const [selectedAffiliatePart, setSelectedAffiliatePart] = useState<AdminPerformancePartRow | null>(null);
+  const [affiliatePartForm, setAffiliatePartForm] = useState<AffiliatePartFormState>({
+    affiliatePartnerId: "",
+    affiliateUrl: "",
+    trackingStatus: "NOT_CONFIGURED",
+    commissionRateBps: "",
+  });
+  const [affiliatePartnerForm, setAffiliatePartnerForm] = useState<AffiliatePartnerFormState>(() =>
+    toAffiliatePartnerForm(affiliatePartners[0] ?? null)
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [brandFilter, setBrandFilter] = useState("");
@@ -250,6 +287,78 @@ export function AdminPartsClient({
     });
   };
 
+  const openAffiliatePartModal = (part: AdminPerformancePartRow) => {
+    setSelectedAffiliatePart(part);
+    setAffiliatePartForm({
+      affiliatePartnerId: part.affiliatePartnerId ?? "",
+      affiliateUrl: part.affiliateUrl ?? "",
+      trackingStatus: part.trackingStatus || "NOT_CONFIGURED",
+      commissionRateBps: part.commissionRateBps === null ? "" : String(part.commissionRateBps),
+    });
+    setActiveModal("affiliatePart");
+  };
+
+  const openAffiliatePartnersModal = () => {
+    setAffiliatePartnerForm(toAffiliatePartnerForm(affiliatePartners[0] ?? null));
+    setActiveModal("affiliatePartners");
+  };
+
+  const updateAffiliatePartForm = (field: keyof AffiliatePartFormState, value: string) => {
+    setAffiliatePartForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const updateAffiliatePartnerForm = (field: keyof AffiliatePartnerFormState, value: string | boolean) => {
+    setAffiliatePartnerForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const chooseAffiliatePartner = (partnerId: string) => {
+    const partner = affiliatePartners.find((item) => item.id === partnerId) ?? null;
+    setAffiliatePartnerForm(toAffiliatePartnerForm(partner));
+  };
+
+  const saveAffiliatePart = () => {
+    if (!selectedAffiliatePart) return;
+
+    startTransition(async () => {
+      const result = await updatePerformancePartAffiliateAction({
+        partId: selectedAffiliatePart.id,
+        affiliatePartnerId: affiliatePartForm.affiliatePartnerId || null,
+        affiliateUrl: affiliatePartForm.affiliateUrl,
+        trackingStatus: affiliatePartForm.trackingStatus,
+        commissionRateBps: toOptionalNumber(affiliatePartForm.commissionRateBps),
+      });
+      setMessage({ type: result.success ? "success" : "error", text: result.message });
+      if (result.success) {
+        setActiveModal(null);
+        setSelectedAffiliatePart(null);
+      }
+    });
+  };
+
+  const saveAffiliatePartner = () => {
+    if (!affiliatePartnerForm.partnerId) {
+      setMessage({ type: "error", text: "Choose an affiliate partner." });
+      return;
+    }
+
+    startTransition(async () => {
+      const result = await updateAffiliatePartnerAction({
+        partnerId: affiliatePartnerForm.partnerId,
+        status: affiliatePartnerForm.status,
+        active: affiliatePartnerForm.active,
+        network: affiliatePartnerForm.network,
+        websiteUrl: affiliatePartnerForm.websiteUrl,
+        commissionLabel: affiliatePartnerForm.commissionLabel,
+        trackingTemplate: affiliatePartnerForm.trackingTemplate,
+        disclosure: affiliatePartnerForm.disclosure,
+      });
+      setMessage({ type: result.success ? "success" : "error", text: result.message });
+      if (result.success) {
+        setActiveModal(null);
+      }
+    });
+  };
+
   return (
     <section className="surface-panel admin-management-panel admin-parts-panel">
       <div className="admin-management-panel-header">
@@ -266,6 +375,9 @@ export function AdminPartsClient({
           </button>
           <button type="button" className="admin-primary-button" onClick={() => setActiveModal("part")}>
             Add Part
+          </button>
+          <button type="button" className="admin-secondary-button" onClick={openAffiliatePartnersModal}>
+            Affiliate Partners
           </button>
         </div>
       </div>
@@ -387,6 +499,9 @@ export function AdminPartsClient({
                     <span className="admin-listing-identifier">
                       {part.affiliatePartnerName ?? "No partner"} · {part.clickCount.toLocaleString()} clicks
                     </span>
+                    <button type="button" className="admin-inline-action-button" onClick={() => openAffiliatePartModal(part)}>
+                      Configure
+                    </button>
                   </td>
                   <td data-label="Source">
                     {part.sourceUrl ? (
@@ -593,6 +708,124 @@ export function AdminPartsClient({
           <ModalActions disabled={isPending} onCancel={() => setActiveModal(null)} onSave={savePart} />
         </AdminModal>
       )}
+
+      {activeModal === "affiliatePart" && selectedAffiliatePart && (
+        <AdminModal title="Configure Affiliate Tracking" onClose={() => setActiveModal(null)} isWide>
+          <div className="admin-modal-grid admin-parts-modal-grid">
+            <div className="admin-modal-wide admin-affiliate-context">
+              <span>Part</span>
+              <strong>{selectedAffiliatePart.name}</strong>
+              <em>{selectedAffiliatePart.brandName} · {selectedAffiliatePart.categoryName}</em>
+            </div>
+            <label>
+              Affiliate Partner
+              <select
+                value={affiliatePartForm.affiliatePartnerId}
+                onChange={(event) => updateAffiliatePartForm("affiliatePartnerId", event.target.value)}
+              >
+                <option value="">No Partner</option>
+                {affiliatePartners.map((partner) => (
+                  <option key={partner.id} value={partner.id}>
+                    {partner.name} ({partner.active ? "Enabled" : partner.status})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Tracking Status
+              <select
+                value={affiliatePartForm.trackingStatus}
+                onChange={(event) => updateAffiliatePartForm("trackingStatus", event.target.value)}
+              >
+                <option value="NOT_CONFIGURED">Not Configured</option>
+                <option value="NEEDS_REVIEW">Needs Review</option>
+                <option value="CONFIGURED">Configured</option>
+                <option value="DISABLED">Disabled</option>
+              </select>
+            </label>
+            <label className="admin-modal-wide">
+              Affiliate URL
+              <input
+                value={affiliatePartForm.affiliateUrl}
+                onChange={(event) => updateAffiliatePartForm("affiliateUrl", event.target.value)}
+                placeholder="https://approved-partner.example/product?tag=..."
+              />
+            </label>
+            <label>
+              Commission Rate (bps)
+              <input
+                type="number"
+                min="0"
+                max="10000"
+                value={affiliatePartForm.commissionRateBps}
+                onChange={(event) => updateAffiliatePartForm("commissionRateBps", event.target.value)}
+                placeholder="500 = 5%"
+              />
+            </label>
+          </div>
+          <ModalActions disabled={isPending} onCancel={() => setActiveModal(null)} onSave={saveAffiliatePart} />
+        </AdminModal>
+      )}
+
+      {activeModal === "affiliatePartners" && (
+        <AdminModal title="Affiliate Partners" onClose={() => setActiveModal(null)} isWide>
+          <div className="admin-modal-grid admin-parts-modal-grid">
+            <label className="admin-modal-wide">
+              Partner
+              <select value={affiliatePartnerForm.partnerId} onChange={(event) => chooseAffiliatePartner(event.target.value)}>
+                {affiliatePartners.length === 0 ? <option value="">No partners captured</option> : null}
+                {affiliatePartners.map((partner) => (
+                  <option key={partner.id} value={partner.id}>
+                    {partner.name} · {partner.partCount.toLocaleString()} parts
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Status
+              <select
+                value={affiliatePartnerForm.status}
+                onChange={(event) => updateAffiliatePartnerForm("status", event.target.value)}
+              >
+                <option value="CANDIDATE">Candidate</option>
+                <option value="APPROVED">Approved</option>
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+                <option value="REJECTED">Rejected</option>
+              </select>
+            </label>
+            <label className="admin-checkbox-field">
+              <input
+                type="checkbox"
+                checked={affiliatePartnerForm.active}
+                onChange={(event) => updateAffiliatePartnerForm("active", event.target.checked)}
+              />
+              Enable Partner
+            </label>
+            <label>
+              Network
+              <input value={affiliatePartnerForm.network} onChange={(event) => updateAffiliatePartnerForm("network", event.target.value)} />
+            </label>
+            <label>
+              Website
+              <input value={affiliatePartnerForm.websiteUrl} onChange={(event) => updateAffiliatePartnerForm("websiteUrl", event.target.value)} placeholder="https://..." />
+            </label>
+            <label className="admin-modal-wide">
+              Commission Label
+              <input value={affiliatePartnerForm.commissionLabel} onChange={(event) => updateAffiliatePartnerForm("commissionLabel", event.target.value)} placeholder="Example: Up to 5% commission" />
+            </label>
+            <label className="admin-modal-wide">
+              Tracking Template
+              <textarea className="admin-modal-textarea" value={affiliatePartnerForm.trackingTemplate} onChange={(event) => updateAffiliatePartnerForm("trackingTemplate", event.target.value)} />
+            </label>
+            <label className="admin-modal-wide">
+              Disclosure
+              <textarea className="admin-modal-textarea" value={affiliatePartnerForm.disclosure} onChange={(event) => updateAffiliatePartnerForm("disclosure", event.target.value)} />
+            </label>
+          </div>
+          <ModalActions disabled={isPending || affiliatePartners.length === 0} onCancel={() => setActiveModal(null)} onSave={saveAffiliatePartner} />
+        </AdminModal>
+      )}
     </section>
   );
 }
@@ -660,4 +893,17 @@ function toOptionalNumber(value: string) {
   if (!value.trim()) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toAffiliatePartnerForm(partner: AdminAffiliatePartnerRow | null): AffiliatePartnerFormState {
+  return {
+    partnerId: partner?.id ?? "",
+    status: partner?.status ?? "CANDIDATE",
+    active: partner?.active ?? false,
+    network: partner?.network ?? "",
+    websiteUrl: partner?.websiteUrl ?? "",
+    commissionLabel: partner?.commissionLabel ?? "",
+    trackingTemplate: partner?.trackingTemplate ?? "",
+    disclosure: partner?.disclosure ?? "",
+  };
 }
