@@ -239,7 +239,7 @@ export async function updateClubProfileAction(formData: FormData) {
   revalidatePath("/clubs");
   revalidatePath(`/clubs/${club.slug}`);
   revalidatePath(`/clubs/${nextSlug}`);
-  redirect(`/clubs/${nextSlug}#club-settings`);
+  redirect(`/clubs/${nextSlug}#members`);
 }
 
 export async function updateClubModelsAction(formData: FormData) {
@@ -279,7 +279,7 @@ export async function updateClubModelsAction(formData: FormData) {
 
   revalidatePath("/clubs");
   revalidatePath(`/clubs/${club.slug}`);
-  redirect(`/clubs/${club.slug}#club-settings`);
+  redirect(`/clubs/${club.slug}#members`);
 }
 
 export async function leaveClubAction(formData: FormData) {

@@ -14,7 +14,9 @@ export default function ClubModelSelector({
   initialModelIds?: string[];
 }) {
   const [openMenu, setOpenMenu] = useState<"make" | "model" | null>(null);
-  const [selectedMakeIds, setSelectedMakeIds] = useState<Set<string>>(() => new Set());
+  const [selectedMakeIds, setSelectedMakeIds] = useState<Set<string>>(
+    () => new Set(models.filter((model) => initialModelIds.includes(model.id)).map((model) => model.makeId)),
+  );
   const [selectedModelIds, setSelectedModelIds] = useState<Set<string>>(() => new Set(initialModelIds));
 
   const sortedMakes = [...makes].sort((a, b) => a.name.localeCompare(b.name));

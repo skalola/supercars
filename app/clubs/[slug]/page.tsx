@@ -5,6 +5,7 @@ import { leaveClubAction, manageClubMemberAction, requestJoinClubAction, updateC
 import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
 import { prisma } from "@/lib/prisma";
 import ClubConfirmButton from "../ClubConfirmButton";
+import ClubEditModal from "../ClubEditModal";
 import ClubModelSelector from "../ClubModelSelector";
 
 export const dynamic = "force-dynamic";
@@ -111,47 +112,49 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
       </section>
 
       <section className="club-detail-layout">
-        <article className="club-panel">
-          <div className="meets-panel-title">
-            <span>Model Network</span>
-            <strong>Cars This Club Follows</strong>
-          </div>
-          <div className="club-model-grid">
-            {club.models.length > 0 ? (
-              club.models.map(({ model }) => (
-                <Link key={model.id} href={`/make/${model.make.slug}/${model.slug}`} className="club-model-card">
-                  <div style={{ backgroundImage: `url("${model.images[0]?.url || model.make.logoUrl || "/images/garage-home-hero.png?v=garage-2"}")` }} />
-                  <span>{model.make.name}</span>
-                  <strong>{model.name}</strong>
-                </Link>
-              ))
-            ) : (
-              <p className="meet-empty-note">This club is open to all makes and models.</p>
-            )}
-          </div>
-        </article>
+        <div className="club-detail-main">
+          <article className="club-panel">
+            <div className="meets-panel-title">
+              <span>Model Network</span>
+              <strong>Cars This Club Follows</strong>
+            </div>
+            <div className="club-model-grid">
+              {club.models.length > 0 ? (
+                club.models.map(({ model }) => (
+                  <Link key={model.id} href={`/make/${model.make.slug}/${model.slug}`} className="club-model-card">
+                    <div style={{ backgroundImage: `url("${model.images[0]?.url || model.make.logoUrl || "/images/garage-home-hero.png?v=garage-2"}")` }} />
+                    <span>{model.make.name}</span>
+                    <strong>{model.name}</strong>
+                  </Link>
+                ))
+              ) : (
+                <p className="meet-empty-note">This club is open to all makes and models.</p>
+              )}
+            </div>
+          </article>
 
-        <article className="club-panel">
-          <div className="meets-panel-title">
-            <span>Meet Link</span>
-            <strong>Club Events</strong>
-          </div>
-          <div className="club-meet-list">
-            {club.meets.length > 0 ? (
-              club.meets.map((meet) => (
-                <Link key={meet.id} href={`/meets/${meet.slug}`} className="club-meet-row">
-                  <span>{meet.city}, {meet.state}</span>
-                  <strong>{meet.title}</strong>
-                  <p>{new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(meet.startsAt)}</p>
-                </Link>
-              ))
-            ) : (
-              <p className="meet-empty-note">No club-hosted meets yet.</p>
-            )}
-          </div>
-        </article>
+          <article className="club-panel">
+            <div className="meets-panel-title">
+              <span>Meet Link</span>
+              <strong>Club Events</strong>
+            </div>
+            <div className="club-meet-list">
+              {club.meets.length > 0 ? (
+                club.meets.map((meet) => (
+                  <Link key={meet.id} href={`/meets/${meet.slug}`} className="club-meet-row">
+                    <span>{meet.city}, {meet.state}</span>
+                    <strong>{meet.title}</strong>
+                    <p>{new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(meet.startsAt)}</p>
+                  </Link>
+                ))
+              ) : (
+                <p className="meet-empty-note">No club-hosted meets yet.</p>
+              )}
+            </div>
+          </article>
+        </div>
 
-        <article id="members" className="club-panel is-wide">
+        <aside id="members" className="club-panel club-members-widget">
           <div className="meets-panel-title">
             <span>Garage Roster</span>
             <strong>Members</strong>
@@ -162,20 +165,16 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
                 {member.user.image ? <img src={member.user.image} alt="" referrerPolicy="no-referrer" /> : <span />}
                 <div>
                   <strong>{member.user.name || member.user.username || "SUPERCAR DASH Member"}</strong>
-                  <p>{member.role === "OWNER" ? "Club Owner" : "Member"}</p>
+                  <p>{member.role === "OWNER" ? "Club Owner" : member.role === "MODERATOR" ? "Moderator" : "Member"}</p>
                 </div>
               </Link>
             ))}
           </div>
-        </article>
-
-        {canModerate ? (
-          <article className="club-panel is-wide">
-            <div className="meets-panel-title">
-              <span>Moderator Console</span>
-              <strong>Membership Requests</strong>
-            </div>
-            <div id="club-settings" className="club-settings-grid">
+          {pendingMembers.length > 0 && canModerate ? (
+            <p className="club-widget-note">{pendingMembers.length} pending {pendingMembers.length === 1 ? "request" : "requests"}</p>
+          ) : null}
+          {canModerate ? (
+            <ClubEditModal>
               <form action={updateClubProfileAction} className="club-form">
                 <input type="hidden" name="clubId" value={club.id} />
                 <div className="meets-panel-title">
@@ -227,59 +226,65 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
                 />
                 <button type="submit">Save Models</button>
               </form>
-            </div>
 
-            {pendingMembers.length > 0 ? (
-              <div className="club-moderation-list">
-                {pendingMembers.map((member) => (
-                  <div key={member.id} className="club-moderation-row">
-                    <div>
-                      <strong>{member.user.name || member.user.username || member.user.email || "Member"}</strong>
-                      <span>Pending approval</span>
-                    </div>
-                    <form action={manageClubMemberAction}>
-                      <input type="hidden" name="memberId" value={member.id} />
-                      <button type="submit" name="action" value="APPROVE">Approve</button>
-                      <ClubConfirmButton name="action" value="DECLINE" message="Decline this club request?">
-                        Decline
-                      </ClubConfirmButton>
-                    </form>
+              <section className="club-edit-section">
+                <div className="meets-panel-title">
+                  <span>Members</span>
+                  <strong>Requests & Roles</strong>
+                </div>
+                {pendingMembers.length > 0 ? (
+                  <div className="club-moderation-list">
+                    {pendingMembers.map((member) => (
+                      <div key={member.id} className="club-moderation-row">
+                        <div>
+                          <strong>{member.user.name || member.user.username || member.user.email || "Member"}</strong>
+                          <span>Pending approval</span>
+                        </div>
+                        <form action={manageClubMemberAction}>
+                          <input type="hidden" name="memberId" value={member.id} />
+                          <button type="submit" name="action" value="APPROVE">Approve</button>
+                          <ClubConfirmButton name="action" value="DECLINE" message="Decline this club request?">
+                            Decline
+                          </ClubConfirmButton>
+                        </form>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="meet-empty-note">No pending requests.</p>
-            )}
+                ) : (
+                  <p className="meet-empty-note">No pending requests.</p>
+                )}
 
-            <div className="club-moderation-list">
-              {activeMembers
-                .filter((member) => member.userId !== club.creatorId)
-                .map((member) => (
-                  <div key={member.id} className="club-moderation-row">
-                    <div>
-                      <strong>{member.user.name || member.user.username || member.user.email || "Member"}</strong>
-                      <span>{member.role}</span>
-                    </div>
-                    <form action={manageClubMemberAction}>
-                      <input type="hidden" name="memberId" value={member.id} />
-                      {member.role === "MODERATOR" ? (
-                        <ClubConfirmButton name="action" value="DEMOTE" message="Demote this moderator to member?">
-                          Demote
-                        </ClubConfirmButton>
-                      ) : (
-                        <ClubConfirmButton name="action" value="PROMOTE" message="Promote this member to moderator?">
-                          Promote
-                        </ClubConfirmButton>
-                      )}
-                      <ClubConfirmButton name="action" value="REMOVE" message="Remove this member from the club?">
-                        Remove
-                      </ClubConfirmButton>
-                    </form>
-                  </div>
-                ))}
-            </div>
-          </article>
-        ) : null}
+                <div className="club-moderation-list">
+                  {activeMembers
+                    .filter((member) => member.userId !== club.creatorId)
+                    .map((member) => (
+                      <div key={member.id} className="club-moderation-row">
+                        <div>
+                          <strong>{member.user.name || member.user.username || member.user.email || "Member"}</strong>
+                          <span>{member.role}</span>
+                        </div>
+                        <form action={manageClubMemberAction}>
+                          <input type="hidden" name="memberId" value={member.id} />
+                          {member.role === "MODERATOR" ? (
+                            <ClubConfirmButton name="action" value="DEMOTE" message="Demote this moderator to member?">
+                              Demote
+                            </ClubConfirmButton>
+                          ) : (
+                            <ClubConfirmButton name="action" value="PROMOTE" message="Promote this member to moderator?">
+                              Promote
+                            </ClubConfirmButton>
+                          )}
+                          <ClubConfirmButton name="action" value="REMOVE" message="Remove this member from the club?">
+                            Remove
+                          </ClubConfirmButton>
+                        </form>
+                      </div>
+                    ))}
+                </div>
+              </section>
+            </ClubEditModal>
+          ) : null}
+        </aside>
       </section>
     </main>
   );

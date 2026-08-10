@@ -7865,11 +7865,17 @@ canvas {
 .clubs-layout,
 .club-detail-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.34fr);
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
   align-items: start;
   gap: 16px;
   width: min(1500px, 100%);
   margin: 0 auto;
+}
+
+.club-detail-main {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
 }
 
 .club-model-grid,
@@ -8298,6 +8304,20 @@ canvas {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.club-members-widget {
+  position: sticky;
+  top: 88px;
+  max-height: calc(100vh - 112px);
+}
+
+.club-members-widget .club-member-grid {
+  grid-template-columns: 1fr;
+  max-height: min(520px, calc(100vh - 310px));
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+}
+
 .club-member-card {
   display: flex;
   align-items: center;
@@ -8307,12 +8327,135 @@ canvas {
 
 .club-member-card img,
 .club-member-card > span {
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
   flex: 0 0 auto;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.14);
   object-fit: cover;
+}
+
+.club-widget-note {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.club-edit-button,
+.club-edit-modal-header button {
+  min-height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.club-edit-button {
+  width: 100%;
+  margin-top: 2px;
+}
+
+.club-edit-button:hover,
+.club-edit-button:focus-visible,
+.club-edit-modal-header button:hover,
+.club-edit-modal-header button:focus-visible {
+  border-color: rgba(226, 15, 27, 0.56);
+  background: rgba(226, 15, 27, 0.14);
+  outline: none;
+}
+
+.club-edit-modal {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+}
+
+.club-edit-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.68);
+  backdrop-filter: blur(14px);
+}
+
+.club-edit-modal-panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(1040px, calc(100vw - 32px));
+  max-height: min(820px, calc(100vh - 32px));
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(8, 9, 11, 0.98);
+  box-shadow: 0 34px 120px rgba(0, 0, 0, 0.64);
+  transform: translate(-50%, -50%);
+}
+
+.club-edit-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+}
+
+.club-edit-modal-header div {
+  display: grid;
+  gap: 4px;
+}
+
+.club-edit-modal-header span {
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.club-edit-modal-header strong {
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 760;
+}
+
+.club-edit-modal-header button {
+  padding: 0 14px;
+}
+
+.club-edit-modal-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 18px;
+}
+
+.club-edit-modal-content > .club-form,
+.club-edit-section {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.club-edit-section {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 14px;
 }
 
 .club-meet-row {
@@ -8507,6 +8650,18 @@ canvas {
   .club-stat-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .club-members-widget {
+    position: static;
+    max-height: none;
+  }
+
+  .club-members-widget .club-member-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
 }
 
 @media (max-width: 720px) {
@@ -8540,6 +8695,47 @@ canvas {
     height: 34px;
     padding: 5px;
     border-radius: 7px;
+  }
+
+  .club-members-widget {
+    position: static;
+    max-height: none;
+  }
+
+  .club-members-widget .club-member-grid {
+    grid-template-columns: 1fr;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .club-edit-modal-panel {
+    inset: 0;
+    width: auto;
+    max-height: none;
+    border-width: 0;
+    border-radius: 0;
+    transform: none;
+  }
+
+  .club-edit-modal-header {
+    align-items: start;
+    padding: 16px;
+  }
+
+  .club-edit-modal-header button {
+    min-height: 38px;
+  }
+
+  .club-edit-modal-content {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .club-edit-modal-content > .club-form,
+  .club-edit-section {
+    padding: 14px;
   }
 
   .club-list-header {
