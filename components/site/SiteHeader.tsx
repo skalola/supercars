@@ -20,6 +20,7 @@ const leftNavLinks = [
   { href: "/meets", label: "Meets" },
   { href: "/clubs", label: "Clubs" },
   { href: "/inventory", label: "Market" },
+  { href: "/parts", label: "Parts" },
 ];
 
 const rightNavLinks: typeof leftNavLinks = [];
