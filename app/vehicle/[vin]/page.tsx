@@ -15,6 +15,7 @@ import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images"
 import { isValidEmail } from "@/lib/fulfillment/partner-registry";
 import { emailMatchesWebsiteDomain } from "@/lib/directory/contact-domain-policy";
 import { calculateModifiedPerformance } from "@/lib/parts/performance";
+import { isAffiliateTrackingReady } from "@/lib/parts/affiliate-tracking";
 import type { CSSProperties } from "react";
 
 type VehiclePageProps = {
@@ -137,7 +138,13 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
     );
   }
 
-  const [maintenanceRules, market, serviceShops, savedFavorite] = await Promise.all([
+  const installedCatalogPartIds = new Set(
+    (vehicle.installedParts || [])
+      .map((installedPart: any) => installedPart.partId)
+      .filter(Boolean)
+  );
+
+  const [maintenanceRules, market, serviceShops, savedFavorite, recommendedParts] = await Promise.all([
     prisma.maintenanceRule.findMany({
       where: {
         OR: [
@@ -183,6 +190,65 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
           select: { id: true },
         })
       : null,
+    prisma.performancePart.findMany({
+      where: {
+        status: "ACTIVE",
+        id: installedCatalogPartIds.size > 0 ? { notIn: Array.from(installedCatalogPartIds) } : undefined,
+        OR: [
+          { compatibility: { none: {} } },
+          {
+            compatibility: {
+              some: {
+                AND: [
+                  {
+                    OR: [
+                      { makeId: null },
+                      { makeId: vehicle.model.makeId },
+                    ],
+                  },
+                  {
+                    OR: [
+                      { modelId: null },
+                      { modelId: vehicle.modelId },
+                    ],
+                  },
+                  {
+                    OR: [
+                      { yearStart: null },
+                      { yearStart: { lte: vehicle.year } },
+                    ],
+                  },
+                  {
+                    OR: [
+                      { yearEnd: null },
+                      { yearEnd: { gte: vehicle.year } },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        ],
+      },
+      include: {
+        category: true,
+        brand: true,
+        affiliatePartner: true,
+        compatibility: {
+          include: {
+            make: true,
+            model: true,
+          },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+      orderBy: [
+        { category: { displayOrder: "asc" } },
+        { brand: { name: "asc" } },
+        { name: "asc" },
+      ],
+      take: 8,
+    }),
   ]);
 
   const makeName = vehicle.model.make.name;
@@ -192,6 +258,13 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
     installedParts: vehicle.installedParts || [],
   });
   const unlinkedModifications = (vehicle.modifications || []).filter((mod: any) => !mod.catalogInstall);
+  const recommendedPerformancePreview = recommendedParts.reduce(
+    (summary, part) => ({
+      hp: summary.hp + (part.estimatedHpGain || 0),
+      torque: summary.torque + (part.estimatedTorqueGain || 0),
+    }),
+    { hp: 0, torque: 0 }
+  );
   const serviceShopNames = serviceShops
     .filter((shop) => isValidEmail(shop.email) && emailMatchesWebsiteDomain(shop.email, shop.website))
     .filter((shop) => {
@@ -1163,6 +1236,77 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
                     )}
                   </div>
                 ))}
+
+                <div className="vehicle-parts-recommendations" aria-label="Compatible performance part recommendations">
+                  <div className="vehicle-parts-recommendations-header">
+                    <div>
+                      <span>Recommended Upgrades</span>
+                      <strong>{recommendedParts.length.toLocaleString()} compatible part{recommendedParts.length === 1 ? "" : "s"}</strong>
+                    </div>
+                    {(recommendedPerformancePreview.hp > 0 || recommendedPerformancePreview.torque > 0) && (
+                      <div>
+                        {recommendedPerformancePreview.hp > 0 ? <em>+{recommendedPerformancePreview.hp.toLocaleString()} hp cataloged</em> : null}
+                        {recommendedPerformancePreview.torque > 0 ? <em>+{recommendedPerformancePreview.torque.toLocaleString()} lb-ft cataloged</em> : null}
+                      </div>
+                    )}
+                  </div>
+
+                  {recommendedParts.length === 0 ? (
+                    <p className="vehicle-parts-empty">
+                      No compatible catalog upgrades are active yet for this model.
+                    </p>
+                  ) : (
+                    <div className="vehicle-parts-recommendation-grid">
+                      {recommendedParts.map((part) => {
+                        const trackingReady = isAffiliateTrackingReady(part);
+                        const fitment = part.compatibility.map(formatPartCompatibility).filter(Boolean);
+
+                        return (
+                          <article key={part.id} className="vehicle-parts-recommendation-card">
+                            {part.imageUrl ? (
+                              <img src={part.imageUrl} alt="" loading="lazy" />
+                            ) : (
+                              <div className="vehicle-parts-recommendation-placeholder">{part.category.name}</div>
+                            )}
+                            <div>
+                              <div className="vehicle-parts-recommendation-kicker">
+                                <span>{part.category.name}</span>
+                                <span>{part.brand.name}</span>
+                              </div>
+                              <h4>{part.name}</h4>
+                              {part.partNumber ? <p className="vehicle-parts-sku">Part #{part.partNumber}</p> : null}
+                              {part.description ? <p>{part.description}</p> : null}
+                              <div className="vehicle-parts-pill-row">
+                                <span>{formatPartPrice(part.retailPriceCents)}</span>
+                                {part.estimatedHpGain ? <span>+{part.estimatedHpGain.toLocaleString()} hp</span> : null}
+                                {part.estimatedTorqueGain ? <span>+{part.estimatedTorqueGain.toLocaleString()} lb-ft</span> : null}
+                                {fitment[0] ? <span>{fitment[0]}</span> : <span>Universal / unscoped</span>}
+                              </div>
+                              <div className="vehicle-parts-recommendation-actions">
+                                {part.sourceUrl ? (
+                                  <a href={part.sourceUrl} target="_blank" rel="noopener noreferrer">
+                                    Review Source
+                                  </a>
+                                ) : (
+                                  <span>No source</span>
+                                )}
+                                {trackingReady ? (
+                                  <a href={`/out/parts/${part.id}?source=/vehicle/${vehicle.vin}`} rel="nofollow sponsored">
+                                    Shop Partner
+                                  </a>
+                                ) : (
+                                  <button type="button" disabled>
+                                    Affiliate Pending
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1291,6 +1435,77 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
         )}
       </section>
 
+      {!isOwner && (
+        <section className="vehicle-public-parts-panel">
+          <div className="vehicle-public-parts-header">
+            <div>
+              <span>Compatible Parts</span>
+              <h2>Recommended Upgrades</h2>
+            </div>
+            {(recommendedPerformancePreview.hp > 0 || recommendedPerformancePreview.torque > 0) && (
+              <div>
+                {recommendedPerformancePreview.hp > 0 ? <em>+{recommendedPerformancePreview.hp.toLocaleString()} hp cataloged</em> : null}
+                {recommendedPerformancePreview.torque > 0 ? <em>+{recommendedPerformancePreview.torque.toLocaleString()} lb-ft cataloged</em> : null}
+              </div>
+            )}
+          </div>
+
+          {recommendedParts.length === 0 ? (
+            <p className="vehicle-parts-empty">No compatible catalog upgrades are active yet for this model.</p>
+          ) : (
+            <div className="vehicle-parts-recommendation-grid">
+              {recommendedParts.map((part) => {
+                const trackingReady = isAffiliateTrackingReady(part);
+                const fitment = part.compatibility.map(formatPartCompatibility).filter(Boolean);
+
+                return (
+                  <article key={part.id} className="vehicle-parts-recommendation-card">
+                    {part.imageUrl ? (
+                      <img src={part.imageUrl} alt="" loading="lazy" />
+                    ) : (
+                      <div className="vehicle-parts-recommendation-placeholder">{part.category.name}</div>
+                    )}
+                    <div>
+                      <div className="vehicle-parts-recommendation-kicker">
+                        <span>{part.category.name}</span>
+                        <span>{part.brand.name}</span>
+                      </div>
+                      <h4>{part.name}</h4>
+                      {part.partNumber ? <p className="vehicle-parts-sku">Part #{part.partNumber}</p> : null}
+                      {part.description ? <p>{part.description}</p> : null}
+                      <div className="vehicle-parts-pill-row">
+                        <span>{formatPartPrice(part.retailPriceCents)}</span>
+                        {part.estimatedHpGain ? <span>+{part.estimatedHpGain.toLocaleString()} hp</span> : null}
+                        {part.estimatedTorqueGain ? <span>+{part.estimatedTorqueGain.toLocaleString()} lb-ft</span> : null}
+                        {fitment[0] ? <span>{fitment[0]}</span> : <span>Universal / unscoped</span>}
+                      </div>
+                      <div className="vehicle-parts-recommendation-actions">
+                        {part.sourceUrl ? (
+                          <a href={part.sourceUrl} target="_blank" rel="noopener noreferrer">
+                            Review Source
+                          </a>
+                        ) : (
+                          <span>No source</span>
+                        )}
+                        {trackingReady ? (
+                          <a href={`/out/parts/${part.id}?source=/vehicle/${vehicle.vin}`} rel="nofollow sponsored">
+                            Shop Partner
+                          </a>
+                        ) : (
+                          <button type="button" disabled>
+                            Affiliate Pending
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* Maintenance Intelligence Section */}
       <MaintenanceIntelligence
         vin={vehicle.vin}
@@ -1350,6 +1565,36 @@ function buildVehicleGalleryImages(vehicle: any, resolvedHeroImage: string | nul
   });
 
   return gallery;
+}
+
+function formatPartPrice(value: number | null) {
+  if (value === null) return "Price pending";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value / 100);
+}
+
+function formatPartCompatibility(partCompatibility: {
+  make: { name: string } | null;
+  model: { name: string } | null;
+  yearStart: number | null;
+  yearEnd: number | null;
+  trim: string | null;
+  engine: string | null;
+}) {
+  const makeModel = [partCompatibility.make?.name, partCompatibility.model?.name].filter(Boolean).join(" ");
+  const years = formatPartYearRange(partCompatibility.yearStart, partCompatibility.yearEnd);
+  const details = [makeModel || "Universal", years, partCompatibility.trim, partCompatibility.engine].filter(Boolean);
+  return details.join(" · ");
+}
+
+function formatPartYearRange(start: number | null, end: number | null) {
+  if (start && end) return start === end ? String(start) : `${start}-${end}`;
+  if (start) return `${start}+`;
+  if (end) return `Through ${end}`;
+  return null;
 }
 
 function PassportMetric({ label, value, accent }: { label: string; value: string; accent?: string }) {
