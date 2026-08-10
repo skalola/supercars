@@ -11,6 +11,7 @@ type CliOptions = {
   categoryLimit: number;
   filesPerCategory: number;
   directSearchLimit: number;
+  wikidataLimit: number;
   openverseLimit: number;
   delayMs: number;
 };
@@ -40,6 +41,47 @@ type CommonsFileSearchResponse = {
       snippet?: string;
     }>;
   };
+};
+
+type WikidataSearchResponse = {
+  search?: Array<{
+    id: string;
+    title: string;
+    label?: string;
+    description?: string;
+  }>;
+};
+
+type WikidataEntitiesResponse = {
+  entities?: Record<string, {
+    id: string;
+    labels?: {
+      en?: {
+        value?: string;
+      };
+    };
+    descriptions?: {
+      en?: {
+        value?: string;
+      };
+    };
+    claims?: {
+      P18?: Array<{
+        mainsnak?: {
+          datavalue?: {
+            value?: string;
+          };
+        };
+      }>;
+      P373?: Array<{
+        mainsnak?: {
+          datavalue?: {
+            value?: string;
+          };
+        };
+      }>;
+    };
+  }>;
 };
 
 type OpenverseImageResponse = {
@@ -152,6 +194,75 @@ async function main() {
       await sleep(options.delayMs);
     }
 
+    const wikidataQueries = buildWikidataSearchQueries(
+      make.name,
+      missingModels.map((model) => model.name),
+      baseFamilies,
+    ).slice(0, options.wikidataLimit);
+    for (const query of wikidataQueries) {
+      const entities = await searchWikidataEntities(query).catch((error) => {
+        console.warn(`[model-image-pool] Wikidata search failed for ${query}:`, error instanceof Error ? error.message : error);
+        return [];
+      });
+      for (const entitySearch of entities.slice(0, 4)) {
+        const entity = await fetchWikidataEntity(entitySearch.id).catch(() => null);
+        if (!entity) continue;
+        const label = entity.labels?.en?.value || entitySearch.label || entitySearch.title;
+        const description = entity.descriptions?.en?.value || entitySearch.description || "";
+        const entityContext = `${query} ${label} ${description}`;
+        const baseModelName = inferBestBaseFamily(entityContext, baseFamilies);
+        const imageFilename = entity.claims?.P18?.[0]?.mainsnak?.datavalue?.value || null;
+        if (imageFilename) {
+          const metadata = await fetchCommonsImageMetadata(imageFilename).catch(() => null);
+          if (metadata?.imageUrl && metadata.license) {
+            const result = await upsertCandidate({
+              makeName: make.name,
+              url: metadata.imageUrl,
+              source: "WIKIDATA_COMMONS_POOL",
+              sourceName: "Wikidata Commons Image",
+              sourceUrl: metadata.sourceUrl || wikidataEntityUrl(entity.id),
+              license: metadata.license,
+              attribution: metadata.attribution,
+              attributionUrl: metadata.attributionUrl,
+              title: imageFilename,
+              category: null,
+              context: entityContext,
+              baseModelName,
+            });
+            candidatesCreated += result.created ? 1 : 0;
+            candidatesUpdated += result.created ? 0 : 1;
+          }
+        }
+
+        const commonsCategory = entity.claims?.P373?.[0]?.mainsnak?.datavalue?.value || null;
+        if (commonsCategory) {
+          const files = await fetchCategoryFiles(`Category:${commonsCategory}`).catch(() => []);
+          for (const file of files.slice(0, Math.min(4, options.filesPerCategory))) {
+            const metadata = await fetchCommonsImageMetadata(file.title).catch(() => null);
+            if (!metadata?.imageUrl || !metadata.license) continue;
+            const title = file.title.replace(/^File:/i, "");
+            const result = await upsertCandidate({
+              makeName: make.name,
+              url: metadata.imageUrl,
+              source: "WIKIDATA_COMMONS_CATEGORY_POOL",
+              sourceName: "Wikidata Commons Category",
+              sourceUrl: metadata.sourceUrl || commonsCategoryUrl(`Category:${commonsCategory}`),
+              license: metadata.license,
+              attribution: metadata.attribution,
+              attributionUrl: metadata.attributionUrl,
+              title,
+              category: `Category:${commonsCategory}`,
+              context: `${entityContext} ${title}`,
+              baseModelName,
+            });
+            candidatesCreated += result.created ? 1 : 0;
+            candidatesUpdated += result.created ? 0 : 1;
+          }
+        }
+        await sleep(options.delayMs);
+      }
+    }
+
     for (const family of baseFamilies.slice(0, options.openverseLimit)) {
       const results = await searchOpenverse(`${make.name} ${family} car`).catch(() => []);
       for (const item of results) {
@@ -180,6 +291,44 @@ async function main() {
   console.log(`[model-image-pool] Categories scanned: ${categoriesScanned}`);
   console.log(`[model-image-pool] Candidates created: ${candidatesCreated}`);
   console.log(`[model-image-pool] Candidates updated: ${candidatesUpdated}`);
+}
+
+async function searchWikidataEntities(query: string) {
+  const params = new URLSearchParams({
+    action: "wbsearchentities",
+    search: query,
+    language: "en",
+    uselang: "en",
+    type: "item",
+    limit: "8",
+    format: "json",
+    origin: "*",
+  });
+  const response = await fetch(`https://www.wikidata.org/w/api.php?${params.toString()}`, {
+    headers: { "User-Agent": "SUPERCAR-DASH-model-image-pool/1.0 (contact: support@supercars.market)" },
+  });
+  if (!response.ok) throw new Error(`Wikidata search HTTP ${response.status}`);
+  const data = (await response.json()) as WikidataSearchResponse;
+  return (data.search || [])
+    .filter((item) => scoreContext(`${item.label || item.title} ${item.description || ""}`, query) >= 45)
+    .sort((a, b) => scoreContext(`${b.label || b.title} ${b.description || ""}`, query) - scoreContext(`${a.label || a.title} ${a.description || ""}`, query));
+}
+
+async function fetchWikidataEntity(id: string) {
+  const params = new URLSearchParams({
+    action: "wbgetentities",
+    ids: id,
+    props: "labels|descriptions|claims",
+    languages: "en",
+    format: "json",
+    origin: "*",
+  });
+  const response = await fetch(`https://www.wikidata.org/w/api.php?${params.toString()}`, {
+    headers: { "User-Agent": "SUPERCAR-DASH-model-image-pool/1.0 (contact: support@supercars.market)" },
+  });
+  if (!response.ok) throw new Error(`Wikidata entity HTTP ${response.status}`);
+  const data = (await response.json()) as WikidataEntitiesResponse;
+  return Object.values(data.entities || {})[0] || null;
 }
 
 async function searchCommonsFiles(query: string) {
@@ -327,6 +476,20 @@ function buildDirectSearchQueries(makeName: string, modelNames: string[], baseFa
   return Array.from(queries).filter((query) => query.length >= makeName.length + 3);
 }
 
+function buildWikidataSearchQueries(makeName: string, modelNames: string[], baseFamilies: string[]) {
+  const queries = new Set<string>();
+  for (const modelName of modelNames) {
+    queries.add(`${makeName} ${stripGameVariantTerms(modelName)}`.trim());
+    queries.add(`${makeName} ${modelName}`.trim());
+    const base = canonicalBaseModelName(modelName, makeName);
+    if (base) queries.add(`${makeName} ${base}`.trim());
+  }
+  for (const family of baseFamilies) {
+    queries.add(`${makeName} ${family}`.trim());
+  }
+  return Array.from(queries).filter((query) => query.length >= makeName.length + 3);
+}
+
 function stripGameVariantTerms(value: string) {
   return value
     .replace(/\([^)]*\)/g, " ")
@@ -371,6 +534,10 @@ function commonsFileUrl(title: string) {
   return `https://commons.wikimedia.org/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`;
 }
 
+function wikidataEntityUrl(id: string) {
+  return `https://www.wikidata.org/wiki/${encodeURIComponent(id)}`;
+}
+
 function parseOptions(args: string[]): CliOptions {
   const getValue = (name: string) => args.find((arg) => arg.startsWith(`--${name}=`))?.split("=").slice(1).join("=");
   return {
@@ -379,6 +546,7 @@ function parseOptions(args: string[]): CliOptions {
     categoryLimit: Math.max(1, Number(getValue("category-limit")) || 12),
     filesPerCategory: Math.max(1, Number(getValue("files-per-category")) || 8),
     directSearchLimit: Math.max(0, Number(getValue("direct-search-limit")) || 20),
+    wikidataLimit: Math.max(0, Number(getValue("wikidata-limit")) || 20),
     openverseLimit: Math.max(0, Number(getValue("openverse-limit")) || 8),
     delayMs: Math.max(0, Number(getValue("delay-ms")) || 1200),
   };
