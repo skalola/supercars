@@ -5169,6 +5169,7 @@ canvas {
   align-items: center;
   justify-content: center;
   min-height: 44px;
+  padding: 0 18px;
   border-radius: 6px;
   color: #ffffff;
   font-size: 13px;
@@ -7822,7 +7823,7 @@ canvas {
 .club-detail-title {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 22px;
   max-width: 860px;
   margin-top: 8px;
 }
@@ -7854,11 +7855,11 @@ canvas {
 
 .club-detail-logo {
   flex: 0 0 auto;
-  width: 42px;
-  height: 42px;
-  padding: 7px;
+  width: clamp(96px, 12vw, 150px);
+  height: clamp(96px, 12vw, 150px);
+  padding: clamp(12px, 1.6vw, 20px);
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 8px;
+  border-radius: 12px;
   background: rgba(0, 0, 0, 0.36);
   object-fit: contain;
 }
@@ -8751,14 +8752,14 @@ canvas {
   }
 
   .club-detail-title {
-    gap: 10px;
+    gap: 14px;
   }
 
   .club-detail-logo {
-    width: 34px;
-    height: 34px;
-    padding: 5px;
-    border-radius: 7px;
+    width: clamp(76px, 22vw, 112px);
+    height: clamp(76px, 22vw, 112px);
+    padding: 10px;
+    border-radius: 10px;
   }
 
   .club-members-widget {
