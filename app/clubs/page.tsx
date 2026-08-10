@@ -38,6 +38,12 @@ export default async function ClubsPage() {
   ]);
 
   const modelOptions = catalog.models.slice(0, 180);
+  const clubsByMembers = [...clubs]
+    .sort((a, b) => b._count.members - a._count.members || b._count.meets - a._count.meets || a.name.localeCompare(b.name))
+    .slice(0, 10);
+  const clubsByMeets = [...clubs]
+    .sort((a, b) => b._count.meets - a._count.meets || b._count.members - a._count.members || a.name.localeCompare(b.name))
+    .slice(0, 10);
 
   return (
     <main className="clubs-shell">
@@ -51,6 +57,54 @@ export default async function ClubsPage() {
             <a href="#club-grid" className="meets-secondary-button">Browse Clubs</a>
           </div>
         </div>
+      </section>
+
+      <section className="club-leaderboard" aria-label="Club leaderboards">
+        <article>
+          <div className="meets-panel-title">
+            <span>Most Members</span>
+            <strong>Largest Clubs</strong>
+          </div>
+          <div className="club-rank-list">
+            {clubsByMembers.length > 0 ? (
+              clubsByMembers.map((club, index) => (
+                <Link key={club.id} href={`/clubs/${club.slug}`} className="club-rank-row">
+                  <em>{String(index + 1).padStart(2, "0")}</em>
+                  <div>
+                    <strong>{club.name}</strong>
+                    <span>{club.city}, {club.state}</span>
+                  </div>
+                  <p>{club._count.members} members</p>
+                </Link>
+              ))
+            ) : (
+              <p className="meet-empty-note">No member activity yet.</p>
+            )}
+          </div>
+        </article>
+
+        <article>
+          <div className="meets-panel-title">
+            <span>Most Meets</span>
+            <strong>Most Active Clubs</strong>
+          </div>
+          <div className="club-rank-list">
+            {clubsByMeets.length > 0 ? (
+              clubsByMeets.map((club, index) => (
+                <Link key={club.id} href={`/clubs/${club.slug}`} className="club-rank-row">
+                  <em>{String(index + 1).padStart(2, "0")}</em>
+                  <div>
+                    <strong>{club.name}</strong>
+                    <span>{club.city}, {club.state}</span>
+                  </div>
+                  <p>{club._count.meets} meets</p>
+                </Link>
+              ))
+            ) : (
+              <p className="meet-empty-note">No club-hosted meets yet.</p>
+            )}
+          </div>
+        </article>
       </section>
 
       <section className="clubs-layout">

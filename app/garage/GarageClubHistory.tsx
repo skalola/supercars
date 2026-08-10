@@ -13,29 +13,40 @@ export default function GarageClubHistory({ clubs, isOwner }: { clubs: GarageClu
       </div>
 
       {clubs.length > 0 ? (
-        <div className="garage-club-grid">
-          {clubs.map((club) => (
-            <Link key={club.id} href={club.href} className="garage-club-card">
-              <div>
-                <span>{club.status === "PENDING" ? "Pending Request" : club.role === "OWNER" ? "Owner" : "Member"}</span>
+        <>
+          <div className="garage-club-badge-strip" aria-label="Club badges">
+            {clubs.map((club) => (
+              <Link key={`badge:${club.id}`} href={club.href} className={club.status === "PENDING" ? "is-pending" : ""}>
+                <span>{club.role === "OWNER" ? "Founder" : club.status === "PENDING" ? "Pending" : "Club"}</span>
                 <strong>{club.name}</strong>
-                <p>{club.location}</p>
-              </div>
-              <div className="garage-club-card-stats">
-                <span>{club.memberCount} members</span>
-                <span>{club.modelCount} models</span>
-                <span>{club.meetCount} meets</span>
-              </div>
-              {club.modelLabels.length > 0 ? (
-                <div className="garage-club-models">
-                  {club.modelLabels.map((label) => (
-                    <em key={label}>{label}</em>
-                  ))}
+              </Link>
+            ))}
+          </div>
+
+          <div className="garage-club-grid">
+            {clubs.map((club) => (
+              <Link key={club.id} href={club.href} className="garage-club-card">
+                <div>
+                  <span>{club.status === "PENDING" ? "Pending Request" : club.role === "OWNER" ? "Owner" : "Member"}</span>
+                  <strong>{club.name}</strong>
+                  <p>{club.location}</p>
                 </div>
-              ) : null}
-            </Link>
-          ))}
-        </div>
+                <div className="garage-club-card-stats">
+                  <span>{club.memberCount} members</span>
+                  <span>{club.modelCount} models</span>
+                  <span>{club.meetCount} meets</span>
+                </div>
+                {club.modelLabels.length > 0 ? (
+                  <div className="garage-club-models">
+                    {club.modelLabels.map((label) => (
+                      <em key={label}>{label}</em>
+                    ))}
+                  </div>
+                ) : null}
+              </Link>
+            ))}
+          </div>
+        </>
       ) : (
         <div className="garage-empty-panel garage-club-empty">
           <h2>No clubs yet</h2>

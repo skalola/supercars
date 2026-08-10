@@ -108,7 +108,6 @@ export async function requestJoinClubAction(formData: FormData) {
     where: { clubId_userId: { clubId, userId } },
     update: {
       status,
-      role: MEMBER_ROLE,
       joinedAt: status === ACTIVE_MEMBER_STATUS ? new Date() : null,
     },
     create: {
