@@ -6470,6 +6470,14 @@ canvas {
   line-height: 1.55;
 }
 
+.parts-store-hero .parts-store-disclosure {
+  margin-top: 12px;
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 12px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
 .parts-store-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -6818,6 +6826,12 @@ canvas {
 .parts-card-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.58;
+}
+
+.parts-card-actions a[rel~="sponsored"] {
+  border-color: #111111;
+  background: #111111;
+  color: #ffffff;
 }
 
 .model-detail-shell {

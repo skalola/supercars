@@ -47,6 +47,9 @@ export type AdminPerformancePartRow = {
   estimatedTorqueGain: string;
   categoryName: string;
   brandName: string;
+  affiliatePartnerName: string | null;
+  affiliateReady: boolean;
+  clickCount: number;
   sourceUrl: string | null;
   compatibility: string[];
   updatedAt: string;
@@ -377,7 +380,14 @@ export function AdminPartsClient({
                       <span className="admin-listing-identifier">Universal / unscoped</span>
                     )}
                   </td>
-                  <td data-label="Tracking">{part.trackingStatus}</td>
+                  <td data-label="Tracking">
+                    <span className={`admin-status-pill ${part.affiliateReady ? "" : "is-muted"}`}>
+                      {part.affiliateReady ? "Ready" : part.trackingStatus}
+                    </span>
+                    <span className="admin-listing-identifier">
+                      {part.affiliatePartnerName ?? "No partner"} · {part.clickCount.toLocaleString()} clicks
+                    </span>
+                  </td>
                   <td data-label="Source">
                     {part.sourceUrl ? (
                       <a href={part.sourceUrl} target="_blank" rel="noopener noreferrer">

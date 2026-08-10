@@ -39,6 +39,7 @@ export type PartsStorePartRow = {
   brandName: string;
   brandLogoUrl: string | null;
   compatibility: string[];
+  affiliatePartnerName: string | null;
   trackingEnabled: boolean;
 };
 
@@ -94,6 +95,9 @@ export function PartsStoreExplorer({ categories, brands, parts }: PartsStoreExpl
           <h1>Build Your Setup</h1>
           <p>
             Browse performance categories, trusted aftermarket brands, and model-aware parts. Affiliate checkout is intentionally inactive until partner programs are approved.
+          </p>
+          <p className="parts-store-disclosure">
+            SUPERCAR DASH may earn a commission from approved partner links once affiliate routing is activated.
           </p>
         </div>
         <div className="parts-store-stats" aria-label="Parts catalog summary">
@@ -226,9 +230,15 @@ export function PartsStoreExplorer({ categories, brands, parts }: PartsStoreExpl
                       ) : (
                         <span>No source link</span>
                       )}
-                      <button type="button" disabled>
-                        Affiliate Pending
-                      </button>
+                      {part.trackingEnabled ? (
+                        <a href={`/out/parts/${part.id}?source=/parts`} rel="nofollow sponsored">
+                          Shop Partner{part.affiliatePartnerName ? `: ${part.affiliatePartnerName}` : ""}
+                        </a>
+                      ) : (
+                        <button type="button" disabled>
+                          Affiliate Pending
+                        </button>
+                      )}
                     </div>
                   </div>
                 </article>

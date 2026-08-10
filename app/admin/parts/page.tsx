@@ -1,5 +1,6 @@
 import { AdminPartsClient, type AdminAffiliatePartnerRow, type AdminPartBrandRow, type AdminPartCategoryRow, type AdminPerformancePartRow } from "@/components/admin/AdminPartsClient";
 import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
+import { isAffiliateTrackingReady } from "@/lib/parts/affiliate-tracking";
 import { prisma } from "@/lib/prisma";
 
 export default async function AdminPartsPage() {
@@ -35,6 +36,12 @@ export default async function AdminPartsPage() {
       include: {
         category: true,
         brand: true,
+        affiliatePartner: true,
+        _count: {
+          select: {
+            clicks: true,
+          },
+        },
         compatibility: {
           include: {
             make: true,
@@ -92,6 +99,9 @@ export default async function AdminPartsPage() {
     estimatedTorqueGain: part.estimatedTorqueGain === null ? "No torque estimate" : `+${part.estimatedTorqueGain.toLocaleString()} lb-ft`,
     categoryName: part.category.name,
     brandName: part.brand.name,
+    affiliatePartnerName: part.affiliatePartner?.name ?? null,
+    affiliateReady: isAffiliateTrackingReady(part),
+    clickCount: part._count.clicks,
     sourceUrl: part.sourceUrl,
     compatibility: part.compatibility.map(formatCompatibility),
     updatedAt: new Intl.DateTimeFormat("en-US", {

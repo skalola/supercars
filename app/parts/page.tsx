@@ -1,4 +1,5 @@
 import { PartsStoreExplorer, type PartsBrandRow, type PartsCategoryRow, type PartsStorePartRow } from "@/components/parts/PartsStoreExplorer";
+import { isAffiliateTrackingReady } from "@/lib/parts/affiliate-tracking";
 import { prisma } from "@/lib/prisma";
 
 export default async function PartsPage() {
@@ -90,7 +91,8 @@ export default async function PartsPage() {
     brandName: part.brand.name,
     brandLogoUrl: part.brand.logoUrl,
     compatibility: part.compatibility.map(formatCompatibility),
-    trackingEnabled: Boolean(part.affiliatePartner?.active && part.affiliateUrl && part.trackingStatus === "CONFIGURED"),
+    affiliatePartnerName: part.affiliatePartner?.name ?? null,
+    trackingEnabled: isAffiliateTrackingReady(part),
   }));
 
   return <PartsStoreExplorer categories={categoryRows} brands={brandRows} parts={partRows} />;
