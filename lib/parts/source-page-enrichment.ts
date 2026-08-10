@@ -28,7 +28,7 @@ export async function fetchPartSourcePageMetadata(sourceUrl: string): Promise<Pa
   const response = await fetch(sourceUrl, {
     headers: {
       "accept": "text/html,application/xhtml+xml",
-      "user-agent": "SUPERCAR DASH part catalog enrichment (+https://supercardash.vercel.app)",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36 SUPERCAR-DASH/1.0",
     },
     redirect: "follow",
   });
@@ -143,13 +143,61 @@ function findJsonLdImage(value: unknown): string | null {
 }
 
 function getLikelyHtmlImage(html: string) {
-  const matches = html.matchAll(/<img[^>]+(?:src|data-src|data-lazy-src)=["']([^"']+)["'][^>]*>/gi);
-  for (const match of matches) {
-    const url = match[1];
-    if (!url || isLowConfidencePartImageUrl(url)) continue;
-    if (/\.(jpg|jpeg|png|webp)(\?|$)/i.test(url)) return decodeHtml(url);
-  }
-  return null;
+  const candidates = Array.from(html.matchAll(/<img[^>]+>/gi))
+    .map((match) => {
+      const tag = match[0];
+      const url = getImageTagUrl(tag);
+      return {
+        tag,
+        url,
+        score: scoreImageTag(tag, url),
+      };
+    })
+    .filter((candidate) => candidate.url && candidate.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  return candidates[0]?.url ? decodeHtml(candidates[0].url) : null;
+}
+
+function getImageTagUrl(tag: string) {
+  const direct = [
+    getAttribute(tag, "data-src"),
+    getAttribute(tag, "data-lazy-src"),
+    getAttribute(tag, "data-original"),
+    getAttribute(tag, "src"),
+  ].find(Boolean);
+
+  if (direct) return direct;
+
+  const srcset = getAttribute(tag, "srcset") || getAttribute(tag, "data-srcset");
+  if (!srcset) return null;
+
+  const firstCandidate = srcset.split(",")[0]?.trim().split(/\s+/)[0];
+  return firstCandidate || null;
+}
+
+function getAttribute(tag: string, attribute: string) {
+  const match = tag.match(new RegExp(`${attribute}=["']([^"']+)["']`, "i"));
+  return match?.[1] ? decodeHtml(match[1]) : null;
+}
+
+function scoreImageTag(tag: string, url: string | null) {
+  if (!url || isLowConfidencePartImageUrl(url)) return 0;
+  if (!/\.(jpg|jpeg|png|webp)(\?|$)/i.test(stripImageSizePrefix(url))) return 0;
+
+  const haystack = `${tag} ${url}`.toLowerCase();
+  let score = 10;
+
+  if (/product|main-product|product-image|get-product|gallery|fresco|hero|primary/.test(haystack)) score += 30;
+  if (/storage\/syshks\/product_db|cdn\/shop\/products|cdn\/shop\/files|images\.dinancars\.com/.test(haystack)) score += 20;
+  if (/logo|icon|spacer|warning|footer|header|menu|collection|article|brand/.test(haystack)) score -= 25;
+  if (/_320x|\/x220\//.test(haystack)) score -= 6;
+
+  return score;
+}
+
+function stripImageSizePrefix(url: string) {
+  return url.replace(/\/(?:\d+x|x\d+)\//i, "/");
 }
 
 function normalizeImageUrl(value: string | null | undefined, baseUrl: string) {
