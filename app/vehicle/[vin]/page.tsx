@@ -11,6 +11,7 @@ import PurchaseWizard from "@/components/market/PurchaseWizard";
 import OwnerSaleControls from "@/components/market/OwnerSaleControls";
 import VehiclePhotoGallery, { VehicleGalleryImage } from "@/components/market/VehiclePhotoGallery";
 import { AddToFavoritesButton } from "@/components/garage/AddToFavoritesButton";
+import { AddRecommendedPartButton } from "@/components/parts/AddRecommendedPartButton";
 import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
 import { isValidEmail } from "@/lib/fulfillment/partner-registry";
 import { emailMatchesWebsiteDomain } from "@/lib/directory/contact-domain-policy";
@@ -1303,6 +1304,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
                                     Affiliate Pending
                                   </button>
                                 )}
+                                <AddRecommendedPartButton vin={vehicle.vin} partId={part.id} partName={part.name} />
                               </div>
                             </div>
                           </article>
