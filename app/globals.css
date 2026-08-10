@@ -8011,12 +8011,34 @@ canvas {
   background: rgba(0, 0, 0, 0.28);
 }
 
-.club-list-header span {
+.club-list-header span,
+.club-list-header a {
   color: rgba(255, 255, 255, 0.58);
   font-size: 10px;
   font-weight: 850;
   letter-spacing: 0.08em;
+  text-decoration: none;
   text-transform: uppercase;
+}
+
+.club-list-header a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.club-list-header a:hover,
+.club-list-header a:focus-visible,
+.club-list-header a.is-active {
+  color: #ffffff;
+  outline: none;
+}
+
+.club-list-header a em {
+  color: rgba(226, 15, 27, 0.92);
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: 0.04em;
 }
 
 .club-list-row {

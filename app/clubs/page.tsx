@@ -7,8 +7,25 @@ import ClubModelSelector from "./ClubModelSelector";
 
 export const dynamic = "force-dynamic";
 const DEFAULT_CLUB_LOGO = "/images/supercar-dash-wordmark.svg";
+type ClubSortKey = "created" | "members" | "meets";
+type SortDirection = "asc" | "desc";
+type SortableClub = {
+  name: string;
+  createdAt: Date;
+  _count: {
+    members: number;
+    meets: number;
+  };
+};
 
-export default async function ClubsPage() {
+export default async function ClubsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ sort?: string; dir?: string }>;
+}) {
+  const resolvedSearchParams = await searchParams;
+  const activeSort = resolveSortKey(resolvedSearchParams?.sort);
+  const activeDirection = resolveSortDirection(resolvedSearchParams?.dir);
   const [session, catalog] = await Promise.all([
     auth(),
     getMakeModelCatalogOptions(),
@@ -38,12 +55,12 @@ export default async function ClubsPage() {
           take: 2,
         },
       },
-      orderBy: { updatedAt: "desc" },
+      orderBy: { createdAt: "asc" },
       take: 80,
     }).catch(() => []);
 
   const sortedClubs = [...clubs]
-    .sort((a, b) => b._count.members - a._count.members || b._count.meets - a._count.meets || a.name.localeCompare(b.name))
+    .sort((a, b) => compareClubs(a, b, activeSort, activeDirection))
     .map((club) => {
       const makeNames = Array.from(new Set(club.models.map(({ model }) => model.make.name))).slice(0, 3);
       const modelNames = club.models.map(({ model }) => model.name).slice(0, 4);
@@ -80,8 +97,14 @@ export default async function ClubsPage() {
               <span>Location</span>
               <span>Make</span>
               <span>Model</span>
-              <span>Members</span>
-              <span>Meets</span>
+              <Link href={getSortHref("members", activeSort, activeDirection)} className={activeSort === "members" ? "is-active" : ""}>
+                Members
+                <em>{activeSort === "members" ? getDirectionLabel(activeDirection) : "Sort"}</em>
+              </Link>
+              <Link href={getSortHref("meets", activeSort, activeDirection)} className={activeSort === "meets" ? "is-active" : ""}>
+                Meets
+                <em>{activeSort === "meets" ? getDirectionLabel(activeDirection) : "Sort"}</em>
+              </Link>
             </div>
             {clubs.length > 0 ? (
               sortedClubs.map((club) => (
@@ -158,4 +181,37 @@ export default async function ClubsPage() {
       </section>
     </main>
   );
+}
+
+function resolveSortKey(value: string | undefined): ClubSortKey {
+  return value === "members" || value === "meets" ? value : "created";
+}
+
+function resolveSortDirection(value: string | undefined): SortDirection {
+  return value === "asc" ? "asc" : "desc";
+}
+
+function getSortHref(sortKey: ClubSortKey, activeSort: ClubSortKey, activeDirection: SortDirection) {
+  const nextDirection = activeSort === sortKey && activeDirection === "desc" ? "asc" : "desc";
+  return `/clubs?sort=${sortKey}&dir=${nextDirection}#club-grid`;
+}
+
+function getDirectionLabel(direction: SortDirection) {
+  return direction === "asc" ? "Low" : "High";
+}
+
+function compareClubs(
+  a: SortableClub,
+  b: SortableClub,
+  sortKey: ClubSortKey,
+  direction: SortDirection,
+) {
+  if (sortKey === "members" || sortKey === "meets") {
+    const left = sortKey === "members" ? a._count.members : a._count.meets;
+    const right = sortKey === "members" ? b._count.members : b._count.meets;
+    const numeric = direction === "asc" ? left - right : right - left;
+    return numeric || a.createdAt.getTime() - b.createdAt.getTime() || a.name.localeCompare(b.name);
+  }
+
+  return a.createdAt.getTime() - b.createdAt.getTime() || a.name.localeCompare(b.name);
 }
