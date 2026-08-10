@@ -93,6 +93,14 @@ export default async function PartsPage() {
     brandName: part.brand.name,
     brandLogoUrl: part.brand.logoUrl,
     compatibility: part.compatibility.map(formatCompatibility),
+    fitments: part.compatibility.map((fitment) => ({
+      makeId: fitment.makeId,
+      makeName: fitment.make?.name ?? null,
+      modelId: fitment.modelId,
+      modelName: fitment.model?.name ?? null,
+    })),
+    fitmentMakeIds: unique(part.compatibility.map((fitment) => fitment.makeId).filter(Boolean)),
+    fitmentModelIds: unique(part.compatibility.map((fitment) => fitment.modelId).filter(Boolean)),
     affiliatePartnerName: part.affiliatePartner?.name ?? null,
     trackingEnabled: isAffiliateTrackingReady(part),
   }));
@@ -128,4 +136,8 @@ function formatYearRange(start: number | null, end: number | null) {
   if (start) return `${start}+`;
   if (end) return `Through ${end}`;
   return null;
+}
+
+function unique(values: Array<string | null | undefined>) {
+  return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
 }

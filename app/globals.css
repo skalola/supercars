@@ -6649,6 +6649,53 @@ canvas {
   -webkit-overflow-scrolling: touch;
 }
 
+.parts-fitment-filter-bar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr)) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.parts-fitment-filter-bar label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.parts-fitment-filter-bar label span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.parts-fitment-filter-bar select {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.parts-fitment-filter-bar > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
 .parts-brand-chip,
 .parts-empty-chip {
   display: inline-flex;
@@ -8325,9 +8372,7 @@ canvas {
   }
 
   .parts-category-panel {
-    position: sticky;
-    top: 76px;
-    z-index: 5;
+    position: static;
   }
 
   .parts-category-list {
@@ -8345,6 +8390,14 @@ canvas {
 
   .parts-results-panel {
     padding: 16px;
+  }
+
+  .parts-fitment-filter-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .parts-fitment-filter-bar > span {
+    justify-content: flex-start;
   }
 
   .parts-card-actions {

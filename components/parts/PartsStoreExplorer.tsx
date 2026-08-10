@@ -40,6 +40,14 @@ export type PartsStorePartRow = {
   brandName: string;
   brandLogoUrl: string | null;
   compatibility: string[];
+  fitments: Array<{
+    makeId: string | null;
+    makeName: string | null;
+    modelId: string | null;
+    modelName: string | null;
+  }>;
+  fitmentMakeIds: string[];
+  fitmentModelIds: string[];
   affiliatePartnerName: string | null;
   trackingEnabled: boolean;
 };
@@ -53,6 +61,8 @@ type PartsStoreExplorerProps = {
 export function PartsStoreExplorer({ categories, brands, parts }: PartsStoreExplorerProps) {
   const [activeCategoryId, setActiveCategoryId] = useState(categories[0]?.id ?? "");
   const [activeBrandId, setActiveBrandId] = useState("");
+  const [activeMakeId, setActiveMakeId] = useState("");
+  const [activeModelId, setActiveModelId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
   const activeCategory = categories.find((category) => category.id === activeCategoryId) ?? categories[0] ?? null;
@@ -62,8 +72,44 @@ export function PartsStoreExplorer({ categories, brands, parts }: PartsStoreExpl
     return brands.filter((brand) => brandIds.has(brand.id)).sort((a, b) => a.name.localeCompare(b.name));
   }, [brands, categoryScopedParts]);
 
+  const makeOptions = useMemo(() => {
+    const options = new Map<string, { id: string; name: string; count: number }>();
+    for (const part of categoryScopedParts) {
+      for (const fitment of part.fitments) {
+        if (!fitment.makeId || !fitment.makeName) continue;
+        const current = options.get(fitment.makeId);
+        options.set(fitment.makeId, {
+          id: fitment.makeId,
+          name: fitment.makeName,
+          count: (current?.count ?? 0) + 1,
+        });
+      }
+    }
+    return Array.from(options.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [categoryScopedParts]);
+
+  const modelOptions = useMemo(() => {
+    const options = new Map<string, { id: string; name: string; makeId: string; count: number }>();
+    for (const part of categoryScopedParts) {
+      for (const fitment of part.fitments) {
+        if (!fitment.modelId || !fitment.modelName || !fitment.makeId) continue;
+        if (activeMakeId && fitment.makeId !== activeMakeId) continue;
+        const current = options.get(fitment.modelId);
+        options.set(fitment.modelId, {
+          id: fitment.modelId,
+          name: fitment.modelName,
+          makeId: fitment.makeId,
+          count: (current?.count ?? 0) + 1,
+        });
+      }
+    }
+    return Array.from(options.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [activeMakeId, categoryScopedParts]);
+
   const filteredParts = categoryScopedParts.filter((part) => {
     if (activeBrandId && part.brandId !== activeBrandId) return false;
+    if (activeMakeId && part.fitmentMakeIds.length > 0 && !part.fitmentMakeIds.includes(activeMakeId)) return false;
+    if (activeModelId && part.fitmentModelIds.length > 0 && !part.fitmentModelIds.includes(activeModelId)) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const haystack = [
@@ -85,6 +131,8 @@ export function PartsStoreExplorer({ categories, brands, parts }: PartsStoreExpl
   const resetFilters = () => {
     setActiveCategoryId(categories[0]?.id ?? "");
     setActiveBrandId("");
+    setActiveMakeId("");
+    setActiveModelId("");
     setSearchQuery("");
   };
 
@@ -134,6 +182,8 @@ export function PartsStoreExplorer({ categories, brands, parts }: PartsStoreExpl
                   onClick={() => {
                     setActiveCategoryId(category.id);
                     setActiveBrandId("");
+                    setActiveMakeId("");
+                    setActiveModelId("");
                   }}
                 >
                   <span>{category.name}</span>
@@ -183,6 +233,42 @@ export function PartsStoreExplorer({ categories, brands, parts }: PartsStoreExpl
             {visibleBrands.length === 0 ? (
               <span className="parts-empty-chip">No brands captured in this category yet</span>
             ) : null}
+          </div>
+
+          <div className="parts-fitment-filter-bar" aria-label="Fitment filters">
+            <label>
+              <span>Make</span>
+              <select
+                value={activeMakeId}
+                onChange={(event) => {
+                  setActiveMakeId(event.target.value);
+                  setActiveModelId("");
+                }}
+              >
+                <option value="">All Makes</option>
+                {makeOptions.map((make) => (
+                  <option key={make.id} value={make.id}>
+                    {make.name} ({make.count})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span>Model</span>
+              <select
+                value={activeModelId}
+                onChange={(event) => setActiveModelId(event.target.value)}
+                disabled={!activeMakeId && modelOptions.length === 0}
+              >
+                <option value="">All Models</option>
+                {modelOptions.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.name} ({model.count})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span>{filteredParts.length.toLocaleString()} shown</span>
           </div>
 
           {filteredParts.length === 0 ? (
