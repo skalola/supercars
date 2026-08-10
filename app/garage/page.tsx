@@ -3,8 +3,10 @@ import { auth, signIn } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import GarageTabs, { type GarageClaimedVehicle, type GarageSavedVehicle } from "./GarageTabs";
+import { getGarageClubSummary } from "./garage-clubs";
 import { getGarageMeetSummary } from "./garage-meets";
 import { getGarageStats } from "./garage-stats";
+import GarageClubHistory from "./GarageClubHistory";
 import GarageMeetHistory from "./GarageMeetHistory";
 
 export default async function GaragePage() {
@@ -38,7 +40,7 @@ export default async function GaragePage() {
     redirect("/onboarding");
   }
 
-  const [claimedVehicleRows, garageItems, meetSummary] = await Promise.all([
+  const [claimedVehicleRows, garageItems, meetSummary, clubSummary] = await Promise.all([
     prisma.vehicle.findMany({
       where: {
         ownerId: session.user.id as string,
@@ -91,6 +93,7 @@ export default async function GaragePage() {
       orderBy: { createdAt: "desc" },
     }),
     getGarageMeetSummary(session.user.id as string),
+    getGarageClubSummary(session.user.id as string, true),
   ]);
 
   const claimedModelIds = new Set(claimedVehicleRows.map((vehicle) => vehicle.modelId));
@@ -163,6 +166,7 @@ export default async function GaragePage() {
       ) : (
         <GarageTabs claimedVehicles={claimedVehicles} savedVehicles={savedVehicles} isOwner />
       )}
+      <GarageClubHistory clubs={clubSummary} isOwner />
       <GarageMeetHistory meetSummary={meetSummary} isOwner />
     </main>
   );

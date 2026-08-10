@@ -7,7 +7,8 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-export default async function HostMeetPage() {
+export default async function HostMeetPage({ searchParams }: { searchParams?: Promise<{ club?: string }> }) {
+  const resolvedSearchParams = (await searchParams) || {};
   const session = await auth();
   if (!session?.user?.id) {
     redirect("/login");
@@ -32,9 +33,10 @@ export default async function HostMeetPage() {
         ],
       },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, city: true, state: true },
+      select: { id: true, slug: true, name: true, city: true, state: true },
     }).catch(() => []),
   ]);
+  const selectedClubId = hostableClubs.find((club) => club.slug === resolvedSearchParams.club || club.id === resolvedSearchParams.club)?.id || "";
 
   return (
     <main className="meet-detail-shell">
@@ -99,7 +101,7 @@ export default async function HostMeetPage() {
           </label>
           <label>
             <span>Club</span>
-            <select name="clubId" defaultValue="">
+            <select name="clubId" defaultValue={selectedClubId}>
               <option value="">No club attached</option>
               {hostableClubs.map((club) => (
                 <option key={club.id} value={club.id}>

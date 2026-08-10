@@ -76,7 +76,7 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
             ) : (
               <Link href="/login" className="meets-primary-button">Sign In to Join</Link>
             )}
-            <Link href="/meets/host" className="meets-secondary-button">Host a Meet</Link>
+            <Link href={`/meets/host?club=${club.slug}`} className="meets-secondary-button">Host a Meet</Link>
           </div>
         </div>
       </section>
