@@ -1,6 +1,7 @@
 import { AdminPartsClient, type AdminAffiliateAnalyticsRow, type AdminAffiliatePartnerRow, type AdminPartBrandRow, type AdminPartCategoryRow, type AdminPerformancePartRow, type AdminRecentAffiliateClickRow } from "@/components/admin/AdminPartsClient";
 import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
 import { isAffiliateTrackingReady } from "@/lib/parts/affiliate-tracking";
+import { auditPerformancePartTrust } from "@/lib/parts/trust";
 import { prisma } from "@/lib/prisma";
 
 export default async function AdminPartsPage() {
@@ -117,32 +118,40 @@ export default async function AdminPartsPage() {
     partCount: partner._count.parts,
   }));
 
-  const partRows: AdminPerformancePartRow[] = parts.map((part) => ({
-    id: part.id,
-    name: part.name,
-    partNumber: part.partNumber,
-    status: part.status,
-    sourceConfidence: part.sourceConfidence,
-    trackingStatus: part.trackingStatus,
-    retailPrice: formatCents(part.retailPriceCents),
-    estimatedHpGain: part.estimatedHpGain === null ? "No HP estimate" : `+${part.estimatedHpGain.toLocaleString()} hp`,
-    estimatedTorqueGain: part.estimatedTorqueGain === null ? "No torque estimate" : `+${part.estimatedTorqueGain.toLocaleString()} lb-ft`,
-    categoryName: part.category.name,
-    brandName: part.brand.name,
-    affiliatePartnerId: part.affiliatePartnerId,
-    affiliatePartnerName: part.affiliatePartner?.name ?? null,
-    affiliateUrl: part.affiliateUrl,
-    commissionRateBps: part.commissionRateBps,
-    affiliateReady: isAffiliateTrackingReady(part),
-    clickCount: part._count.clicks,
-    sourceUrl: part.sourceUrl,
-    compatibility: part.compatibility.map(formatCompatibility),
-    updatedAt: new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }).format(part.updatedAt),
-  }));
+  const partRows: AdminPerformancePartRow[] = parts.map((part) => {
+    const trustAudit = auditPerformancePartTrust(part);
+
+    return {
+      id: part.id,
+      name: part.name,
+      partNumber: part.partNumber,
+      status: part.status,
+      sourceConfidence: part.sourceConfidence,
+      trackingStatus: part.trackingStatus,
+      retailPrice: formatCents(part.retailPriceCents),
+      estimatedHpGain: part.estimatedHpGain === null ? "No HP estimate" : `+${part.estimatedHpGain.toLocaleString()} hp`,
+      estimatedTorqueGain: part.estimatedTorqueGain === null ? "No torque estimate" : `+${part.estimatedTorqueGain.toLocaleString()} lb-ft`,
+      categoryName: part.category.name,
+      brandName: part.brand.name,
+      affiliatePartnerId: part.affiliatePartnerId,
+      affiliatePartnerName: part.affiliatePartner?.name ?? null,
+      affiliateUrl: part.affiliateUrl,
+      commissionRateBps: part.commissionRateBps,
+      affiliateReady: isAffiliateTrackingReady(part),
+      clickCount: part._count.clicks,
+      sourceUrl: part.sourceUrl,
+      publicEligible: trustAudit.publicEligible,
+      trustScore: trustAudit.score,
+      trustIssues: trustAudit.issues,
+      trustWarnings: trustAudit.warnings,
+      compatibility: part.compatibility.map(formatCompatibility),
+      updatedAt: new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }).format(part.updatedAt),
+    };
+  });
 
   const analyticsRows = buildAffiliateAnalyticsRows(parts);
   const recentClickRows: AdminRecentAffiliateClickRow[] = recentClicks.map((click) => ({

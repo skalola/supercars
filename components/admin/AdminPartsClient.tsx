@@ -60,6 +60,10 @@ export type AdminPerformancePartRow = {
   affiliateReady: boolean;
   clickCount: number;
   sourceUrl: string | null;
+  publicEligible: boolean;
+  trustScore: number;
+  trustIssues: string[];
+  trustWarnings: string[];
   compatibility: string[];
   updatedAt: string;
 };
@@ -207,6 +211,7 @@ export function AdminPartsClient({
   const [categoryFilter, setCategoryFilter] = useState("");
   const [brandFilter, setBrandFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [trustFilter, setTrustFilter] = useState("");
 
   const filteredModels = useMemo(
     () => models.filter((model) => !partForm.makeId || model.makeId === partForm.makeId),
@@ -217,6 +222,8 @@ export function AdminPartsClient({
     if (categoryFilter && part.categoryName !== categoryFilter) return false;
     if (brandFilter && part.brandName !== brandFilter) return false;
     if (statusFilter && part.status !== statusFilter) return false;
+    if (trustFilter === "PUBLIC_READY" && !part.publicEligible) return false;
+    if (trustFilter === "NEEDS_REVIEW" && part.publicEligible) return false;
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -227,6 +234,9 @@ export function AdminPartsClient({
         part.brandName,
         part.sourceConfidence,
         part.trackingStatus,
+        part.publicEligible ? "public ready" : "needs review",
+        ...part.trustIssues,
+        ...part.trustWarnings,
         ...part.compatibility,
       ]
         .filter(Boolean)
@@ -243,6 +253,7 @@ export function AdminPartsClient({
     setCategoryFilter("");
     setBrandFilter("");
     setStatusFilter("");
+    setTrustFilter("");
   };
 
   const updatePartForm = (field: keyof PartFormState, value: string) => {
@@ -417,6 +428,8 @@ export function AdminPartsClient({
         <SummaryCard label="Categories" value={categories.length.toLocaleString()} />
         <SummaryCard label="Brands" value={brands.length.toLocaleString()} />
         <SummaryCard label="Parts Captured" value={parts.length.toLocaleString()} />
+        <SummaryCard label="Public Ready" value={parts.filter((part) => part.publicEligible).length.toLocaleString()} />
+        <SummaryCard label="Needs Review" value={parts.filter((part) => !part.publicEligible).length.toLocaleString()} />
         <SummaryCard label="Affiliate Candidates" value={affiliatePartners.length.toLocaleString()} />
       </div>
 
@@ -496,6 +509,14 @@ export function AdminPartsClient({
             <option value="INACTIVE">Inactive</option>
           </select>
         </label>
+        <label>
+          <span>Catalog Trust</span>
+          <select value={trustFilter} onChange={(event) => setTrustFilter(event.target.value)}>
+            <option value="">All Trust States</option>
+            <option value="PUBLIC_READY">Public Ready</option>
+            <option value="NEEDS_REVIEW">Needs Review</option>
+          </select>
+        </label>
         <button type="button" onClick={resetFilters}>
           Reset
         </button>
@@ -538,6 +559,15 @@ export function AdminPartsClient({
                       {part.status}
                     </span>
                     <span className="admin-listing-identifier">{part.sourceConfidence}</span>
+                    <span className={`admin-status-pill ${part.publicEligible ? "" : "is-muted"}`}>
+                      {part.publicEligible ? "Public Ready" : "Needs Review"}
+                    </span>
+                    <span className="admin-listing-identifier">Trust {part.trustScore}/100</span>
+                    {[...part.trustIssues, ...part.trustWarnings].length > 0 ? (
+                      <span className="admin-parts-quality-list">
+                        {[...part.trustIssues, ...part.trustWarnings].slice(0, 3).join(" · ")}
+                      </span>
+                    ) : null}
                   </td>
                   <td data-label="Price">{part.retailPrice}</td>
                   <td data-label="Gain">

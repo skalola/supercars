@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { isAffiliateTrackingReady } from "@/lib/parts/affiliate-tracking";
+import { auditPerformancePartTrust } from "@/lib/parts/trust";
 import { prisma } from "@/lib/prisma";
 
 type PartDetailPageProps = {
@@ -41,7 +42,7 @@ export default async function PartDetailPage({ params }: PartDetailPageProps) {
     },
   });
 
-  if (!part) notFound();
+  if (!part || !auditPerformancePartTrust(part).publicEligible) notFound();
 
   const trackingReady = isAffiliateTrackingReady(part);
   const fitmentRows = part.compatibility.map(formatPartCompatibility);

@@ -1,6 +1,7 @@
 import { PartsStoreExplorer, type PartsBrandRow, type PartsCategoryRow, type PartsStorePartRow } from "@/components/parts/PartsStoreExplorer";
 import { isAffiliateTrackingReady } from "@/lib/parts/affiliate-tracking";
 import { getPartDetailPath } from "@/lib/parts/routes";
+import { auditPerformancePartTrust } from "@/lib/parts/trust";
 import { prisma } from "@/lib/prisma";
 
 export default async function PartsPage() {
@@ -57,12 +58,16 @@ export default async function PartsPage() {
     }),
   ]);
 
+  const publicParts = parts.filter((part) => auditPerformancePartTrust(part).publicEligible);
+  const categoryPartCounts = countBy(publicParts.map((part) => part.categoryId));
+  const brandPartCounts = countBy(publicParts.map((part) => part.brandId));
+
   const categoryRows: PartsCategoryRow[] = categories.map((category) => ({
     id: category.id,
     name: category.name,
     slug: category.slug,
     description: category.description,
-    partCount: category._count.parts,
+    partCount: categoryPartCounts.get(category.id) ?? 0,
   }));
 
   const brandRows: PartsBrandRow[] = brands.map((brand) => ({
@@ -72,10 +77,10 @@ export default async function PartsPage() {
     logoUrl: brand.logoUrl,
     websiteUrl: brand.websiteUrl,
     country: brand.country,
-    partCount: brand._count.parts,
+    partCount: brandPartCounts.get(brand.id) ?? 0,
   }));
 
-  const partRows: PartsStorePartRow[] = parts.map((part) => ({
+  const partRows: PartsStorePartRow[] = publicParts.map((part) => ({
     id: part.id,
     name: part.name,
     partNumber: part.partNumber,
@@ -140,4 +145,11 @@ function formatYearRange(start: number | null, end: number | null) {
 
 function unique(values: Array<string | null | undefined>) {
   return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
+}
+
+function countBy(values: string[]) {
+  return values.reduce((map, value) => {
+    map.set(value, (map.get(value) ?? 0) + 1);
+    return map;
+  }, new Map<string, number>());
 }

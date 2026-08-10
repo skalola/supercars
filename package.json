@@ -59,6 +59,7 @@
     "seed-parts-foundation": "tsx --env-file .env scripts/seed-parts-foundation.ts",
     "seed-real-parts-batch": "tsx --env-file .env scripts/seed-real-performance-parts-batch.ts",
     "enrich-performance-parts": "tsx --env-file .env scripts/enrich-performance-parts.ts",
+    "audit-performance-parts": "tsx --env-file .env scripts/audit-performance-parts.ts",
     "migrate:neon:dry": "tsx --env-file .env scripts/migrate-sqlite-to-neon.ts",
     "migrate:neon": "tsx --env-file .env scripts/migrate-sqlite-to-neon.ts --execute",
     "verify:neon": "tsx --env-file .env scripts/verify-neon-migration.ts",

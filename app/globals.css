@@ -7718,7 +7718,7 @@ canvas {
 }
 
 .admin-parts-filter-toolbar {
-  grid-template-columns: minmax(220px, 1.4fr) repeat(3, minmax(150px, 0.8fr)) auto;
+  grid-template-columns: minmax(220px, 1.4fr) repeat(4, minmax(150px, 0.8fr)) auto;
 }
 
 .admin-parts-table {
@@ -7741,6 +7741,15 @@ canvas {
   color: var(--foreground);
   font-size: 12px;
   font-weight: 760;
+}
+
+.admin-parts-quality-list {
+  display: block;
+  max-width: 220px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .admin-inline-action-button {
