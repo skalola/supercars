@@ -137,31 +137,15 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
             </div>
           </article>
 
-          <article className="club-panel">
-            <div className="meets-panel-title">
-              <span>Model Network</span>
-              <strong>Cars This Club Follows</strong>
-            </div>
-            <div className="club-model-grid">
-              {club.models.length > 0 ? (
-                club.models.map(({ model }) => (
-                  <Link key={model.id} href={`/make/${model.make.slug}/${model.slug}`} className="club-model-card">
-                    <div style={{ backgroundImage: `url("${model.images[0]?.url || model.make.logoUrl || "/images/garage-home-hero.png?v=garage-2"}")` }} />
-                    <span>{model.make.name}</span>
-                    <strong>{model.name}</strong>
-                  </Link>
-                ))
-              ) : (
-                <p className="meet-empty-note">This club is open to all makes and models.</p>
-              )}
-            </div>
-          </article>
         </div>
 
         <aside id="members" className="club-panel club-members-widget">
           <div className="meets-panel-title">
             <span>Garage Roster</span>
-            <strong>Members</strong>
+            <strong>
+              Members
+              <em className="club-member-count">{activeMembers.length}</em>
+            </strong>
           </div>
           <div className="club-member-grid">
             {activeMembers.map((member) => (

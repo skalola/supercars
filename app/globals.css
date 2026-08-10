@@ -8021,6 +8021,30 @@ canvas {
   color: #ffffff;
 }
 
+.club-members-widget .meets-panel-title strong {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.club-member-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid rgba(226, 15, 27, 0.42);
+  border-radius: 999px;
+  background: rgba(226, 15, 27, 0.12);
+  color: #ffffff;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 850;
+  line-height: 1;
+}
+
 .club-empty-state p,
 .club-stat-grid p,
 .club-meet-row p {
