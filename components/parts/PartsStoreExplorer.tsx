@@ -459,7 +459,7 @@ export function PartsStoreExplorer({
         </section>
 
         <aside className="parts-build-panel" aria-label="Parts catalog status">
-          <article className="parts-featured-build-card">
+          <article className={`parts-featured-build-card${selectedGarageCar?.imageUrl ? " has-selected-car" : ""}`}>
             <span>Featured Build</span>
             <div className={`parts-featured-build-image${selectedGarageCar?.imageUrl ? " has-selected-car" : ""}`}>
               {selectedGarageCar?.imageUrl ? (

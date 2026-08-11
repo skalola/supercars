@@ -13778,12 +13778,18 @@ canvas {
   }
 
   .market-page-shell {
-    padding: 24px 18px 52px;
+    gap: 16px;
+    padding: 18px 18px 52px;
   }
 
   .market-hero {
     grid-template-columns: 1fr;
-    min-height: 420px;
+    gap: 16px;
+    min-height: auto;
+    align-items: start;
+    background:
+      linear-gradient(90deg, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.48)),
+      url("/images/garage-home-hero.png?v=garage-2") center 42% / cover;
   }
 
   .market-layout {
@@ -14066,7 +14072,7 @@ canvas {
   }
 
   .parts-store-shell {
-    padding: 12px 14px 48px;
+    padding: 8px 14px 48px;
     background:
       linear-gradient(90deg, rgba(5, 5, 5, 0.98), rgba(5, 5, 5, 0.68) 58%, rgba(5, 5, 5, 0.95)),
       linear-gradient(180deg, rgba(5, 5, 5, 0.18), rgba(5, 5, 5, 0.9) 260px, rgba(13, 13, 13, 0.98) 460px),
@@ -14085,9 +14091,9 @@ canvas {
   }
 
   .parts-store-hero {
-    min-height: 160px;
-    margin-bottom: 12px;
-    padding-top: 36px;
+    min-height: auto;
+    margin-bottom: 10px;
+    padding-top: 8px;
   }
 
   .parts-store-hero::after {
@@ -14096,6 +14102,7 @@ canvas {
 
   .parts-store-hero > div {
     margin-left: 0;
+    padding-bottom: 8px;
   }
 
   .parts-active-category-summary {
@@ -14358,11 +14365,20 @@ canvas {
     grid-column: 1 / -1;
   }
 
-  .parts-featured-build-image,
   .parts-featured-build-card p,
   .parts-progress-card,
   .parts-disclosure-card {
     display: none;
+  }
+
+  .parts-featured-build-card:not(.has-selected-car) .parts-featured-build-image {
+    display: none;
+  }
+
+  .parts-featured-build-card.has-selected-car .parts-featured-build-image {
+    display: block;
+    aspect-ratio: 16 / 8.5;
+    min-height: 132px;
   }
 
   .parts-trust-strip {
@@ -14574,7 +14590,23 @@ canvas {
 
   .garage-profile-hero h1 {
     gap: 6px;
-    font-size: clamp(24px, 7.1vw, 34px);
+    align-items: flex-start;
+    max-width: min(100%, 292px);
+    width: fit-content;
+    padding: 2px 6px 3px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, rgba(0, 0, 0, 0.48), rgba(0, 0, 0, 0.16));
+    font-size: clamp(22px, 6.1vw, 28px);
+    line-height: 1.05;
+    text-shadow: 0 12px 32px rgba(0, 0, 0, 0.95);
+  }
+
+  .garage-profile-hero h1 > span:first-child {
+    display: -webkit-box;
+    overflow: hidden;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
   }
 
   .garage-profile-meta > span {
@@ -14632,15 +14664,49 @@ canvas {
   }
 
   .market-hero {
-    padding: 24px;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .market-eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.1em;
   }
 
   .market-hero h1 {
-    font-size: clamp(38px, 12vw, 58px);
+    max-width: 280px;
+    margin-top: 6px;
+    font-size: clamp(28px, 8.2vw, 36px);
+    font-weight: 720;
+    line-height: 1.02;
+  }
+
+  .market-hero p {
+    display: none;
   }
 
   .market-stat-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .market-stat-grid article {
+    min-height: 70px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.075);
+  }
+
+  .market-stat-grid span {
+    font-size: 10px;
+  }
+
+  .market-stat-grid strong {
+    font-size: clamp(20px, 6.2vw, 25px);
+  }
+
+  .market-stat-grid strong.market-value-number {
+    font-size: clamp(13px, 4.1vw, 16px);
+    white-space: normal;
   }
 
   .market-results-header {
@@ -15144,8 +15210,8 @@ canvas {
 
   .parts-store-hero h1 {
     max-width: 100%;
-    margin-bottom: 10px;
-    font-size: clamp(34px, 10vw, 44px);
+    margin-bottom: 8px;
+    font-size: clamp(32px, 9vw, 40px);
     line-height: 1;
     transform: none;
     white-space: normal;
@@ -15154,8 +15220,14 @@ canvas {
   .parts-store-hero .parts-store-subtitle {
     align-items: flex-start;
     gap: 8px;
-    font-size: 12px;
+    font-size: 11px;
     line-height: 1.25;
+  }
+
+  .parts-subtitle-dash {
+    width: 28px;
+    height: 3px;
+    margin-top: 5px;
   }
 
   .directory-tabs {
@@ -16521,5 +16593,148 @@ canvas {
 
   .part-detail-fitment-drawer summary strong {
     display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .market-page-shell {
+    gap: 14px;
+    padding: 14px 18px 52px;
+  }
+
+  .market-hero {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    align-items: start;
+    min-height: auto;
+    padding: 16px;
+    background:
+      linear-gradient(90deg, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.48)),
+      url("/images/garage-home-hero.png?v=garage-2") center 42% / cover;
+  }
+
+  .market-eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+  }
+
+  .market-hero h1 {
+    max-width: 280px;
+    margin-top: 6px;
+    font-size: clamp(28px, 8.2vw, 36px);
+    font-weight: 720;
+    line-height: 1.02;
+  }
+
+  .market-hero p {
+    display: none;
+  }
+
+  .market-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .market-stat-grid article {
+    min-height: 70px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.075);
+  }
+
+  .market-stat-grid span {
+    font-size: 10px;
+  }
+
+  .market-stat-grid strong {
+    font-size: clamp(20px, 6.2vw, 25px);
+  }
+
+  .market-stat-grid strong.market-value-number {
+    font-size: clamp(13px, 4.1vw, 16px);
+    white-space: normal;
+  }
+}
+
+@media (max-width: 720px) {
+  .clubs-shell,
+  .club-detail-shell {
+    gap: 14px;
+    padding: 14px 14px 52px;
+  }
+
+  .clubs-hero,
+  .club-detail-hero {
+    align-items: start;
+    min-height: auto;
+    padding: 16px;
+    background-position: center 42%;
+  }
+
+  .clubs-hero h1,
+  .club-detail-hero h1 {
+    max-width: 280px;
+    font-size: clamp(28px, 8.4vw, 36px);
+    font-weight: 720;
+    line-height: 1.02;
+  }
+
+  .clubs-hero p,
+  .club-detail-hero p {
+    display: none;
+  }
+
+  .clubs-hero-actions,
+  .club-detail-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .clubs-hero-actions a,
+  .club-detail-actions a,
+  .club-detail-actions button,
+  .club-detail-actions .club-status-pill {
+    min-height: 40px;
+    padding: 0 12px;
+    font-size: 11px;
+  }
+
+  .club-detail-title {
+    gap: 12px;
+    align-items: center;
+    max-width: 100%;
+    margin-top: 10px;
+  }
+
+  .club-detail-logo {
+    width: 58px;
+    height: 58px;
+    padding: 8px;
+    border-radius: 8px;
+  }
+
+  .club-detail-title > div {
+    gap: 6px;
+  }
+
+  .club-detail-meta {
+    gap: 6px 10px;
+  }
+
+  .club-detail-creator em,
+  .club-detail-location {
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+
+  .club-detail-creator img,
+  .club-detail-creator > span {
+    width: 20px;
+    height: 20px;
+  }
+
+  .club-stat-grid {
+    gap: 10px;
   }
 }
