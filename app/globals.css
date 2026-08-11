@@ -3816,7 +3816,7 @@ canvas {
 .vehicle-service-booking-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 1200;
+  z-index: 2147483000;
   display: grid;
   place-items: center;
   padding: 20px;
