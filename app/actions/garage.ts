@@ -122,6 +122,81 @@ export async function toggleGarageAlert(itemId: string, alertType: GarageAlertTy
   };
 }
 
+export async function removeClaimedVehicle(vehicleId: string) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { ok: false, reason: "unauthenticated" };
+  }
+
+  const vehicle = await prisma.vehicle.findFirst({
+    where: {
+      id: vehicleId,
+      ownerId: session.user.id as string,
+      status: "CLAIMED",
+    },
+    select: {
+      id: true,
+      owner: {
+        select: {
+          username: true,
+        },
+      },
+    },
+  });
+
+  if (!vehicle) {
+    return { ok: false, reason: "not_found" };
+  }
+
+  await prisma.vehicle.update({
+    where: { id: vehicle.id },
+    data: {
+      ownerId: null,
+      status: "UNCLAIMED",
+    },
+  });
+
+  revalidatePath("/garage");
+  if (vehicle.owner?.username) revalidatePath(`/garage/${vehicle.owner.username}`);
+
+  return { ok: true };
+}
+
+export async function removeSavedGarageItem(itemId: string) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { ok: false, reason: "unauthenticated" };
+  }
+
+  const item = await prisma.garageItem.findFirst({
+    where: {
+      id: itemId,
+      userId: session.user.id as string,
+    },
+    select: {
+      id: true,
+      user: {
+        select: {
+          username: true,
+        },
+      },
+    },
+  });
+
+  if (!item) {
+    return { ok: false, reason: "not_found" };
+  }
+
+  await prisma.garageItem.delete({
+    where: { id: item.id },
+  });
+
+  revalidatePath("/garage");
+  if (item.user.username) revalidatePath(`/garage/${item.user.username}`);
+
+  return { ok: true };
+}
+
 async function getCurrentLowestListingPrice(modelId: string) {
   const listing = await prisma.listing.findFirst({
     where: {

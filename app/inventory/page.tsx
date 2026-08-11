@@ -6,7 +6,12 @@ import InventoryExplorer from "@/components/market/InventoryExplorer";
 import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
 import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
 
-export default async function InventoryPage() {
+type InventoryPageProps = {
+  searchParams?: Promise<{ make?: string; model?: string }>;
+};
+
+export default async function InventoryPage({ searchParams }: InventoryPageProps) {
+  const resolvedSearchParams = (await searchParams) || {};
   const session = await auth();
   const isAdmin = session?.user?.role === "ADMIN";
 
@@ -134,7 +139,15 @@ export default async function InventoryPage() {
 
   const { makes: mappedMakes, models: mappedModels } = await getMakeModelCatalogOptions();
 
-  return <InventoryExplorer listings={mappedListings} makes={mappedMakes} models={mappedModels} />;
+  return (
+    <InventoryExplorer
+      listings={mappedListings}
+      makes={mappedMakes}
+      models={mappedModels}
+      initialMake={resolvedSearchParams.make}
+      initialModel={resolvedSearchParams.model}
+    />
+  );
 }
 
 function hasCleanDisplayImage(listing: any) {

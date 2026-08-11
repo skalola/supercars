@@ -11,6 +11,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -84,30 +85,43 @@ function trendLabel(direction: TrendDirection, pct: number | null): string {
   return "Stable";
 }
 
+function sourceBackedInventoryListingWhere(modelId: string): Prisma.ListingWhereInput {
+  return {
+    modelId,
+    status: "ACTIVE",
+    validationStatus: "VALID",
+    vehicleId: { not: null },
+    sourceId: { not: null },
+    externalListingId: { not: null },
+    url: { not: null },
+    sellerId: null,
+    priceStatus: { not: "PRICE_INVALID" },
+    vehicle: {
+      is: {
+        inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
+      },
+    },
+    OR: [
+      { askingPrice: { gte: 10000 } },
+      { price: { gte: 10000 } },
+    ],
+    NOT: [
+      { source: { is: { type: "AUCTION" } } },
+      { url: { contains: "bringatrailer.com", mode: "insensitive" } },
+      { externalListingId: { contains: "sprint-", mode: "insensitive" } },
+      { externalListingId: { contains: "admin-ops", mode: "insensitive" } },
+      { externalListingId: { contains: "demo", mode: "insensitive" } },
+      { externalListingId: { contains: "test", mode: "insensitive" } },
+    ],
+  };
+}
+
 // ─── 1. Market Range ─────────────────────────────────────────────────────────
 
 export async function getMarketRange(modelId: string): Promise<MarketRange | null> {
-  // This protects market intelligence from invalid source pricing.
+  // Market range is based only on active inventory with source-backed listing identity.
   const listings = await prisma.listing.findMany({
-    where: {
-      modelId,
-      status: "ACTIVE",
-      validationStatus: "VALID",
-      priceStatus: { not: "PRICE_INVALID" },
-      vehicle: {
-        is: {
-          inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
-        }
-      },
-      OR: [
-        { askingPrice: { gte: 10000 } },
-        { price: { gte: 10000 } }
-      ],
-      NOT: [
-        { source: { is: { type: "AUCTION" } } },
-        { url: { contains: "bringatrailer.com", mode: "insensitive" } },
-      ]
-    },
+    where: sourceBackedInventoryListingWhere(modelId),
     select: { price: true, askingPrice: true },
   });
 
@@ -129,27 +143,9 @@ export async function getMarketRange(modelId: string): Promise<MarketRange | nul
 // ─── 2. Market Supply ────────────────────────────────────────────────────────
 
 export async function getMarketSupply(modelId: string): Promise<MarketSupply> {
-  // This protects market intelligence from invalid source pricing.
+  // Supply uses the same source-backed active inventory filter as market range.
   const activeListingCount = await prisma.listing.count({
-    where: {
-      modelId,
-      status: "ACTIVE",
-      validationStatus: "VALID",
-      priceStatus: { not: "PRICE_INVALID" },
-      vehicle: {
-        is: {
-          inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
-        }
-      },
-      OR: [
-        { askingPrice: { gte: 10000 } },
-        { price: { gte: 10000 } }
-      ],
-      NOT: [
-        { source: { is: { type: "AUCTION" } } },
-        { url: { contains: "bringatrailer.com", mode: "insensitive" } },
-      ]
-    },
+    where: sourceBackedInventoryListingWhere(modelId),
   });
   return { activeListingCount };
 }
@@ -296,7 +292,6 @@ export async function getMarketPriceHistory(modelId: string): Promise<MarketPric
     prisma.listing.findMany({
       where: {
         modelId,
-        status: "ACTIVE",
         validationStatus: "VALID",
         priceStatus: { not: "PRICE_INVALID" },
         vehicleId: { not: null },

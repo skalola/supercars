@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, @next/next/no-img-element */
+/* eslint-disable @typescript-eslint/no-explicit-any, @next/next/no-img-element */
 import Link from "next/link";
 import Image from "next/image";
 import { auth, signIn } from "@/auth";
@@ -8,6 +8,7 @@ import { getMarketSummary } from "@/lib/market-intelligence";
 import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
 import MarketPriceHistory from "@/components/market/MarketPriceHistory";
 import { isListingMatchForModel } from "@/lib/inventory/validate-listing-identity";
+import { getPartDetailPath } from "@/lib/parts/routes";
 
 
 
@@ -32,6 +33,12 @@ function getHeroImage(images: ModelImageRecord[]) {
   return displayableImages.find((image) => image.type?.toLowerCase() === "hero") ?? displayableImages[0] ?? null;
 }
 
+function getDisplayableModelImages(images: ModelImageRecord[]) {
+  return images.filter(
+    (image) => image.reviewStatus !== "NEEDS_REVIEW" && image.type?.toLowerCase() !== "candidate",
+  );
+}
+
 function getListingImage(listing: any) {
   const hasOwnerPhotos = listing.vehicle?.photos && listing.vehicle.photos.length > 0;
   if (!hasOwnerPhotos && listing.imageUrl && !isNonVehicleImageUrl(listing.imageUrl)) {
@@ -52,7 +59,7 @@ type ModelPageProps = {
 
 function formatYears(startYear: number | null, endYear: number | null) {
   if (!startYear) {
-    return "Production years unavailable";
+    return null;
   }
 
   return endYear ? `${startYear} - ${endYear}` : `${startYear} - present`;
@@ -60,10 +67,66 @@ function formatYears(startYear: number | null, endYear: number | null) {
 
 function formatCount(count: number | null) {
   if (!count) {
-    return "Not published";
+    return null;
   }
 
   return count.toLocaleString();
+}
+
+function formatMaintenanceInterval(intervalMiles: number | null, intervalMonths: number | null) {
+  const parts = [
+    intervalMiles ? `${intervalMiles.toLocaleString()} mi` : null,
+    intervalMonths ? `${intervalMonths.toLocaleString()} mo` : null,
+  ].filter(Boolean);
+
+  return parts.length > 0 ? parts.join(" / ") : "As needed";
+}
+
+function formatPartPrice(value: number | null) {
+  if (value === null) return "Price pending";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value / 100);
+}
+
+function buildDisplayMarketRange(listings: any[]) {
+  const prices = listings
+    .map((listing) => listing.askingPrice ?? listing.price)
+    .filter((price): price is number => typeof price === "number" && price >= 10000);
+
+  if (prices.length === 0) return null;
+
+  const sorted = [...prices].sort((a, b) => a - b);
+  const average = Math.round(prices.reduce((sum, price) => sum + price, 0) / prices.length);
+
+  return {
+    lowestPrice: sorted[0],
+    highestPrice: sorted[sorted.length - 1],
+    averageAskingPrice: average,
+    activeListingCount: prices.length,
+  };
+}
+
+function ModelEmptyState({
+  title,
+  detail,
+  actionHref,
+  actionLabel,
+}: {
+  title: string;
+  detail: string;
+  actionHref: string;
+  actionLabel: string;
+}) {
+  return (
+    <div className="model-intelligence-empty-state">
+      <strong>{title}</strong>
+      <p>{detail}</p>
+      <Link href={actionHref}>{actionLabel}</Link>
+    </div>
+  );
 }
 
 type ModelDetail = {
@@ -78,10 +141,16 @@ type ModelDetail = {
   bodyStyle: string | null;
   productionCount: number | null;
   description: string | null;
+  metadataStatus: string;
+  metadataConfidence: number | null;
+  metadataSource: string | null;
+  metadataSourceUrl: string | null;
+  lastMetadataAuditAt: Date | null;
   make: {
     id: string;
     name: string;
     slug: string;
+    logoUrl: string | null;
     createdAt: Date;
     updatedAt: Date;
   };
@@ -183,7 +252,7 @@ export default async function ModelPage({ params }: ModelPageProps) {
     );
   }
 
-  const [spec, modelImages, market, rawListings] = await Promise.all([
+  const [spec, modelImages, market, rawListings, maintenanceRules, recommendedParts] = await Promise.all([
     prisma.modelSpec.findUnique({
       where: { modelId: model.id },
     }),
@@ -192,12 +261,16 @@ export default async function ModelPage({ params }: ModelPageProps) {
       orderBy: [{ type: "asc" }, { createdAt: "asc" }],
     }),
     getMarketSummary(model.id),
-    // This protects market intelligence from invalid source pricing.
+    // Public model inventory preview follows the same source-backed trust rules as market pages.
     prisma.listing.findMany({
       where: {
         status: "ACTIVE",
         modelId: model.id,
         vehicleId: { not: null },
+        sourceId: { not: null },
+        externalListingId: { not: null },
+        url: { not: null },
+        sellerId: null,
         vehicle: {
           is: {
             // ACTIVE covers older VIN-backed rows created before the VALID/WARNING quality pass existed.
@@ -216,9 +289,19 @@ export default async function ModelPage({ params }: ModelPageProps) {
         NOT: [
           { source: { is: { type: "AUCTION" } } },
           { url: { contains: "bringatrailer.com", mode: "insensitive" } },
+          { externalListingId: { contains: "sprint-", mode: "insensitive" } },
+          { externalListingId: { contains: "admin-ops", mode: "insensitive" } },
+          { externalListingId: { contains: "demo", mode: "insensitive" } },
+          { externalListingId: { contains: "test", mode: "insensitive" } },
         ]
       },
       include: {
+        source: {
+          select: {
+            name: true,
+            type: true,
+          },
+        },
         vehicle: {
           include: {
             photos: {
@@ -237,7 +320,77 @@ export default async function ModelPage({ params }: ModelPageProps) {
         }
       },
       orderBy: { createdAt: "desc" }
-    })
+    }),
+    prisma.maintenanceRule.findMany({
+      where: {
+        OR: [
+          { modelId: null },
+          { modelId: model.id },
+        ],
+      },
+      orderBy: [
+        { priority: "asc" },
+        { intervalMiles: "asc" },
+      ],
+      take: 6,
+    }),
+    prisma.performancePart.findMany({
+      where: {
+        status: "ACTIVE",
+        OR: [
+          { compatibility: { none: {} } },
+          {
+            compatibility: {
+              some: {
+                AND: [
+                  {
+                    OR: [
+                      { makeId: null },
+                      { makeId: model.makeId },
+                    ],
+                  },
+                  {
+                    OR: [
+                      { modelId: null },
+                      { modelId: model.id },
+                    ],
+                  },
+                  {
+                    OR: [
+                      { yearStart: null },
+                      { yearStart: { lte: model.productionEndYear ?? model.productionStartYear ?? 9999 } },
+                    ],
+                  },
+                  {
+                    OR: [
+                      { yearEnd: null },
+                      { yearEnd: { gte: model.productionStartYear ?? model.productionEndYear ?? 0 } },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        ],
+      },
+      include: {
+        category: true,
+        brand: true,
+        compatibility: {
+          include: {
+            make: true,
+            model: true,
+          },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+      orderBy: [
+        { category: { displayOrder: "asc" } },
+        { brand: { name: "asc" } },
+        { name: "asc" },
+      ],
+      take: 4,
+    }),
   ]);
 
   // Validate and filter listings to ensure they match current make and model
@@ -255,7 +408,7 @@ export default async function ModelPage({ params }: ModelPageProps) {
   }
 
   const dedupedListings: any[] = [];
-  for (const [vin, list] of groups.entries()) {
+  for (const list of groups.values()) {
     list.sort((a, b) => {
       const dateA = new Date(a.createdAt || 0).getTime();
       const dateB = new Date(b.createdAt || 0).getTime();
@@ -270,15 +423,6 @@ export default async function ModelPage({ params }: ModelPageProps) {
   const listings = dedupedListings.sort((a, b) => {
     return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
   });
-
-  // Snapshots for the sparkline chart (separate query — needed as array with date)
-  const marketSnapshots = market.hasData
-    ? await prisma.marketSnapshot.findMany({
-        where: { modelId: model.id },
-        orderBy: { date: "asc" },
-        take: 12,
-      })
-    : [];
 
   const garageItem = session?.user ? await prisma.garageItem.findUnique({
     where: {
@@ -296,7 +440,11 @@ export default async function ModelPage({ params }: ModelPageProps) {
     },
   }) : null;
 
+  const displayableModelImages = getDisplayableModelImages(modelImages);
   const heroImage = getHeroImage(modelImages);
+  const galleryImages = displayableModelImages
+    .filter((image) => image.url !== heroImage?.url)
+    .slice(0, 5);
   const heroImageCredit = heroImage
     ? heroImage.attribution || heroImage.sourceName || heroImage.source || null
     : null;
@@ -314,470 +462,411 @@ export default async function ModelPage({ params }: ModelPageProps) {
     ["0-60 mph", spec?.zeroToSixty],
     ["Weight", spec?.weight],
   ].filter((entry): entry is [string, string] => Boolean(entry[1]));
+  const modelTitle = `${model.make.name} ${model.name}`;
+  const inventoryHref = `/inventory?make=${encodeURIComponent(model.make.slug)}&model=${encodeURIComponent(model.slug)}`;
+  const partsHref = `/parts?make=${encodeURIComponent(model.make.slug)}&model=${encodeURIComponent(model.slug)}`;
+  const productionYears = formatYears(model.productionStartYear, model.productionEndYear);
+  const metadataSourceLabel = model.metadataSource || model.metadataSourceUrl || heroImageCredit || null;
+  const metadataSourceHref = model.metadataSourceUrl || heroImageCreditUrl || null;
+  const modelPassportFields = [
+    ["Make", model.make.name],
+    ["Model", model.name],
+    ["Production Years", productionYears],
+    ["Category", model.category],
+    ["Body Style", model.bodyStyle],
+    ["Production Count", formatCount(model.productionCount)],
+    ...specs,
+  ].filter((entry): entry is [string, string] => Boolean(entry[1]));
+  const heroMeta = [
+    "Model Passport",
+    model.category,
+    model.bodyStyle,
+  ].filter((value): value is string => Boolean(value));
+  const displayListings = listings.filter((listing) => getListingImage(listing) !== "/images/placeholder.jpg");
+  const displayMarketRange = buildDisplayMarketRange(displayListings);
+  const displayMarketRangeLabel = displayMarketRange
+    ? `$${displayMarketRange.lowestPrice.toLocaleString()} - $${displayMarketRange.highestPrice.toLocaleString()}`
+    : null;
+  const marketHasDisplayData = Boolean(displayMarketRange || market.recentSales.salesCount > 0 || market.trend);
+  const heroStats = [
+    productionYears ? ["Production Years", productionYears] : null,
+    ["Horsepower", spec?.horsepower],
+    ["0-60 MPH", spec?.zeroToSixty],
+    ["Top Speed", spec?.topSpeed],
+    displayMarketRangeLabel ? ["Market Range", displayMarketRangeLabel] : null,
+  ].filter((entry): entry is [string, string] => Boolean(entry?.[1]));
+  const modelFamilyItems = [
+    {
+      id: model.id,
+      name: model.name,
+      years: productionYears,
+      productionCount: model.productionCount,
+      description: model.description,
+      current: true,
+    },
+    ...model.variants.map((variant) => ({
+      id: variant.id,
+      name: variant.name,
+      years: formatYears(variant.productionStartYear, variant.productionEndYear),
+      productionCount: variant.productionCount,
+      description: variant.description,
+      current: false,
+    })),
+  ];
+  const previewListings = displayListings.slice(0, 6);
+  const modelMaintenanceRules = [...maintenanceRules].sort((a, b) => {
+    const priority: Record<string, number> = { REQUIRED: 1, RECOMMENDED: 2, INSPECT: 3 };
+    const priorityDelta = (priority[a.priority] || 99) - (priority[b.priority] || 99);
+    if (priorityDelta !== 0) return priorityDelta;
+    return (a.intervalMiles || 0) - (b.intervalMiles || 0);
+  });
 
   return (
-    <main className="garage-page-shell model-detail-shell">
-      <Link
-        className="model-back-link"
-        href={`/make/${model.make.slug}`}
-      >
-        {model.make.name}
-      </Link>
+    <main className="model-intelligence-shell">
+      <section className="model-intelligence-hero">
+        <div className="vehicle-intelligence-hero-shade" aria-hidden="true" />
+        <div className="vehicle-intelligence-hero-copy model-intelligence-hero-copy">
+          <Link className="vehicle-intelligence-kicker model-back-link" href={`/make/${model.make.slug}`}>
+            All {model.make.name} Models
+          </Link>
+          <div className="model-intelligence-make-row">
+            {model.make.logoUrl ? <img src={model.make.logoUrl} alt="" loading="lazy" /> : null}
+            <span>{model.make.name}</span>
+          </div>
+          <h1>{modelTitle}</h1>
+          <div className="vehicle-intelligence-meta">
+            {heroMeta.map((value) => (
+              <span key={value}>{value}</span>
+            ))}
+          </div>
+          {model.description ? <p>{model.description}</p> : null}
+          {heroImageCredit ? (
+            <small className="model-intelligence-image-credit">
+              Image:{" "}
+              {heroImageCreditUrl ? (
+                <Link href={heroImageCreditUrl} target="_blank" rel="noreferrer">
+                  {heroImageCredit}
+                </Link>
+              ) : (
+                heroImageCredit
+              )}
+            </small>
+          ) : null}
+        </div>
 
-      <h1 className="model-detail-title">{model.name}</h1>
-
-      <div style={{ marginTop: 20, display: "grid", gap: 20 }}>
-        {heroImage ? (
-          <div
-            style={{
-              position: "relative",
-              width: "100%",
-              aspectRatio: "16 / 9",
-              borderRadius: 8,
-              overflow: "hidden",
-              border: "1px solid rgba(255, 255, 255, 0.12)",
-              background: "rgba(255, 255, 255, 0.06)",
-            }}
-          >
+        <div className="model-intelligence-hero-media">
+          {heroImage ? (
             <Image
               src={heroImage.url}
-              alt={`${model.make.name} ${model.name}`}
+              alt=""
               fill
-              sizes="(max-width: 768px) 100vw, 75vw"
+              sizes="(max-width: 980px) 100vw, 70vw"
               style={{ objectFit: "cover" }}
               priority
               unoptimized
             />
-            {heroImageCredit ? (
-              <div
-                style={{
-                  position: "absolute",
-                  left: 12,
-                  bottom: 12,
-                  maxWidth: "calc(100% - 24px)",
-                  border: "1px solid rgba(255, 255, 255, 0.14)",
-                  borderRadius: 999,
-                  background: "rgba(0, 0, 0, 0.58)",
-                  color: "rgba(255, 255, 255, 0.78)",
-                  fontSize: 11,
-                  fontWeight: 600,
-                  padding: "6px 10px",
-                  backdropFilter: "blur(12px)",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                Image:{" "}
-                {heroImageCreditUrl ? (
-                  <Link
-                    href={heroImageCreditUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ color: "#ffffff", textDecoration: "none" }}
-                  >
-                    {heroImageCredit}
+          ) : (
+            <div className="model-intelligence-hero-fallback">
+              <strong>{model.make.name}</strong>
+              <span>{model.name}</span>
+            </div>
+          )}
+          {galleryImages.length > 0 ? (
+            <div className="model-intelligence-image-strip" aria-label="Additional model images">
+              {galleryImages.map((image, index) => {
+                const sourceHref = image.attributionUrl || image.sourceUrl || null;
+                const imageLabel = `${modelTitle} image ${index + 2}`;
+                return sourceHref ? (
+                  <Link key={image.id ?? image.url} href={sourceHref} target="_blank" rel="noreferrer" aria-label={`${imageLabel} source`}>
+                    <img src={image.url} alt={imageLabel} loading="lazy" />
                   </Link>
                 ) : (
-                  heroImageCredit
+                  <span key={image.id ?? image.url}>
+                    <img src={image.url} alt={imageLabel} loading="lazy" />
+                  </span>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
+
+        <aside className="vehicle-intelligence-actions model-intelligence-actions" aria-label="Model actions">
+          <form action={async () => {
+            "use server";
+            if (!session?.user?.id) {
+              await signIn("google", { redirectTo: `/make/${slug}/${modelSlug}` });
+              return;
+            }
+            await toggleGarageItem(model.id);
+          }}>
+              <button
+                type="submit"
+              >
+                <span aria-hidden="true">♡</span>
+                {session?.user?.id && garageItem ? "Remove Dream Car" : "Add to Dream Garage"}
+              </button>
+          </form>
+          {claimedVehicle ? (
+            <Link href={`/vehicle/${claimedVehicle.vin}`}><span aria-hidden="true">▣</span>View Passport</Link>
+          ) : (
+            <Link href={`/claim/${model.id}`}><span aria-hidden="true">▣</span>Claim This Car</Link>
+          )}
+          <Link href={inventoryHref}><span aria-hidden="true">⌁</span>View Inventory</Link>
+          <Link href={partsHref}><span aria-hidden="true">⌘</span>View Parts</Link>
+        </aside>
+      </section>
+
+      <section className="vehicle-intelligence-hero-stats model-intelligence-stat-strip" aria-label="Model stats">
+        {heroStats.map(([label, value]) => (
+          <article key={label}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+          </article>
+        ))}
+      </section>
+
+      <section className="vehicle-intelligence-dashboard model-intelligence-dashboard">
+        <div className="vehicle-intelligence-main-column">
+          {model.description ? (
+            <section className="vehicle-intelligence-card model-intelligence-history-card">
+              <div className="vehicle-intelligence-card-heading">
+                <span>History</span>
+                <strong>{model.make.name}</strong>
+              </div>
+              <p>{model.description}</p>
+            </section>
+          ) : null}
+
+          <section className="vehicle-intelligence-card model-intelligence-variants-card">
+            <div className="vehicle-intelligence-card-heading">
+              <span>Model Family</span>
+              <strong>{modelFamilyItems.length.toLocaleString()} cataloged</strong>
+            </div>
+            <div className="model-intelligence-family-track" aria-label={`${modelTitle} family timeline`}>
+              {modelFamilyItems.map((item, index) => (
+                <article key={item.id} className={item.current ? "is-current" : undefined}>
+                  <div>
+                    <span>{item.current ? "Current View" : `Variant ${index}`}</span>
+                    <strong>{item.name}</strong>
+                  </div>
+                  {item.years || item.productionCount ? (
+                    <dl>
+                      {item.years ? (
+                        <div>
+                          <dt>Years</dt>
+                          <dd>{item.years}</dd>
+                        </div>
+                      ) : null}
+                      {item.productionCount ? (
+                        <div>
+                          <dt>Production</dt>
+                          <dd>{item.productionCount.toLocaleString()}</dd>
+                        </div>
+                      ) : null}
+                    </dl>
+                  ) : null}
+                  {item.description ? <p>{item.description}</p> : null}
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="vehicle-intelligence-card vehicle-intelligence-passport-card">
+            <div className="vehicle-intelligence-card-heading">
+              <span>Model Passport</span>
+              <strong>{model.metadataStatus === "REVIEWED" ? "Reviewed" : "Cataloged"}</strong>
+            </div>
+            {model.make.logoUrl ? <img className="vehicle-intelligence-passport-watermark" src={model.make.logoUrl} alt="" loading="lazy" /> : null}
+            <div className="vehicle-intelligence-spec-grid vehicle-intelligence-passport-specs">
+              {modelPassportFields.map(([label, value]) => (
+                <div key={label}>
+                  <span>{label}</span>
+                  <strong>{value}</strong>
+                </div>
+              ))}
+            </div>
+            {metadataSourceLabel ? (
+              <div className="model-intelligence-source-note">
+                <span>Model Data Source</span>
+                {metadataSourceHref ? (
+                  <Link href={metadataSourceHref} target="_blank" rel="noreferrer">
+                    {metadataSourceLabel}
+                  </Link>
+                ) : (
+                  <strong>{metadataSourceLabel}</strong>
                 )}
               </div>
             ) : null}
-            <form action={async () => {
-              "use server";
-              if (!session?.user?.id) {
-                await signIn("google", { redirectTo: `/make/${slug}/${modelSlug}` });
-                return;
-              }
-              await toggleGarageItem(model.id);
-            }} style={{ position: "absolute", top: 12, right: 12 }}>
-              <button
-                type="submit"
-                style={{
-                  border: "none",
-                  borderRadius: 999,
-                  padding: "10px 12px",
-                  cursor: "pointer",
-                  background: "#e20f1b",
-                  color: "#ffffff",
-                  fontWeight: 700,
-                }}
-              >
-                {session?.user?.id && garageItem ? "Remove from My Garage" : "Add to My Garage"}
-              </button>
-            </form>
-          </div>
-        ) : (
-          <div
-            style={{
-              width: "100%",
-              aspectRatio: "16 / 9",
-              borderRadius: 8,
-              border: "1px solid rgba(255, 255, 255, 0.12)",
-              background: "linear-gradient(135deg, #0f172a, #1d4ed8)",
-              color: "white",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 24,
-              textAlign: "center",
-            }}
-          >
-            <div>
-              <div style={{ fontSize: 22, fontWeight: 700 }}>{model.make.name}</div>
-              <div style={{ fontSize: 32, fontWeight: 800, marginTop: 8 }}>{model.name}</div>
-              <div style={{ marginTop: 10, color: "#cbd5e1" }}>Placeholder image coming soon</div>
-            </div>
-          </div>
-        )}
-      </div>
+          </section>
 
-      <div style={{ marginTop: 24, padding: 20, border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: 8, background: "rgba(255, 255, 255, 0.06)" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <div style={{ fontSize: 14, color: "rgba(255, 255, 255, 0.62)", fontWeight: 600 }}>Ownership</div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>
-              {claimedVehicle ? (
-                <span style={{ color: claimedVehicle.status === "CLAIMED" ? "#059669" : "#d97706" }}>
-                  {claimedVehicle.status === "CLAIMED" ? "CLAIMED" : "CLAIM PENDING"}
-                </span>
-              ) : garageItem ? (
-                <span style={{ color: "rgba(255, 255, 255, 0.62)" }}>In My Garage</span>
-              ) : (
-                "Not Claimed"
-              )}
+          <section className="vehicle-intelligence-card vehicle-intelligence-market-card model-intelligence-market-card">
+            <div className="vehicle-intelligence-card-heading">
+              <span>Market Intelligence</span>
+              <strong>{marketHasDisplayData ? "Source Backed" : "Pending"}</strong>
             </div>
-            {claimedVehicle && (
-              <div style={{ marginTop: 8 }}>
-                <Link 
-                  href={`/vehicle/${claimedVehicle.vin}`}
-                  style={{ 
-                    display: "inline-block",
-                    padding: "6px 12px", 
-                    background: "#e20f1b", 
-                    color: "#fff", 
-                    borderRadius: 8, 
-                    textDecoration: "none", 
-                    fontSize: 13, 
-                    fontWeight: 600 
-                  }}
-                >
-                  View Vehicle Passport &rarr;
-                </Link>
-              </div>
+            {marketHasDisplayData ? (
+              <>
+                <div className="vehicle-intelligence-mini-stats">
+                  {displayMarketRange ? (
+                    <>
+                      <article>
+                        <span>Market Range</span>
+                        <strong>{displayMarketRangeLabel}</strong>
+                      </article>
+                      <article>
+                        <span>Average Asking</span>
+                        <strong>${displayMarketRange.averageAskingPrice.toLocaleString()}</strong>
+                      </article>
+                    </>
+                  ) : null}
+                  <article>
+                    <span>Active Listings</span>
+                    <Link href={inventoryHref}>
+                      <strong>{displayListings.length.toLocaleString()}</strong>
+                    </Link>
+                  </article>
+                  <article>
+                    <span>Recent Sales</span>
+                    <strong>{market.recentSales.salesCount.toLocaleString()}</strong>
+                  </article>
+                </div>
+                <div className="vehicle-intelligence-market-chart model-intelligence-market-chart">
+                  <MarketPriceHistory modelId={model.id} compact />
+                </div>
+                <div className="vehicle-intelligence-source-row" aria-label="Market data sources">
+                  <span>Known Listings</span>
+                  <span>Sold Comps</span>
+                  <span>Price Trend</span>
+                </div>
+              </>
+            ) : (
+              <ModelEmptyState
+                title="Market data is building"
+                detail="SUPERCAR DASH needs source-backed listings or sold comps before this model gets a market range."
+                actionHref={inventoryHref}
+                actionLabel="Check Inventory"
+              />
             )}
-          </div>
-          {session?.user && garageItem && !claimedVehicle && (
-            <Link 
-              href={`/claim/${model.id}`}
-              style={{ 
-                padding: "8px 16px", 
-                background: "#e20f1b", 
-                color: "#fff", 
-                borderRadius: 8, 
-                textDecoration: "none", 
-                fontSize: 14, 
-                fontWeight: 600 
-              }}
-            >
-              Claim This Vehicle
-            </Link>
-          )}
-        </div>
-      </div>
+          </section>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-          gap: 12,
-          marginTop: 28,
-        }}
-
-      >
-        <div>
-          <div style={{ color: "rgba(255, 255, 255, 0.58)", fontSize: 13 }}>Production years</div>
-          <strong>
-            {formatYears(model.productionStartYear, model.productionEndYear)}
-          </strong>
-        </div>
-        <div>
-          <div style={{ color: "rgba(255, 255, 255, 0.58)", fontSize: 13 }}>Category</div>
-          <strong>{model.category ?? "Uncategorized"}</strong>
-        </div>
-        <div>
-          <div style={{ color: "rgba(255, 255, 255, 0.58)", fontSize: 13 }}>Body style</div>
-          <strong>{model.bodyStyle ?? "Unavailable"}</strong>
-        </div>
-        <div>
-          <div style={{ color: "rgba(255, 255, 255, 0.58)", fontSize: 13 }}>Production count</div>
-          <strong>{formatCount(model.productionCount)}</strong>
-        </div>
-      </div>
-
-      {model.description ? (
-        <section style={{ marginTop: 36 }}>
-          <h2>History</h2>
-          <p style={{ color: "rgba(255, 255, 255, 0.78)", fontSize: 18, lineHeight: 1.65 }}>
-            {model.description}
-          </p>
-        </section>
-      ) : null}
-
-      {model.variants.length > 0 ? (
-        <section style={{ marginTop: 36 }}>
-          <h2>Variants</h2>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-              gap: 12,
-            }}
-          >
-            {model.variants.map((variant) => (
-              <div
-                key={variant.id}
-                style={{
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
-                  borderRadius: 8,
-                  padding: 16,
-                }}
-              >
-                <h3 style={{ margin: "0 0 8px" }}>{variant.name}</h3>
-                <div style={{ color: "rgba(255, 255, 255, 0.58)", fontSize: 13 }}>
-                  {formatYears(
-                    variant.productionStartYear,
-                    variant.productionEndYear,
-                  )}
-                </div>
-                {variant.productionCount ? (
-                  <div style={{ color: "rgba(255, 255, 255, 0.58)", fontSize: 13, marginTop: 4 }}>
-                    {variant.productionCount.toLocaleString()} built
-                  </div>
-                ) : null}
-                {variant.description ? (
-                  <p style={{ color: "rgba(255, 255, 255, 0.78)", lineHeight: 1.5 }}>
-                    {variant.description}
-                  </p>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {specs.length > 0 ? (
-        <section style={{ marginTop: 36 }}>
-          <h2>Performance specifications</h2>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: 12,
-            }}
-          >
-            {specs.map(([label, value]) => (
-              <div
-                key={label}
-                style={{
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
-                  borderRadius: 8,
-                  padding: 16,
-                }}
-              >
-                <div style={{ color: "rgba(255, 255, 255, 0.58)", fontSize: 13 }}>{label}</div>
-                <strong>{value}</strong>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      <section style={{ marginTop: 40 }}>
-        <h2 style={{ fontSize: 24, marginBottom: 20 }}>Market Intelligence</h2>
-
-        {market.hasData ? (
-          <>
-            {/* Stat Cards */}
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: 12,
-              marginBottom: 28,
-            }}>
-              {/* Market Range */}
-              {market.range && (
-                <div style={{ border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: 8, padding: 16, background: "rgba(255, 255, 255, 0.06)" }}>
-                  <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.58)", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Market Range</div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: "#ffffff" }}>
-                    ${market.range.lowestPrice.toLocaleString()} &ndash; ${market.range.highestPrice.toLocaleString()}
-                  </div>
-                  <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.5)", marginTop: 4 }}>Active listings</div>
-                </div>
-              )}
-
-              {/* Avg Asking */}
-              {market.range && (
-                <div style={{ border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: 8, padding: 16, background: "rgba(255, 255, 255, 0.06)" }}>
-                  <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.58)", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Avg Asking Price</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: "#ffffff" }}>${market.range.averageAskingPrice.toLocaleString()}</div>
-                  <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.5)", marginTop: 4 }}>Median ${market.range.medianAskingPrice.toLocaleString()}</div>
-                </div>
-              )}
-
-              {/* Supply */}
-              <div style={{ border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: 8, padding: 16, background: "rgba(255, 255, 255, 0.06)" }}>
-                <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.58)", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Active Listings</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: "#ffffff" }}>{market.supply.activeListingCount}</div>
-                <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.5)", marginTop: 4 }}>Currently on market</div>
-              </div>
-
-              {/* Recent Sales */}
-              <div style={{ border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: 8, padding: 16, background: "rgba(255, 255, 255, 0.06)" }}>
-                <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.58)", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Recent Sales</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: "#ffffff" }}>{market.recentSales.salesCount}</div>
-                <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.5)", marginTop: 4 }}>Last {market.recentSales.periodDays} days</div>
-              </div>
-
-              {/* Asking vs Sold */}
-              {market.askingVsSold.differencePercent !== null && (
-                <div style={{ border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: 8, padding: 16, background: "rgba(255, 255, 255, 0.06)" }}>
-                  <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.58)", fontWeight: 600, textTransform: "uppercase", marginBottom: 6 }}>Asking vs Sold</div>
-                  <div style={{
-                    fontSize: 18,
-                    fontWeight: 800,
-                    color: market.askingVsSold.differencePercent < 0 ? "#059669" : "#dc2626",
-                  }}>
-                    {market.askingVsSold.differencePercent > 0 ? "+" : ""}{market.askingVsSold.differencePercent}%
-                  </div>
-                  <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.5)", marginTop: 4 }}>Sold vs asking</div>
-                </div>
-              )}
-
+          <section className="vehicle-intelligence-card model-intelligence-inventory-card">
+            <div className="vehicle-intelligence-card-heading">
+              <span>Available Inventory</span>
+              <Link href={inventoryHref}>View Inventory</Link>
             </div>
-          </>
-        ) : (
-          <div style={{ border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: 8, padding: 20, background: "rgba(255, 255, 255, 0.06)" }}>
-            <div style={{ fontSize: 16, color: "rgba(255, 255, 255, 0.66)", fontStyle: "italic", marginBottom: 12 }}>
-              No market data available yet.
-            </div>
-            <div style={{ fontSize: 13, color: "rgba(255, 255, 255, 0.66)", marginTop: 12, borderTop: "1px solid rgba(255, 255, 255, 0.1)", paddingTop: 12 }}>
-              <strong>Monitored Sources:</strong> Bring a Trailer, RM Sotheby&apos;s, DuPont Registry, and supported dealer networks
-            </div>
-            <div style={{ fontSize: 12, color: "rgba(255, 255, 255, 0.5)", marginTop: 4 }}>
-              Status: Active monitoring in progress. Data is updated daily as auctions close and dealer inventories refresh.
-            </div>
-          </div>
-        )}
-      </section>
-
-      <MarketPriceHistory modelId={model.id} />
-
-      {/* Available Inventory Section */}
-      <section style={{ marginTop: 40, marginBottom: 40 }}>
-        <h2 style={{ fontSize: 24, marginBottom: 20 }}>Available Inventory</h2>
-        {listings.length === 0 ? (
-          <p style={{ color: "rgba(255, 255, 255, 0.58)", fontStyle: "italic" }}>No active listings for this model currently available.</p>
-        ) : (
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-            gap: 20
-          }}>
-            {listings.map((lst) => {
-              const image = getListingImage(lst);
-              const price = lst.askingPrice || lst.price || null;
-              return (
-                <div
-                  key={lst.id}
-                  style={{
-                    border: "1px solid rgba(255, 255, 255, 0.12)",
-                    borderRadius: 8,
-                    overflow: "hidden",
-                    backgroundColor: "rgba(255, 255, 255, 0.06)",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "space-between"
-                  }}
-                >
-                  <div>
-                    {image ? (
-                      <div style={{ position: "relative", width: "100%", paddingTop: "56.25%", backgroundColor: "rgba(255, 255, 255, 0.08)" }}>
-                        <img
-                          src={image}
-                          alt={`${lst.vehicle?.year ?? "Year"} ${lst.vehicle?.model?.make?.name ?? "Make"} ${lst.vehicle?.model?.name ?? "Model"}`}
-                          style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }}
-                        />
-                      </div>
-                    ) : (
-                      <div style={{
-                        width: "100%",
-                        paddingTop: "56.25%",
-                        backgroundColor: "rgba(255, 255, 255, 0.08)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "rgba(255, 255, 255, 0.5)",
-                        fontSize: "14px",
-                        position: "relative"
-                      }}>
-                        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}>
-                          No Image
+            {previewListings.length === 0 ? (
+              <ModelEmptyState
+                title="No live inventory"
+                detail="Only VIN-backed listings with price, image, and source identity are shown here."
+                actionHref={inventoryHref}
+                actionLabel="Search Inventory"
+              />
+            ) : (
+              <div className="inventory-card-grid model-intelligence-inventory-grid">
+                {previewListings.map((lst) => {
+                  const image = getListingImage(lst);
+                  const price = lst.askingPrice || lst.price || null;
+                  const sourceLabel = lst.dealerName || lst.source?.name || "Source backed";
+                  const vehicleHref = `/vehicle/${lst.vehicle?.vin}`;
+                  return (
+                    <article key={lst.id} className="market-listing-card">
+                      <div>
+                        <Link className="market-listing-image" href={vehicleHref} aria-label={`View ${model.make.name} ${model.name}`}>
+                          <Image
+                            src={image}
+                            alt={`${lst.vehicle?.year ?? ""} ${model.make.name} ${model.name}`.trim()}
+                            fill
+                            sizes="(max-width: 720px) 100vw, (max-width: 1100px) 50vw, 33vw"
+                            unoptimized
+                          />
+                        </Link>
+                        <div className="market-listing-body">
+                          <div className="market-listing-meta-row">
+                            <span className="market-sale-pill">For Sale</span>
+                            {price !== null ? (
+                              <span className="market-listing-price">${price.toLocaleString()}</span>
+                            ) : null}
+                          </div>
+                          <h3>{lst.vehicle?.year ?? "Year"} {model.make.name} {model.name}</h3>
+                          <div className="market-listing-detail">
+                            {lst.mileage !== null ? `${lst.mileage.toLocaleString()} miles` : "Mileage unavailable"}
+                          </div>
+                          <div className="market-listing-detail">{sourceLabel}</div>
                         </div>
                       </div>
-                    )}
-                    <div style={{ padding: 16 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
-                        <span style={{
-                          backgroundColor: "#fef3c7",
-                          color: "#d97706",
-                          fontSize: "11px",
-                          fontWeight: "bold",
-                          padding: "2px 6px",
-                          borderRadius: 4,
-                          textTransform: "uppercase"
-                        }}>
-                          FOR SALE
-                        </span>
-                        {price !== null && (
-                          <span style={{ fontWeight: 800, color: "#10b981", fontSize: "16px" }}>
-                            ${price.toLocaleString()}
-                          </span>
-                        )}
+                      <div className="market-listing-actions">
+                        {lst.url ? (
+                          <Link href={lst.url} target="_blank" rel="noreferrer" className="market-source-link">
+                            View original listing
+                          </Link>
+                        ) : null}
+                        <Link href={vehicleHref} className="market-card-button">
+                          View Vehicle
+                        </Link>
                       </div>
-                      <h3 style={{ fontSize: 18, fontWeight: 700, margin: "0 0 6px 0", color: "#ffffff" }}>
-                        {lst.vehicle?.year ?? "Year"} {lst.vehicle?.model?.make?.name ?? "Make"} {lst.vehicle?.model?.name ?? "Model"}
-                      </h3>
-                      <div style={{ fontSize: 13, color: "rgba(255, 255, 255, 0.58)" }}>
-                        {lst.mileage !== null ? `${lst.mileage.toLocaleString()} miles` : "Mileage unavailable"}
-                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </div>
+
+        <aside className="vehicle-intelligence-side-column">
+          <section className="vehicle-intelligence-card model-intelligence-maintenance-card">
+            <div className="vehicle-intelligence-card-heading">
+              <span>Maintenance Intelligence</span>
+              <strong>{modelMaintenanceRules.length > 0 ? `${modelMaintenanceRules.length} rules` : "Model Guide"}</strong>
+            </div>
+            {modelMaintenanceRules.length > 0 ? (
+              <div className="model-intelligence-rule-list">
+                {modelMaintenanceRules.slice(0, 4).map((rule) => (
+                  <article key={rule.id}>
+                    <strong>{rule.serviceName}</strong>
+                    <span>{formatMaintenanceInterval(rule.intervalMiles, rule.intervalMonths)}</span>
+                    {rule.description ? <small>{rule.description}</small> : null}
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <ModelEmptyState
+                title="No model-specific rules yet"
+                detail="Claim a VIN to personalize service timing, records, and shop routing for this model."
+                actionHref={`/claim/${model.id}`}
+                actionLabel="Claim This Car"
+              />
+            )}
+          </section>
+
+          <section className="vehicle-intelligence-card model-intelligence-parts-card">
+            <div className="vehicle-intelligence-card-heading">
+              <span>Recommended Parts</span>
+              <Link href={partsHref}>View Parts</Link>
+            </div>
+            {recommendedParts.length > 0 ? (
+              <div className="model-intelligence-part-list">
+                {recommendedParts.map((part) => (
+                  <Link key={part.id} href={getPartDetailPath(part)}>
+                    {part.imageUrl ? <img src={part.imageUrl} alt="" loading="lazy" /> : <span>{part.category.name}</span>}
+                    <div>
+                      <small>{part.category.name} · {part.brand.name}</small>
+                      <strong>{part.name}</strong>
+                      <em>{formatPartPrice(part.retailPriceCents)}</em>
                     </div>
-                  </div>
-                  <div style={{ padding: 16, paddingTop: 0 }}>
-                    <Link
-                      href={`/vehicle/${lst.vehicle?.vin}`}
-                      style={{
-                        display: "block",
-                        textAlign: "center",
-                        backgroundColor: "#e20f1b",
-                        color: "#ffffff",
-                        padding: "10px 16px",
-                        borderRadius: 8,
-                        fontSize: "14px",
-                        fontWeight: 600,
-                        textDecoration: "none",
-                        transition: "background-color 0.2s"
-                      }}
-                    >
-                      View Vehicle
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <ModelEmptyState
+                title="Parts fitment is pending"
+                detail="Open the parts store with this make and model selected to browse universal and compatible categories."
+                actionHref={partsHref}
+                actionLabel="View Parts Store"
+              />
+            )}
+          </section>
+
+        </aside>
       </section>
 
     </main>

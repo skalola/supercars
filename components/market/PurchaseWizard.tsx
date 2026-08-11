@@ -166,23 +166,27 @@ export default function PurchaseWizard({
   if (!isOpen) {
     return (
       <button
+        className="vehicle-purchase-button"
         onClick={() => setIsOpen(true)}
         style={{
           width: "100%",
-          backgroundColor: "#2563eb",
+          backgroundColor: "#e20f1b",
           color: "#ffffff",
-          padding: "16px 24px",
-          borderRadius: "12px",
-          fontSize: "18px",
-          fontWeight: 700,
-          border: "none",
+          minHeight: "42px",
+          padding: "0 14px",
+          borderRadius: "6px",
+          fontSize: "12px",
+          fontWeight: 900,
+          letterSpacing: "0.06em",
+          border: "1px solid rgba(226, 15, 27, 0.82)",
           cursor: "pointer",
-          boxShadow: "0 4px 6px -1px rgba(37, 99, 235, 0.2), 0 2px 4px -1px rgba(37, 99, 235, 0.1)",
+          boxShadow: "0 14px 34px rgba(226, 15, 27, 0.18)",
           transition: "background-color 0.2s, transform 0.1s",
           textAlign: "center",
+          textTransform: "uppercase",
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#1d4ed8")}
-        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#2563eb")}
+        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#f01928")}
+        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#e20f1b")}
       >
         Buy This Car
       </button>
@@ -476,7 +480,7 @@ export default function PurchaseWizard({
 
                 <div style={{ backgroundColor: "#f8fafc", padding: "16px", borderRadius: "8px", border: "1px solid #e2e8f0", marginTop: "8px" }}>
                   <p style={{ fontSize: "12px", color: "#475569", lineHeight: 1.5, margin: 0, paddingBottom: "12px", borderBottom: "1px solid #cbd5e1" }}>
-                    <strong>Legal Disclaimer:</strong> This purchase request is contingent upon the selling dealer's final approval of the offer and vehicle availability. By proceeding, the buyer agrees to pay the total vehicle price upon approval. A platform service fee of <strong>{platformFeePercent}</strong> (${platformFee.toLocaleString()}) will be applied to this transaction. This fee is non-refundable once the dealer accepts the offer.
+                    <strong>Legal Disclaimer:</strong> This purchase request is contingent upon the selling dealer&apos;s final approval of the offer and vehicle availability. By proceeding, the buyer agrees to pay the total vehicle price upon approval. A platform service fee of <strong>{platformFeePercent}</strong> (${platformFee.toLocaleString()}) will be applied to this transaction. This fee is non-refundable once the dealer accepts the offer.
                   </p>
                   <div style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginTop: "12px" }}>
                     <input
@@ -487,7 +491,7 @@ export default function PurchaseWizard({
                       style={{ marginTop: "3px", width: "16px", height: "16px" }}
                     />
                     <label htmlFor="legalConsent" style={{ fontSize: "13px", color: "#334155", lineHeight: 1.4 }}>
-                      I acknowledge that I have read and agree to SUPERCAR DASH's <a href="/legal/terms" target="_blank" style={{ color: "#2563eb", textDecoration: "underline" }}>Terms of Use</a> and <a href="/legal/privacy" target="_blank" style={{ color: "#2563eb", textDecoration: "underline" }}>Privacy Policy</a>.
+                      I acknowledge that I have read and agree to SUPERCAR DASH&apos;s <a href="/legal/terms" target="_blank" style={{ color: "#2563eb", textDecoration: "underline" }}>Terms of Use</a> and <a href="/legal/privacy" target="_blank" style={{ color: "#2563eb", textDecoration: "underline" }}>Privacy Policy</a>.
                     </label>
                   </div>
                 </div>

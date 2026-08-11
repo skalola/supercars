@@ -30,11 +30,16 @@ async function main() {
       )
     ),
     Promise.all(
-      PART_BRAND_SEEDS.map((brand) =>
-        prisma.partBrand.upsert({
+      PART_BRAND_SEEDS.map(async (brand) => {
+        const row = await prisma.partBrand.upsert({
           where: { slug: brand.slug },
           update: {
             name: brand.name,
+            logoUrl: brand.logoUrl ?? null,
+            logoSourceUrl: brand.logoUrl ?? null,
+            logoBackground: brand.logoUrl ? "TRANSPARENT" : "UNKNOWN",
+            logoVerifiedAt: brand.logoUrl ? new Date() : null,
+            logoNeedsReview: !brand.logoUrl,
             websiteUrl: brand.websiteUrl ?? null,
             country: brand.country ?? null,
             active: true,
@@ -42,12 +47,19 @@ async function main() {
           create: {
             name: brand.name,
             slug: brand.slug,
+            logoUrl: brand.logoUrl ?? null,
+            logoSourceUrl: brand.logoUrl ?? null,
+            logoBackground: brand.logoUrl ? "TRANSPARENT" : "UNKNOWN",
+            logoVerifiedAt: brand.logoUrl ? new Date() : null,
+            logoNeedsReview: !brand.logoUrl,
             websiteUrl: brand.websiteUrl ?? null,
             country: brand.country ?? null,
             active: true,
           },
-        })
-      )
+        });
+
+        return row;
+      })
     ),
     Promise.all(
       AFFILIATE_PARTNER_SEEDS.map((partner) =>

@@ -582,6 +582,7 @@ model PartCategory {
 
   parts          PerformancePart[]
   installedParts VehicleInstalledPart[]
+  catalogNodes   PartCatalogNode[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -589,14 +590,48 @@ model PartCategory {
   @@index([active, displayOrder])
 }
 
+model PartCatalogNode {
+  id              String  @id @default(uuid())
+  categoryId      String?
+  parentId        String?
+  name            String
+  slug            String
+  path            String  @unique
+  description     String?
+  iconUrl         String?
+  depth           Int     @default(0)
+  displayOrder    Int     @default(0)
+  sourceName      String?
+  sourceUrl       String?
+  placeholderOnly Boolean @default(true)
+  inventoryStatus String  @default("SHELL_ONLY")
+  active          Boolean @default(true)
+
+  category PartCategory?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  parent   PartCatalogNode?  @relation("PartCatalogTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children PartCatalogNode[] @relation("PartCatalogTree")
+  parts    PerformancePart[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId, active])
+  @@index([parentId, displayOrder])
+  @@index([inventoryStatus])
+}
+
 model PartBrand {
-  id         String  @id @default(uuid())
-  name       String
-  slug       String  @unique
-  logoUrl    String?
-  websiteUrl String?
-  country    String?
-  active     Boolean @default(true)
+  id              String    @id @default(uuid())
+  name            String
+  slug            String    @unique
+  logoUrl         String?
+  logoSourceUrl   String?
+  logoBackground  String    @default("UNKNOWN")
+  logoVerifiedAt  DateTime?
+  logoNeedsReview Boolean   @default(false)
+  websiteUrl      String?
+  country         String?
+  active          Boolean   @default(true)
 
   parts PerformancePart[]
 
@@ -630,6 +665,7 @@ model AffiliatePartner {
 model PerformancePart {
   id                 String  @id @default(uuid())
   categoryId         String
+  catalogNodeId      String?
   brandId            String
   affiliatePartnerId String?
   name               String
@@ -658,6 +694,7 @@ model PerformancePart {
   notes               String?
 
   category         PartCategory           @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  catalogNode      PartCatalogNode?       @relation(fields: [catalogNodeId], references: [id], onDelete: SetNull)
   brand            PartBrand              @relation(fields: [brandId], references: [id], onDelete: Restrict)
   affiliatePartner AffiliatePartner?      @relation(fields: [affiliatePartnerId], references: [id], onDelete: SetNull)
   compatibility    PartCompatibility[]
@@ -669,6 +706,7 @@ model PerformancePart {
 
   @@unique([brandId, slug])
   @@index([categoryId, status])
+  @@index([catalogNodeId, status])
   @@index([brandId, status])
   @@index([trackingStatus])
 }

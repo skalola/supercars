@@ -21,6 +21,11 @@ export default function OwnerSaleControls({
   const [isCancelHovered, setIsCancelHovered] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const defaultAskingPrice = askingPrice ?? undefined;
+
+  const getErrorMessage = (err: unknown) => {
+    return err instanceof Error ? err.message : "Something went wrong.";
+  };
 
   const handleList = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -32,8 +37,8 @@ export default function OwnerSaleControls({
     try {
       await listVehicleForSale(vin, price);
       setIsListingFlow(false);
-    } catch (err: any) {
-      setError(err.message || "Something went wrong.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -46,24 +51,24 @@ export default function OwnerSaleControls({
     try {
       await removeFromSale(vin);
       setIsListingFlow(false);
-    } catch (err: any) {
-      setError(err.message || "Something went wrong.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ display: "inline-block", fontFamily: "system-ui, sans-serif" }}>
+    <div className="owner-sale-controls">
       {error && (
-        <div style={{ color: "#dc2626", fontSize: "12px", marginBottom: "4px", fontWeight: 600 }}>
+        <div className="owner-sale-controls__error">
           Error: {error}
         </div>
       )}
 
       {isForSale ? (
         // AFTER LISTING: Show Remove From Sale button
-        <form onSubmit={handleRemove} style={{ display: "inline" }}>
+        <form onSubmit={handleRemove}>
           <button
             type="submit"
             disabled={loading}
@@ -87,7 +92,7 @@ export default function OwnerSaleControls({
         </form>
       ) : (
         // NOT FOR SALE: Show list button or inline form
-        <div style={{ display: "inline" }}>
+        <div>
           {!isListingFlow ? (
             <button
               type="button"
@@ -110,16 +115,16 @@ export default function OwnerSaleControls({
             </button>
           ) : (
             // Listing flow: Show price input and confirm button next to each other inline
-            <form onSubmit={handleList} style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+            <form className="owner-sale-controls__listing-form" onSubmit={handleList}>
               <input
                 type="number"
                 name="askingPrice"
                 placeholder="Asking Price ($)"
                 required
                 min="1"
+                defaultValue={defaultAskingPrice}
                 disabled={loading}
                 style={{
-                  width: "140px",
                   padding: "8px 12px",
                   border: "1px solid #cbd5e1",
                   borderRadius: "8px",

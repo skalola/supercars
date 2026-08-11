@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useTransition } from "react";
-import { toggleGarageAlert } from "@/app/actions/garage";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
+import { removeClaimedVehicle, removeSavedGarageItem, toggleGarageAlert } from "@/app/actions/garage";
 
 export type GarageClaimedVehicle = {
   id: string;
@@ -12,16 +12,19 @@ export type GarageClaimedVehicle = {
   status: string;
   mileage: number | null;
   image: string | null;
+  makeLogoUrl: string | null;
   makeName: string;
   makeSlug: string;
   modelName: string;
   modelSlug: string;
   trim: string | null;
+  estimatedValue: number | null;
 };
 
 export type GarageSavedVehicle = {
   id: string;
   image: string | null;
+  makeLogoUrl: string | null;
   makeName: string;
   makeSlug: string;
   modelName: string;
@@ -31,101 +34,204 @@ export type GarageSavedVehicle = {
   listingTrackerAlertsEnabled: boolean;
 };
 
+export type GaragePreviousVehicle = {
+  id: string;
+  vin: string;
+  year: number;
+  status: string;
+  mileage: number | null;
+  image: string | null;
+  makeLogoUrl: string | null;
+  makeName: string;
+  makeSlug: string;
+  modelName: string;
+  modelSlug: string;
+  trim: string | null;
+  estimatedValue: number | null;
+};
+
 type GarageTabsProps = {
   claimedVehicles: GarageClaimedVehicle[];
   savedVehicles: GarageSavedVehicle[];
+  previousVehicles?: GaragePreviousVehicle[];
   isOwner?: boolean;
 };
 
-type ActiveTab = "claimed" | "saved";
+type ActiveTab = "claimed" | "saved" | "previouslyOwned";
+type PendingRemoval =
+  | { kind: "claimed"; id: string; label: string }
+  | { kind: "saved"; id: string; label: string };
 
-export default function GarageTabs({ claimedVehicles, savedVehicles, isOwner = true }: GarageTabsProps) {
-  const [activeTab, setActiveTab] = useState<ActiveTab>(claimedVehicles.length > 0 ? "claimed" : "saved");
+export default function GarageTabs({ claimedVehicles, savedVehicles, previousVehicles = [], isOwner = true }: GarageTabsProps) {
+  const [activeTab, setActiveTab] = useState<ActiveTab>(claimedVehicles.length > 0 || savedVehicles.length === 0 ? "claimed" : "saved");
+  const [localClaimedVehicles, setLocalClaimedVehicles] = useState(claimedVehicles);
   const [localSavedVehicles, setLocalSavedVehicles] = useState(savedVehicles);
   const [pendingAlertId, setPendingAlertId] = useState<string | null>(null);
+  const [pendingRemoval, setPendingRemoval] = useState<PendingRemoval | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [collectionPage, setCollectionPage] = useState(0);
+  const pageSize = useGarageCollectionPageSize();
   const [isPending, startTransition] = useTransition();
-  const activeCount = activeTab === "claimed" ? claimedVehicles.length : savedVehicles.length;
+  const previouslyOwnedCount = previousVehicles.length;
+  const activeCount =
+    activeTab === "claimed"
+      ? localClaimedVehicles.length
+      : activeTab === "saved"
+        ? localSavedVehicles.length
+        : previouslyOwnedCount;
+  const pageCount = Math.max(1, Math.ceil(activeCount / pageSize));
+  const activePage = Math.min(collectionPage, pageCount - 1);
+  const visibleClaimedVehicles = localClaimedVehicles.slice(activePage * pageSize, activePage * pageSize + pageSize);
+  const visibleSavedVehicles = localSavedVehicles.slice(activePage * pageSize, activePage * pageSize + pageSize);
+  const visiblePreviousVehicles = previousVehicles.slice(activePage * pageSize, activePage * pageSize + pageSize);
 
   return (
-    <section style={styles.shell}>
-      <div role="tablist" aria-label="Garage vehicle categories" style={styles.tabs}>
+    <section className="garage-collection-shell">
+      <div role="tablist" aria-label="Garage vehicle categories" className="garage-collection-tabs">
         <button
           type="button"
           role="tab"
           aria-selected={activeTab === "claimed"}
-          onClick={() => setActiveTab("claimed")}
-          style={tabStyle(activeTab === "claimed")}
+          onClick={() => selectTab("claimed")}
+          className={activeTab === "claimed" ? "is-active" : undefined}
         >
-          <span>Claimed vehicles</span>
-          <span style={countStyle(activeTab === "claimed")}>{claimedVehicles.length}</span>
+          <span>Claimed</span>
+          <strong>{localClaimedVehicles.length}</strong>
         </button>
         <button
           type="button"
           role="tab"
           aria-selected={activeTab === "saved"}
-          onClick={() => setActiveTab("saved")}
-          style={tabStyle(activeTab === "saved")}
+          onClick={() => selectTab("saved")}
+          className={activeTab === "saved" ? "is-active" : undefined}
         >
-          <span>Saved vehicles</span>
-          <span style={countStyle(activeTab === "saved")}>{savedVehicles.length}</span>
+          <span>Dream Garage</span>
+          <strong>{localSavedVehicles.length}</strong>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "previouslyOwned"}
+          onClick={() => selectTab("previouslyOwned")}
+          className={activeTab === "previouslyOwned" ? "is-active" : undefined}
+        >
+          <span>Previously Owned</span>
+          <strong>{previouslyOwnedCount}</strong>
         </button>
       </div>
 
       {activeCount === 0 ? (
-        <div style={styles.emptyPanel}>
-          <h2 style={styles.emptyTitle}>
-            {activeTab === "claimed" ? "No claimed vehicles yet" : "No saved vehicles yet"}
-          </h2>
-          <p style={styles.emptyCopy}>
-            {activeTab === "claimed"
-              ? "Claim a VIN-backed vehicle passport to manage ownership, service, and selling workflows."
-              : "Save supported supercar models from model pages to keep them in your garage."}
-          </p>
-          <Link href="/inventory" style={styles.emptyLink}>
-            Browse Market
-          </Link>
+        <div className="garage-collection-empty">
+          <div className="garage-collection-empty-mark" aria-hidden="true">SD</div>
+          <div>
+            <h2>{getEmptyTitle(activeTab)}</h2>
+            <p>{getEmptyCopy(activeTab)}</p>
+          </div>
+          <Link href={getEmptyActionHref(activeTab)}>{getEmptyActionLabel(activeTab)}</Link>
         </div>
       ) : activeTab === "claimed" ? (
-        <div style={styles.grid}>
-          {claimedVehicles.map((vehicle) => (
-            <Link key={vehicle.id} href={`/vehicle/${vehicle.vin}`} className="clean-link" style={styles.card}>
-              <VehicleImage src={vehicle.image} alt={`${vehicle.year} ${vehicle.makeName} ${vehicle.modelName}`} />
-              <div style={styles.cardBody}>
-                <div style={styles.kicker}>{vehicle.makeName}</div>
-                <h2 style={styles.cardTitle}>
-                  {vehicle.year} {vehicle.modelName}
-                </h2>
-                {vehicle.trim && <p style={styles.meta}>{vehicle.trim}</p>}
-                <div style={styles.cardFooter}>
-                  <span style={styles.claimedBadge}>{vehicle.status === "CLAIMED" ? "Claimed" : "Claim pending"}</span>
-                  <span style={styles.vin}>{vehicle.vin}</span>
+        <div className="garage-collection-grid">
+          {visibleClaimedVehicles.map((vehicle) => (
+            <article key={vehicle.id} className="garage-vehicle-card">
+              {isOwner ? (
+                <button
+                  type="button"
+                  className="garage-card-remove-button"
+                  aria-label={`Remove ${vehicle.year} ${vehicle.makeName} ${vehicle.modelName} from claimed garage`}
+                  disabled={removingId === vehicle.id}
+                  onClick={() => setPendingRemoval({ kind: "claimed", id: vehicle.id, label: `${vehicle.year} ${vehicle.makeName} ${vehicle.modelName}` })}
+                >
+                  ×
+                </button>
+              ) : null}
+              <Link href={`/vehicle/${vehicle.vin}`} className="clean-link garage-card-main-link">
+                <VehicleImage src={vehicle.image} alt={`${vehicle.year} ${vehicle.makeName} ${vehicle.modelName}`}>
+                  <span className="garage-card-vin-overlay">
+                    <span aria-hidden="true" />
+                    {vehicle.status === "CLAIMED" ? "VIN Verified" : "Claim Pending"}
+                  </span>
+                </VehicleImage>
+                <div className="garage-card-body">
+                  <div className="garage-card-identity">
+                    <MakeMark src={vehicle.makeLogoUrl} label={vehicle.makeName} />
+                    <div>
+                      <span>
+                        {vehicle.year} {vehicle.makeName}
+                      </span>
+                      <strong>{vehicle.modelName}</strong>
+                      {getDisplayTrim(vehicle.trim) ? <em>{getDisplayTrim(vehicle.trim)}</em> : null}
+                    </div>
+                  </div>
+                  <div className="garage-card-meta-grid">
+                    <span>
+                      <em>Est. Value</em>
+                      <strong>{formatMoney(vehicle.estimatedValue)}</strong>
+                    </span>
+                    <span>
+                      <em>Mileage</em>
+                      <strong>{vehicle.mileage !== null ? `${vehicle.mileage.toLocaleString()} mi` : "Pending"}</strong>
+                    </span>
+                  </div>
                 </div>
-                <p style={styles.mileage}>
-                  {vehicle.mileage !== null ? `${vehicle.mileage.toLocaleString()} miles` : "Mileage unavailable"}
-                </p>
+              </Link>
+              <div className="garage-card-actions-row">
+                <Link href={`/vehicle/${vehicle.vin}`}>
+                  <ActionIcon kind="details" />
+                  View Details
+                </Link>
+                <Link href={`/vehicle/${vehicle.vin}#service`}>
+                  <ActionIcon kind="service" />
+                  Service
+                </Link>
+                <button type="button" onClick={() => shareVehicle(vehicle.vin)}>
+                  <ActionIcon kind="share" />
+                  Share
+                </button>
               </div>
-            </Link>
+            </article>
           ))}
         </div>
-      ) : (
-        <div style={styles.grid}>
-          {localSavedVehicles.map((item) => (
-            <article key={item.id} style={styles.card}>
-              <Link href={`/make/${item.makeSlug}/${item.modelSlug}`} className="clean-link">
-              <VehicleImage src={item.image} alt={`${item.makeName} ${item.modelName}`} />
-              </Link>
-              <div style={styles.cardBody}>
-                <div style={styles.kicker}>{item.makeName}</div>
-                <Link href={`/make/${item.makeSlug}/${item.modelSlug}`} className="clean-link">
-                  <h2 style={styles.cardTitle}>{item.modelName}</h2>
-                </Link>
-                <p style={styles.meta}>{item.years ?? "Production years unavailable"}</p>
-                <div style={styles.cardFooter}>
-                  <span style={styles.savedBadge}>Saved</span>
-                  <span style={styles.modelPath}>{item.makeName} model</span>
+      ) : activeTab === "saved" ? (
+        <div className="garage-collection-grid">
+          {visibleSavedVehicles.map((item) => (
+            <article key={item.id} className="garage-vehicle-card is-dream">
+              {isOwner ? (
+                <button
+                  type="button"
+                  className="garage-card-remove-button"
+                  aria-label={`Remove ${item.makeName} ${item.modelName} from dream garage`}
+                  disabled={removingId === item.id}
+                  onClick={() => setPendingRemoval({ kind: "saved", id: item.id, label: `${item.makeName} ${item.modelName}` })}
+                >
+                  ×
+                </button>
+              ) : null}
+              <Link href={`/make/${item.makeSlug}/${item.modelSlug}`} className="clean-link garage-card-main-link">
+                <VehicleImage src={item.image} alt={`${item.makeName} ${item.modelName}`} />
+                <div className="garage-card-body">
+                  <div className="garage-card-identity">
+                    <MakeMark src={item.makeLogoUrl} label={item.makeName} />
+                    <div>
+                      <span>{item.makeName}</span>
+                      <strong>{item.modelName}</strong>
+                      {item.years ? <em>{item.years}</em> : null}
+                    </div>
+                  </div>
+                  <div className="garage-card-meta-grid">
+                    <span>
+                      <em>Years</em>
+                      <strong>{item.years || "Pending"}</strong>
+                    </span>
+                    <span>
+                      <em>Trackers</em>
+                      <strong>{formatTrackerCount(item)}</strong>
+                    </span>
+                  </div>
                 </div>
+              </Link>
+              <div className="garage-card-body garage-card-alert-body">
                 {isOwner ? (
-                  <div style={styles.alertPanel} aria-label={`${item.makeName} ${item.modelName} alerts`}>
+                  <div className="garage-alert-panel" aria-label={`${item.makeName} ${item.modelName} alerts`}>
                     <AlertToggle
                       label="Price tracker"
                       detail="Email me when tracked listings drop in price."
@@ -142,15 +248,123 @@ export default function GarageTabs({ claimedVehicles, savedVehicles, isOwner = t
                     />
                   </div>
                 ) : (
-                  <p style={styles.publicSavedMeta}>Saved to this public garage</p>
+                  <p className="garage-public-saved-meta">Saved to this public garage</p>
                 )}
               </div>
             </article>
           ))}
         </div>
-      )}
+      ) : activeTab === "previouslyOwned" ? (
+        <div className="garage-collection-grid">
+          {visiblePreviousVehicles.map((vehicle) => (
+            <article key={vehicle.id} className="garage-vehicle-card is-previous">
+              <Link href={`/vehicle/${vehicle.vin}`} className="clean-link garage-card-main-link">
+                <VehicleImage src={vehicle.image} alt={`${vehicle.year} ${vehicle.makeName} ${vehicle.modelName}`}>
+                  <span className="garage-card-history-overlay">{formatVehicleStatus(vehicle.status)}</span>
+                </VehicleImage>
+                <div className="garage-card-body">
+                  <div className="garage-card-identity">
+                    <MakeMark src={vehicle.makeLogoUrl} label={vehicle.makeName} />
+                    <div>
+                      <span>
+                        {vehicle.year} {vehicle.makeName}
+                      </span>
+                      <strong>{vehicle.modelName}</strong>
+                      {getDisplayTrim(vehicle.trim) ? <em>{getDisplayTrim(vehicle.trim)}</em> : null}
+                    </div>
+                  </div>
+                  <div className="garage-card-meta-grid">
+                    <span>
+                      <em>Est. Value</em>
+                      <strong>{formatMoney(vehicle.estimatedValue)}</strong>
+                    </span>
+                    <span>
+                      <em>Mileage</em>
+                      <strong>{vehicle.mileage !== null ? `${vehicle.mileage.toLocaleString()} mi` : "Archived"}</strong>
+                    </span>
+                  </div>
+                </div>
+              </Link>
+              <div className="garage-card-actions-row">
+                <Link href={`/vehicle/${vehicle.vin}`}>
+                  <ActionIcon kind="details" />
+                  View Details
+                </Link>
+                <Link href={`/make/${vehicle.makeSlug}/${vehicle.modelSlug}`}>
+                  <ActionIcon kind="details" />
+                  Model
+                </Link>
+                <button type="button" onClick={() => shareVehicle(vehicle.vin)}>
+                  <ActionIcon kind="share" />
+                  Share
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
+      {activeCount > pageSize ? (
+        <GarageCarouselControls
+          activePage={activePage}
+          pageCount={pageCount}
+          onPrevious={() => setCollectionPage((current) => (Math.min(current, pageCount - 1) === 0 ? pageCount - 1 : Math.min(current, pageCount - 1) - 1))}
+          onNext={() => setCollectionPage((current) => (Math.min(current, pageCount - 1) + 1) % pageCount)}
+          onSelect={setCollectionPage}
+        />
+      ) : null}
+      {pendingRemoval ? (
+        <div className="garage-remove-modal" role="dialog" aria-modal="true" aria-labelledby="garage-remove-title">
+          <div className="garage-remove-modal-panel">
+            <h2 id="garage-remove-title">Remove car?</h2>
+            <p>
+              Are you sure you want to remove {pendingRemoval.label} from your{" "}
+              {pendingRemoval.kind === "claimed" ? "claimed garage" : "dream garage"}?
+            </p>
+            <div className="garage-remove-modal-actions">
+              <button type="button" className="garage-remove-modal-secondary" disabled={Boolean(removingId)} onClick={() => setPendingRemoval(null)}>
+                Keep Car
+              </button>
+              <button type="button" className="garage-remove-modal-danger" disabled={Boolean(removingId)} onClick={confirmRemoval}>
+                {removingId ? "Removing..." : "Remove"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
+
+  function selectTab(tab: ActiveTab) {
+    setActiveTab(tab);
+    setCollectionPage(0);
+  }
+
+  function confirmRemoval() {
+    if (!pendingRemoval) return;
+    const removal = pendingRemoval;
+    setRemovingId(removal.id);
+
+    if (removal.kind === "claimed") {
+      const previous = localClaimedVehicles;
+      setLocalClaimedVehicles((current) => current.filter((vehicle) => vehicle.id !== removal.id));
+      startTransition(async () => {
+        const result = await removeClaimedVehicle(removal.id);
+        if (!result.ok) setLocalClaimedVehicles(previous);
+        setPendingRemoval(null);
+        setRemovingId(null);
+      });
+      return;
+    }
+
+    const previous = localSavedVehicles;
+    setLocalSavedVehicles((current) => current.filter((item) => item.id !== removal.id));
+    startTransition(async () => {
+      const result = await removeSavedGarageItem(removal.id);
+      if (!result.ok) setLocalSavedVehicles(previous);
+      setPendingRemoval(null);
+      setRemovingId(null);
+    });
+  }
 
   function updateAlert(itemId: string, alertType: "price" | "listing", enabled: boolean) {
     setPendingAlertId(`${itemId}:${alertType}`);
@@ -186,6 +400,172 @@ export default function GarageTabs({ claimedVehicles, savedVehicles, isOwner = t
   }
 }
 
+function useGarageCollectionPageSize() {
+  const [pageSize, setPageSize] = useState(3);
+
+  useEffect(() => {
+    function updatePageSize() {
+      if (window.innerWidth <= 720) {
+        setPageSize(1);
+        return;
+      }
+
+      if (window.innerWidth <= 1180) {
+        setPageSize(2);
+        return;
+      }
+
+      setPageSize(3);
+    }
+
+    updatePageSize();
+    window.addEventListener("resize", updatePageSize);
+    return () => window.removeEventListener("resize", updatePageSize);
+  }, []);
+
+  return pageSize;
+}
+
+function GarageCarouselControls({
+  activePage,
+  pageCount,
+  onPrevious,
+  onNext,
+  onSelect,
+}: {
+  activePage: number;
+  pageCount: number;
+  onPrevious: () => void;
+  onNext: () => void;
+  onSelect: (page: number) => void;
+}) {
+  const pages = getVisibleCarouselPages(activePage, pageCount);
+
+  return (
+    <div className="garage-carousel-controls" aria-label="Garage carousel controls">
+      <button type="button" className="garage-carousel-arrow" aria-label="Previous garage cars" onClick={onPrevious}>
+        <span aria-hidden="true" />
+      </button>
+      <div className="garage-carousel-dots" aria-label="Garage carousel pages">
+        {pages.map((page, index) =>
+          page === "gap" ? (
+            <span key={`gap-${index}`} className="garage-carousel-gap" aria-hidden="true" />
+          ) : (
+            <button
+              key={page}
+              type="button"
+              aria-label={`Show garage page ${page + 1}`}
+              aria-current={activePage === page ? "true" : undefined}
+              className={activePage === page ? "is-active" : undefined}
+              onClick={() => onSelect(page)}
+            />
+          ),
+        )}
+      </div>
+      <button type="button" className="garage-carousel-arrow is-next" aria-label="Next garage cars" onClick={onNext}>
+        <span aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
+function getVisibleCarouselPages(activePage: number, pageCount: number): Array<number | "gap"> {
+  if (pageCount <= 7) return Array.from({ length: pageCount }, (_, index) => index);
+
+  const pages = new Set([0, pageCount - 1, activePage - 1, activePage, activePage + 1]);
+  const sortedPages = [...pages]
+    .filter((page) => page >= 0 && page < pageCount)
+    .sort((a, b) => a - b);
+
+  return sortedPages.flatMap((page, index) => {
+    const previous = sortedPages[index - 1];
+    if (index > 0 && previous !== undefined && page - previous > 1) return ["gap", page];
+    return [page];
+  });
+}
+
+function getEmptyTitle(activeTab: ActiveTab) {
+  if (activeTab === "claimed") return "No claimed vehicles yet";
+  if (activeTab === "saved") return "No dream cars yet";
+  return "No previously owned vehicles yet";
+}
+
+function getEmptyCopy(activeTab: ActiveTab) {
+  if (activeTab === "claimed") {
+    return "Claim a VIN-backed vehicle passport to manage ownership, service, and selling workflows.";
+  }
+
+  if (activeTab === "saved") {
+    return "Save supported models from the market to build your dream garage.";
+  }
+
+  return "Cars no longer marked as actively claimed will appear here when ownership history is retained.";
+}
+
+function getEmptyActionHref(activeTab: ActiveTab) {
+  if (activeTab === "claimed") return "/claim";
+  if (activeTab === "saved") return "/makes";
+  return "/inventory";
+}
+
+function getEmptyActionLabel(activeTab: ActiveTab) {
+  if (activeTab === "claimed") return "Claim Car";
+  if (activeTab === "saved") return "Browse Makes";
+  return "Browse Market";
+}
+
+function formatTrackerCount(item: GarageSavedVehicle) {
+  const count = Number(item.priceTrackerAlertsEnabled) + Number(item.listingTrackerAlertsEnabled);
+  if (count === 0) return "Off";
+  return `${count} active`;
+}
+
+function formatVehicleStatus(status: string) {
+  if (!status || status === "UNCLAIMED") return "Previously Owned";
+  return status
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function getDisplayTrim(trim: string | null) {
+  if (!trim) return null;
+  const normalized = trim.toLowerCase();
+  if (normalized.includes("[admin test]") || normalized.includes("admin test") || normalized.includes(" qa")) return null;
+  return trim;
+}
+
+function formatMoney(value: number | null) {
+  if (!value || value <= 0) return "Pending";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function ActionIcon({ kind }: { kind: "details" | "service" | "share" }) {
+  return <span className={`garage-card-action-icon is-${kind}`} aria-hidden="true" />;
+}
+
+function shareVehicle(vin: string) {
+  const href = `${window.location.origin}/vehicle/${vin}`;
+  if (navigator.share) {
+    void navigator.share({ title: "SUPERCAR DASH vehicle", url: href });
+    return;
+  }
+  void navigator.clipboard?.writeText(href);
+}
+
+function MakeMark({ src, label }: { src: string | null; label: string }) {
+  return (
+    <span className="garage-card-make-mark" aria-hidden="true">
+      {src ? <Image src={src} alt="" width={34} height={34} unoptimized /> : label.slice(0, 2).toUpperCase()}
+    </span>
+  );
+}
+
 function AlertToggle({
   label,
   detail,
@@ -200,301 +580,33 @@ function AlertToggle({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label style={styles.alertToggle}>
-      <span style={styles.alertText}>
-        <strong style={styles.alertTitle}>{label}</strong>
-        <em style={styles.alertDetail}>{detail}</em>
+    <label className="garage-alert-toggle">
+      <span className="garage-alert-text">
+        <strong>{label}</strong>
+        <em>{detail}</em>
       </span>
       <input
         type="checkbox"
         checked={checked}
         disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
-        style={styles.alertInput}
       />
-      <span style={toggleTrackStyle(checked, disabled)}>
-        <span style={toggleKnobStyle(checked)} />
+      <span className="garage-alert-track" data-checked={checked ? "true" : "false"} data-disabled={disabled ? "true" : "false"}>
+        <span />
       </span>
     </label>
   );
 }
 
-function VehicleImage({ src, alt }: { src: string | null; alt: string }) {
+function VehicleImage({ src, alt, children }: { src: string | null; alt: string; children?: ReactNode }) {
   return (
-    <div style={styles.imageWrap}>
+    <div className="garage-card-image">
       {src ? (
-        <Image src={src} alt={alt} fill sizes="(max-width: 720px) 100vw, 33vw" style={styles.image} unoptimized />
+        <Image src={src} alt={alt} fill sizes="(max-width: 720px) 100vw, 33vw" unoptimized />
       ) : (
-        <div style={styles.imageFallback}>SUPERCAR DASH</div>
+        <div className="garage-card-image-fallback">SUPERCAR DASH</div>
       )}
+      {children}
     </div>
   );
 }
-
-function tabStyle(active: boolean): React.CSSProperties {
-  return {
-    ...styles.tab,
-    backgroundColor: active ? "rgba(226, 15, 27, 0.95)" : "rgba(255, 255, 255, 0.06)",
-    color: "#FFFFFF",
-    borderColor: active ? "rgba(226, 15, 27, 0.95)" : "rgba(255, 255, 255, 0.12)",
-  };
-}
-
-function countStyle(active: boolean): React.CSSProperties {
-  return {
-    ...styles.count,
-    backgroundColor: active ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.08)",
-    color: active ? "#FFFFFF" : "rgba(255,255,255,0.72)",
-  };
-}
-
-function toggleTrackStyle(checked: boolean, disabled: boolean): React.CSSProperties {
-  return {
-    position: "relative",
-    width: "42px",
-    height: "24px",
-    flex: "0 0 auto",
-    borderRadius: "999px",
-    backgroundColor: checked ? "#e20f1b" : "rgba(255,255,255,0.2)",
-    opacity: disabled ? 0.6 : 1,
-    transition: "background-color 160ms ease, opacity 160ms ease",
-  };
-}
-
-function toggleKnobStyle(checked: boolean): React.CSSProperties {
-  return {
-    position: "absolute",
-    top: "3px",
-    left: "3px",
-    width: "18px",
-    height: "18px",
-    borderRadius: "999px",
-    backgroundColor: "#FFFFFF",
-    boxShadow: "0 1px 2px rgba(16, 24, 40, 0.22)",
-    transform: checked ? "translateX(18px)" : "translateX(0)",
-    transition: "transform 160ms ease",
-  };
-}
-
-const styles: Record<string, React.CSSProperties> = {
-  shell: {
-    display: "grid",
-    gap: "18px",
-    width: "min(1360px, 100%)",
-    margin: "0 auto",
-  },
-  tabs: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "8px",
-    padding: "6px",
-    border: "1px solid rgba(255,255,255,0.12)",
-    borderRadius: "8px",
-    backgroundColor: "rgba(255,255,255,0.05)",
-    backdropFilter: "blur(18px)",
-  },
-  tab: {
-    minWidth: 0,
-    minHeight: "42px",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderRadius: "6px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "8px",
-    padding: "0 10px",
-    fontSize: "13px",
-    fontWeight: 780,
-    cursor: "pointer",
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-  },
-  count: {
-    minWidth: "24px",
-    minHeight: "22px",
-    borderRadius: "999px",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "0 7px",
-    fontSize: "12px",
-    fontWeight: 850,
-  },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
-    gap: "14px",
-  },
-  card: {
-    minWidth: 0,
-    overflow: "hidden",
-    border: "1px solid rgba(255,255,255,0.12)",
-    borderRadius: "8px",
-    backgroundColor: "rgba(255,255,255,0.06)",
-    color: "#FFFFFF",
-    boxShadow: "0 24px 60px rgba(0, 0, 0, 0.26)",
-  },
-  imageWrap: {
-    position: "relative",
-    width: "100%",
-    aspectRatio: "16 / 10",
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-  image: {
-    objectFit: "cover",
-  },
-  imageFallback: {
-    position: "absolute",
-    inset: 0,
-    display: "grid",
-    placeItems: "center",
-    color: "rgba(255,255,255,0.58)",
-    fontSize: "12px",
-    fontWeight: 850,
-    letterSpacing: "1px",
-  },
-  cardBody: {
-    display: "grid",
-    gap: "7px",
-    padding: "14px",
-  },
-  kicker: {
-    color: "rgba(255,255,255,0.58)",
-    fontSize: "11px",
-    fontWeight: 850,
-    textTransform: "uppercase",
-  },
-  cardTitle: {
-    color: "#FFFFFF",
-    fontSize: "18px",
-    fontWeight: 850,
-    lineHeight: 1.2,
-    margin: 0,
-  },
-  meta: {
-    color: "rgba(255,255,255,0.66)",
-    fontSize: "13px",
-    lineHeight: 1.4,
-    margin: 0,
-  },
-  mileage: {
-    color: "rgba(255,255,255,0.66)",
-    fontSize: "12px",
-    margin: 0,
-  },
-  cardFooter: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "10px",
-    minWidth: 0,
-    marginTop: "4px",
-  },
-  claimedBadge: {
-    flex: "0 0 auto",
-    borderRadius: "999px",
-    backgroundColor: "rgba(34, 197, 94, 0.16)",
-    color: "#86efac",
-    padding: "4px 8px",
-    fontSize: "11px",
-    fontWeight: 850,
-  },
-  savedBadge: {
-    flex: "0 0 auto",
-    borderRadius: "999px",
-    backgroundColor: "rgba(255,255,255,0.1)",
-    color: "rgba(255,255,255,0.82)",
-    padding: "4px 8px",
-    fontSize: "11px",
-    fontWeight: 850,
-  },
-  vin: {
-    minWidth: 0,
-    overflow: "hidden",
-    color: "rgba(255,255,255,0.58)",
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-    fontSize: "11px",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
-  modelPath: {
-    color: "rgba(255,255,255,0.58)",
-    fontSize: "12px",
-  },
-  alertPanel: {
-    display: "grid",
-    gap: "8px",
-    marginTop: "8px",
-    paddingTop: "10px",
-    borderTop: "1px solid rgba(255,255,255,0.1)",
-  },
-  alertToggle: {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) auto",
-    gap: "12px",
-    alignItems: "center",
-    cursor: "pointer",
-  },
-  alertText: {
-    display: "grid",
-    gap: "3px",
-    minWidth: 0,
-  },
-  alertTitle: {
-    color: "#FFFFFF",
-    fontSize: "13px",
-    fontStyle: "normal",
-    fontWeight: 820,
-  },
-  alertDetail: {
-    color: "rgba(255,255,255,0.58)",
-    fontSize: "12px",
-    fontStyle: "normal",
-    lineHeight: 1.35,
-  },
-  alertInput: {
-    position: "absolute",
-    opacity: 0,
-    pointerEvents: "none",
-  },
-  publicSavedMeta: {
-    margin: "8px 0 0",
-    paddingTop: "10px",
-    borderTop: "1px solid rgba(255,255,255,0.1)",
-    color: "rgba(255,255,255,0.58)",
-    fontSize: "12px",
-    lineHeight: 1.35,
-  },
-  emptyPanel: {
-    border: "1px solid rgba(255,255,255,0.12)",
-    borderRadius: "8px",
-    backgroundColor: "rgba(255,255,255,0.06)",
-    padding: "28px",
-  },
-  emptyTitle: {
-    color: "#FFFFFF",
-    fontSize: "20px",
-    fontWeight: 850,
-    margin: "0 0 8px",
-  },
-  emptyCopy: {
-    color: "rgba(255,255,255,0.66)",
-    fontSize: "14px",
-    lineHeight: 1.5,
-    margin: 0,
-  },
-  emptyLink: {
-    display: "inline-flex",
-    marginTop: "16px",
-    minHeight: "38px",
-    alignItems: "center",
-    borderRadius: "6px",
-    backgroundColor: "#e20f1b",
-    color: "#FFFFFF",
-    padding: "0 14px",
-    textDecoration: "none",
-    fontSize: "13px",
-    fontWeight: 800,
-  },
-};

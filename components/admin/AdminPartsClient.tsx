@@ -81,6 +81,8 @@ export type AdminRecentAffiliateClickRow = {
   brandName: string;
   categoryName: string;
   affiliatePartnerName: string | null;
+  routeType: "affiliate" | "source" | "unknown";
+  routeSource: string | null;
   sourcePath: string | null;
   outboundUrl: string;
   userLabel: string;
@@ -90,6 +92,8 @@ export type AdminRecentAffiliateClickRow = {
 type AdminAffiliateAnalytics = {
   totalClicks: number;
   recentClickCount: number;
+  affiliateClickCount: number;
+  sourceClickCount: number;
   configuredParts: number;
   estimatedCommissionLabel: string;
   topParts: AdminAffiliateAnalyticsRow[];
@@ -436,6 +440,8 @@ export function AdminPartsClient({
       <div className="admin-parts-analytics-grid" aria-label="Affiliate click analytics">
         <SummaryCard label="Total Clicks" value={affiliateAnalytics.totalClicks.toLocaleString()} />
         <SummaryCard label="30 Day Clicks" value={affiliateAnalytics.recentClickCount.toLocaleString()} />
+        <SummaryCard label="Affiliate Routed" value={affiliateAnalytics.affiliateClickCount.toLocaleString()} />
+        <SummaryCard label="Source Routed" value={affiliateAnalytics.sourceClickCount.toLocaleString()} />
         <SummaryCard label="Configured Parts" value={affiliateAnalytics.configuredParts.toLocaleString()} />
         <SummaryCard label="Estimated Commission" value={affiliateAnalytics.estimatedCommissionLabel} />
       </div>
@@ -454,10 +460,15 @@ export function AdminPartsClient({
             <div className="admin-affiliate-click-list">
               {affiliateAnalytics.recentClicks.slice(0, 8).map((click) => (
                 <a key={click.id} href={click.outboundUrl} target="_blank" rel="noopener noreferrer">
-                  <strong>{click.partName}</strong>
+                  <div className="admin-affiliate-click-title">
+                    <strong>{click.partName}</strong>
+                    <span className={`admin-affiliate-route-pill is-${click.routeType}`}>
+                      {formatRouteType(click.routeType)}
+                    </span>
+                  </div>
                   <span>{click.brandName} · {click.categoryName}</span>
                   <em>{click.clickedAt} · {click.affiliatePartnerName ?? "No partner"} · {click.userLabel}</em>
-                  {click.sourcePath ? <small>{click.sourcePath}</small> : null}
+                  {click.routeSource ? <small>{click.routeSource}</small> : null}
                 </a>
               ))}
             </div>
@@ -959,6 +970,12 @@ function AffiliateInsightPanel({ title, rows }: { title: string; rows: AdminAffi
       )}
     </div>
   );
+}
+
+function formatRouteType(routeType: AdminRecentAffiliateClickRow["routeType"]) {
+  if (routeType === "affiliate") return "Affiliate";
+  if (routeType === "source") return "Source";
+  return "Unknown";
 }
 
 function AdminModal({

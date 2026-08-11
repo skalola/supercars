@@ -20,25 +20,28 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     },
   });
 
-  if (!part || !isAffiliateTrackingReady(part) || !isSafeOutboundUrl(part.affiliateUrl)) {
-    return NextResponse.redirect(new URL("/parts?affiliate=not-configured", request.url), { status: 303 });
+  if (!part || part.status !== "ACTIVE") {
+    return NextResponse.redirect(new URL("/parts?outbound=part-unavailable", request.url), { status: 303 });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const session = (globalThis as any).mockSession !== undefined ? (globalThis as any).mockSession : await auth();
   const userId = session?.user?.id || undefined;
-  const outboundUrl = part.affiliateUrl;
+  const affiliateReady = isAffiliateTrackingReady(part) && isSafeOutboundUrl(part.affiliateUrl);
+  const sourceReady = isSafeOutboundUrl(part.sourceUrl);
+  const outboundUrl = affiliateReady ? part.affiliateUrl : sourceReady ? part.sourceUrl : null;
+
   if (!outboundUrl) {
-    return NextResponse.redirect(new URL("/parts?affiliate=not-configured", request.url), { status: 303 });
+    return NextResponse.redirect(new URL("/parts?outbound=missing-retailer", request.url), { status: 303 });
   }
 
   await prisma.partAffiliateClick.create({
     data: {
       partId: part.id,
-      affiliatePartnerId: part.affiliatePartnerId,
+      affiliatePartnerId: affiliateReady ? part.affiliatePartnerId : null,
       userId,
       outboundUrl,
-      sourcePath: getSourcePath(request),
+      sourcePath: getSourcePath(request, affiliateReady ? "affiliate" : "source"),
       ipHash: hashHeaderValue(getClientIp(request)),
       userAgentHash: hashHeaderValue(request.headers.get("user-agent")),
     },
@@ -47,18 +50,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   return NextResponse.redirect(outboundUrl, { status: 302 });
 }
 
-function getSourcePath(request: NextRequest) {
+function getSourcePath(request: NextRequest, routeType: "affiliate" | "source") {
   const source = request.nextUrl.searchParams.get("source");
-  if (source) return source.slice(0, 240);
+  if (source) return `${routeType}:${source}`.slice(0, 240);
 
   const referer = request.headers.get("referer");
-  if (!referer) return request.nextUrl.pathname;
+  if (!referer) return `${routeType}:${request.nextUrl.pathname}`;
 
   try {
     const parsed = new URL(referer);
-    return `${parsed.pathname}${parsed.search}`.slice(0, 240);
+    return `${routeType}:${parsed.pathname}${parsed.search}`.slice(0, 240);
   } catch {
-    return request.nextUrl.pathname;
+    return `${routeType}:${request.nextUrl.pathname}`;
   }
 }
 

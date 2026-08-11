@@ -49,6 +49,13 @@ export default function GarageMeetHistory({ meetSummary, isOwner }: { meetSummar
       })),
     [meetSummary.stats],
   );
+  const featuredMeet =
+    meetSummary.upcoming[0] || meetSummary.hosted[0] || meetSummary.attended[0] || null;
+  const featuredMeetLabel = meetSummary.upcoming[0]
+    ? "Next Registered Meet"
+    : meetSummary.hosted[0]
+      ? "Latest Hosted Meet"
+      : "Latest Attended Meet";
 
   return (
     <section className="garage-meet-history" aria-label="Garage meet history">
@@ -72,6 +79,29 @@ export default function GarageMeetHistory({ meetSummary, isOwner }: { meetSummar
             <strong>{card.value}</strong>
           </button>
         ))}
+      </div>
+
+      <div className="garage-meet-preview-card">
+        {featuredMeet ? (
+          <Link href={featuredMeet.href}>
+            <div>
+              <span>{featuredMeetLabel}</span>
+              <strong>{featuredMeet.title}</strong>
+              <p>{featuredMeet.location}</p>
+            </div>
+            <div>
+              <em>{featuredMeet.badge}</em>
+              <span>{featuredMeet.date}</span>
+            </div>
+          </Link>
+        ) : (
+          <div>
+            <span>Next Meet</span>
+            <strong>No meet activity yet</strong>
+            <p>{isOwner ? "Host or RSVP to a meet to add activity to this garage." : "This public garage has not attended any meets yet."}</p>
+            <Link href={isOwner ? "/meets/host" : "/meets"}>{isOwner ? "Host a Meet" : "Explore Meets"}</Link>
+          </div>
+        )}
       </div>
 
       {activeTab && activeMeta ? (

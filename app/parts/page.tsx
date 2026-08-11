@@ -1,11 +1,21 @@
-import { PartsStoreExplorer, type PartsBrandRow, type PartsCategoryRow, type PartsStorePartRow } from "@/components/parts/PartsStoreExplorer";
+import { auth } from "@/auth";
+import { PartsStoreExplorer, type PartsBrandRow, type PartsCatalogNodeRow, type PartsCategoryRow, type PartsStorePartRow } from "@/components/parts/PartsStoreExplorer";
 import { isAffiliateTrackingReady } from "@/lib/parts/affiliate-tracking";
 import { getPartDetailPath } from "@/lib/parts/routes";
 import { auditPerformancePartTrust } from "@/lib/parts/trust";
+import { getCatalogNodePlaceholderUrl } from "@/lib/parts/visual-placeholders";
 import { prisma } from "@/lib/prisma";
 
-export default async function PartsPage() {
-  const [categories, brands, parts] = await Promise.all([
+type PartsPageProps = {
+  searchParams?: Promise<{ make?: string; model?: string }>;
+};
+
+export default async function PartsPage({ searchParams }: PartsPageProps) {
+  const session = await auth();
+  const userId = session?.user?.id as string | undefined;
+  const resolvedSearchParams = (await searchParams) || {};
+
+  const [categories, brands, parts, catalogNodes, garageCars, initialFilter] = await Promise.all([
     prisma.partCategory.findMany({
       where: { active: true },
       include: {
@@ -56,6 +66,20 @@ export default async function PartsPage() {
       ],
       take: 500,
     }),
+    prisma.partCatalogNode.findMany({
+      where: {
+        active: true,
+        placeholderOnly: true,
+        categoryId: { not: null },
+      },
+      orderBy: [
+        { category: { displayOrder: "asc" } },
+        { name: "asc" },
+      ],
+      take: 500,
+    }),
+    getGarageCars(userId),
+    getInitialPartsFilter(resolvedSearchParams.make, resolvedSearchParams.model),
   ]);
 
   const publicParts = parts.filter((part) => auditPerformancePartTrust(part).publicEligible);
@@ -67,6 +91,7 @@ export default async function PartsPage() {
     name: category.name,
     slug: category.slug,
     description: category.description,
+    iconUrl: getCatalogNodePlaceholderUrl(category.slug, category.slug),
     partCount: categoryPartCounts.get(category.id) ?? 0,
   }));
 
@@ -75,6 +100,8 @@ export default async function PartsPage() {
     name: brand.name,
     slug: brand.slug,
     logoUrl: brand.logoUrl,
+    logoBackground: brand.logoBackground,
+    logoNeedsReview: brand.logoNeedsReview,
     websiteUrl: brand.websiteUrl,
     country: brand.country,
     partCount: brandPartCounts.get(brand.id) ?? 0,
@@ -97,6 +124,8 @@ export default async function PartsPage() {
     brandId: part.brandId,
     brandName: part.brand.name,
     brandLogoUrl: part.brand.logoUrl,
+    brandLogoBackground: part.brand.logoBackground,
+    brandLogoNeedsReview: part.brand.logoNeedsReview,
     compatibility: part.compatibility.map(formatCompatibility),
     fitments: part.compatibility.map((fitment) => ({
       makeId: fitment.makeId,
@@ -110,7 +139,165 @@ export default async function PartsPage() {
     trackingEnabled: isAffiliateTrackingReady(part),
   }));
 
-  return <PartsStoreExplorer categories={categoryRows} brands={brandRows} parts={partRows} />;
+  const catalogNodeRows: PartsCatalogNodeRow[] = catalogNodes.map((node) => ({
+    id: node.id,
+    name: node.name,
+    slug: node.slug,
+    iconUrl: node.iconUrl,
+    categoryId: node.categoryId,
+  }));
+
+  return (
+    <PartsStoreExplorer
+      categories={categoryRows}
+      brands={brandRows}
+      parts={partRows}
+      catalogNodes={catalogNodeRows}
+      garageCars={garageCars}
+      initialMakeId={initialFilter.makeId}
+      initialModelId={initialFilter.modelId}
+    />
+  );
+}
+
+async function getInitialPartsFilter(makeSlug?: string, modelSlug?: string) {
+  const normalizedMakeSlug = makeSlug?.trim();
+  const normalizedModelSlug = modelSlug?.trim();
+
+  if (normalizedModelSlug) {
+    const model = await prisma.model.findFirst({
+      where: {
+        slug: normalizedModelSlug,
+        ...(normalizedMakeSlug ? { make: { slug: normalizedMakeSlug } } : {}),
+      },
+      select: {
+        id: true,
+        makeId: true,
+      },
+    });
+
+    if (model) {
+      return {
+        makeId: model.makeId,
+        modelId: model.id,
+      };
+    }
+  }
+
+  if (normalizedMakeSlug) {
+    const make = await prisma.make.findUnique({
+      where: { slug: normalizedMakeSlug },
+      select: { id: true },
+    });
+
+    if (make) {
+      return {
+        makeId: make.id,
+        modelId: "",
+      };
+    }
+  }
+
+  return {
+    makeId: "",
+    modelId: "",
+  };
+}
+
+async function getGarageCars(userId: string | undefined) {
+  if (!userId) return [];
+
+  const [claimedVehicles, savedVehicles] = await Promise.all([
+    prisma.vehicle.findMany({
+      where: {
+        ownerId: userId,
+        status: "CLAIMED",
+      },
+      select: {
+        id: true,
+        vin: true,
+        year: true,
+        trim: true,
+        modelId: true,
+        photos: {
+          orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+          select: { filePath: true },
+          take: 1,
+        },
+        images: {
+          orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+          select: { url: true },
+          take: 1,
+        },
+        model: {
+          select: {
+            name: true,
+            makeId: true,
+            make: {
+              select: { name: true },
+            },
+            images: {
+              orderBy: [{ type: "asc" }, { createdAt: "asc" }],
+              select: { url: true },
+              take: 1,
+            },
+          },
+        },
+      },
+      orderBy: [{ year: "desc" }, { createdAt: "desc" }],
+      take: 25,
+    }),
+    prisma.garageItem.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        modelId: true,
+        model: {
+          select: {
+            name: true,
+            makeId: true,
+            make: {
+              select: { name: true },
+            },
+            images: {
+              orderBy: [{ type: "asc" }, { createdAt: "asc" }],
+              select: { url: true },
+              take: 1,
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 25,
+    }),
+  ]);
+
+  const claimedModelIds = new Set(claimedVehicles.map((vehicle) => vehicle.modelId));
+  const claimedRows = claimedVehicles.map((vehicle) => ({
+    id: `claimed:${vehicle.id}`,
+    label: [
+      vehicle.year,
+      vehicle.model.make.name,
+      vehicle.model.name,
+      vehicle.trim,
+    ].filter(Boolean).join(" "),
+    detail: vehicle.vin ? `VIN ${vehicle.vin.slice(-6)}` : "Claimed",
+    makeId: vehicle.model.makeId,
+    modelId: vehicle.modelId,
+    imageUrl: vehicle.photos[0]?.filePath || vehicle.images[0]?.url || vehicle.model.images[0]?.url || null,
+  }));
+  const savedRows = savedVehicles
+    .filter((item) => !claimedModelIds.has(item.modelId))
+    .map((item) => ({
+      id: `saved:${item.id}`,
+      label: `${item.model.make.name} ${item.model.name}`,
+      detail: "Dream Garage",
+      makeId: item.model.makeId,
+      modelId: item.modelId,
+      imageUrl: item.model.images[0]?.url || null,
+    }));
+
+  return [...claimedRows, ...savedRows].sort((a, b) => a.label.localeCompare(b.label));
 }
 
 function formatCents(value: number | null) {

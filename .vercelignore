@@ -3,6 +3,7 @@
 .env.local
 .vercel
 .next
+.next-stale-*
 node_modules
 npm-debug.log*
 yarn-debug.log*

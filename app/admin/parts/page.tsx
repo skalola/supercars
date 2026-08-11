@@ -154,12 +154,15 @@ export default async function AdminPartsPage() {
   });
 
   const analyticsRows = buildAffiliateAnalyticsRows(parts);
+  const clickRouteCounts = countClickRoutes(recentClicks);
   const recentClickRows: AdminRecentAffiliateClickRow[] = recentClicks.map((click) => ({
     id: click.id,
     partName: click.part.name,
     brandName: click.part.brand.name,
     categoryName: click.part.category.name,
     affiliatePartnerName: click.affiliatePartner?.name ?? null,
+    routeType: getClickRouteType(click.sourcePath),
+    routeSource: getClickRouteSource(click.sourcePath),
     sourcePath: click.sourcePath,
     outboundUrl: click.outboundUrl,
     userLabel: click.user?.name || click.user?.email || "Anonymous",
@@ -197,6 +200,8 @@ export default async function AdminPartsPage() {
         affiliateAnalytics={{
           totalClicks,
           recentClickCount,
+          affiliateClickCount: clickRouteCounts.affiliate,
+          sourceClickCount: clickRouteCounts.source,
           configuredParts,
           estimatedCommissionLabel: formatCents(estimatedCommissionCents),
           topParts: analyticsRows.topParts,
@@ -208,6 +213,31 @@ export default async function AdminPartsPage() {
       />
     </main>
   );
+}
+
+function countClickRoutes(clicks: Array<{ sourcePath: string | null }>) {
+  return clicks.reduce(
+    (counts, click) => {
+      const routeType = getClickRouteType(click.sourcePath);
+      if (routeType === "affiliate") counts.affiliate += 1;
+      if (routeType === "source") counts.source += 1;
+      return counts;
+    },
+    { affiliate: 0, source: 0 },
+  );
+}
+
+function getClickRouteType(sourcePath: string | null): "affiliate" | "source" | "unknown" {
+  if (sourcePath?.startsWith("affiliate:")) return "affiliate";
+  if (sourcePath?.startsWith("source:")) return "source";
+  return "unknown";
+}
+
+function getClickRouteSource(sourcePath: string | null) {
+  if (!sourcePath) return null;
+  if (sourcePath.startsWith("affiliate:")) return sourcePath.slice("affiliate:".length);
+  if (sourcePath.startsWith("source:")) return sourcePath.slice("source:".length);
+  return sourcePath;
 }
 
 function buildAffiliateAnalyticsRows(parts: Array<{

@@ -57,6 +57,8 @@
     "match-model-image-candidates": "tsx --env-file .env scripts/match-model-image-candidates.ts",
     "backfill-model-brand-heroes": "tsx --env-file .env scripts/backfill-model-brand-hero-images.ts",
     "seed-parts-foundation": "tsx --env-file .env scripts/seed-parts-foundation.ts",
+    "cleanup-part-brand-logos": "tsx --env-file .env scripts/cleanup-part-brand-logos.ts",
+    "seed-part-taxonomy": "tsx --env-file .env scripts/seed-part-catalog-taxonomy.ts",
     "seed-real-parts-batch": "tsx --env-file .env scripts/seed-real-performance-parts-batch.ts",
     "enrich-performance-parts": "tsx --env-file .env scripts/enrich-performance-parts.ts",
     "audit-performance-parts": "tsx --env-file .env scripts/audit-performance-parts.ts",

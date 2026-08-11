@@ -8,6 +8,7 @@ export type PartCategorySeed = {
 export type PartBrandSeed = {
   name: string;
   slug: string;
+  logoUrl?: string;
   websiteUrl?: string;
   country?: string;
 };

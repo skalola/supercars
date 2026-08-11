@@ -38,6 +38,12 @@ export type ModelAuditRow = {
   slug: string;
   status: ModelCoverageStatus;
   missing: string[];
+  approvedImageCount: number;
+  sourceBackedInventoryCount: number;
+  visibleInventoryCount: number;
+  compatiblePartCount: number;
+  modelMaintenanceRuleCount: number;
+  renderedMaintenanceRuleCount: number;
   hasHeroImage: boolean;
   hasDescription: boolean;
   hasProductionYears: boolean;
@@ -45,6 +51,8 @@ export type ModelAuditRow = {
   hasBodyStyle: boolean;
   hasSpecs: boolean;
   hasVariants: boolean;
+  hasCompatibleParts: boolean;
+  hasVisibleInventory: boolean;
   hasMaintenanceRules: boolean;
   hasMarketData: boolean;
   hasListings: boolean;

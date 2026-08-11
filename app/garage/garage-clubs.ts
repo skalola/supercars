@@ -4,6 +4,7 @@ export type GarageClubSummaryItem = {
   id: string;
   href: string;
   name: string;
+  logoUrl: string | null;
   role: string;
   status: string;
   location: string;
@@ -43,6 +44,7 @@ export async function getGarageClubSummary(userId: string, includePending = fals
     id: membership.club.id,
     href: `/clubs/${membership.club.slug}`,
     name: membership.club.name,
+    logoUrl: membership.club.logoUrl,
     role: membership.role,
     status: membership.status,
     location: [membership.club.city, membership.club.state].filter(Boolean).join(", ") || "Location pending",

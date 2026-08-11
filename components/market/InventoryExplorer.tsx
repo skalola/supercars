@@ -45,6 +45,8 @@ type InventoryExplorerProps = {
   listings: ListingObj[];
   makes: MakeObj[];
   models: ModelObj[];
+  initialMake?: string;
+  initialModel?: string;
 };
 
 function getListingImage(listing: ListingObj) {
@@ -58,9 +60,13 @@ export default function InventoryExplorer({
   listings,
   makes,
   models,
+  initialMake,
+  initialModel,
 }: InventoryExplorerProps) {
-  const [selectedMakeId, setSelectedMakeId] = useState("");
-  const [selectedModelId, setSelectedModelId] = useState("");
+  const initialMakeId = resolveMakeId(makes, initialMake);
+  const initialModelId = resolveModelId(models, initialModel, initialMakeId);
+  const [selectedMakeId, setSelectedMakeId] = useState(initialMakeId);
+  const [selectedModelId, setSelectedModelId] = useState(initialModelId);
   const [selectedYear, setSelectedYear] = useState("");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
@@ -291,4 +297,31 @@ function formatFullCurrency(value: number) {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+function resolveMakeId(makes: MakeObj[], value?: string) {
+  const normalized = normalizeFilterValue(value);
+  if (!normalized) return "";
+
+  return (
+    makes.find((make) =>
+      [make.id, make.slug, make.name].some((candidate) => normalizeFilterValue(candidate) === normalized)
+    )?.id || ""
+  );
+}
+
+function resolveModelId(models: ModelObj[], value?: string, makeId?: string) {
+  const normalized = normalizeFilterValue(value);
+  if (!normalized) return "";
+
+  return (
+    models.find((model) => {
+      if (makeId && model.makeId !== makeId) return false;
+      return [model.id, model.slug, model.name].some((candidate) => normalizeFilterValue(candidate) === normalized);
+    })?.id || ""
+  );
+}
+
+function normalizeFilterValue(value?: string) {
+  return value?.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "";
 }
