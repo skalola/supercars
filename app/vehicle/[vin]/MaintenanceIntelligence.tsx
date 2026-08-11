@@ -2,7 +2,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { completeMaintenanceItem, createServiceBookingPackage } from "@/app/actions/passport";
@@ -99,7 +99,7 @@ export default function MaintenanceIntelligence({
     }
   }
 
-  const requestServiceLocation = () => {
+  const requestServiceLocation = useCallback(() => {
     if (!navigator.geolocation) {
       setLocationStatus("Location is unavailable in this browser, so nearby service booking cannot be shown.");
       return;
@@ -136,9 +136,9 @@ export default function MaintenanceIntelligence({
       },
       { enableHighAccuracy: false, timeout: 8000 },
     );
-  };
+  }, [serviceShops]);
 
-  const openBookingFlow = (rule: any) => {
+  const openBookingFlow = useCallback((rule: any) => {
     setBookingRule(rule);
     setBookingStep(1);
     setSelectedShop("");
@@ -148,7 +148,24 @@ export default function MaintenanceIntelligence({
     setPreferredTime("10:00 AM");
     setBookingModalOpen(true);
     if (!userCoordinates) requestServiceLocation();
-  };
+  }, [requestServiceLocation, userCoordinates]);
+
+  useEffect(() => {
+    const handleOpenServiceBooking = (event: Event) => {
+      const detail = (event as CustomEvent<{ vin?: string }>).detail;
+      if (detail?.vin && detail.vin !== vin) return;
+
+      openBookingFlow(
+        sortedRules[0] ?? {
+          serviceName: "Service Appointment",
+          description: "Certified service appointment",
+        },
+      );
+    };
+
+    window.addEventListener("supercars:open-service-booking", handleOpenServiceBooking);
+    return () => window.removeEventListener("supercars:open-service-booking", handleOpenServiceBooking);
+  }, [openBookingFlow, sortedRules, vin]);
 
   // Prefill helper when opening the modal
   const openCompletionForm = (rule: any) => {

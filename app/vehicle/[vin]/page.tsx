@@ -13,6 +13,7 @@ import { AddToFavoritesButton } from "@/components/garage/AddToFavoritesButton";
 import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
 import { calculateModifiedPerformance } from "@/lib/parts/performance";
 import { getPartDetailPath } from "@/lib/parts/routes";
+import ServiceBookingActionButton from "./ServiceBookingActionButton";
 import type { CSSProperties } from "react";
 
 type VehiclePageProps = {
@@ -371,7 +372,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
             {isOwner ? (
               <>
                 <Link href={`/vehicle/${vehicle.vin}/edit`}><span aria-hidden="true">✎</span>Edit Passport</Link>
-                <Link href="#vehicle-maintenance"><span aria-hidden="true">▣</span>Book Service</Link>
+                <ServiceBookingActionButton vin={vehicle.vin} />
                 <Link href={`/vehicle/${vehicle.vin}/edit`}><span aria-hidden="true">＋</span>Add Mod</Link>
                 <Link href={matchingPartsHref}><span aria-hidden="true">⌘</span>View Parts</Link>
                 <OwnerSaleControls vin={vin} isForSale={isForSale} askingPrice={askingPrice} />

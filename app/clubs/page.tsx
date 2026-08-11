@@ -109,7 +109,10 @@ export default async function ClubsPage({
                 <Link key={club.id} href={`/clubs/${club.slug}`} className="club-list-row" role="row">
                   <div className="club-list-name-cell" data-label="Name">
                     <img src={club.logoUrl || DEFAULT_CLUB_LOGO} alt="" />
-                    <strong>{club.name}</strong>
+                    <div>
+                      <strong>{club.name}</strong>
+                      <small className="club-list-mobile-location">{club.city}, {club.state}</small>
+                    </div>
                   </div>
                   <span data-label="Location">{club.city}, {club.state}</span>
                   <span data-label="Make">{club.makeLabel}</span>
