@@ -14,6 +14,7 @@ import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images"
 import { calculateModifiedPerformance } from "@/lib/parts/performance";
 import { getPartDetailPath } from "@/lib/parts/routes";
 import ServiceBookingActionButton from "./ServiceBookingActionButton";
+import ServiceBookingModule from "./ServiceBookingModule";
 import type { CSSProperties } from "react";
 
 type VehiclePageProps = {
@@ -142,7 +143,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
       .filter(Boolean)
   );
 
-  const [maintenanceRules, market, savedFavorite, recommendedParts] = await Promise.all([
+  const [maintenanceRules, market, savedFavorite, recommendedParts, serviceShops] = await Promise.all([
     prisma.maintenanceRule.findMany({
       where: {
         OR: [
@@ -221,6 +222,25 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
         { name: "asc" },
       ],
       take: 8,
+    }),
+    prisma.partnerContact.findMany({
+      where: {
+        type: "SERVICE_SHOP",
+        active: true,
+        email: { not: null },
+        latitude: { not: null },
+        longitude: { not: null },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        city: true,
+        state: true,
+        latitude: true,
+        longitude: true,
+      },
+      orderBy: { name: "asc" },
     }),
   ]);
 
@@ -331,6 +351,24 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
   return (
       <main className="vehicle-intelligence-shell">
         <section className="vehicle-intelligence-hero" style={heroStyle}>
+          {isOwner ? (
+            <ServiceBookingModule
+              vin={vehicle.vin}
+              makeName={vehicle.model.make.name}
+              defaultRule={firstMaintenanceRule}
+              serviceShops={serviceShops
+                .filter((shop) => shop.email && shop.latitude !== null && shop.longitude !== null)
+                .map((shop) => ({
+                  id: shop.id,
+                  name: shop.name,
+                  email: shop.email as string,
+                  city: shop.city,
+                  state: shop.state,
+                  latitude: shop.latitude as number,
+                  longitude: shop.longitude as number,
+                }))}
+            />
+          ) : null}
           <div className="vehicle-intelligence-hero-shade" aria-hidden="true" />
           <div className="vehicle-intelligence-hero-copy">
             <span className="vehicle-intelligence-kicker">{isOwner ? "Claimed Garage" : isForSale ? "Market Listing" : "Vehicle Passport"}</span>

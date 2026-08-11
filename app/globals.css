@@ -3813,6 +3813,246 @@ canvas {
   font-size: 15px;
 }
 
+.vehicle-service-booking-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(16px);
+}
+
+.vehicle-service-booking-modal {
+  display: grid;
+  gap: 18px;
+  width: min(560px, 100%);
+  max-height: min(760px, calc(100vh - 40px));
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background:
+    linear-gradient(135deg, rgba(226, 15, 27, 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(18, 18, 20, 0.98), rgba(4, 4, 5, 0.98));
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.52);
+  color: #ffffff;
+}
+
+.vehicle-service-booking-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px 0;
+}
+
+.vehicle-service-booking-header span,
+.vehicle-service-booking-field,
+.vehicle-service-booking-review dt {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vehicle-service-booking-header h2 {
+  margin: 5px 0 0;
+  color: #ffffff;
+  font-size: clamp(22px, 4vw, 32px);
+  line-height: 0.96;
+  text-transform: uppercase;
+}
+
+.vehicle-service-booking-header > button {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.vehicle-service-booking-body {
+  display: grid;
+  gap: 15px;
+  padding: 0 22px 22px;
+}
+
+.vehicle-service-booking-copy {
+  display: grid;
+  gap: 5px;
+  padding-top: 4px;
+}
+
+.vehicle-service-booking-copy strong {
+  color: #ffffff;
+  font-size: 15px;
+  text-transform: uppercase;
+}
+
+.vehicle-service-booking-copy p,
+.vehicle-service-booking-status,
+.vehicle-service-booking-error {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.vehicle-service-booking-error {
+  color: #ff7a84;
+}
+
+.vehicle-service-booking-primary,
+.vehicle-service-booking-actions button,
+.vehicle-service-booking-actions a {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.vehicle-service-booking-primary,
+.vehicle-service-booking-actions button:last-child,
+.vehicle-service-booking-actions a {
+  border: 1px solid rgba(226, 15, 27, 0.72);
+  background: linear-gradient(180deg, #f01928, #b90d18);
+  color: #ffffff;
+}
+
+.vehicle-service-booking-actions button:first-child {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+.vehicle-service-booking-primary,
+.vehicle-service-booking-actions button {
+  cursor: pointer;
+}
+
+.vehicle-service-booking-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.vehicle-service-booking-shops {
+  display: grid;
+  gap: 10px;
+}
+
+.vehicle-service-booking-shops label,
+.vehicle-service-booking-empty,
+.vehicle-service-booking-review,
+.vehicle-service-booking-field input,
+.vehicle-service-booking-field select {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.vehicle-service-booking-shops label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px;
+  cursor: pointer;
+}
+
+.vehicle-service-booking-shops label.is-selected {
+  border-color: rgba(69, 214, 88, 0.72);
+  background: rgba(69, 214, 88, 0.1);
+}
+
+.vehicle-service-booking-shops input {
+  accent-color: #45d658;
+}
+
+.vehicle-service-booking-shops span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.vehicle-service-booking-shops strong {
+  color: #ffffff;
+  font-size: 14px;
+}
+
+.vehicle-service-booking-shops small,
+.vehicle-service-booking-empty {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.vehicle-service-booking-empty {
+  padding: 14px;
+}
+
+.vehicle-service-booking-field {
+  display: grid;
+  gap: 7px;
+}
+
+.vehicle-service-booking-field input,
+.vehicle-service-booking-field select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  color: #ffffff;
+  font: inherit;
+}
+
+.vehicle-service-booking-field select option {
+  color: #111111;
+}
+
+.vehicle-service-booking-review {
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+}
+
+.vehicle-service-booking-review div {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.vehicle-service-booking-review div:last-child {
+  border-bottom: 0;
+}
+
+.vehicle-service-booking-review dd {
+  margin: 0;
+  color: #ffffff;
+  font-size: 14px;
+}
+
+.vehicle-service-booking-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 4px;
+}
+
 .owner-sale-controls,
 .owner-sale-controls > div,
 .owner-sale-controls form,
