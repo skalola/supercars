@@ -28,8 +28,9 @@ export async function createCarClubAction(formData: FormData) {
   });
 
   const name = readString(formData, "name");
-  const city = readString(formData, "city");
-  const state = readString(formData, "state").toUpperCase();
+  const isNationwide = readString(formData, "nationwide") === "true";
+  const city = isNationwide ? "Nationwide" : readString(formData, "city");
+  const state = isNationwide ? "US" : readString(formData, "state").toUpperCase();
   const country = readString(formData, "country") || "US";
   const description = readString(formData, "description");
   const visibility = readString(formData, "visibility") === "PRIVATE" ? "PRIVATE" : "PUBLIC";

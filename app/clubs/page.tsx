@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { createCarClubAction } from "@/app/actions/clubs";
 import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
 import { prisma } from "@/lib/prisma";
+import ClubLocationFields from "./ClubLocationFields";
 import ClubModelSelector from "./ClubModelSelector";
 
 export const dynamic = "force-dynamic";
@@ -142,16 +143,7 @@ export default async function ClubsPage({
                 <span>Club Name</span>
                 <input name="name" placeholder="Charlotte V10 Owners" required />
               </label>
-              <div className="club-form-grid">
-                <label>
-                  <span>City</span>
-                  <input name="city" placeholder="Charlotte" required />
-                </label>
-                <label>
-                  <span>State</span>
-                  <input name="state" placeholder="NC" maxLength={2} required />
-                </label>
-              </div>
+              <ClubLocationFields />
               <input type="hidden" name="country" value="US" />
               <label>
                 <span>Visibility</span>

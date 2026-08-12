@@ -16076,6 +16076,34 @@ canvas {
   gap: 16px;
 }
 
+.club-location-fields {
+  display: grid;
+  gap: 10px;
+}
+
+.club-checkbox-row {
+  display: flex !important;
+  min-height: 44px;
+  align-items: center;
+  gap: 10px !important;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+  cursor: pointer;
+}
+
+.club-checkbox-row input {
+  width: 16px;
+  min-height: 16px;
+  height: 16px;
+  accent-color: #e20f1b;
+}
+
+.club-checkbox-row span {
+  color: #ffffff;
+}
+
 .club-form-grid {
   display: grid;
   grid-template-columns: 1fr 96px;
@@ -16104,6 +16132,11 @@ canvas {
 .club-form option {
   background: #101010;
   color: #ffffff;
+}
+
+.club-form input:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
 }
 
 .club-model-selectors {
