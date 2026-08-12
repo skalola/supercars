@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { createClubInviteToken, verifyClubInviteToken } from "@/lib/clubs/invite-token";
 import { isUploadableImageFile, uploadPublicImage } from "@/lib/media/upload-storage";
 import { prisma } from "@/lib/prisma";
 import { enforceActionRateLimit } from "@/lib/security/action-rate-limit";
@@ -309,6 +310,99 @@ export async function leaveClubAction(formData: FormData) {
   revalidatePath("/clubs");
   revalidatePath(`/clubs/${membership.club.slug}`);
   redirect(`/clubs/${membership.club.slug}`);
+}
+
+export async function createClubInviteAction(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+
+  const userId = session.user.id as string;
+  const clubId = readString(formData, "clubId");
+  if (!clubId) throw new Error("Missing club.");
+
+  await enforceActionRateLimit({
+    actorId: userId,
+    action: "CAR_CLUB_INVITE_CREATE",
+    limit: 60,
+    windowMs: 10 * 60 * 1000,
+    bucketKey: clubId,
+  });
+
+  const [club, membership, user] = await Promise.all([
+    prisma.carClub.findFirst({
+      where: {
+        id: clubId,
+        status: "ACTIVE",
+      },
+      select: { id: true },
+    }),
+    prisma.carClubMember.findUnique({
+      where: { clubId_userId: { clubId, userId } },
+      select: { status: true },
+    }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    }),
+  ]);
+
+  if (!club) throw new Error("Club not found.");
+  if (membership?.status !== ACTIVE_MEMBER_STATUS && user?.role !== "ADMIN") {
+    throw new Error("Only active club members can invite drivers.");
+  }
+
+  const token = createClubInviteToken({ clubId: club.id, inviterId: userId });
+  return { invitePath: `/clubs/invite/${token}` };
+}
+
+export async function acceptClubInviteAction(formData: FormData) {
+  const session = await auth();
+  const token = readString(formData, "token");
+  if (!session?.user?.id) {
+    redirect(`/login?returnTo=${encodeURIComponent(`/clubs/invite/${token}`)}`);
+  }
+
+  const invite = verifyClubInviteToken(token);
+  if (!invite) {
+    throw new Error("This club invite is invalid or expired.");
+  }
+
+  const userId = session.user.id as string;
+  await enforceActionRateLimit({
+    actorId: userId,
+    action: "CAR_CLUB_INVITE_ACCEPT",
+    limit: 20,
+    windowMs: 10 * 60 * 1000,
+    bucketKey: invite.clubId,
+  });
+
+  const club = await prisma.carClub.findFirst({
+    where: { id: invite.clubId, status: "ACTIVE" },
+    select: { id: true, slug: true },
+  });
+  if (!club) throw new Error("Club not found.");
+
+  await prisma.carClubMember.upsert({
+    where: { clubId_userId: { clubId: club.id, userId } },
+    update: {
+      status: ACTIVE_MEMBER_STATUS,
+      joinedAt: new Date(),
+    },
+    create: {
+      clubId: club.id,
+      userId,
+      role: MEMBER_ROLE,
+      status: ACTIVE_MEMBER_STATUS,
+      joinedAt: new Date(),
+    },
+  });
+
+  revalidatePath("/clubs");
+  revalidatePath(`/clubs/${club.slug}`);
+  revalidatePath("/garage");
+  redirect(`/clubs/${club.slug}`);
 }
 
 async function canModerateClub(clubId: string, userId: string) {

@@ -69,117 +69,6 @@ const stateCoordinates: Record<string, { latitude: number; longitude: number }> 
   WA: { latitude: 47.7511, longitude: -120.7401 },
 };
 
-export const demoMeetEvents: MeetEvent[] = [
-  createDemoMeet({
-    slug: "charlotte-supercar-breakfast",
-    title: "Charlotte Supercar Breakfast",
-    dateLabel: "Aug 24",
-    timeLabel: "8:30 AM",
-    city: "Charlotte",
-    state: "NC",
-    type: "Cars & Coffee",
-    status: "Open",
-    expectedCars: 18,
-    host: "SUPERCAR DASH Hosted",
-    locationName: "South End Garage Row",
-    locationDetail: "Exact bay shared after RSVP",
-    description: "A low-key owner breakfast and morning roll-out built around verified garage profiles.",
-    mapX: 69,
-    mapY: 58,
-    accent: "red",
-  }),
-  createDemoMeet({
-    slug: "miami-coastal-cruise",
-    title: "Miami Coastal Cruise",
-    dateLabel: "Aug 31",
-    timeLabel: "7:00 AM",
-    city: "Miami",
-    state: "FL",
-    type: "Private Drive",
-    status: "Open",
-    expectedCars: 24,
-    host: "Miami Owners Circle",
-    locationName: "Brickell Meet Point",
-    locationDetail: "Route opens after RSVP",
-    description: "Early coastal drive with photo stop, breakfast, and verified car roll call.",
-    mapX: 77,
-    mapY: 78,
-    accent: "red",
-  }),
-  createDemoMeet({
-    slug: "la-canyon-run",
-    title: "Canyon Run",
-    dateLabel: "Sep 7",
-    timeLabel: "6:45 AM",
-    city: "Los Angeles",
-    state: "CA",
-    type: "Drive",
-    status: "Invite Only",
-    expectedCars: 20,
-    host: "West Coast Garage",
-    locationName: "Malibu Staging Point",
-    locationDetail: "Private route shared with approved cars",
-    description: "Morning canyon session with a verified-car attendance list and post-drive gallery.",
-    mapX: 16,
-    mapY: 60,
-    accent: "red",
-  }),
-  createDemoMeet({
-    slug: "atlanta-midtown-meet",
-    title: "Midtown Meet",
-    dateLabel: "Sep 14",
-    timeLabel: "9:00 AM",
-    city: "Atlanta",
-    state: "GA",
-    type: "Garage Night",
-    status: "Open",
-    expectedCars: 15,
-    host: "Atlanta Supercar Society",
-    locationName: "Midtown Private Deck",
-    locationDetail: "Address shared after RSVP",
-    description: "A city meet for owners who want a clean roll call, parking order, and car-led profiles.",
-    mapX: 65,
-    mapY: 64,
-    accent: "white",
-  }),
-  createDemoMeet({
-    slug: "chicago-lakeside-drive",
-    title: "Lakeside Drive",
-    dateLabel: "Sep 21",
-    timeLabel: "8:00 AM",
-    city: "Chicago",
-    state: "IL",
-    type: "Drive",
-    status: "Open",
-    expectedCars: 22,
-    host: "Great Lakes Owners",
-    locationName: "North Shore Start",
-    locationDetail: "Parking zone shared after RSVP",
-    description: "Lakefront morning route with verified cars and owner activity logged back to the garage.",
-    mapX: 58,
-    mapY: 43,
-    accent: "red",
-  }),
-  createDemoMeet({
-    slug: "seattle-mountain-loop",
-    title: "Mountain Loop",
-    dateLabel: "Sep 28",
-    timeLabel: "7:30 AM",
-    city: "Seattle",
-    state: "WA",
-    type: "Private Drive",
-    status: "Full",
-    expectedCars: 12,
-    host: "Pacific Northwest Garage",
-    locationName: "Eastside Start",
-    locationDetail: "Waitlist open",
-    description: "Small-capacity mountain drive with curated attendance and post-event car photography.",
-    mapX: 12,
-    mapY: 23,
-    accent: "white",
-  }),
-];
-
 export async function getUpcomingMeetEvents() {
   try {
     const rows = await prisma.meet.findMany({
@@ -190,10 +79,9 @@ export async function getUpcomingMeetEvents() {
       orderBy: { startsAt: "asc" },
       take: 24,
     });
-    if (rows.length === 0) return demoMeetEvents;
     return rows.map(serializeMeet);
   } catch {
-    return demoMeetEvents;
+    return [];
   }
 }
 
@@ -205,9 +93,9 @@ export async function getMeetBySlug(slug: string) {
     });
     if (row) return serializeMeet(row);
   } catch {
-    return demoMeetEvents.find((meet) => meet.slug === slug) ?? null;
+    return null;
   }
-  return demoMeetEvents.find((meet) => meet.slug === slug) ?? null;
+  return null;
 }
 
 const meetInclude = {
@@ -296,45 +184,6 @@ function serializeMeet(row: MeetRow): MeetEvent {
       vehicleHref: photo.vehicle ? `/vehicle/${photo.vehicle.vin}` : null,
       createdAt: photo.createdAt.toISOString(),
     })),
-  };
-}
-
-function createDemoMeet(
-  input: Omit<
-    MeetEvent,
-    | "id"
-    | "capacity"
-    | "hostUserId"
-    | "hostUsername"
-    | "club"
-    | "allowedMakes"
-    | "latitude"
-    | "longitude"
-    | "heroImage"
-    | "isDemo"
-    | "cars"
-    | "photos"
-  >,
-): MeetEvent {
-  return {
-    ...input,
-    type: normalizeMeetType(input.type),
-    id: null,
-    capacity: input.expectedCars,
-    hostUserId: null,
-    hostUsername: null,
-    club: null,
-    allowedMakes: ["Ferrari", "Lamborghini", "McLaren"],
-    latitude: estimateLatitude(input.city, input.state),
-    longitude: estimateLongitude(input.city, input.state),
-    heroImage: "/images/garage-home-hero.png?v=garage-2",
-    isDemo: true,
-    cars: [
-      { name: "Ferrari 458 Italia", owner: "@redline", ownerHref: "/garage", image: "/images/garage-home-hero.png?v=garage-2" },
-      { name: "Lamborghini Huracan", owner: "@v10club", ownerHref: "/garage", image: "/images/garage-home-hero.png?v=garage-2" },
-      { name: "McLaren 720S", owner: "@carbonclub", ownerHref: "/garage", image: "/images/garage-home-hero.png?v=garage-2" },
-    ],
-    photos: [],
   };
 }
 

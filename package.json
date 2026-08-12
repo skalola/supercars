@@ -67,6 +67,7 @@
     "verify:neon": "tsx --env-file .env scripts/verify-neon-migration.ts",
     "process-fulfillment-expirations": "tsx --env-file .env scripts/process-fulfillment-expirations.ts",
     "process-meet-lifecycle": "tsx --env-file .env scripts/process-meet-lifecycle.ts",
+    "cleanup-test-meets": "tsx --env-file .env scripts/cleanup-test-meets.ts",
     "qa:meets": "tsx scratch/test_meet_system_regression.ts",
     "qa:meet-map": "tsx scripts/verify-meet-map-projection.ts",
     "backfill-meet-coordinates": "tsx --env-file .env scripts/backfill-meet-coordinates.ts",

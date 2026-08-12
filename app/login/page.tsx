@@ -1,22 +1,25 @@
-import { auth, signIn } from "@/auth";
 import Link from "next/link";
+import { auth, signIn } from "@/auth";
 
 async function credentialSignIn(formData: FormData) {
   "use server";
 
   const email = String(formData.get("email") || "").trim();
   const password = String(formData.get("password") || "");
+  const returnTo = sanitizeReturnTo(String(formData.get("returnTo") || ""));
   const adminEmail = (process.env.ADMIN_TEST_EMAIL || "admin@supercars.test").toLowerCase();
   const provider = email.toLowerCase() === adminEmail ? "admin-test" : "user-test";
 
   await signIn(provider, {
     email,
     password,
-    redirectTo: provider === "admin-test" ? "/admin/fulfillment" : "/transactions",
+    redirectTo: returnTo || (provider === "admin-test" ? "/admin/fulfillment" : "/transactions"),
   });
 }
 
-export default async function LoginPage() {
+export default async function LoginPage({ searchParams }: { searchParams?: Promise<{ returnTo?: string }> }) {
+  const params = await searchParams;
+  const returnTo = sanitizeReturnTo(params?.returnTo || "");
   const session = await auth();
   const isAdmin = session?.user?.role === "ADMIN";
 
@@ -38,6 +41,7 @@ export default async function LoginPage() {
         <div className="auth-form-stack">
           <form action={credentialSignIn} className="auth-form">
             <strong>Account login</strong>
+            <input type="hidden" name="returnTo" value={returnTo} />
             <input
               name="email"
               type="email"
@@ -63,7 +67,7 @@ export default async function LoginPage() {
           </div>
           <form action={async () => {
             "use server";
-            await signIn("google", { redirectTo: "/garage" });
+            await signIn("google", { redirectTo: returnTo || "/garage" });
           }}>
             <button type="submit" className="auth-google-button">
               Continue with Google
@@ -74,4 +78,10 @@ export default async function LoginPage() {
       </section>
     </main>
   );
+}
+
+function sanitizeReturnTo(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) return "";
+  return trimmed;
 }

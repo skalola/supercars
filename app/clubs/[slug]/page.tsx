@@ -185,7 +185,13 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
               <em className="club-member-count">{activeMembers.length}</em>
             </strong>
           </div>
-          {canInviteMembers ? <ClubInviteLink clubName={club.name} clubPath={`/clubs/${club.slug}`} /> : null}
+          {canInviteMembers ? (
+            <ClubInviteLink
+              clubId={club.id}
+              clubName={club.name}
+              inviterName={userLabel(session?.user?.name, session?.user?.email)}
+            />
+          ) : null}
           <div className="club-member-grid">
             {activeMembers.map((member) => (
               <Link key={member.id} href={member.user.username ? `/garage/${member.user.username}` : "/garage"} className="club-member-card">
@@ -371,6 +377,10 @@ function formatMeetDate(date: Date) {
     day: "numeric",
     year: "numeric",
   }).format(date);
+}
+
+function userLabel(name?: string | null, email?: string | null) {
+  return name || email || "A SUPERCAR DASH member";
 }
 
 function parseHorsepower(value: string | null | undefined) {

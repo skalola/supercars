@@ -68,6 +68,7 @@ export function MeetsMapExperience({ meetEvents, makeOptions }: MeetsMapExperien
     meet,
     point: getMeetMapPoint(meet),
   }));
+  const hasMeets = meetEvents.length > 0;
 
   function handleNearMe() {
     if (!navigator.geolocation) {
@@ -154,30 +155,39 @@ export function MeetsMapExperience({ meetEvents, makeOptions }: MeetsMapExperien
           </CountryMapGraphic>
         </div>
 
-        {filteredMeets.length === 0 && nearMeEnabled ? (
+        {!hasMeets ? (
+          <article className="meets-empty-card">
+            <span>Live Calendar</span>
+            <h2>No live meets yet</h2>
+            <p>Host the first SUPERCAR DASH meet and it will appear on the national map.</p>
+            <Link href="/meets/host" className="is-primary">Host a Meet</Link>
+          </article>
+        ) : filteredMeets.length === 0 && nearMeEnabled ? (
           <div className="meets-map-message">No meets found within {NEARBY_RADIUS_MILES} miles.</div>
         ) : null}
 
-        <article className="meets-selected-card">
-          <div className="meets-selected-image" style={{ backgroundImage: `url("${selectedMeet.heroImage}")` }} />
-          <div>
-            <span className={`meet-type-badge ${getMeetTypeBadgeClass(selectedMeet.type)}`}>{normalizeMeetType(selectedMeet.type)}</span>
-            <h2>{selectedMeet.title}</h2>
-            <p>
-              {selectedMeet.dateLabel} · {selectedMeet.city}, {selectedMeet.state}
-              {"distanceMiles" in selectedMeet && typeof selectedMeet.distanceMiles === "number"
-                ? ` · ${Math.round(selectedMeet.distanceMiles).toLocaleString()} mi`
-                : ""}
-            </p>
-            <strong>{selectedMeet.expectedCars} cars expected</strong>
-            <div className="meets-selected-actions">
-              <Link href={`/meets/${selectedMeet.slug}`}>RSVP</Link>
-              <Link href={`/meets/${selectedMeet.slug}`} className="is-primary">
-                View Meet
-              </Link>
+        {selectedMeet ? (
+          <article className="meets-selected-card">
+            <div className="meets-selected-image" style={{ backgroundImage: `url("${selectedMeet.heroImage}")` }} />
+            <div>
+              <span className={`meet-type-badge ${getMeetTypeBadgeClass(selectedMeet.type)}`}>{normalizeMeetType(selectedMeet.type)}</span>
+              <h2>{selectedMeet.title}</h2>
+              <p>
+                {selectedMeet.dateLabel} · {selectedMeet.city}, {selectedMeet.state}
+                {"distanceMiles" in selectedMeet && typeof selectedMeet.distanceMiles === "number"
+                  ? ` · ${Math.round(selectedMeet.distanceMiles).toLocaleString()} mi`
+                  : ""}
+              </p>
+              <strong>{selectedMeet.expectedCars} cars expected</strong>
+              <div className="meets-selected-actions">
+                <Link href={`/meets/${selectedMeet.slug}`}>RSVP</Link>
+                <Link href={`/meets/${selectedMeet.slug}`} className="is-primary">
+                  View Meet
+                </Link>
+              </div>
             </div>
-          </div>
-        </article>
+          </article>
+        ) : null}
       </div>
 
       {locationStatus ? <p className="meets-location-status">{locationStatus}</p> : null}
@@ -188,20 +198,27 @@ export function MeetsMapExperience({ meetEvents, makeOptions }: MeetsMapExperien
           <strong>Upcoming Meets</strong>
         </div>
         <div className="meets-upcoming-list">
-          {visibleMeets.slice(0, 5).map((meet) => (
-            <Link key={meet.slug} href={`/meets/${meet.slug}`} className="meets-upcoming-card">
-              <div className="meets-upcoming-image" style={{ backgroundImage: `url("${meet.heroImage}")` }} />
-              <div>
-                <strong>{meet.title}</strong>
-                <span>
-                  {meet.dateLabel} · {meet.city}, {meet.state}
-                </span>
-                <small className={`meet-type-badge ${getMeetTypeBadgeClass(meet.type)}`}>{normalizeMeetType(meet.type)}</small>
-                <p>{meet.expectedCars} cars expected</p>
-              </div>
-              <em aria-hidden="true">&gt;</em>
-            </Link>
-          ))}
+          {visibleMeets.length > 0 ? (
+            visibleMeets.slice(0, 5).map((meet) => (
+              <Link key={meet.slug} href={`/meets/${meet.slug}`} className="meets-upcoming-card">
+                <div className="meets-upcoming-image" style={{ backgroundImage: `url("${meet.heroImage}")` }} />
+                <div>
+                  <strong>{meet.title}</strong>
+                  <span>
+                    {meet.dateLabel} · {meet.city}, {meet.state}
+                  </span>
+                  <small className={`meet-type-badge ${getMeetTypeBadgeClass(meet.type)}`}>{normalizeMeetType(meet.type)}</small>
+                  <p>{meet.expectedCars} cars expected</p>
+                </div>
+                <em aria-hidden="true">&gt;</em>
+              </Link>
+            ))
+          ) : (
+            <div className="meets-upcoming-empty">
+              <strong>No scheduled meets</strong>
+              <p>Upcoming user-hosted meets will appear here.</p>
+            </div>
+          )}
         </div>
         <Link href="/meets/host" className="meets-host-button">
           <span aria-hidden="true">+</span>

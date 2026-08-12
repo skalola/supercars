@@ -1,21 +1,39 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState, useTransition } from "react";
+import { createClubInviteAction } from "@/app/actions/clubs";
 
 type ClubInviteLinkProps = {
+  clubId: string;
   clubName: string;
-  clubPath: string;
+  inviterName: string;
 };
 
-export default function ClubInviteLink({ clubName, clubPath }: ClubInviteLinkProps) {
+export default function ClubInviteLink({ clubId, clubName, inviterName }: ClubInviteLinkProps) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const inviteUrl = useMemo(() => {
-    if (typeof window === "undefined") return clubPath;
-    return new URL(clubPath, window.location.origin).toString();
-  }, [clubPath]);
+  const [inviteUrl, setInviteUrl] = useState("");
+  const [error, setError] = useState("");
+  const [isPending, startTransition] = useTransition();
+
+  function openInviteModal() {
+    setOpen(true);
+    setError("");
+    if (inviteUrl) return;
+    const formData = new FormData();
+    formData.set("clubId", clubId);
+    startTransition(async () => {
+      try {
+        const result = await createClubInviteAction(formData);
+        setInviteUrl(new URL(result.invitePath, window.location.origin).toString());
+      } catch {
+        setError("Invite link could not be created. Try again in a moment.");
+      }
+    });
+  }
 
   async function copyInvite() {
+    if (!inviteUrl) return;
     try {
       await navigator.clipboard.writeText(inviteUrl);
       setCopied(true);
@@ -27,7 +45,7 @@ export default function ClubInviteLink({ clubName, clubPath }: ClubInviteLinkPro
 
   return (
     <>
-      <button type="button" className="club-invite-link" onClick={() => setOpen(true)}>
+      <button type="button" className="club-invite-link" onClick={openInviteModal}>
         Invite Members
       </button>
       {open ? (
@@ -40,11 +58,15 @@ export default function ClubInviteLink({ clubName, clubPath }: ClubInviteLinkPro
               </div>
               <button type="button" aria-label="Close invite modal" onClick={() => setOpen(false)}>×</button>
             </header>
-            <p>Share this link with drivers you want to invite into the club roster.</p>
-            <div className="club-invite-url">{inviteUrl}</div>
+            <p>Share this invite with drivers you want to add directly to {clubName}. The link opens a cinematic join page and signs them into this club.</p>
+            <div className="club-invite-byline">Invited by {inviterName}</div>
+            <div className="club-invite-url">{isPending ? "Creating secure invite link..." : error || inviteUrl}</div>
             <div className="club-invite-actions">
-              <button type="button" onClick={copyInvite}>{copied ? "Copied" : "Copy Link"}</button>
-              <a href={`mailto:?subject=${encodeURIComponent(`Join ${clubName} on SUPERCAR DASH`)}&body=${encodeURIComponent(inviteUrl)}`}>
+              <button type="button" onClick={copyInvite} disabled={!inviteUrl || isPending}>{copied ? "Copied" : "Copy Link"}</button>
+              <a
+                aria-disabled={!inviteUrl}
+                href={inviteUrl ? `mailto:?subject=${encodeURIComponent(`Join ${clubName} on SUPERCAR DASH`)}&body=${encodeURIComponent(`${inviterName} invited you to join ${clubName} on SUPERCAR DASH.\n\n${inviteUrl}`)}` : undefined}
+              >
                 Email Invite
               </a>
             </div>
