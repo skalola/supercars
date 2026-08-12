@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { geocodeLocation } from "@/lib/location/geocode";
 import { getCatalogMakeNames } from "@/lib/makes/catalog";
 import { notifyMeetCancelled, notifyMeetCreated, notifyMeetRsvp, notifyMeetUpdated } from "@/lib/meets/meet-notifications";
+import { normalizeMeetType } from "@/lib/meets/meet-types";
 import { isUploadableImageFile, uploadPublicImage } from "@/lib/media/upload-storage";
 import { enforceActionRateLimit } from "@/lib/security/action-rate-limit";
 
@@ -24,7 +25,7 @@ export async function createMeetAction(formData: FormData) {
   });
 
   const title = readString(formData, "title");
-  const type = readString(formData, "type") || "Cars & Coffee";
+  const type = normalizeMeetType(readString(formData, "type"));
   const startsAtInput = readString(formData, "startsAt");
   const city = readString(formData, "city");
   const state = readString(formData, "state").toUpperCase();
@@ -180,7 +181,7 @@ export async function updateHostedMeetAction(formData: FormData) {
     bucketKey: meetId || "UNKNOWN_MEET",
   });
   const title = readString(formData, "title");
-  const type = readString(formData, "type") || "Cars & Coffee";
+  const type = normalizeMeetType(readString(formData, "type"));
   const startsAtInput = readString(formData, "startsAt");
   const capacity = parseOptionalInt(readString(formData, "capacity"));
   const city = readString(formData, "city");

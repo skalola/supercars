@@ -13,6 +13,8 @@ import { AddToFavoritesButton } from "@/components/garage/AddToFavoritesButton";
 import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
 import { calculateModifiedPerformance } from "@/lib/parts/performance";
 import { getPartDetailPath } from "@/lib/parts/routes";
+import { getExplicitPartCompatibilityWhereForVehicle } from "@/lib/parts/compatibility";
+import { auditPerformancePartTrust } from "@/lib/parts/trust";
 import ServiceBookingActionButton from "./ServiceBookingActionButton";
 import ServiceBookingModule from "./ServiceBookingModule";
 import type { CSSProperties } from "react";
@@ -143,7 +145,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
       .filter(Boolean)
   );
 
-  const [maintenanceRules, market, savedFavorite, recommendedParts, serviceShops] = await Promise.all([
+  const [maintenanceRules, market, savedFavorite, rawRecommendedParts, serviceShops] = await Promise.all([
     prisma.maintenanceRule.findMany({
       where: {
         OR: [
@@ -168,41 +170,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
       where: {
         status: "ACTIVE",
         id: installedCatalogPartIds.size > 0 ? { notIn: Array.from(installedCatalogPartIds) } : undefined,
-        OR: [
-          { compatibility: { none: {} } },
-          {
-            compatibility: {
-              some: {
-                AND: [
-                  {
-                    OR: [
-                      { makeId: null },
-                      { makeId: vehicle.model.makeId },
-                    ],
-                  },
-                  {
-                    OR: [
-                      { modelId: null },
-                      { modelId: vehicle.modelId },
-                    ],
-                  },
-                  {
-                    OR: [
-                      { yearStart: null },
-                      { yearStart: { lte: vehicle.year } },
-                    ],
-                  },
-                  {
-                    OR: [
-                      { yearEnd: null },
-                      { yearEnd: { gte: vehicle.year } },
-                    ],
-                  },
-                ],
-              },
-            },
-          },
-        ],
+        ...getExplicitPartCompatibilityWhereForVehicle(vehicle),
       },
       include: {
         category: true,
@@ -249,6 +217,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
     stockTorque: vehicle.model.spec?.torque,
     installedParts: vehicle.installedParts || [],
   });
+  const recommendedParts = rawRecommendedParts.filter((part) => auditPerformancePartTrust(part).publicEligible);
   const unlinkedModifications = (vehicle.modifications || []).filter((mod: any) => !mod.catalogInstall);
 
   const priorityOrder: Record<string, number> = {

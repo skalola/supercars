@@ -629,9 +629,23 @@ function isCleanBrandLogo(logoUrl: string | null, logoBackground: string, logoNe
 }
 
 function partMatchesFitment(part: PartsStorePartRow, makeId: string, modelId: string) {
-  if (makeId && part.fitmentMakeIds.length > 0 && !part.fitmentMakeIds.includes(makeId)) return false;
-  if (modelId && part.fitmentModelIds.length > 0 && !part.fitmentModelIds.includes(modelId)) return false;
-  return true;
+  if (!makeId && !modelId) return true;
+  if (part.fitments.length === 0) return false;
+
+  return part.fitments.some((fitment) => {
+    if (modelId) {
+      if (fitment.modelId === modelId) return !makeId || !fitment.makeId || fitment.makeId === makeId;
+      if (fitment.modelId) return false;
+      return Boolean(makeId && fitment.makeId === makeId);
+    }
+
+    if (makeId) {
+      if (fitment.makeId === makeId) return true;
+      if (fitment.makeId || fitment.modelId) return false;
+    }
+
+    return false;
+  });
 }
 
 function getProductBadge(index: number) {

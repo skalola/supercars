@@ -5,6 +5,7 @@ import { addMeetPhotoAction, manageMeetRsvpAction, updateHostedMeetAction } from
 import { HostCancelMeetForm } from "@/components/meets/HostCancelMeetForm";
 import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
 import { projectContiguousUsToPercent } from "@/lib/maps/us-projection";
+import { getMeetTypeBadgeClass, MEET_TYPE_OPTIONS, normalizeMeetType } from "@/lib/meets/meet-types";
 import { prisma } from "@/lib/prisma";
 import { CountryMapGraphic } from "../CountryMapGraphic";
 import { getMeetBySlug } from "../meet-data";
@@ -101,7 +102,7 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
           <Link href="/meets" className="meet-back-link">
             &lt; Back to Meets
           </Link>
-          <span>{meet.type}</span>
+          <span className={`meet-type-badge ${getMeetTypeBadgeClass(meet.type)}`}>{normalizeMeetType(meet.type)}</span>
           <h1>{meet.title}</h1>
           <p>{meet.description}</p>
           <div className="meet-detail-actions">
@@ -209,12 +210,10 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
                 </label>
                 <label>
                   <span>Format</span>
-                  <select name="type" defaultValue={privateMeetContext.type}>
-                    <option>Cars & Coffee</option>
-                    <option>Private Drive</option>
-                    <option>Garage Night</option>
-                    <option>Concours</option>
-                    <option>Track</option>
+                  <select name="type" defaultValue={normalizeMeetType(privateMeetContext.type)}>
+                    {MEET_TYPE_OPTIONS.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
                   </select>
                 </label>
                 <label>

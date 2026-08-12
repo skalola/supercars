@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
 import type { MakeOption } from "@/lib/makes/catalog";
+import { getMeetTypeBadgeClass, normalizeMeetType } from "@/lib/meets/meet-types";
 import { projectContiguousUsToPercent, type MapPoint } from "@/lib/maps/us-projection";
 import { CountryMapGraphic } from "./CountryMapGraphic";
 import type { MeetEvent } from "./meet-data";
@@ -160,7 +161,7 @@ export function MeetsMapExperience({ meetEvents, makeOptions }: MeetsMapExperien
         <article className="meets-selected-card">
           <div className="meets-selected-image" style={{ backgroundImage: `url("${selectedMeet.heroImage}")` }} />
           <div>
-            <span>{selectedMeet.type}</span>
+            <span className={`meet-type-badge ${getMeetTypeBadgeClass(selectedMeet.type)}`}>{normalizeMeetType(selectedMeet.type)}</span>
             <h2>{selectedMeet.title}</h2>
             <p>
               {selectedMeet.dateLabel} · {selectedMeet.city}, {selectedMeet.state}
@@ -195,6 +196,7 @@ export function MeetsMapExperience({ meetEvents, makeOptions }: MeetsMapExperien
                 <span>
                   {meet.dateLabel} · {meet.city}, {meet.state}
                 </span>
+                <small className={`meet-type-badge ${getMeetTypeBadgeClass(meet.type)}`}>{normalizeMeetType(meet.type)}</small>
                 <p>{meet.expectedCars} cars expected</p>
               </div>
               <em aria-hidden="true">&gt;</em>

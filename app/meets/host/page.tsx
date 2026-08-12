@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { createMeetAction } from "@/app/actions/meets";
 import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
+import { MEET_TYPE_OPTIONS } from "@/lib/meets/meet-types";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -65,11 +66,9 @@ export default async function HostMeetPage({ searchParams }: { searchParams?: Pr
           <label>
             <span>Format</span>
             <select name="type" defaultValue="Cars & Coffee">
-              <option>Cars & Coffee</option>
-              <option>Private Drive</option>
-              <option>Garage Night</option>
-              <option>Concours</option>
-              <option>Track</option>
+              {MEET_TYPE_OPTIONS.map((type) => (
+                <option key={type} value={type}>{type}</option>
+              ))}
             </select>
           </label>
           <label>

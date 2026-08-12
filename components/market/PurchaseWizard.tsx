@@ -194,32 +194,8 @@ export default function PurchaseWizard({
   }
 
   return (
-    <div style={{
-      position: "fixed",
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: "rgba(0, 0, 0, 0.5)",
-      backdropFilter: "blur(4px)",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      zIndex: 1000,
-      padding: "20px",
-      fontFamily: "Inter, system-ui, sans-serif"
-    }}>
-      <div style={{
-        backgroundColor: "#ffffff",
-        borderRadius: "16px",
-        width: "100%",
-        maxWidth: "600px",
-        boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-        maxHeight: "90vh",
-      }}>
+    <div className="purchase-wizard-backdrop">
+      <div className="purchase-wizard-panel">
         {/* Header */}
         <div style={{
           padding: "20px 24px",
@@ -286,15 +262,7 @@ export default function PurchaseWizard({
         </div>
 
         {/* Steps Progress Indicator */}
-        <div style={{
-          display: "flex",
-          background: "#f1f5f9",
-          padding: "12px 24px",
-          borderBottom: "1px solid #e5e7eb",
-          gap: "8px",
-          alignItems: "center",
-          flexWrap: "wrap"
-        }}>
+        <div className="purchase-wizard-progress">
           {[1, 2, 3, 4, 5].map((s) => (
             <React.Fragment key={s}>
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -337,7 +305,7 @@ export default function PurchaseWizard({
         </div>
 
         {/* Content Area */}
-        <div style={{ padding: "24px", overflowY: "auto", flex: 1 }}>
+        <div className="purchase-wizard-content">
           {step === 1 && (
             <div>
               <h4 style={{ fontSize: "16px", fontWeight: 700, color: "#111827", marginTop: 0, marginBottom: "12px" }}>
@@ -798,14 +766,7 @@ export default function PurchaseWizard({
 
 
         {/* Footer */}
-        <div style={{
-          padding: "16px 24px",
-          borderTop: "1px solid #e5e7eb",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          background: "#f8fafc"
-        }}>
+        <div className="purchase-wizard-footer">
           <button
             onClick={() => setStep(Math.max(1, step - 1))}
             disabled={step === 1}

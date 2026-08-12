@@ -1,4 +1,47 @@
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
+
+type VehicleFitmentTarget = {
+  year: number;
+  modelId: string;
+  model: {
+    makeId: string;
+  };
+};
+
+export function getExplicitPartCompatibilityWhereForVehicle(vehicle: VehicleFitmentTarget): Prisma.PerformancePartWhereInput {
+  return {
+    compatibility: {
+      some: {
+        AND: [
+          {
+            OR: [
+              { modelId: vehicle.modelId },
+              {
+                AND: [
+                  { modelId: null },
+                  { makeId: vehicle.model.makeId },
+                ],
+              },
+            ],
+          },
+          {
+            OR: [
+              { yearStart: null },
+              { yearStart: { lte: vehicle.year } },
+            ],
+          },
+          {
+            OR: [
+              { yearEnd: null },
+              { yearEnd: { gte: vehicle.year } },
+            ],
+          },
+        ],
+      },
+    },
+  };
+}
 
 export async function getCompatiblePerformancePartsForVehicle(vehicle: {
   year: number;
@@ -10,41 +53,7 @@ export async function getCompatiblePerformancePartsForVehicle(vehicle: {
   const parts = await prisma.performancePart.findMany({
     where: {
       status: { in: ["ACTIVE", "MANUAL_REVIEW"] },
-      OR: [
-        { compatibility: { none: {} } },
-        {
-          compatibility: {
-            some: {
-              AND: [
-                {
-                  OR: [
-                    { makeId: null },
-                    { makeId: vehicle.model.makeId },
-                  ],
-                },
-                {
-                  OR: [
-                    { modelId: null },
-                    { modelId: vehicle.modelId },
-                  ],
-                },
-                {
-                  OR: [
-                    { yearStart: null },
-                    { yearStart: { lte: vehicle.year } },
-                  ],
-                },
-                {
-                  OR: [
-                    { yearEnd: null },
-                    { yearEnd: { gte: vehicle.year } },
-                  ],
-                },
-              ],
-            },
-          },
-        },
-      ],
+      ...getExplicitPartCompatibilityWhereForVehicle(vehicle),
     },
     include: {
       category: true,

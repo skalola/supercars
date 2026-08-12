@@ -3477,6 +3477,56 @@ canvas {
   align-items: stretch;
 }
 
+.purchase-wizard-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: grid;
+  place-items: center;
+  padding: clamp(14px, 2.4vw, 32px);
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(16px);
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.purchase-wizard-panel {
+  display: flex;
+  width: min(960px, 100%);
+  max-height: min(860px, calc(100dvh - 40px));
+  overflow: hidden;
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.46);
+}
+
+.purchase-wizard-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px clamp(16px, 2vw, 28px);
+  border-bottom: 1px solid #e5e7eb;
+  background: #f1f5f9;
+}
+
+.purchase-wizard-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: clamp(18px, 2.2vw, 30px);
+}
+
+.purchase-wizard-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px clamp(16px, 2vw, 28px);
+  border-top: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
 .vehicle-favorite-button {
   display: inline-flex;
   align-items: center;
@@ -4969,6 +5019,49 @@ canvas {
 }
 
 @media (max-width: 720px) {
+  .purchase-wizard-backdrop {
+    align-items: stretch;
+    padding: 8px;
+  }
+
+  .purchase-wizard-panel {
+    width: 100%;
+    max-height: calc(100dvh - 16px);
+    border-radius: 10px;
+  }
+
+  .purchase-wizard-progress {
+    overflow-x: auto;
+    flex-wrap: nowrap !important;
+    padding: 10px 14px;
+    scrollbar-width: none;
+  }
+
+  .purchase-wizard-progress::-webkit-scrollbar {
+    display: none;
+  }
+
+  .purchase-wizard-progress > div {
+    flex: 0 0 auto;
+  }
+
+  .purchase-wizard-progress > div[style*="height"] {
+    min-width: 18px !important;
+  }
+
+  .purchase-wizard-content {
+    padding: 16px 14px;
+  }
+
+  .purchase-wizard-footer {
+    padding: 12px 14px;
+  }
+
+  .purchase-wizard-footer button {
+    min-height: 42px;
+    flex: 1;
+  }
+
   .vehicle-intelligence-shell {
     gap: 10px;
     padding: 14px 12px 44px;
@@ -8326,10 +8419,43 @@ canvas {
   padding: 18px;
 }
 
-.meets-selected-card span,
-.meets-upcoming-card span {
+.meets-selected-card span:not(.meet-type-badge),
+.meets-upcoming-card span:not(.meet-type-badge) {
   color: rgba(255, 255, 255, 0.56);
   font-size: 12px;
+}
+
+.meet-type-badge {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 24px;
+  align-items: center;
+  padding: 0 9px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.075);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.meet-type-badge.is-cars-coffee {
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+}
+
+.meet-type-badge.is-cruise {
+  border-color: rgba(59, 130, 246, 0.48);
+  color: #93c5fd;
+}
+
+.meet-type-badge.is-track-day {
+  border-color: rgba(226, 15, 27, 0.58);
+  background: rgba(226, 15, 27, 0.14);
+  color: #ff6b73;
 }
 
 .meets-selected-card h2 {
@@ -16162,6 +16288,138 @@ canvas {
   padding-right: 2px;
 }
 
+.club-invite-link {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  padding: 0 14px;
+  border: 1px solid rgba(226, 15, 27, 0.48);
+  border-radius: 6px;
+  background: rgba(226, 15, 27, 0.12);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.club-invite-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(16px);
+}
+
+.club-invite-modal {
+  display: grid;
+  gap: 16px;
+  width: min(520px, 100%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background:
+    linear-gradient(135deg, rgba(226, 15, 27, 0.12), transparent 36%),
+    rgba(9, 10, 12, 0.98);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.48);
+  padding: 20px;
+  color: #ffffff;
+}
+
+.club-invite-modal header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.club-invite-modal header span {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.club-invite-modal h2,
+.club-invite-modal p {
+  margin: 0;
+}
+
+.club-invite-modal h2 {
+  margin-top: 5px;
+  font-size: clamp(24px, 5vw, 34px);
+  line-height: 1;
+}
+
+.club-invite-modal p {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.club-invite-modal header button {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.club-invite-url {
+  overflow-wrap: anywhere;
+  padding: 13px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 13px;
+}
+
+.club-invite-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.club-invite-actions button,
+.club-invite-actions a {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.club-invite-actions button {
+  border: 1px solid rgba(226, 15, 27, 0.72);
+  background: linear-gradient(180deg, #f01928, #b90d18);
+  cursor: pointer;
+}
+
+.club-invite-actions a {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .club-member-card {
   display: flex;
   align-items: center;
@@ -16345,6 +16603,10 @@ canvas {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.club-meet-row .meet-type-badge {
+  margin-top: 2px;
 }
 
 .club-status-pill {

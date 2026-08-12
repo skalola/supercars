@@ -3,9 +3,11 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { leaveClubAction, manageClubMemberAction, requestJoinClubAction, updateClubModelsAction, updateClubProfileAction } from "@/app/actions/clubs";
 import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
+import { getMeetTypeBadgeClass, normalizeMeetType } from "@/lib/meets/meet-types";
 import { prisma } from "@/lib/prisma";
 import ClubConfirmButton from "../ClubConfirmButton";
 import ClubEditModal from "../ClubEditModal";
+import ClubInviteLink from "../ClubInviteLink";
 import ClubModelSelector from "../ClubModelSelector";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +51,7 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
     isAdmin ||
       (viewerMembership?.status === "ACTIVE" && ["OWNER", "MODERATOR"].includes(viewerMembership.role)),
   );
+  const canInviteMembers = Boolean(isAdmin || viewerMembership?.status === "ACTIVE");
   const activeMembers = club.members.filter((member) => member.status === "ACTIVE");
   const pendingMembers = club.members.filter((member) => member.status === "PENDING");
   const memberUserIds = activeMembers.map((member) => member.userId);
@@ -162,6 +165,7 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
                     <div>
                       <strong>{meet.title}</strong>
                       <p>{meet.city}, {meet.state}</p>
+                      <span className={`meet-type-badge ${getMeetTypeBadgeClass(meet.type)}`}>{normalizeMeetType(meet.type)}</span>
                     </div>
                   </Link>
                 ))
@@ -181,6 +185,7 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
               <em className="club-member-count">{activeMembers.length}</em>
             </strong>
           </div>
+          {canInviteMembers ? <ClubInviteLink clubName={club.name} clubPath={`/clubs/${club.slug}`} /> : null}
           <div className="club-member-grid">
             {activeMembers.map((member) => (
               <Link key={member.id} href={member.user.username ? `/garage/${member.user.username}` : "/garage"} className="club-member-card">

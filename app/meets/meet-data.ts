@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { normalizeMeetType } from "@/lib/meets/meet-types";
 import { prisma } from "@/lib/prisma";
 
 export type MeetEvent = {
@@ -254,7 +255,7 @@ function serializeMeet(row: MeetRow): MeetEvent {
     timeLabel: formatTime(row.startsAt),
     city: row.city,
     state: row.state,
-    type: row.type,
+    type: normalizeMeetType(row.type),
     status: getPublicStatus(row.status, row.visibility),
     expectedCars: goingCount || row.capacity || 0,
     capacity: row.capacity,
@@ -317,6 +318,7 @@ function createDemoMeet(
 ): MeetEvent {
   return {
     ...input,
+    type: normalizeMeetType(input.type),
     id: null,
     capacity: input.expectedCars,
     hostUserId: null,
