@@ -4454,6 +4454,197 @@ canvas {
   min-height: 132px;
 }
 
+.vehicle-intelligence-service-heading-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.vehicle-intelligence-add-record-button,
+.vehicle-intelligence-primary-button,
+.vehicle-intelligence-secondary-button {
+  min-height: 34px;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.vehicle-intelligence-add-record-button {
+  padding: 0 12px;
+  border: 1px solid rgba(239, 35, 60, 0.72);
+  background: rgba(239, 35, 60, 0.1);
+  color: #ffffff;
+  box-shadow: inset 0 0 18px rgba(239, 35, 60, 0.12);
+}
+
+.vehicle-intelligence-add-record-button:hover,
+.vehicle-intelligence-add-record-button:focus-visible,
+.vehicle-intelligence-primary-button:hover,
+.vehicle-intelligence-primary-button:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.68);
+  background: linear-gradient(135deg, #ff1f32, #9f0712);
+}
+
+.vehicle-intelligence-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2500;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(0, 0, 0, 0.74);
+  backdrop-filter: blur(14px);
+}
+
+.vehicle-intelligence-modal {
+  width: min(100%, 680px);
+  max-height: min(760px, calc(100vh - 44px));
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 34%),
+    linear-gradient(180deg, #111316, #050607);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.72);
+  color: #ffffff;
+}
+
+.vehicle-intelligence-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px 22px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.vehicle-intelligence-modal-header span {
+  color: #ef233c;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.vehicle-intelligence-modal-header h2 {
+  margin: 5px 0 0;
+  color: #ffffff;
+  font-size: clamp(22px, 3vw, 34px);
+  line-height: 0.96;
+  text-transform: uppercase;
+}
+
+.vehicle-intelligence-modal-close {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.vehicle-intelligence-service-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 22px;
+}
+
+.vehicle-intelligence-service-form label {
+  display: grid;
+  gap: 7px;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vehicle-intelligence-service-form input,
+.vehicle-intelligence-service-form textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.055);
+  color: #ffffff;
+  font: inherit;
+  font-size: 14px;
+  letter-spacing: 0;
+  outline: none;
+}
+
+.vehicle-intelligence-service-form input {
+  min-height: 44px;
+  padding: 0 12px;
+}
+
+.vehicle-intelligence-service-form textarea {
+  resize: vertical;
+  padding: 12px;
+}
+
+.vehicle-intelligence-service-form input:focus,
+.vehicle-intelligence-service-form textarea:focus {
+  border-color: rgba(239, 35, 60, 0.82);
+  box-shadow: 0 0 0 3px rgba(239, 35, 60, 0.16);
+}
+
+.vehicle-intelligence-service-form-wide,
+.vehicle-intelligence-form-error,
+.vehicle-intelligence-modal-actions {
+  grid-column: 1 / -1;
+}
+
+.vehicle-intelligence-form-error {
+  margin: 0;
+  color: #fecaca;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.vehicle-intelligence-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.vehicle-intelligence-primary-button,
+.vehicle-intelligence-secondary-button {
+  min-width: 132px;
+  padding: 0 16px;
+}
+
+.vehicle-intelligence-primary-button {
+  border: 1px solid rgba(239, 35, 60, 0.8);
+  background: linear-gradient(135deg, #ef233c, #8f0711);
+  color: #ffffff;
+}
+
+.vehicle-intelligence-secondary-button {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.vehicle-intelligence-primary-button:disabled,
+.vehicle-intelligence-secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
 .vehicle-intelligence-record-list article,
 .vehicle-intelligence-mod-list article,
 .vehicle-intelligence-part-list article {
@@ -5122,6 +5313,49 @@ canvas {
   .vehicle-intelligence-card-heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .vehicle-intelligence-service-heading-actions {
+    width: 100%;
+    align-items: stretch;
+    justify-content: space-between;
+  }
+
+  .vehicle-intelligence-add-record-button {
+    width: 100%;
+    min-height: 40px;
+  }
+
+  .vehicle-intelligence-modal-backdrop {
+    align-items: stretch;
+    padding: 10px;
+  }
+
+  .vehicle-intelligence-modal {
+    width: 100%;
+    max-height: calc(100dvh - 20px);
+    border-radius: 10px;
+  }
+
+  .vehicle-intelligence-modal-header {
+    padding: 18px 16px 14px;
+  }
+
+  .vehicle-intelligence-service-form {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .vehicle-intelligence-modal-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .vehicle-intelligence-primary-button,
+  .vehicle-intelligence-secondary-button {
+    width: 100%;
+    min-height: 42px;
   }
 
   .vehicle-intelligence-record-list article,

@@ -4,6 +4,12 @@ const nextConfig: NextConfig = {
 
   reactCompiler: true,
 
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "9mb",
+    },
+  },
+
   images: {
     remotePatterns: [
       {

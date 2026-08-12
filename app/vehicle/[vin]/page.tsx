@@ -17,6 +17,7 @@ import { getExplicitPartCompatibilityWhereForVehicle } from "@/lib/parts/compati
 import { auditPerformancePartTrust } from "@/lib/parts/trust";
 import ServiceBookingActionButton from "./ServiceBookingActionButton";
 import ServiceBookingModule from "./ServiceBookingModule";
+import AddServiceRecordButton from "./AddServiceRecordButton";
 import type { CSSProperties } from "react";
 
 type VehiclePageProps = {
@@ -486,7 +487,10 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
             <section className="vehicle-intelligence-card vehicle-intelligence-service-card">
               <div className="vehicle-intelligence-card-heading">
                 <span>Service Records</span>
-                <strong>{serviceRecordCount.toLocaleString()} record{serviceRecordCount === 1 ? "" : "s"}</strong>
+                <div className="vehicle-intelligence-service-heading-actions">
+                  <strong>{serviceRecordCount.toLocaleString()} record{serviceRecordCount === 1 ? "" : "s"}</strong>
+                  {isOwner ? <AddServiceRecordButton vin={vehicle.vin} /> : null}
+                </div>
               </div>
               <div className="vehicle-intelligence-record-list">
                 <div className="vehicle-intelligence-record-header" aria-hidden="true">
