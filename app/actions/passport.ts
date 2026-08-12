@@ -201,6 +201,56 @@ export async function addVehicleInstalledPart(
   safeRevalidatePath(vin);
 }
 
+export async function deleteVehicleModification(
+  vin: string,
+  data: {
+    modificationId?: string | null;
+    installedPartId?: string | null;
+  }
+) {
+  const { vehicleId } = await verifyOwnership(vin);
+  const modificationId = data.modificationId?.trim() || null;
+  const installedPartId = data.installedPartId?.trim() || null;
+
+  if (!modificationId && !installedPartId) {
+    throw new Error("Choose a modification to delete.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const installedPart = installedPartId
+      ? await tx.vehicleInstalledPart.findFirst({
+          where: { id: installedPartId, vehicleId },
+          select: { id: true, legacyModificationId: true },
+        })
+      : modificationId
+        ? await tx.vehicleInstalledPart.findFirst({
+            where: { legacyModificationId: modificationId, vehicleId },
+            select: { id: true, legacyModificationId: true },
+          })
+        : null;
+
+    const targetModificationId = modificationId || installedPart?.legacyModificationId || null;
+
+    if (installedPart) {
+      await tx.vehicleInstalledPart.delete({ where: { id: installedPart.id } });
+    }
+
+    if (targetModificationId) {
+      const deleted = await tx.vehicleModification.deleteMany({
+        where: { id: targetModificationId, vehicleId },
+      });
+
+      if (!installedPart && deleted.count === 0) {
+        throw new Error("Modification not found.");
+      }
+    } else if (!installedPart) {
+      throw new Error("Modification not found.");
+    }
+  });
+
+  safeRevalidatePath(vin);
+}
+
 export async function addServiceRecord(
   vin: string,
   data: {

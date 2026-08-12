@@ -8,8 +8,13 @@ const IMAGE_TYPES = new Map([
   ["image/png", "png"],
   ["image/webp", "webp"],
 ]);
+const PUBLIC_FILE_TYPES = new Set([
+  "application/pdf",
+  ...IMAGE_TYPES.keys(),
+]);
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_PUBLIC_FILE_BYTES = 12 * 1024 * 1024;
 
 type UploadImageInput = {
   file: File;
@@ -18,7 +23,15 @@ type UploadImageInput = {
 
 export async function uploadPublicImage({ file, folder }: UploadImageInput) {
   validateImageFile(file);
+  return uploadPublicFile({ file, folder, maxBytes: MAX_IMAGE_BYTES });
+}
 
+export async function uploadPublicFile({
+  file,
+  folder,
+  maxBytes = MAX_PUBLIC_FILE_BYTES,
+}: UploadImageInput & { maxBytes?: number }) {
+  validatePublicFile(file, maxBytes);
   const extension = IMAGE_TYPES.get(file.type) || getSafeExtension(file.name);
   const filename = `${crypto.randomUUID()}.${extension}`;
   const objectPath = `${sanitizeFolder(folder)}/${filename}`;
@@ -59,8 +72,14 @@ function validateImageFile(file: File) {
   if (!IMAGE_TYPES.has(file.type)) {
     throw new Error("Upload a JPG, PNG, or WebP image.");
   }
-  if (file.size > MAX_IMAGE_BYTES) {
-    throw new Error("Images must be 8 MB or smaller.");
+}
+
+function validatePublicFile(file: File, maxBytes: number) {
+  if (!PUBLIC_FILE_TYPES.has(file.type)) {
+    throw new Error("Upload a PDF, JPG, PNG, or WebP file.");
+  }
+  if (file.size > maxBytes) {
+    throw new Error(`Files must be ${Math.floor(maxBytes / 1024 / 1024)} MB or smaller.`);
   }
 }
 
@@ -74,5 +93,5 @@ function sanitizeFolder(value: string) {
 
 function getSafeExtension(filename: string) {
   const extension = filename.split(".").pop()?.toLowerCase() || "jpg";
-  return ["jpg", "jpeg", "png", "webp"].includes(extension) ? (extension === "jpeg" ? "jpg" : extension) : "jpg";
+  return ["jpg", "jpeg", "png", "webp", "pdf"].includes(extension) ? (extension === "jpeg" ? "jpg" : extension) : "jpg";
 }

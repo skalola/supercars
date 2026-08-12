@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import {
   updateVehicleProfile,
   addVehicleModification,
-  addVehicleInstalledPart,
+  deleteVehicleModification,
   addServiceRecord,
   addVehicleAward
 } from "@/app/actions/passport";
@@ -21,14 +21,23 @@ import {
   uploadVehicleDocument,
   deleteVehicleDocument
 } from "@/app/actions/media";
+import type { ManualPartTypeGroup } from "@/lib/parts/manual-part-options";
+
+const CUSTOM_OPTION_VALUE = "__custom";
 
 type VehicleEditorProps = {
   vehicle: any;
   partCategories: any[];
-  compatibleParts: any[];
+  manualBrandOptions: string[];
+  manualPartTypeGroups: ManualPartTypeGroup[];
 };
 
-export default function VehicleEditorForm({ vehicle, partCategories, compatibleParts }: VehicleEditorProps) {
+export default function VehicleEditorForm({
+  vehicle,
+  partCategories,
+  manualBrandOptions,
+  manualPartTypeGroups,
+}: VehicleEditorProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"info" | "modifications" | "service" | "awards" | "photos" | "documents">("info");
   const [loading, setLoading] = useState(false);
@@ -43,17 +52,14 @@ export default function VehicleEditorForm({ vehicle, partCategories, compatibleP
 
   // 2. Add Modification State
   const [modName, setModName] = useState("");
+  const [customModName, setCustomModName] = useState("");
   const [modBrand, setModBrand] = useState("");
+  const [customModBrand, setCustomModBrand] = useState("");
   const [modDesc, setModDesc] = useState("");
   const [modDate, setModDate] = useState("");
   const [modCategoryId, setModCategoryId] = useState("");
   const [modHpGain, setModHpGain] = useState<number | "">("");
   const [modTorqueGain, setModTorqueGain] = useState<number | "">("");
-  const [catalogPartId, setCatalogPartId] = useState("");
-  const [catalogPartDate, setCatalogPartDate] = useState("");
-  const [catalogPartNotes, setCatalogPartNotes] = useState("");
-  const [catalogHpOverride, setCatalogHpOverride] = useState<number | "">("");
-  const [catalogTorqueOverride, setCatalogTorqueOverride] = useState<number | "">("");
 
   // 3. Add Service Record State
   const [srvDate, setSrvDate] = useState("");
@@ -86,6 +92,15 @@ export default function VehicleEditorForm({ vehicle, partCategories, compatibleP
   const showError = (msg: string) => {
     setErrorMessage(msg);
     setSuccessMessage(null);
+  };
+
+  const selectedManualPartTypes =
+    manualPartTypeGroups.find((group) => group.categoryId === modCategoryId)?.options ?? [];
+
+  const handleManualCategoryChange = (categoryId: string) => {
+    setModCategoryId(categoryId);
+    setModName("");
+    setCustomModName("");
   };
 
   // Actions
@@ -230,15 +245,18 @@ export default function VehicleEditorForm({ vehicle, partCategories, compatibleP
 
   async function handleAddModification(e: React.FormEvent) {
     e.preventDefault();
-    if (!modName.trim()) {
+    const resolvedModName = modName === CUSTOM_OPTION_VALUE ? customModName.trim() : modName.trim();
+    const resolvedModBrand = modBrand === CUSTOM_OPTION_VALUE ? customModBrand.trim() : modBrand.trim();
+
+    if (!resolvedModName) {
       showError("Modification name is required.");
       return;
     }
     setLoading(true);
     try {
       await addVehicleModification(vehicle.vin, {
-        name: modName,
-        brand: modBrand,
+        name: resolvedModName,
+        brand: resolvedModBrand,
         description: modDesc,
         installedDate: modDate,
         categoryId: modCategoryId || null,
@@ -247,7 +265,9 @@ export default function VehicleEditorForm({ vehicle, partCategories, compatibleP
       });
       showSuccess("Modification added successfully!");
       setModName("");
+      setCustomModName("");
       setModBrand("");
+      setCustomModBrand("");
       setModDesc("");
       setModDate("");
       setModCategoryId("");
@@ -261,30 +281,26 @@ export default function VehicleEditorForm({ vehicle, partCategories, compatibleP
     }
   }
 
-  async function handleAddCatalogPart(e: React.FormEvent) {
-    e.preventDefault();
-    if (!catalogPartId) {
-      showError("Choose a catalog part to install.");
-      return;
-    }
+  async function handleDeleteModification({
+    label,
+    modificationId,
+    installedPartId,
+  }: {
+    label: string;
+    modificationId?: string | null;
+    installedPartId?: string | null;
+  }) {
+    if (!confirm(`Remove "${label}" from this vehicle passport?`)) return;
     setLoading(true);
     try {
-      await addVehicleInstalledPart(vehicle.vin, {
-        partId: catalogPartId,
-        installedDate: catalogPartDate,
-        notes: catalogPartNotes,
-        hpGainOverride: catalogHpOverride === "" ? null : Number(catalogHpOverride),
-        torqueGainOverride: catalogTorqueOverride === "" ? null : Number(catalogTorqueOverride),
+      await deleteVehicleModification(vehicle.vin, {
+        modificationId: modificationId || null,
+        installedPartId: installedPartId || null,
       });
-      showSuccess("Catalog part added successfully!");
-      setCatalogPartId("");
-      setCatalogPartDate("");
-      setCatalogPartNotes("");
-      setCatalogHpOverride("");
-      setCatalogTorqueOverride("");
+      showSuccess("Modification deleted successfully!");
       router.refresh();
     } catch (err: any) {
-      showError(err.message || "Could not add catalog part.");
+      showError(err.message || "Could not delete modification.");
     } finally {
       setLoading(false);
     }
@@ -483,7 +499,30 @@ export default function VehicleEditorForm({ vehicle, partCategories, compatibleP
                     <div key={installedPart.id} style={{ padding: "16px", border: "1px solid #e5e7eb", borderRadius: "8px", backgroundColor: "#fafafa" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", marginBottom: "4px" }}>
                         <span style={{ fontWeight: 700 }}>{label}</span>
-                        <span style={{ fontSize: "12px", color: "#6b7280", fontWeight: 700 }}>{installedPart.part ? "Catalog" : "Manual"}</span>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                          <span style={{ fontSize: "12px", color: "#6b7280", fontWeight: 700 }}>{installedPart.part ? "Catalog" : "Manual"}</span>
+                          <button
+                            type="button"
+                            disabled={loading}
+                            onClick={() => handleDeleteModification({
+                              label,
+                              modificationId: installedPart.legacyModificationId,
+                              installedPartId: installedPart.id,
+                            })}
+                            style={{
+                              border: "1px solid #fecaca",
+                              borderRadius: "6px",
+                              backgroundColor: "#fef2f2",
+                              color: "#b91c1c",
+                              cursor: loading ? "not-allowed" : "pointer",
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              padding: "4px 8px",
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", fontSize: "13px", color: "#4b5563" }}>
                         {brand && <span>Brand: {brand}</span>}
@@ -506,9 +545,31 @@ export default function VehicleEditorForm({ vehicle, partCategories, compatibleP
               <div style={{ display: "grid", gap: "12px" }}>
                 {unlinkedModifications.map((mod: any) => (
                   <div key={mod.id} style={{ padding: "16px", border: "1px solid #e5e7eb", borderRadius: "8px", backgroundColor: "#fafafa" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", marginBottom: "4px" }}>
                       <span style={{ fontWeight: 600 }}>{mod.name}</span>
-                      {mod.installedDate && <span style={{ fontSize: "13px", color: "#6b7280" }}>Installed: {mod.installedDate}</span>}
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                        {mod.installedDate && <span style={{ fontSize: "13px", color: "#6b7280" }}>Installed: {mod.installedDate}</span>}
+                        <button
+                          type="button"
+                          disabled={loading}
+                          onClick={() => handleDeleteModification({
+                            label: mod.name,
+                            modificationId: mod.id,
+                          })}
+                          style={{
+                            border: "1px solid #fecaca",
+                            borderRadius: "6px",
+                            backgroundColor: "#fef2f2",
+                            color: "#b91c1c",
+                            cursor: loading ? "not-allowed" : "pointer",
+                            fontSize: "12px",
+                            fontWeight: 700,
+                            padding: "4px 8px",
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                     {mod.brand && <p style={{ fontSize: "14px", color: "#4b5563", margin: "2px 0" }}>Brand: {mod.brand}</p>}
                     {mod.description && <p style={{ fontSize: "14px", color: "#6b7280", margin: "6px 0 0 0" }}>{mod.description}</p>}
@@ -518,60 +579,12 @@ export default function VehicleEditorForm({ vehicle, partCategories, compatibleP
             </div>
           )}
 
-          <form onSubmit={handleAddCatalogPart} style={{ borderTop: "1px solid #e5e7eb", paddingTop: "24px", display: "grid", gap: "16px" }}>
-            <h3 style={{ fontSize: "18px", fontWeight: 600 }}>Install Catalog Part</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-              <div>
-                <label style={labelStyle}>Catalog Part</label>
-                <select value={catalogPartId} onChange={(e) => setCatalogPartId(e.target.value)} style={inputStyle}>
-                  <option value="">Choose a compatible part</option>
-                  {compatibleParts.map((part: any) => (
-                    <option key={part.id} value={part.id}>
-                      {part.category.name} · {part.brand.name} · {part.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label style={labelStyle}>Installed Date / Year</label>
-                <input value={catalogPartDate} onChange={(e) => setCatalogPartDate(e.target.value)} placeholder="e.g. June 2024 or 2024" style={inputStyle} />
-              </div>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-              <div>
-                <label style={labelStyle}>HP Override</label>
-                <input type="number" value={catalogHpOverride} onChange={(e) => setCatalogHpOverride(e.target.value === "" ? "" : Number(e.target.value))} placeholder="Optional dyno estimate" style={inputStyle} />
-              </div>
-              <div>
-                <label style={labelStyle}>Torque Override</label>
-                <input type="number" value={catalogTorqueOverride} onChange={(e) => setCatalogTorqueOverride(e.target.value === "" ? "" : Number(e.target.value))} placeholder="Optional dyno estimate" style={inputStyle} />
-              </div>
-            </div>
-            <div>
-              <label style={labelStyle}>Notes</label>
-              <input value={catalogPartNotes} onChange={(e) => setCatalogPartNotes(e.target.value)} placeholder="Install notes, tune map, shop, or dyno context" style={inputStyle} />
-            </div>
-            <button type="submit" disabled={loading || compatibleParts.length === 0} style={{ ...btnStyle, justifySelf: "start" }}>
-              {loading ? "Adding..." : compatibleParts.length === 0 ? "No Catalog Parts Yet" : "Add Catalog Part"}
-            </button>
-          </form>
-
           <form onSubmit={handleAddModification} style={{ borderTop: "1px solid #e5e7eb", paddingTop: "24px", display: "grid", gap: "16px" }}>
             <h3 style={{ fontSize: "18px", fontWeight: 600 }}>Add Manual Part / Modification</h3>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
               <div>
-                <label style={labelStyle}>Part / Modification Name *</label>
-                <input required value={modName} onChange={(e) => setModName(e.target.value)} placeholder="e.g. Capristo Exhaust" style={inputStyle} />
-              </div>
-              <div>
-                <label style={labelStyle}>Brand</label>
-                <input value={modBrand} onChange={(e) => setModBrand(e.target.value)} placeholder="e.g. Capristo" style={inputStyle} />
-              </div>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-              <div>
                 <label style={labelStyle}>Category</label>
-                <select value={modCategoryId} onChange={(e) => setModCategoryId(e.target.value)} style={inputStyle}>
+                <select value={modCategoryId} onChange={(e) => handleManualCategoryChange(e.target.value)} style={inputStyle}>
                   <option value="">Choose Category</option>
                   {partCategories.map((category: any) => (
                     <option key={category.id} value={category.id}>
@@ -581,10 +594,75 @@ export default function VehicleEditorForm({ vehicle, partCategories, compatibleP
                 </select>
               </div>
               <div>
+                <label style={labelStyle}>Common Part Type *</label>
+                <select
+                  required
+                  value={modName}
+                  onChange={(e) => {
+                    setModName(e.target.value);
+                    if (e.target.value !== CUSTOM_OPTION_VALUE) setCustomModName("");
+                  }}
+                  disabled={!modCategoryId}
+                  style={inputStyle}
+                >
+                  <option value="">{modCategoryId ? "Choose common part" : "Choose category first"}</option>
+                  {selectedManualPartTypes.map((partType) => (
+                    <option key={partType} value={partType}>
+                      {partType}
+                    </option>
+                  ))}
+                  <option value={CUSTOM_OPTION_VALUE}>Custom part / modification</option>
+                </select>
+              </div>
+            </div>
+            {modName === CUSTOM_OPTION_VALUE && (
+              <div>
+                <label style={labelStyle}>Custom Part / Modification Name *</label>
+                <input
+                  required
+                  value={customModName}
+                  onChange={(e) => setCustomModName(e.target.value)}
+                  placeholder="e.g. ITB conversion, custom titanium exhaust"
+                  style={inputStyle}
+                />
+              </div>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+              <div>
+                <label style={labelStyle}>Brand</label>
+                <select
+                  value={modBrand}
+                  onChange={(e) => {
+                    setModBrand(e.target.value);
+                    if (e.target.value !== CUSTOM_OPTION_VALUE) setCustomModBrand("");
+                  }}
+                  style={inputStyle}
+                >
+                  <option value="">Choose Brand</option>
+                  {manualBrandOptions.map((brand) => (
+                    <option key={brand} value={brand}>
+                      {brand}
+                    </option>
+                  ))}
+                  <option value={CUSTOM_OPTION_VALUE}>Custom brand</option>
+                </select>
+              </div>
+              <div>
                 <label style={labelStyle}>Installed Date / Year</label>
                 <input value={modDate} onChange={(e) => setModDate(e.target.value)} placeholder="e.g. June 2024 or 2024" style={inputStyle} />
               </div>
             </div>
+            {modBrand === CUSTOM_OPTION_VALUE && (
+              <div>
+                <label style={labelStyle}>Custom Brand</label>
+                <input
+                  value={customModBrand}
+                  onChange={(e) => setCustomModBrand(e.target.value)}
+                  placeholder="e.g. Local fabrication shop or niche manufacturer"
+                  style={inputStyle}
+                />
+              </div>
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
               <div>
                 <label style={labelStyle}>Estimated HP Gain</label>

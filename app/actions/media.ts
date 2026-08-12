@@ -1,11 +1,11 @@
 "use server";
 
 import { auth } from "@/auth";
+import { isUploadableImageFile, uploadPublicFile, uploadPublicImage } from "@/lib/media/upload-storage";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import fs from "fs";
 import path from "path";
-import crypto from "crypto";
 
 function safeRevalidatePath(vin: string) {
   try {
@@ -46,24 +46,17 @@ async function verifyOwnership(vin: string) {
 export async function uploadVehiclePhoto(vin: string, formData: FormData) {
   const { vehicleId } = await verifyOwnership(vin);
 
-  const file = formData.get("file") as File | null;
+  const file = formData.get("file");
   const caption = formData.get("caption") as string | null;
 
-  if (!file) {
+  if (!isUploadableImageFile(file)) {
     throw new Error("No file provided.");
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const ext = file.name.substring(file.name.lastIndexOf("."));
-  const filename = `${crypto.randomUUID()}${ext}`;
-
-  const uploadDir = path.join(process.cwd(), "public", "uploads", "vehicles", vehicleId, "photos");
-  await fs.promises.mkdir(uploadDir, { recursive: true });
-
-  const filePath = path.join(uploadDir, filename);
-  await fs.promises.writeFile(filePath, buffer);
-
-  const webPath = `/uploads/vehicles/${vehicleId}/photos/${filename}`;
+  const upload = await uploadPublicImage({
+    file,
+    folder: `vehicles/${vehicleId}/photos`,
+  });
 
   // Check if this is the first photo of the vehicle
   const existingCount = await prisma.vehiclePhoto.count({
@@ -73,7 +66,7 @@ export async function uploadVehiclePhoto(vin: string, formData: FormData) {
   await prisma.vehiclePhoto.create({
     data: {
       vehicleId,
-      filePath: webPath,
+      filePath: upload.url,
       caption: caption || null,
       isHero: existingCount === 0, // Mark as hero if it's the first photo
       displayOrder: existingCount,
@@ -94,15 +87,7 @@ export async function deleteVehiclePhoto(vin: string, photoId: string) {
     throw new Error("Photo not found.");
   }
 
-  // Delete physical file
-  const fullPath = path.join(process.cwd(), "public", photo.filePath);
-  try {
-    if (fs.existsSync(fullPath)) {
-      await fs.promises.unlink(fullPath);
-    }
-  } catch (e) {
-    console.error("Could not delete physical photo file:", e);
-  }
+  await deleteLocalUploadIfPresent(photo.filePath, "photo");
 
   // Delete from DB
   await prisma.vehiclePhoto.delete({
@@ -174,11 +159,11 @@ export async function reorderVehiclePhotos(vin: string, photoIds: string[]) {
 export async function uploadVehicleDocument(vin: string, formData: FormData) {
   const { vehicleId } = await verifyOwnership(vin);
 
-  const file = formData.get("file") as File | null;
+  const file = formData.get("file");
   const title = formData.get("title") as string | null;
   const documentType = formData.get("documentType") as string | null;
 
-  if (!file) {
+  if (!isUploadableFile(file)) {
     throw new Error("No file provided.");
   }
   if (!title || title.trim() === "") {
@@ -188,24 +173,17 @@ export async function uploadVehicleDocument(vin: string, formData: FormData) {
     throw new Error("Document type is required.");
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const ext = file.name.substring(file.name.lastIndexOf("."));
-  const filename = `${crypto.randomUUID()}${ext}`;
-
-  const uploadDir = path.join(process.cwd(), "public", "uploads", "vehicles", vehicleId, "documents");
-  await fs.promises.mkdir(uploadDir, { recursive: true });
-
-  const filePath = path.join(uploadDir, filename);
-  await fs.promises.writeFile(filePath, buffer);
-
-  const webPath = `/uploads/vehicles/${vehicleId}/documents/${filename}`;
+  const upload = await uploadPublicFile({
+    file,
+    folder: `vehicles/${vehicleId}/documents`,
+  });
 
   await prisma.vehicleDocument.create({
     data: {
       vehicleId,
       title: title.trim(),
       documentType: documentType.trim(),
-      filePath: webPath,
+      filePath: upload.url,
     },
   });
 
@@ -223,15 +201,7 @@ export async function deleteVehicleDocument(vin: string, docId: string) {
     throw new Error("Document not found.");
   }
 
-  // Delete physical file
-  const fullPath = path.join(process.cwd(), "public", doc.filePath);
-  try {
-    if (fs.existsSync(fullPath)) {
-      await fs.promises.unlink(fullPath);
-    }
-  } catch (e) {
-    console.error("Could not delete physical document file:", e);
-  }
+  await deleteLocalUploadIfPresent(doc.filePath, "document");
 
   // Delete from DB
   await prisma.vehicleDocument.delete({
@@ -239,4 +209,21 @@ export async function deleteVehicleDocument(vin: string, docId: string) {
   });
 
   safeRevalidatePath(vin);
+}
+
+function isUploadableFile(value: FormDataEntryValue | null): value is File {
+  return typeof File !== "undefined" && value instanceof File && value.size > 0;
+}
+
+async function deleteLocalUploadIfPresent(filePath: string, label: string) {
+  if (!filePath.startsWith("/uploads/")) return;
+
+  const fullPath = path.join(process.cwd(), "public", filePath);
+  try {
+    if (fs.existsSync(fullPath)) {
+      await fs.promises.unlink(fullPath);
+    }
+  } catch (e) {
+    console.error(`Could not delete local ${label} file:`, e);
+  }
 }
