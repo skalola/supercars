@@ -11,6 +11,7 @@
     "lint:fulfillment": "eslint app/actions/admin.ts app/actions/admin-partner.ts app/admin app/api/payments app/fulfillment app/transactions components/admin components/transactions lib/admin.ts lib/admin lib/fulfillment lib/mail lib/payments scripts/process-fulfillment-expirations.ts scripts/seed-fulfillment-demo.ts scripts/seed-partner-registry.ts types/next-auth.d.ts scratch/test_sprint8a_real_email_delivery.ts scratch/test_sprint8b_payment_provider.ts scratch/test_sprint8c_end_to_end_fulfillment_qa.ts scratch/test_sprint8d_transaction_ux_scoping.ts scratch/test_sprint8e_expiration_operations.ts scratch/test_sprint8f_admin_financial_reconciliation.ts scratch/test_sprint8g_partner_package_scoping.ts scratch/test_sprint8h_partner_decision_confirmation.ts scratch/test_sprint8i_partner_decision_audit.ts",
     "db:usage-report": "tsx --env-file .env scripts/db-usage-report.ts",
     "db:usage-reset": "tsx --env-file .env scripts/db-usage-report.ts --reset",
+    "db:usage-check": "tsx --env-file .env scripts/check-db-usage.ts",
     "refresh-market-summaries": "tsx --env-file .env scripts/refresh-market-model-summaries.ts",
     "crawl-inventory": "tsx --env-file .env scripts/crawl-inventory.ts",
     "refresh-inventory-weekly": "npm run refresh-official-dealers && tsx --env-file .env scripts/weekly-inventory-refresh.ts",
