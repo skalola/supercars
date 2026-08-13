@@ -74,13 +74,12 @@ function getClubDetailSelect(now = new Date()) {
 
 export default async function ClubDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const [club, session, catalog] = await Promise.all([
+  const [club, session] = await Promise.all([
     prisma.carClub.findUnique({
       where: { slug },
       select: getClubDetailSelect(),
     }),
     auth(),
-    getMakeModelCatalogOptions(),
   ]);
 
   if (!club || club.status !== "ACTIVE") {
@@ -98,9 +97,10 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
   const activeMembers = club.members.filter((member) => member.status === "ACTIVE");
   const pendingMembers = club.members.filter((member) => member.status === "PENDING");
   const memberUserIds = activeMembers.map((member) => member.userId);
-  const [fastest, mostModified] = await Promise.all([
+  const [fastest, mostModified, catalog] = await Promise.all([
     getFastestClubCar(memberUserIds),
     getMostModifiedClubCar(memberUserIds),
+    canModerate ? getMakeModelCatalogOptions() : Promise.resolve(null),
   ]);
   const nextMeet = club.meets[0] ?? null;
   const creatorName = club.creator.name || club.creator.username || "SUPERCAR DASH Member";
@@ -249,7 +249,7 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
           {pendingMembers.length > 0 && canModerate ? (
             <p className="club-widget-note">{pendingMembers.length} pending {pendingMembers.length === 1 ? "request" : "requests"}</p>
           ) : null}
-          {canModerate ? (
+          {canModerate && catalog ? (
             <ClubEditModal>
               <form action={updateClubProfileAction} className="club-form">
                 <input type="hidden" name="clubId" value={club.id} />
