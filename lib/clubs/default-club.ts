@@ -4,6 +4,20 @@ export const DEFAULT_CAR_CLUB_SLUG = "supercar-dash";
 export const DEFAULT_CAR_CLUB_LOGO = "/images/supercar-dash-wordmark.svg";
 
 export async function ensureDefaultClubMembership(userId: string) {
+  const activeMembership = await prisma.carClubMember.findFirst({
+    where: {
+      userId,
+      status: "ACTIVE",
+      club: { slug: DEFAULT_CAR_CLUB_SLUG },
+    },
+    select: {
+      club: {
+        select: { id: true, creatorId: true },
+      },
+    },
+  });
+  if (activeMembership) return activeMembership.club;
+
   const club = await ensureDefaultClub(userId);
   const membership = await prisma.carClubMember.findUnique({
     where: {
