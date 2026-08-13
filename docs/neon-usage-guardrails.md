@@ -24,6 +24,8 @@ Run the check after a representative production traffic window and before downgr
 
 The 688-row make/model selector is intentionally cached for 24 hours and does not violate these limits. Aggregate queries returning one row are also safe.
 
+The public parts catalog is likewise cached for 24 hours and invalidated immediately by admin part mutations. Keep the 240-product ceiling until server-side filtering and pagination replace the single catalog payload; do not increase the ceiling to accommodate affiliate imports.
+
 ## Measurement Procedure
 
 1. Deploy the intended release and apply its migrations.

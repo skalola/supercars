@@ -217,7 +217,9 @@ const getPublicPartsStoreCatalog = unstable_cache(
   },
   ["public-parts-store-catalog-v2"],
   {
-    revalidate: 60 * 60,
+    // Admin catalog mutations invalidate this tag immediately. The fallback TTL
+    // only covers out-of-band imports, so avoid refetching the full catalog hourly.
+    revalidate: 86_400,
     tags: ["parts-catalog"],
   },
 );
