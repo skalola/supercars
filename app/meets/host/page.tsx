@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { createMeetAction } from "@/app/actions/meets";
-import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
+import { getCatalogMakeOptions } from "@/lib/makes/catalog";
 import { MEET_TYPE_OPTIONS } from "@/lib/meets/meet-types";
 import { prisma } from "@/lib/prisma";
 
@@ -15,8 +15,8 @@ export default async function HostMeetPage({ searchParams }: { searchParams?: Pr
     redirect("/login");
   }
   const userId = session.user.id as string;
-  const [{ makes }, hostableClubs] = await Promise.all([
-    getMakeModelCatalogOptions(),
+  const [makes, hostableClubs] = await Promise.all([
+    getCatalogMakeOptions(),
     prisma.carClub.findMany({
       where: {
         status: "ACTIVE",
