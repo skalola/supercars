@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { resolveModel } from "@/lib/market-sources/model-matcher";
 import { upsertPartnerContact } from "@/lib/fulfillment/partner-registry";
@@ -27,6 +28,8 @@ type VpicDecodeResponse = {
 };
 
 type CachedSource = { id: string };
+type VehicleImageState = "NONE" | "UNVERIFIED" | "VALID";
+type VehicleImageStateRow = { vehicleId: string; hasValidImage: boolean };
 
 const sourceCache = new Map<string, Promise<CachedSource>>();
 const vinDecodeCache = new Map<string, Promise<DecodedVinValues>>();
@@ -167,6 +170,21 @@ export async function ingestCrawlerListings(
     select: { id: true, vin: true },
   });
   const vehiclesByVin = new Map(existingVehicles.map((vehicle) => [vehicle.vin, vehicle.id]));
+  const existingVehicleIds = existingVehicles.map((vehicle) => vehicle.id);
+  const existingImageRows = existingVehicleIds.length > 0
+    ? await prisma.$queryRaw<VehicleImageStateRow[]>(Prisma.sql`
+        SELECT
+          image."vehicleId",
+          BOOL_OR(image."validationStatus" = 'VALID') AS "hasValidImage"
+        FROM "VehicleImage" image
+        WHERE image."vehicleId" IN (${Prisma.join(existingVehicleIds)})
+        GROUP BY image."vehicleId"
+      `)
+    : [];
+  const imageStateByVehicleId = new Map<string, VehicleImageState>();
+  for (const image of existingImageRows) {
+    imageStateByVehicleId.set(image.vehicleId, image.hasValidImage ? "VALID" : "UNVERIFIED");
+  }
 
   const sourceIds = Array.from(new Set(sourceEntries.map(([, source]) => source.id)));
   const externalListingIds = Array.from(new Set(uniqueListings.map((listing) => listing.externalListingId)));
@@ -278,12 +296,14 @@ export async function ingestCrawlerListings(
     else {
       counters.createdVehicles++;
       vehiclesByVin.set(listing.vin, vehicle.id);
+      imageStateByVehicleId.set(vehicle.id, "NONE");
     }
 
     await attachVehicleImages(
       vehicle.id,
       listing.images,
-      validationStatus === "VALID" ? "VALID" : "IMAGE_UNVERIFIED"
+      validationStatus === "VALID" ? "VALID" : "IMAGE_UNVERIFIED",
+      imageStateByVehicleId,
     );
     await upsertVinDiscovery(listing, source.id, vehicle.id);
 
@@ -416,26 +436,24 @@ async function safelySendSavedCarAlert(send: () => Promise<{ sent: number; skipp
   }
 }
 
-async function attachVehicleImages(vehicleId: string, images: string[], validationStatus: string) {
+async function attachVehicleImages(
+  vehicleId: string,
+  images: string[],
+  validationStatus: string,
+  imageStateByVehicleId: Map<string, VehicleImageState>,
+) {
   const uniqueImages = Array.from(new Set(images.filter(Boolean))).slice(0, 12);
   if (uniqueImages.length === 0) return;
 
-  const existingValidImage = await prisma.vehicleImage.findFirst({
-    where: { vehicleId, validationStatus: "VALID" },
-    select: { id: true },
-  });
-  if (existingValidImage) return;
+  const currentState = imageStateByVehicleId.get(vehicleId) ?? "NONE";
+  if (currentState === "VALID") return;
 
   if (validationStatus === "VALID") {
     await prisma.vehicleImage.deleteMany({
       where: { vehicleId },
     });
-  } else {
-    const existingImage = await prisma.vehicleImage.findFirst({
-      where: { vehicleId },
-      select: { id: true },
-    });
-    if (existingImage) return;
+  } else if (currentState !== "NONE") {
+    return;
   }
 
   await prisma.vehicleImage.createMany({
@@ -446,6 +464,10 @@ async function attachVehicleImages(vehicleId: string, images: string[], validati
         validationStatus,
       })),
   });
+  imageStateByVehicleId.set(
+    vehicleId,
+    validationStatus === "VALID" ? "VALID" : "UNVERIFIED",
+  );
 }
 
 async function upsertVinDiscovery(
