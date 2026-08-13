@@ -10,13 +10,26 @@ interface RouteParams {
   }>;
 }
 
+const CLICK_DEDUPE_WINDOW_MS = 10 * 60 * 1000;
+
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const { partId } = await params;
 
   const part = await prisma.performancePart.findUnique({
     where: { id: partId },
-    include: {
-      affiliatePartner: true,
+    select: {
+      id: true,
+      status: true,
+      affiliateUrl: true,
+      sourceUrl: true,
+      trackingStatus: true,
+      affiliatePartnerId: true,
+      affiliatePartner: {
+        select: {
+          active: true,
+          status: true,
+        },
+      },
     },
   });
 
@@ -35,17 +48,34 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.redirect(new URL("/parts?outbound=missing-retailer", request.url), { status: 303 });
   }
 
-  await prisma.partAffiliateClick.create({
-    data: {
-      partId: part.id,
-      affiliatePartnerId: affiliateReady ? part.affiliatePartnerId : null,
-      userId,
-      outboundUrl,
-      sourcePath: getSourcePath(request, affiliateReady ? "affiliate" : "source"),
-      ipHash: hashHeaderValue(getClientIp(request)),
-      userAgentHash: hashHeaderValue(request.headers.get("user-agent")),
-    },
+  const sourcePath = getSourcePath(request, affiliateReady ? "affiliate" : "source");
+  const ipHash = hashHeaderValue(getClientIp(request));
+  const userAgentHash = hashHeaderValue(request.headers.get("user-agent"));
+  const clickRef = createDedupeClickRef({
+    partId: part.id,
+    userId,
+    ipHash,
+    userAgentHash,
+    sourcePath,
   });
+  const clickData = {
+    partId: part.id,
+    affiliatePartnerId: affiliateReady ? part.affiliatePartnerId : null,
+    userId,
+    outboundUrl,
+    sourcePath,
+    ipHash,
+    userAgentHash,
+  };
+
+  if (clickRef) {
+    await prisma.partAffiliateClick.createMany({
+      data: [{ ...clickData, clickRef }],
+      skipDuplicates: true,
+    });
+  } else {
+    await prisma.partAffiliateClick.create({ data: clickData });
+  }
 
   return NextResponse.redirect(outboundUrl, { status: 302 });
 }
@@ -82,4 +112,31 @@ function hashHeaderValue(value: string | null | undefined) {
     "supercar-dash-affiliate-clicks";
 
   return createHash("sha256").update(`${salt}:${value}`).digest("hex");
+}
+
+function createDedupeClickRef({
+  partId,
+  userId,
+  ipHash,
+  userAgentHash,
+  sourcePath,
+}: {
+  partId: string;
+  userId?: string;
+  ipHash?: string;
+  userAgentHash?: string;
+  sourcePath: string;
+}) {
+  const visitorKey = userId
+    ? `user:${userId}`
+    : ipHash || userAgentHash
+      ? `anonymous:${ipHash || "unknown-ip"}:${userAgentHash || "unknown-agent"}`
+      : null;
+
+  if (!visitorKey) return undefined;
+
+  const timeBucket = Math.floor(Date.now() / CLICK_DEDUPE_WINDOW_MS);
+  return createHash("sha256")
+    .update(`part-click:v1:${partId}:${visitorKey}:${sourcePath}:${timeBucket}`)
+    .digest("hex");
 }
