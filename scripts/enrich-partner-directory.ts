@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma";
 import { resolveUnresolvedPartnerContact } from "../lib/fulfillment/partner-registry";
+import { getBatchLimit, isExecuteMode, logScriptMode } from "./lib/script-guards";
 import https from "https";
 import http from "http";
 
@@ -57,6 +58,9 @@ function extractEmails(html: string): string[] {
 }
 
 async function enrichPartnerDirectory() {
+  const execute = isExecuteMode();
+  const limit = getBatchLimit({ defaultLimit: 50, maxLimit: 200 });
+  logScriptMode("enrich-partner-directory", execute, limit);
   console.log("Starting Partner Directory Enrichment...");
 
   const unresolved = await prisma.partnerContact.findMany({
@@ -67,7 +71,14 @@ async function enrichPartnerDirectory() {
       ],
       active: true,
       website: { not: null }
-    }
+    },
+    select: {
+      id: true,
+      name: true,
+      website: true,
+    },
+    orderBy: [{ updatedAt: "asc" }, { name: "asc" }],
+    take: limit,
   });
 
   console.log(`Found ${unresolved.length} unresolved partners with a website to scan.`);
@@ -105,16 +116,18 @@ async function enrichPartnerDirectory() {
       console.log(`  -> SUCCESS! Found email: ${bestEmail}`);
       
       try {
-        await resolveUnresolvedPartnerContact(
-          partner.id,
-          bestEmail,
-          "PUBLIC_SOURCE",
-          "PUBLIC_WEBSITE"
-        );
+        if (execute) {
+          await resolveUnresolvedPartnerContact(
+            partner.id,
+            bestEmail,
+            "PUBLIC_SOURCE",
+            "PUBLIC_WEBSITE"
+          );
+        }
         resolvedCount++;
-        console.log(`  -> Partner marked as RESOLVED.`);
-      } catch (e: any) {
-        console.error(`  -> Failed to resolve: ${e.message}`);
+        console.log(`  -> ${execute ? "Partner marked as RESOLVED." : "Would mark partner as RESOLVED."}`);
+      } catch (error) {
+        console.error(`  -> Failed to resolve: ${error instanceof Error ? error.message : String(error)}`);
       }
     } else {
       console.log(`  -> FAILED to find any emails on website.`);

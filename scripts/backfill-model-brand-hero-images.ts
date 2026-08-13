@@ -14,9 +14,23 @@ type CliOptions = {
 async function main() {
   const options = parseOptions(process.argv.slice(2));
   const models = await prisma.model.findMany({
-    include: {
-      make: true,
-      images: true,
+    select: {
+      id: true,
+      name: true,
+      make: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          logoUrl: true,
+        },
+      },
+      images: {
+        select: {
+          type: true,
+          reviewStatus: true,
+        },
+      },
     },
     orderBy: [
       { make: { name: "asc" } },

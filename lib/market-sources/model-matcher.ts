@@ -23,6 +23,31 @@ export type ModelMatchResult =
   | { matched: true; modelId: string; modelName: string }
   | { matched: false; reason: string };
 
+type MakeCatalog = {
+  name: string;
+  models: Array<{ id: string; name: string; slug: string }>;
+};
+
+const makeCatalogCache = new Map<string, Promise<MakeCatalog | null>>();
+
+function getMakeCatalog(make: string) {
+  const key = make.trim().toLowerCase();
+  const cached = makeCatalogCache.get(key);
+  if (cached) return cached;
+
+  const catalog = prisma.make.findFirst({
+    where: { name: { equals: make.trim() } },
+    select: {
+      name: true,
+      models: {
+        select: { id: true, name: true, slug: true },
+      },
+    },
+  });
+  makeCatalogCache.set(key, catalog);
+  return catalog;
+}
+
 /**
  * Attempts to resolve a (make, model) string pair to a single Model record.
  *
@@ -34,18 +59,10 @@ export async function resolveModel(
   make: string,
   model: string
 ): Promise<ModelMatchResult> {
-  const normalizedMake = make.trim().toLowerCase();
   const normalizedModel = model.trim().toLowerCase();
 
   // Fetch all models for this make (case-insensitive make slug match)
-  const makeRecord = await prisma.make.findFirst({
-    where: { name: { equals: make.trim() } },
-    include: {
-      models: {
-        select: { id: true, name: true, slug: true },
-      },
-    },
-  });
+  const makeRecord = await getMakeCatalog(make);
 
   if (!makeRecord) {
     return {
@@ -146,11 +163,9 @@ export async function batchResolveModels(
 
   const results = new Map<string, ModelMatchResult>();
 
-  await Promise.all(
-    Array.from(unique.entries()).map(async ([key, { make, model }]) => {
-      results.set(key, await resolveModel(make, model));
-    })
-  );
+  await Promise.all(Array.from(unique.entries()).map(async ([key, { make, model }]) => {
+    results.set(key, await resolveModel(make, model));
+  }));
 
   return results;
 }

@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export type FilterCategory =
   | "ALL"
@@ -21,8 +22,6 @@ export interface TransactionCenterItem {
   expectedPlatformFee: number;
   expectedPartnerCommission: number;
   collectedAmount: number;
-  refundableAmount: number;
-  payoutStatus: string;
   createdAt: string | Date;
   updatedAt: string | Date;
   vehicle?: {
@@ -66,6 +65,15 @@ export interface TransactionCenterItem {
 interface TransactionCenterClientProps {
   userId?: string;
   transactions: TransactionCenterItem[];
+  activeTab: FilterCategory;
+  searchQuery: string;
+  summary: {
+    total: number;
+    active: number;
+    attention: number;
+    captured: number;
+    tabCounts: Record<FilterCategory, number>;
+  };
 }
 
 const tabs: Array<{ id: FilterCategory; label: string }> = [
@@ -77,60 +85,26 @@ const tabs: Array<{ id: FilterCategory; label: string }> = [
   { id: "TRANSPORT_REQUESTS", label: "Transport" },
 ];
 
-export function TransactionCenterClient({ userId, transactions }: TransactionCenterClientProps) {
-  const [activeTab, setActiveTab] = useState<FilterCategory>("ALL");
-  const [searchQuery, setSearchQuery] = useState("");
+export function TransactionCenterClient({
+  userId,
+  transactions,
+  activeTab,
+  searchQuery,
+  summary,
+}: TransactionCenterClientProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  const summary = useMemo(() => {
-    const active = transactions.filter((tx) => ["SENT", "VIEWED", "ACCEPTED", "READY_TO_SEND"].includes(tx.status)).length;
-    const attention = transactions.filter((tx) => ["DECLINED", "EXPIRED", "FAILED"].includes(tx.status) || tx.paymentStatus === "FAILED").length;
-    const captured = transactions.reduce((sum, tx) => sum + (tx.collectedAmount || 0), 0);
-    return { total: transactions.length, active, attention, captured };
-  }, [transactions]);
-
-  const filteredTransactions = transactions.filter((tx) => {
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const vinMatch = tx.vehicle?.vin.toLowerCase().includes(q);
-      const makeMatch = tx.vehicle?.make.toLowerCase().includes(q);
-      const modelMatch = tx.vehicle?.model.toLowerCase().includes(q);
-      const partnerMatch = tx.parties?.some((p) => p.name.toLowerCase().includes(q));
-      if (!vinMatch && !makeMatch && !modelMatch && !partnerMatch) return false;
+  function updateFilters(updates: Record<string, string | undefined>) {
+    const params = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(updates)) {
+      if (value) params.set(key, value);
+      else params.delete(key);
     }
-
-    switch (activeTab) {
-      case "BUYING":
-        return tx.requestType === "DEALER_PURCHASE" && !tx.isOwnerView;
-      case "SELLING":
-        return tx.requestType === "DEALER_PURCHASE" && tx.isOwnerView;
-      case "SERVICE_BOOKINGS":
-        return tx.requestType === "SERVICE_BOOKING";
-      case "INSURANCE_REQUESTS":
-        return tx.requestType === "INSURANCE_QUOTE";
-      case "TRANSPORT_REQUESTS":
-        return tx.requestType === "TRANSPORT_QUOTE";
-      default:
-        return true;
-    }
-  });
-
-  function getTabCount(cat: FilterCategory) {
-    return transactions.filter((tx) => {
-      switch (cat) {
-        case "BUYING":
-          return tx.requestType === "DEALER_PURCHASE" && !tx.isOwnerView;
-        case "SELLING":
-          return tx.requestType === "DEALER_PURCHASE" && tx.isOwnerView;
-        case "SERVICE_BOOKINGS":
-          return tx.requestType === "SERVICE_BOOKING";
-        case "INSURANCE_REQUESTS":
-          return tx.requestType === "INSURANCE_QUOTE";
-        case "TRANSPORT_REQUESTS":
-          return tx.requestType === "TRANSPORT_QUOTE";
-        default:
-          return true;
-      }
-    }).length;
+    params.delete("page");
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname);
   }
 
   return (
@@ -162,11 +136,11 @@ export function TransactionCenterClient({ userId, transactions }: TransactionCen
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => updateFilters({ tab: tab.id === "ALL" ? undefined : tab.id })}
                 style={{ ...styles.tabBtn, ...(active ? styles.activeTabBtn : {}) }}
               >
                 <span>{tab.label}</span>
-                <span style={{ ...styles.tabBadge, ...(active ? styles.activeTabBadge : {}) }}>{getTabCount(tab.id)}</span>
+                <span style={{ ...styles.tabBadge, ...(active ? styles.activeTabBadge : {}) }}>{summary.tabCounts[tab.id]}</span>
               </button>
             );
           })}
@@ -175,19 +149,21 @@ export function TransactionCenterClient({ userId, transactions }: TransactionCen
           <input
             type="search"
             placeholder="Search VIN, vehicle, or partner"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
+            defaultValue={searchQuery}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") updateFilters({ q: event.currentTarget.value.trim() || undefined });
+            }}
             style={styles.searchInput}
           />
           {searchQuery && (
-            <button onClick={() => setSearchQuery("")} style={styles.clearBtn}>
+            <button onClick={() => updateFilters({ q: undefined })} style={styles.clearBtn}>
               Clear
             </button>
           )}
         </div>
       </section>
 
-      {filteredTransactions.length === 0 ? (
+      {transactions.length === 0 ? (
         <section style={styles.emptyState}>
           <h2 style={styles.emptyTitle}>No matching transactions</h2>
           <p style={styles.emptyText}>{searchQuery ? `No results for "${searchQuery}".` : "New requests will appear here as soon as they are created."}</p>
@@ -197,7 +173,7 @@ export function TransactionCenterClient({ userId, transactions }: TransactionCen
         </section>
       ) : (
         <section className="transaction-list" style={styles.list}>
-          {filteredTransactions.map((tx) => (
+          {transactions.map((tx) => (
             <TransactionRow key={tx.id} tx={tx} />
           ))}
         </section>

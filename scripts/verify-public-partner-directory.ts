@@ -19,15 +19,28 @@
 
 import { prisma } from "../lib/prisma";
 import { verifyPartnerWebsiteContact } from "../lib/directory/partner-website-verification";
+import { getBatchLimit, isExecuteMode, logScriptMode } from "./lib/script-guards";
 
-const execute = process.argv.includes("--execute");
-const limit = parseLimit(process.argv.slice(2));
+const execute = isExecuteMode();
+const limit = getBatchLimit({ defaultLimit: 100, maxLimit: 500 });
 
 async function main() {
+  logScriptMode("verify-public-partner-directory", execute, limit);
   const contacts = await prisma.partnerContact.findMany({
     where: {
       active: true,
       type: { in: ["DEALER", "SERVICE_SHOP", "TRANSPORTER", "INSURER"] },
+    },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      website: true,
+      email: true,
+      phone: true,
+      city: true,
+      state: true,
+      confidence: true,
     },
     orderBy: [{ type: "asc" }, { name: "asc" }],
     take: limit,
@@ -85,12 +98,6 @@ async function main() {
   console.log(`  Verified: ${verified}`);
   console.log(`  Held out: ${failed}`);
   console.log("==================================================");
-}
-
-function parseLimit(args: string[]) {
-  const index = args.indexOf("--limit");
-  const parsed = index >= 0 ? Number(args[index + 1]) : undefined;
-  return Number.isFinite(parsed) && parsed! > 0 ? parsed : undefined;
 }
 
 main()

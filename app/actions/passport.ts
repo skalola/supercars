@@ -37,6 +37,11 @@ async function verifyOwnership(vin: string) {
 
   const vehicle = await prisma.vehicle.findUnique({
     where: { vin },
+    select: {
+      id: true,
+      ownerId: true,
+      status: true,
+    },
   });
 
   if (!vehicle) {
@@ -148,9 +153,14 @@ export async function addVehicleInstalledPart(
 
   const part = await prisma.performancePart.findUnique({
     where: { id: data.partId },
-    include: {
-      brand: true,
-      category: true,
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      categoryId: true,
+      status: true,
+      brand: { select: { name: true } },
+      category: { select: { name: true } },
     },
   });
 
@@ -380,10 +390,21 @@ export async function createServiceBookingPackage(input: CreateServiceBookingInp
 
   const vehicle = await prisma.vehicle.findUnique({
     where: { vin: input.vin },
-    include: {
-      model: { include: { make: true } },
-      profile: true,
-      documents: true,
+    select: {
+      id: true,
+      vin: true,
+      year: true,
+      model: {
+        select: {
+          name: true,
+          make: { select: { name: true } },
+        },
+      },
+      profile: {
+        select: {
+          currentMileage: true,
+        },
+      },
     },
   });
 
@@ -434,7 +455,7 @@ export async function createServiceBookingPackage(input: CreateServiceBookingInp
     shopName: resolvedShop?.name || input.shopName,
     shopEmail: resolvedShop?.email || null,
     notes: input.notes,
-    attachedDocumentCount: vehicle.documents.length,
+    attachedDocumentCount: await prisma.vehicleDocument.count({ where: { vehicleId: vehicle.id } }),
     depositAmount,
   });
 

@@ -23,6 +23,9 @@ export async function claimVehicle(
   try {
     const existingVehicle = await prisma.vehicle.findUnique({
       where: { vin },
+      select: {
+        id: true,
+      },
     });
 
     const vehicleData = {
@@ -153,8 +156,13 @@ async function findCatalogModel(makeName: string, decodedModelName: string) {
     where: {
       name: { equals: makeName, mode: "insensitive" },
     },
-    include: {
-      models: true,
+    select: {
+      models: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
     },
   });
   if (!make) return null;

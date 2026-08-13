@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 export type GarageMeetActivityItem = {
   id: string;
@@ -29,39 +30,60 @@ export async function getGarageMeetSummary(userId: string): Promise<GarageMeetSu
       attendedRsvps,
       upcomingHostedMeets,
       upcomingRsvps,
-      hostedCount,
-      attendedCount,
-      upcomingHostedCount,
-      upcomingAttendedCount,
+      statsRows,
     ] = await Promise.all([
       prisma.meet.findMany({
         where: { hostId: userId, status: { not: "HIDDEN" } },
+        select: meetActivitySelect,
         orderBy: { startsAt: "desc" },
-        take: 40,
+        take: 8,
       }),
       prisma.meetRsvp.findMany({
         where: { userId, status: { not: "CANCELLED" }, meet: { status: { not: "HIDDEN" } } },
-        include: { meet: true },
+        select: { status: true, meet: { select: meetActivitySelect } },
+        orderBy: { meet: { startsAt: "desc" } },
+        take: 8,
       }),
       prisma.meet.findMany({
         where: { hostId: userId, status: { in: ["PUBLISHED", "FULL"] }, startsAt: { gte: now } },
+        select: meetActivitySelect,
         orderBy: { startsAt: "asc" },
-        take: 24,
+        take: 6,
       }),
       prisma.meetRsvp.findMany({
         where: { userId, status: { not: "CANCELLED" }, meet: { status: { in: ["PUBLISHED", "FULL"] }, startsAt: { gte: now } } },
-        include: { meet: true },
+        select: { status: true, meet: { select: meetActivitySelect } },
+        orderBy: { meet: { startsAt: "asc" } },
+        take: 8,
       }),
-      prisma.meet.count({ where: { hostId: userId, status: { not: "HIDDEN" } } }),
-      prisma.meetRsvp.count({ where: { userId, status: { not: "CANCELLED" }, meet: { status: { not: "HIDDEN" } } } }),
-      prisma.meet.count({ where: { hostId: userId, status: { in: ["PUBLISHED", "FULL"] }, startsAt: { gte: now } } }),
-      prisma.meetRsvp.count({ where: { userId, status: { not: "CANCELLED" }, meet: { status: { in: ["PUBLISHED", "FULL"] }, startsAt: { gte: now } } } }),
+      prisma.$queryRaw<Array<{
+        hosted: bigint;
+        attended: bigint;
+        upcomingHosted: bigint;
+        upcomingAttended: bigint;
+      }>>(Prisma.sql`
+        SELECT
+          (SELECT COUNT(*) FROM "Meet" meet
+            WHERE meet."hostId" = ${userId} AND meet."status" <> 'HIDDEN')::bigint AS hosted,
+          (SELECT COUNT(*) FROM "MeetRsvp" rsvp
+            JOIN "Meet" meet ON meet."id" = rsvp."meetId"
+            WHERE rsvp."userId" = ${userId} AND rsvp."status" <> 'CANCELLED'
+              AND meet."status" <> 'HIDDEN')::bigint AS attended,
+          (SELECT COUNT(*) FROM "Meet" meet
+            WHERE meet."hostId" = ${userId} AND meet."status" IN ('PUBLISHED', 'FULL')
+              AND meet."startsAt" >= ${now})::bigint AS "upcomingHosted",
+          (SELECT COUNT(*) FROM "MeetRsvp" rsvp
+            JOIN "Meet" meet ON meet."id" = rsvp."meetId"
+            WHERE rsvp."userId" = ${userId} AND rsvp."status" <> 'CANCELLED'
+              AND meet."status" IN ('PUBLISHED', 'FULL') AND meet."startsAt" >= ${now})::bigint AS "upcomingAttended"
+      `),
     ]);
+    const stats = statsRows[0];
 
     const attendedMeets = attendedRsvps
       .map((rsvp) => ({ meet: rsvp.meet, rsvpStatus: rsvp.status }))
       .sort((a, b) => b.meet.startsAt.getTime() - a.meet.startsAt.getTime())
-      .slice(0, 40);
+      .slice(0, 8);
 
     const upcomingMeetItems = uniqueMeetItems([
       ...upcomingHostedMeets.map((meet) => toMeetActivityItem(meet, "Hosting")),
@@ -69,13 +91,13 @@ export async function getGarageMeetSummary(userId: string): Promise<GarageMeetSu
         .map((rsvp) => ({ meet: rsvp.meet, rsvpStatus: rsvp.status }))
         .sort((a, b) => a.meet.startsAt.getTime() - b.meet.startsAt.getTime())
         .map(({ meet, rsvpStatus }) => toMeetActivityItem(meet, formatRsvpBadge(rsvpStatus))),
-    ]).slice(0, 40);
+    ]).slice(0, 8);
 
     return {
       stats: {
-        hosted: hostedCount,
-        attended: attendedCount,
-        upcoming: upcomingHostedCount + upcomingAttendedCount,
+        hosted: Number(stats?.hosted ?? 0),
+        attended: Number(stats?.attended ?? 0),
+        upcoming: Number(stats?.upcomingHosted ?? 0) + Number(stats?.upcomingAttended ?? 0),
       },
       hosted: hostedMeets.map((meet) => toMeetActivityItem(meet, meet.status)),
       attended: attendedMeets.map(({ meet, rsvpStatus }) => toMeetActivityItem(meet, formatRsvpBadge(rsvpStatus))),
@@ -85,6 +107,16 @@ export async function getGarageMeetSummary(userId: string): Promise<GarageMeetSu
     return emptyMeetSummary();
   }
 }
+
+const meetActivitySelect = {
+  id: true,
+  slug: true,
+  title: true,
+  startsAt: true,
+  city: true,
+  state: true,
+  status: true,
+};
 
 function emptyMeetSummary(): GarageMeetSummary {
   return {

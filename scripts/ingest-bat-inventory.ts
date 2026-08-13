@@ -73,7 +73,11 @@ async function fetchAndDecodeVin(vin: string): Promise<Record<string, any>> {
 async function cleanDatabase() {
   console.log("Starting database cleanup for invalid vehicle identifiers...");
   const vehicles = await prisma.vehicle.findMany({
-    include: { listings: true }
+    select: {
+      id: true,
+      vin: true,
+      _count: { select: { listings: true } },
+    },
   });
 
   let deletedVehicles = 0;
@@ -88,9 +92,9 @@ async function cleanDatabase() {
       console.log(`- Removing invalid vehicle from DB: ${v.vin}`);
       
       // Delete associated child relations first to bypass FK constraints
-      if (v.listings && v.listings.length > 0) {
+      if (v._count.listings > 0) {
         await prisma.listing.deleteMany({ where: { vehicleId: v.id } });
-        deletedListingsCount += v.listings.length;
+        deletedListingsCount += v._count.listings;
       }
       await prisma.vehicleImage.deleteMany({ where: { vehicleId: v.id } });
       await prisma.vehiclePhoto.deleteMany({ where: { vehicleId: v.id } });
@@ -187,7 +191,10 @@ async function ingestBatListings(listings: NormalizedExternalListing[]) {
     // 4. Match or Create Vehicle
     let vehicle = await prisma.vehicle.findUnique({
       where: { vin: cleanVin },
-      include: { photos: true, images: true },
+      select: {
+        id: true,
+        _count: { select: { photos: true, images: true } },
+      },
     });
 
     if (vehicle) {
@@ -206,14 +213,17 @@ async function ingestBatListings(listings: NormalizedExternalListing[]) {
           color: (listing as any).color || null,
           ...decodedSpecs,
         },
-        include: { photos: true, images: true },
+        select: {
+          id: true,
+          _count: { select: { photos: true, images: true } },
+        },
       });
       createdVehicles++;
     }
 
     // 5. Ingest listing images into Vehicle if empty
     if (listing.images && listing.images.length > 0) {
-      const hasImages = (vehicle.photos && vehicle.photos.length > 0) || (vehicle.images && vehicle.images.length > 0);
+      const hasImages = vehicle._count.photos > 0 || vehicle._count.images > 0;
       if (!hasImages) {
         for (let i = 0; i < listing.images.length; i++) {
           await prisma.vehicleImage.create({

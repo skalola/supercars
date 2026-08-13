@@ -22,17 +22,37 @@ export async function getGarageClubSummary(userId: string, includePending = fals
       status: { in: statuses },
       club: { status: "ACTIVE" },
     },
-    include: {
+    select: {
+      role: true,
+      status: true,
       club: {
-        include: {
-          members: { where: { status: "ACTIVE" }, select: { id: true } },
-          models: {
-            include: { model: { include: { make: true } } },
-            orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          logoUrl: true,
+          city: true,
+          state: true,
+          _count: {
+            select: {
+              members: { where: { status: "ACTIVE" } },
+              meets: { where: { status: { in: ["PUBLISHED", "FULL", "COMPLETED"] } } },
+              models: true,
+            },
           },
-          meets: {
-            where: { status: { in: ["PUBLISHED", "FULL", "COMPLETED"] } },
-            select: { id: true },
+          models: {
+            select: {
+              model: {
+                select: {
+                  name: true,
+                  make: {
+                    select: { name: true },
+                  },
+                },
+              },
+            },
+            orderBy: { createdAt: "asc" },
+            take: 4,
           },
         },
       },
@@ -48,9 +68,9 @@ export async function getGarageClubSummary(userId: string, includePending = fals
     role: membership.role,
     status: membership.status,
     location: [membership.club.city, membership.club.state].filter(Boolean).join(", ") || "Location pending",
-    memberCount: membership.club.members.length,
-    modelCount: membership.club.models.length,
-    meetCount: membership.club.meets.length,
-    modelLabels: membership.club.models.slice(0, 4).map(({ model }) => `${model.make.name} ${model.name}`),
+    memberCount: membership.club._count.members,
+    modelCount: membership.club._count.models,
+    meetCount: membership.club._count.meets,
+    modelLabels: membership.club.models.map(({ model }) => `${model.make.name} ${model.name}`),
   }));
 }

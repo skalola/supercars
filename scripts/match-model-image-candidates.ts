@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { canonicalBaseModelName, scoreBaseModelFallback } from "@/lib/model-catalog/base-model";
 import { normalizeCatalogText, scoreTitleMatch } from "@/lib/model-catalog/normalizer";
+import { getBatchLimit, hasArg, isExecuteMode, logScriptMode } from "./lib/script-guards";
 
 const prisma = new PrismaClient();
 const KNOWN_MAKE_ALIASES = [
@@ -43,20 +44,63 @@ type CliOptions = {
   make: string | null;
   limit: number;
   minConfidence: number;
-  dryRun: boolean;
+  execute: boolean;
+};
+
+type CandidateForMatch = {
+  id: string;
+  makeName: string;
+  url: string;
+  source: string;
+  sourceName: string | null;
+  sourceUrl: string | null;
+  license: string | null;
+  attribution: string | null;
+  attributionUrl: string | null;
+  title: string | null;
+  context: string | null;
+  category: string | null;
+  baseModelName: string | null;
 };
 
 async function main() {
   const options = parseOptions(process.argv.slice(2));
+  logScriptMode("match-model-image-candidates", options.execute, options.limit);
   const models = await prisma.model.findMany({
     where: {
       ...(options.make ? { make: { name: { equals: options.make, mode: "insensitive" } } } : {}),
       metadataStatus: { not: "READY" },
     },
-    include: {
-      make: true,
-      images: true,
-      spec: true,
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      years: true,
+      productionStartYear: true,
+      productionEndYear: true,
+      make: {
+        select: { name: true },
+      },
+      images: {
+        select: {
+          type: true,
+          reviewStatus: true,
+        },
+      },
+      spec: {
+        select: {
+          engine: true,
+          displacement: true,
+          cylinders: true,
+          horsepower: true,
+          torque: true,
+          transmission: true,
+          drivetrain: true,
+          topSpeed: true,
+          zeroToSixty: true,
+          weight: true,
+        },
+      },
     },
     orderBy: [
       { make: { name: "asc" } },
@@ -66,19 +110,13 @@ async function main() {
   const missingModels = models
     .filter((model) => !model.images.some((image) => image.type?.toLowerCase() !== "candidate" && image.reviewStatus !== "NEEDS_REVIEW"))
     .slice(0, options.limit);
+  const candidatesByMake = await getCandidatesByMake(unique(missingModels.map((model) => model.make.name)));
 
   let matched = 0;
   let skipped = 0;
 
   for (const model of missingModels) {
-    const candidates = await prisma.modelImageCandidate.findMany({
-      where: {
-        makeName: model.make.name,
-        reviewStatus: { not: "REJECTED" },
-        license: { not: null },
-      },
-      orderBy: [{ createdAt: "desc" }],
-    });
+    const candidates = candidatesByMake.get(model.make.name) ?? [];
 
     const best = candidates
       .map((candidate) => ({
@@ -106,7 +144,7 @@ async function main() {
     }
 
     console.log(`[model-image-match] ${model.make.name} ${model.name} -> ${best.candidate.sourceName || best.candidate.source} (${best.confidence})`);
-    if (!options.dryRun) {
+    if (options.execute) {
       await prisma.modelImage.upsert({
         where: {
           modelId_url: {
@@ -204,6 +242,42 @@ function scoreCandidateForModel(
   }
 
   return Math.max(0, Math.min(100, score));
+}
+
+async function getCandidatesByMake(makeNames: string[]) {
+  if (makeNames.length === 0) return new Map<string, CandidateForMatch[]>();
+
+  const candidates = await prisma.modelImageCandidate.findMany({
+    where: {
+      makeName: { in: makeNames },
+      reviewStatus: { not: "REJECTED" },
+      license: { not: null },
+    },
+    select: {
+      id: true,
+      makeName: true,
+      url: true,
+      source: true,
+      sourceName: true,
+      sourceUrl: true,
+      license: true,
+      attribution: true,
+      attributionUrl: true,
+      title: true,
+      context: true,
+      category: true,
+      baseModelName: true,
+    },
+    orderBy: [{ createdAt: "desc" }],
+    take: Math.min(2000, Math.max(200, makeNames.length * 400)),
+  });
+
+  return candidates.reduce((map, candidate) => {
+    const rows = map.get(candidate.makeName) ?? [];
+    rows.push(candidate);
+    map.set(candidate.makeName, rows);
+    return map;
+  }, new Map<string, CandidateForMatch[]>());
 }
 
 function hasConflictingMake(context: string, makeName: string, modelName: string) {
@@ -338,10 +412,14 @@ function parseOptions(args: string[]): CliOptions {
   const getValue = (name: string) => args.find((arg) => arg.startsWith(`--${name}=`))?.split("=").slice(1).join("=");
   return {
     make: getValue("make") || null,
-    limit: Math.max(1, Number(getValue("limit")) || 80),
+    limit: getBatchLimit({ defaultLimit: 80, maxLimit: 250 }),
     minConfidence: Math.max(0, Math.min(100, Number(getValue("min-confidence")) || 86)),
-    dryRun: args.includes("--dry-run"),
+    execute: isExecuteMode() && !hasArg("--dry-run"),
   };
+}
+
+function unique(values: string[]) {
+  return Array.from(new Set(values));
 }
 
 main()

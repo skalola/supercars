@@ -7,6 +7,7 @@ import {
   isMarketingAutomationSettingKey,
 } from "@/lib/admin/marketing-settings";
 import { prisma } from "@/lib/prisma";
+import { clearMarketingAutomationGateCache } from "@/lib/admin/marketing-automation";
 
 export async function updateMarketingAutomationSettingAction(key: string, enabled: boolean) {
   try {
@@ -59,6 +60,7 @@ export async function updateMarketingAutomationSettingAction(key: string, enable
     });
 
     revalidatePath("/admin/marketing");
+    clearMarketingAutomationGateCache(key);
 
     return {
       success: true,

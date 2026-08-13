@@ -2,8 +2,11 @@ import { prisma } from "@/lib/prisma";
 import { isModelMatch } from "@/lib/data-quality/inventory-validator";
 import { isValidVin } from "@/lib/market-crawlers/vin-extractor";
 import { normalizeSupportedMake, SUPPORTED_MAKES } from "@/lib/supported-makes";
+import { getArgValue, getBatchLimit, isExecuteMode, logScriptMode } from "./lib/script-guards";
 
-const makeArg = process.argv.find((arg) => arg.startsWith("--make="))?.split("=")[1];
+const makeArg = getArgValue("--make");
+const execute = isExecuteMode();
+const limit = getBatchLimit({ defaultLimit: 250, maxLimit: 1000 });
 const targetMakes = makeArg
   ? [normalizeSupportedMake(makeArg)].filter((make): make is (typeof SUPPORTED_MAKES)[number] => Boolean(make))
   : [...SUPPORTED_MAKES];
@@ -12,6 +15,7 @@ async function main() {
   if (targetMakes.length === 0) {
     throw new Error(`Unsupported make: ${makeArg}`);
   }
+  logScriptMode("validate-supported-inventory", execute, limit);
 
   const vehicles = await prisma.vehicle.findMany({
     where: {
@@ -29,16 +33,47 @@ async function main() {
         },
       },
     },
-    include: {
-      model: { include: { make: true } },
-      images: true,
+    select: {
+      id: true,
+      vin: true,
+      model: {
+        select: {
+          name: true,
+          make: {
+            select: { name: true },
+          },
+        },
+      },
+      images: {
+        where: { validationStatus: "VALID" },
+        select: { id: true },
+        take: 1,
+      },
       listings: {
-        include: {
-          model: { include: { make: true } },
-          source: true,
+        select: {
+          status: true,
+          validationStatus: true,
+          priceStatus: true,
+          askingPrice: true,
+          price: true,
+          url: true,
+          model: {
+            select: {
+              name: true,
+              slug: true,
+              make: {
+                select: { name: true },
+              },
+            },
+          },
+          source: {
+            select: { type: true },
+          },
         },
       },
     },
+    orderBy: { updatedAt: "asc" },
+    take: limit,
   });
 
   let valid = 0;
@@ -66,22 +101,24 @@ async function main() {
       continue;
     }
 
-    const hasValidImage = vehicle.images.some((image) => image.validationStatus === "VALID");
-    await prisma.vehicle.update({
-      where: { id: vehicle.id },
-      data: {
-        inventoryStatus: hasValidImage ? "VALID" : "WARNING",
-        imageValidationStatus: hasValidImage ? "VALID_IMAGE" : "MISSING_IMAGE",
-        vinIdentityStatus: "VALID",
-        vinIdentityClassification: "VALID",
-      },
-    });
+    const hasValidImage = vehicle.images.length > 0;
+    if (execute) {
+      await prisma.vehicle.update({
+        where: { id: vehicle.id },
+        data: {
+          inventoryStatus: hasValidImage ? "VALID" : "WARNING",
+          imageValidationStatus: hasValidImage ? "VALID_IMAGE" : "MISSING_IMAGE",
+          vinIdentityStatus: "VALID",
+          vinIdentityClassification: "VALID",
+        },
+      });
+    }
 
     if (hasValidImage) valid++;
     else warning++;
   }
 
-  console.log(JSON.stringify({ targetMakes, inspected: vehicles.length, valid, warning, skipped }, null, 2));
+  console.log(JSON.stringify({ execute, targetMakes, inspected: vehicles.length, valid, warning, skipped }, null, 2));
 }
 
 main()

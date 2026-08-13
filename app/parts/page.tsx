@@ -1,13 +1,69 @@
 import { auth } from "@/auth";
-import { PartsStoreExplorer, type PartsBrandRow, type PartsCatalogNodeRow, type PartsCategoryRow, type PartsStorePartRow } from "@/components/parts/PartsStoreExplorer";
-import { isAffiliateTrackingReady } from "@/lib/parts/affiliate-tracking";
+import { PartsStoreExplorer, type PartsBrandRow, type PartsCategoryRow, type PartsStorePartRow } from "@/components/parts/PartsStoreExplorer";
 import { getPartDetailPath } from "@/lib/parts/routes";
-import { auditPerformancePartTrust } from "@/lib/parts/trust";
 import { getCatalogNodePlaceholderUrl } from "@/lib/parts/visual-placeholders";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
+import { unstable_cache } from "next/cache";
 
 type PartsPageProps = {
   searchParams?: Promise<{ make?: string; model?: string }>;
+};
+
+const PARTS_STORE_PAGE_SIZE = 240;
+
+const publicPartsWhere = {
+  status: "ACTIVE",
+  sourceUrl: { not: null },
+  sourceConfidence: "SOURCE_VERIFIED",
+  imageUrl: { not: null },
+  compatibility: {
+    some: {
+      OR: [
+        { makeId: { not: null } },
+        { modelId: { not: null } },
+      ],
+    },
+  },
+} satisfies Prisma.PerformancePartWhereInput;
+
+const storePartSelect = {
+  id: true,
+  name: true,
+  slug: true,
+  partNumber: true,
+  description: true,
+  imageUrl: true,
+  retailPriceCents: true,
+  estimatedHpGain: true,
+  estimatedTorqueGain: true,
+  categoryId: true,
+  brandId: true,
+  category: {
+    select: { name: true },
+  },
+  brand: {
+    select: {
+      name: true,
+      slug: true,
+      logoUrl: true,
+      logoBackground: true,
+      logoNeedsReview: true,
+    },
+  },
+} satisfies Prisma.PerformancePartSelect;
+
+type StorePart = Prisma.PerformancePartGetPayload<{ select: typeof storePartSelect }>;
+type StorePartCompatibility = {
+  makeId: string | null;
+  modelId: string | null;
+  yearStart: number | null;
+  yearEnd: number | null;
+  make: { name: string } | null;
+  model: { name: string } | null;
+};
+type StorePartWithCompatibility = StorePart & {
+  compatibility: StorePartCompatibility[];
 };
 
 export default async function PartsPage({ searchParams }: PartsPageProps) {
@@ -15,107 +71,165 @@ export default async function PartsPage({ searchParams }: PartsPageProps) {
   const userId = session?.user?.id as string | undefined;
   const resolvedSearchParams = (await searchParams) || {};
 
-  const [categories, brands, parts, catalogNodes, garageCars, initialFilter] = await Promise.all([
-    prisma.partCategory.findMany({
-      where: { active: true },
-      include: {
-        _count: {
-          select: {
-            parts: {
-              where: { status: "ACTIVE" },
-            },
-          },
-        },
-      },
-      orderBy: [
-        { displayOrder: "asc" },
-        { name: "asc" },
-      ],
-    }),
-    prisma.partBrand.findMany({
-      where: { active: true },
-      include: {
-        _count: {
-          select: {
-            parts: {
-              where: { status: "ACTIVE" },
-            },
-          },
-        },
-      },
-      orderBy: { name: "asc" },
-    }),
-    prisma.performancePart.findMany({
-      where: { status: "ACTIVE" },
-      include: {
-        category: true,
-        brand: true,
-        affiliatePartner: true,
-        compatibility: {
-          include: {
-            make: true,
-            model: true,
-          },
-          orderBy: { createdAt: "asc" },
-        },
-      },
-      orderBy: [
-        { category: { displayOrder: "asc" } },
-        { brand: { name: "asc" } },
-        { name: "asc" },
-      ],
-      take: 500,
-    }),
-    prisma.partCatalogNode.findMany({
-      where: {
-        active: true,
-        placeholderOnly: true,
-        categoryId: { not: null },
-      },
-      orderBy: [
-        { category: { displayOrder: "asc" } },
-        { name: "asc" },
-      ],
-      take: 500,
-    }),
+  const [publicCatalog, garageCars, initialFilter] = await Promise.all([
+    getPublicPartsStoreCatalog(),
     getGarageCars(userId),
     getInitialPartsFilter(resolvedSearchParams.make, resolvedSearchParams.model),
   ]);
 
-  const publicParts = parts.filter((part) => auditPerformancePartTrust(part).publicEligible);
-  const categoryPartCounts = countBy(publicParts.map((part) => part.categoryId));
-  const brandPartCounts = countBy(publicParts.map((part) => part.brandId));
+  return (
+    <PartsStoreExplorer
+      categories={publicCatalog.categoryRows}
+      brands={publicCatalog.brandRows}
+      parts={publicCatalog.partRows}
+      catalogNodeCount={publicCatalog.catalogNodeCount}
+      garageCars={garageCars}
+      initialMakeId={initialFilter.makeId}
+      initialModelId={initialFilter.modelId}
+    />
+  );
+}
 
-  const categoryRows: PartsCategoryRow[] = categories.map((category) => ({
-    id: category.id,
-    name: category.name,
-    slug: category.slug,
-    description: category.description,
-    iconUrl: getCatalogNodePlaceholderUrl(category.slug, category.slug),
-    partCount: categoryPartCounts.get(category.id) ?? 0,
-  }));
+const getPublicPartsStoreCatalog = unstable_cache(
+  async () => {
+    const [categories, brands, parts, catalogNodeCount] = await Promise.all([
+      prisma.partCategory.findMany({
+        where: { active: true },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+        },
+        orderBy: [
+          { displayOrder: "asc" },
+          { name: "asc" },
+        ],
+      }),
+      prisma.partBrand.findMany({
+        where: { active: true },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          logoUrl: true,
+          logoBackground: true,
+          logoNeedsReview: true,
+        },
+        orderBy: { name: "asc" },
+      }),
+      prisma.performancePart.findMany({
+        where: publicPartsWhere,
+        select: storePartSelect,
+        orderBy: [
+          { category: { displayOrder: "asc" } },
+          { brand: { name: "asc" } },
+          { name: "asc" },
+        ],
+        take: PARTS_STORE_PAGE_SIZE,
+      }),
+      prisma.partCatalogNode.count({
+        where: {
+          active: true,
+          placeholderOnly: true,
+          categoryId: { not: null },
+        },
+      }),
+    ]);
 
-  const brandRows: PartsBrandRow[] = brands.map((brand) => ({
-    id: brand.id,
-    name: brand.name,
-    slug: brand.slug,
-    logoUrl: brand.logoUrl,
-    logoBackground: brand.logoBackground,
-    logoNeedsReview: brand.logoNeedsReview,
-    websiteUrl: brand.websiteUrl,
-    country: brand.country,
-    partCount: brandPartCounts.get(brand.id) ?? 0,
-  }));
+    const partIds = parts.map((part) => part.id);
+    const compatibility = partIds.length
+      ? await prisma.partCompatibility.findMany({
+          where: { partId: { in: partIds } },
+          select: {
+            partId: true,
+            makeId: true,
+            modelId: true,
+            yearStart: true,
+            yearEnd: true,
+            make: {
+              select: { name: true },
+            },
+            model: {
+              select: { name: true },
+            },
+          },
+          orderBy: { createdAt: "asc" },
+        })
+      : [];
+    const compatibilityByPartId = compatibility.reduce((map, row) => {
+      const rows = map.get(row.partId) ?? [];
+      rows.push({
+        makeId: row.makeId,
+        modelId: row.modelId,
+        yearStart: row.yearStart,
+        yearEnd: row.yearEnd,
+        make: row.make,
+        model: row.model,
+      });
+      map.set(row.partId, rows);
+      return map;
+    }, new Map<string, StorePartCompatibility[]>());
+    const partsWithCompatibility: StorePartWithCompatibility[] = parts.map((part) => ({
+      ...part,
+      compatibility: compatibilityByPartId.get(part.id) ?? [],
+    }));
+    const [categoryCounts, brandCounts] = await Promise.all([
+      prisma.performancePart.groupBy({
+        by: ["categoryId"],
+        where: publicPartsWhere,
+        _count: { id: true },
+      }),
+      prisma.performancePart.groupBy({
+        by: ["brandId"],
+        where: publicPartsWhere,
+        _count: { id: true },
+      }),
+    ]);
+    const categoryPartCounts = new Map(categoryCounts.map((row) => [row.categoryId, row._count.id]));
+    const brandPartCounts = new Map(brandCounts.map((row) => [row.brandId, row._count.id]));
 
-  const partRows: PartsStorePartRow[] = publicParts.map((part) => ({
+    const categoryRows: PartsCategoryRow[] = categories.map((category) => ({
+      id: category.id,
+      name: category.name,
+      slug: category.slug,
+      iconUrl: getCatalogNodePlaceholderUrl(category.slug, category.slug),
+      partCount: categoryPartCounts.get(category.id) ?? 0,
+    }));
+
+    const brandRows: PartsBrandRow[] = brands.map((brand) => ({
+      id: brand.id,
+      name: brand.name,
+      slug: brand.slug,
+      logoUrl: brand.logoUrl,
+      logoBackground: brand.logoBackground,
+      logoNeedsReview: brand.logoNeedsReview,
+      partCount: brandPartCounts.get(brand.id) ?? 0,
+    }));
+
+    const partRows: PartsStorePartRow[] = partsWithCompatibility.map(mapStorePartRow);
+
+    return {
+      categoryRows,
+      brandRows,
+      partRows,
+      catalogNodeCount,
+    };
+  },
+  ["public-parts-store-catalog-v2"],
+  {
+    revalidate: 60 * 60,
+    tags: ["parts-catalog"],
+  },
+);
+
+function mapStorePartRow(part: StorePartWithCompatibility): PartsStorePartRow {
+  return {
     id: part.id,
     name: part.name,
     partNumber: part.partNumber,
     detailPath: getPartDetailPath(part),
     description: part.description,
     imageUrl: part.imageUrl,
-    sourceUrl: part.sourceUrl,
-    status: part.status,
     priceLabel: formatCents(part.retailPriceCents),
     hpGainLabel: part.estimatedHpGain === null ? null : `+${part.estimatedHpGain.toLocaleString()} hp`,
     torqueGainLabel: part.estimatedTorqueGain === null ? null : `+${part.estimatedTorqueGain.toLocaleString()} lb-ft`,
@@ -133,31 +247,7 @@ export default async function PartsPage({ searchParams }: PartsPageProps) {
       modelId: fitment.modelId,
       modelName: fitment.model?.name ?? null,
     })),
-    fitmentMakeIds: unique(part.compatibility.map((fitment) => fitment.makeId).filter(Boolean)),
-    fitmentModelIds: unique(part.compatibility.map((fitment) => fitment.modelId).filter(Boolean)),
-    affiliatePartnerName: part.affiliatePartner?.name ?? null,
-    trackingEnabled: isAffiliateTrackingReady(part),
-  }));
-
-  const catalogNodeRows: PartsCatalogNodeRow[] = catalogNodes.map((node) => ({
-    id: node.id,
-    name: node.name,
-    slug: node.slug,
-    iconUrl: node.iconUrl,
-    categoryId: node.categoryId,
-  }));
-
-  return (
-    <PartsStoreExplorer
-      categories={categoryRows}
-      brands={brandRows}
-      parts={partRows}
-      catalogNodes={catalogNodeRows}
-      garageCars={garageCars}
-      initialMakeId={initialFilter.makeId}
-      initialModelId={initialFilter.modelId}
-    />
-  );
+  };
 }
 
 async function getInitialPartsFilter(makeSlug?: string, modelSlug?: string) {
@@ -314,12 +404,10 @@ function formatCompatibility(partCompatibility: {
   model: { name: string } | null;
   yearStart: number | null;
   yearEnd: number | null;
-  trim: string | null;
-  engine: string | null;
 }) {
   const makeModel = [partCompatibility.make?.name, partCompatibility.model?.name].filter(Boolean).join(" ");
   const years = formatYearRange(partCompatibility.yearStart, partCompatibility.yearEnd);
-  const details = [makeModel || "Universal", years, partCompatibility.trim, partCompatibility.engine].filter(Boolean);
+  const details = [makeModel || "Universal", years].filter(Boolean);
   return details.join(" · ");
 }
 
@@ -328,15 +416,4 @@ function formatYearRange(start: number | null, end: number | null) {
   if (start) return `${start}+`;
   if (end) return `Through ${end}`;
   return null;
-}
-
-function unique(values: Array<string | null | undefined>) {
-  return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
-}
-
-function countBy(values: string[]) {
-  return values.reduce((map, value) => {
-    map.set(value, (map.get(value) ?? 0) + 1);
-    return map;
-  }, new Map<string, number>());
 }

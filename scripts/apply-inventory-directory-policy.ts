@@ -1,14 +1,11 @@
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { emailMatchesWebsiteDomain } from "@/lib/directory/contact-domain-policy";
 import { isValidEmail } from "@/lib/fulfillment/partner-registry";
 import { SUPPORTED_MAKES } from "@/lib/supported-makes";
 
 const TARGET_MAKES = [...SUPPORTED_MAKES];
 const AUCTION_DOMAINS = ["bringatrailer.com"];
-
-function hasUsablePrice(listing: { price: number | null; askingPrice: number | null }) {
-  return (listing.askingPrice !== null && listing.askingPrice > 0) || (listing.price !== null && listing.price > 0);
-}
 
 async function main() {
   const partnerContacts = await prisma.partnerContact.findMany({
@@ -23,6 +20,7 @@ async function main() {
         },
       },
     },
+    take: 1000,
   });
   const contactsWithoutValidEmail = partnerContacts.filter((contact) => !isValidEmail(contact.email));
   const contactsWithMismatchedDomains = partnerContacts.filter(
@@ -54,7 +52,7 @@ async function main() {
     },
   });
 
-  const noVinNoPriceListings = await prisma.listing.findMany({
+  const removedNoVinNoPrice = await prisma.listing.deleteMany({
     where: {
       vehicleId: null,
       AND: [
@@ -62,44 +60,23 @@ async function main() {
         { OR: [{ askingPrice: null }, { askingPrice: { lte: 0 } }] },
       ],
     },
-    select: { id: true },
   });
 
-  const removedNoVinNoPrice = await prisma.listing.deleteMany({
-    where: {
-      id: { in: noVinNoPriceListings.map((listing) => listing.id) },
-    },
-  });
-
-  const activeListingsWithoutVehicles = await prisma.listing.findMany({
-    where: {
-      status: "ACTIVE",
-      vehicleId: null,
-    },
-    select: {
-      id: true,
-      _count: {
-        select: {
-          purchases: true,
-          fulfillmentRequests: true,
-        },
-      },
-    },
-  });
-  const removableNoVinListings = activeListingsWithoutVehicles.filter(
-    (listing) => listing._count.purchases === 0 && listing._count.fulfillmentRequests === 0,
-  );
-  const heldNoVinListings = activeListingsWithoutVehicles.filter(
-    (listing) => listing._count.purchases > 0 || listing._count.fulfillmentRequests > 0,
-  );
+  const missingVehicleWhere: Prisma.ListingWhereInput = {
+    status: "ACTIVE",
+    vehicleId: null,
+  };
   const removedNoVinListings = await prisma.listing.deleteMany({
     where: {
-      id: { in: removableNoVinListings.map((listing) => listing.id) },
+      ...missingVehicleWhere,
+      purchases: { none: {} },
+      fulfillmentRequests: { none: {} },
     },
   });
   const heldInactiveNoVinListings = await prisma.listing.updateMany({
     where: {
-      id: { in: heldNoVinListings.map((listing) => listing.id) },
+      ...missingVehicleWhere,
+      OR: [{ purchases: { some: {} } }, { fulfillmentRequests: { some: {} } }],
     },
     data: {
       status: "INACTIVE",
@@ -124,22 +101,14 @@ async function main() {
     },
   });
 
-  const activeVinListings = await prisma.listing.findMany({
+  const deactivatedVinNoPrice = await prisma.listing.updateMany({
     where: {
       status: "ACTIVE",
       vehicleId: { not: null },
-    },
-    select: {
-      id: true,
-      price: true,
-      askingPrice: true,
-    },
-  });
-  const activeVinListingsWithoutPrice = activeVinListings.filter((listing) => !hasUsablePrice(listing));
-
-  const deactivatedVinNoPrice = await prisma.listing.updateMany({
-    where: {
-      id: { in: activeVinListingsWithoutPrice.map((listing) => listing.id) },
+      AND: [
+        { OR: [{ price: null }, { price: { lte: 0 } }] },
+        { OR: [{ askingPrice: null }, { askingPrice: { lte: 0 } }] },
+      ],
     },
     data: {
       status: "INACTIVE",
@@ -148,36 +117,24 @@ async function main() {
     },
   });
 
-  const activeVinListingsWithoutImages = await prisma.listing.findMany({
-    where: {
-      status: "ACTIVE",
-      vehicleId: { not: null },
-      OR: [{ imageUrl: null }, { imageUrl: "" }],
-    },
-    select: {
-      id: true,
-      _count: {
-        select: {
-          purchases: true,
-          fulfillmentRequests: true,
-        },
-      },
-    },
-  });
-  const deletableNoImageListings = activeVinListingsWithoutImages.filter(
-    (listing) => listing._count.purchases === 0 && listing._count.fulfillmentRequests === 0,
-  );
-  const heldNoImageListings = activeVinListingsWithoutImages.filter(
-    (listing) => listing._count.purchases > 0 || listing._count.fulfillmentRequests > 0,
-  );
+  const missingImageWhere: Prisma.ListingWhereInput = {
+    status: "ACTIVE",
+    vehicleId: { not: null },
+    OR: [{ imageUrl: null }, { imageUrl: "" }],
+  };
   const removedVinNoImage = await prisma.listing.deleteMany({
     where: {
-      id: { in: deletableNoImageListings.map((listing) => listing.id) },
+      ...missingImageWhere,
+      purchases: { none: {} },
+      fulfillmentRequests: { none: {} },
     },
   });
   const heldRemovedVinNoImage = await prisma.listing.updateMany({
     where: {
-      id: { in: heldNoImageListings.map((listing) => listing.id) },
+      AND: [
+        missingImageWhere,
+        { OR: [{ purchases: { some: {} } }, { fulfillmentRequests: { some: {} } }] },
+      ],
     },
     data: {
       status: "REMOVED",
@@ -186,44 +143,23 @@ async function main() {
     },
   });
 
-  const nonTargetListings = await prisma.listing.findMany({
-    where: {
-      status: "ACTIVE",
-      vehicle: {
-        is: {
-          model: {
-            make: {
-              name: { notIn: TARGET_MAKES },
-            },
-          },
-        },
-      },
+  const nonTargetWhere: Prisma.ListingWhereInput = {
+    status: "ACTIVE",
+    vehicle: {
+      is: { model: { make: { name: { notIn: TARGET_MAKES } } } },
     },
-    select: {
-      id: true,
-      _count: {
-        select: {
-          purchases: true,
-          fulfillmentRequests: true,
-        },
-      },
-    },
-  });
-  const deletableNonTargetListings = nonTargetListings.filter(
-    (listing) => listing._count.purchases === 0 && listing._count.fulfillmentRequests === 0,
-  );
-  const heldNonTargetListings = nonTargetListings.filter(
-    (listing) => listing._count.purchases > 0 || listing._count.fulfillmentRequests > 0,
-  );
-
+  };
   const removedNonTargetListings = await prisma.listing.deleteMany({
     where: {
-      id: { in: deletableNonTargetListings.map((listing) => listing.id) },
+      ...nonTargetWhere,
+      purchases: { none: {} },
+      fulfillmentRequests: { none: {} },
     },
   });
   const heldRemovedNonTargetListings = await prisma.listing.updateMany({
     where: {
-      id: { in: heldNonTargetListings.map((listing) => listing.id) },
+      ...nonTargetWhere,
+      OR: [{ purchases: { some: {} } }, { fulfillmentRequests: { some: {} } }],
     },
     data: {
       status: "REMOVED",
@@ -232,40 +168,28 @@ async function main() {
     },
   });
 
-  const auctionListings = await prisma.listing.findMany({
-    where: {
-      status: "ACTIVE",
-      OR: [
-        { source: { is: { type: "AUCTION" } } },
-        ...AUCTION_DOMAINS.map((domain) => ({
-          url: { contains: domain, mode: "insensitive" as const },
-        })),
-      ],
-    },
-    select: {
-      id: true,
-      _count: {
-        select: {
-          purchases: true,
-          fulfillmentRequests: true,
-        },
-      },
-    },
-  });
-  const deletableAuctionListings = auctionListings.filter(
-    (listing) => listing._count.purchases === 0 && listing._count.fulfillmentRequests === 0,
-  );
-  const heldAuctionListings = auctionListings.filter(
-    (listing) => listing._count.purchases > 0 || listing._count.fulfillmentRequests > 0,
-  );
+  const auctionWhere: Prisma.ListingWhereInput = {
+    status: "ACTIVE",
+    OR: [
+      { source: { is: { type: "AUCTION" } } },
+      ...AUCTION_DOMAINS.map((domain) => ({
+        url: { contains: domain, mode: "insensitive" as const },
+      })),
+    ],
+  };
   const removedAuctionListings = await prisma.listing.deleteMany({
     where: {
-      id: { in: deletableAuctionListings.map((listing) => listing.id) },
+      ...auctionWhere,
+      purchases: { none: {} },
+      fulfillmentRequests: { none: {} },
     },
   });
   const heldRemovedAuctionListings = await prisma.listing.updateMany({
     where: {
-      id: { in: heldAuctionListings.map((listing) => listing.id) },
+      AND: [
+        auctionWhere,
+        { OR: [{ purchases: { some: {} } }, { fulfillmentRequests: { some: {} } }] },
+      ],
     },
     data: {
       status: "REMOVED",

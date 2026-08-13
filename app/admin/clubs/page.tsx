@@ -2,20 +2,43 @@ import Link from "next/link";
 import { adminDeleteClubAction, adminHideClubAction, adminTransferClubAction } from "@/app/actions/admin-clubs";
 import ClubConfirmButton from "@/app/clubs/ClubConfirmButton";
 import { requireAdmin } from "@/lib/admin/auth";
+import { AdminPagination, parseAdminPage } from "@/components/admin/AdminPagination";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminClubsPage() {
+const CLUBS_PAGE_SIZE = 24;
+const TRANSFER_MEMBER_LIMIT = 100;
+
+export default async function AdminClubsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ page?: string | string[] }>;
+}) {
   await requireAdmin();
+  const requestedPage = parseAdminPage((await searchParams)?.page);
+  const totalClubs = await prisma.carClub.count();
+  const totalPages = Math.max(1, Math.ceil(totalClubs / CLUBS_PAGE_SIZE));
+  const page = Math.min(requestedPage, totalPages);
 
   const clubs = await prisma.carClub.findMany({
-    include: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      city: true,
+      state: true,
+      status: true,
+      creatorId: true,
       creator: { select: { id: true, name: true, username: true, email: true } },
       members: {
         where: { status: "ACTIVE" },
-        include: { user: { select: { id: true, name: true, username: true, email: true } } },
+        select: {
+          userId: true,
+          user: { select: { name: true, username: true, email: true } },
+        },
         orderBy: { joinedAt: "asc" },
+        take: TRANSFER_MEMBER_LIMIT,
       },
       _count: {
         select: {
@@ -26,7 +49,8 @@ export default async function AdminClubsPage() {
       },
     },
     orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
-    take: 120,
+    skip: (page - 1) * CLUBS_PAGE_SIZE,
+    take: CLUBS_PAGE_SIZE,
   });
 
   return (
@@ -109,6 +133,7 @@ export default async function AdminClubsPage() {
           </article>
         ))}
       </section>
+      <AdminPagination pathname="/admin/clubs" page={page} totalPages={totalPages} />
     </main>
   );
 }

@@ -105,6 +105,7 @@ export async function createAuthorizedDealerSourcesFromDirectory(): Promise<Publ
       updatedAt: true,
     },
     orderBy: [{ makeSpecialization: "asc" }, { state: "asc" }, { city: "asc" }, { name: "asc" }],
+    take: 500,
   });
 
   const deduped = new Map<string, DirectoryDealerSource & { score: number }>();

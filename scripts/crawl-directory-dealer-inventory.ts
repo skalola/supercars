@@ -3,6 +3,7 @@ import { crawlInventory } from "@/lib/market-crawlers/crawler-engine";
 import { PublicPageSource } from "@/lib/market-crawlers/sources/public-page-source";
 import { isDealerOwnedWebsite } from "@/lib/directory/contact-domain-policy";
 import { SUPPORTED_MAKES } from "@/lib/supported-makes";
+import { getBatchLimit, getBatchOffset, getRotatingBatchOffset } from "./lib/script-guards";
 
 const allowedMakes = new Set(
   (process.env.DIRECTORY_MAKES || SUPPORTED_MAKES.join(","))
@@ -11,7 +12,8 @@ const allowedMakes = new Set(
     .filter(Boolean),
 );
 
-const limit = parseLimit(process.argv.slice(2));
+const limit = getBatchLimit({ defaultLimit: 40, maxLimit: 100 });
+const requestedOffset = getBatchOffset();
 
 async function main() {
   const contacts = await prisma.partnerContact.findMany({
@@ -29,6 +31,7 @@ async function main() {
       updatedAt: true,
     },
     orderBy: [{ updatedAt: "desc" }, { name: "asc" }],
+    take: 500,
   });
 
   const eligible = contacts
@@ -37,10 +40,11 @@ async function main() {
     .filter((contact) => {
       const specialization = contact.makeSpecialization || "ALL";
       return specialization === "ALL" || Array.from(allowedMakes).some((make) => specialization.includes(make));
-    })
-    .slice(0, limit || undefined);
+    });
+  const offset = getRotatingBatchOffset(eligible.length, limit, requestedOffset);
+  const selected = eligible.slice(offset, offset + limit);
 
-  const sources = eligible.map(
+  const sources = selected.map(
     (contact) =>
       new PublicPageSource({
         sourceName: contact.name,
@@ -55,6 +59,7 @@ async function main() {
   console.log("  SUPERCAR DASH Directory Dealer Inventory Crawl");
   console.log("==================================================");
   console.log(`Dealer sources: ${sources.length}`);
+  console.log(`Eligible dealers: ${eligible.length} | batch offset: ${offset} | batch limit: ${limit}`);
 
   const result = await crawlInventory(sources);
 
@@ -105,12 +110,6 @@ function originFromUrl(value?: string | null) {
   } catch {
     return null;
   }
-}
-
-function parseLimit(args: string[]) {
-  const index = args.indexOf("--limit");
-  const parsed = index >= 0 ? Number(args[index + 1]) : undefined;
-  return Number.isFinite(parsed) && parsed! > 0 ? parsed : undefined;
 }
 
 function isLikelyFixtureContact(name?: string | null, website?: string | null, email?: string | null) {

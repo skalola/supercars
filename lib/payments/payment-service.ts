@@ -100,6 +100,133 @@ export function getDealerPurchaseDepositCents(vehiclePrice?: number | null): num
   return 500000;
 }
 
+const paymentConfirmationRequestSelect = {
+  id: true,
+  publicTransactionToken: true,
+  parties: {
+    select: {
+      partyType: true,
+      name: true,
+      email: true,
+    },
+  },
+  partnerTokens: {
+    select: {
+      token: true,
+    },
+    take: 1,
+  },
+  vehicle: {
+    select: {
+      year: true,
+      vin: true,
+      model: {
+        select: {
+          name: true,
+          make: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+const paidDealerPurchaseRequestSelect = {
+  id: true,
+  requestType: true,
+  status: true,
+  publicTransactionToken: true,
+  packages: {
+    select: {
+      id: true,
+      title: true,
+      scope: true,
+    },
+    take: 1,
+  },
+  parties: {
+    select: {
+      partyType: true,
+      name: true,
+      email: true,
+    },
+  },
+  partnerTokens: {
+    select: {
+      token: true,
+    },
+    take: 1,
+  },
+  vehicle: {
+    select: {
+      year: true,
+      vin: true,
+      model: {
+        select: {
+          name: true,
+          make: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+const dealerPurchaseWebhookRequestSelect = {
+  id: true,
+  requestType: true,
+  status: true,
+  paymentStatus: true,
+  fees: {
+    select: {
+      id: true,
+      feeType: true,
+    },
+  },
+  depositIntents: {
+    select: {
+      id: true,
+      transactionRef: true,
+    },
+  },
+  listing: {
+    select: {
+      askingPrice: true,
+      price: true,
+    },
+  },
+};
+
+const serviceBookingWebhookRequestSelect = {
+  id: true,
+  requestType: true,
+  status: true,
+  paymentStatus: true,
+  fees: {
+    select: {
+      id: true,
+      feeType: true,
+    },
+  },
+  depositIntents: {
+    select: {
+      id: true,
+      transactionRef: true,
+    },
+  },
+};
+
+const webhookLookupRequestSelect = {
+  id: true,
+  status: true,
+};
+
 function parseProviderRef(transactionRef: string | null | undefined): { provider: PaymentProviderName; id: string } {
   if (!transactionRef) {
     return { provider: "ledger", id: `missing_${crypto.randomUUID()}` };
@@ -352,11 +479,7 @@ function stripeEventAlreadyProcessed(eventId: string | undefined) {
 async function sendServiceBookingPaymentConfirmations(fulfillmentRequestId: string) {
   const req = await prisma.fulfillmentRequest.findUnique({
     where: { id: fulfillmentRequestId },
-    include: {
-      parties: true,
-      partnerTokens: true,
-      vehicle: { include: { model: { include: { make: true } } } },
-    },
+    select: paymentConfirmationRequestSelect,
   });
   if (!req) return;
 
@@ -395,12 +518,7 @@ async function sendServiceBookingPaymentConfirmations(fulfillmentRequestId: stri
 async function dispatchPaidDealerPurchaseRequest(fulfillmentRequestId: string) {
   const req = await prisma.fulfillmentRequest.findUnique({
     where: { id: fulfillmentRequestId },
-    include: {
-      packages: true,
-      parties: true,
-      partnerTokens: true,
-      vehicle: { include: { model: { include: { make: true } } } },
-    },
+    select: paidDealerPurchaseRequestSelect,
   });
   if (!req || req.requestType !== "DEALER_PURCHASE") return;
 
@@ -507,7 +625,7 @@ export async function processStripeWebhookPayload(payload: string): Promise<Paym
     if (object?.metadata?.feeType === "DEALER_PURCHASE_DEPOSIT" && fulfillmentRequestId) {
       const req = await prisma.fulfillmentRequest.findUnique({
         where: { id: fulfillmentRequestId },
-        include: { fees: true, depositIntents: true, listing: true },
+        select: dealerPurchaseWebhookRequestSelect,
       });
       if (!req || req.requestType !== "DEALER_PURCHASE") {
         return { received: true, eventType, fulfillmentRequestId: null };
@@ -596,7 +714,7 @@ export async function processStripeWebhookPayload(payload: string): Promise<Paym
 
     const req = await prisma.fulfillmentRequest.findUnique({
       where: { id: fulfillmentRequestId },
-      include: { fees: true, depositIntents: true },
+      select: serviceBookingWebhookRequestSelect,
     });
     if (!req || req.requestType !== "SERVICE_BOOKING") {
       return { received: true, eventType, fulfillmentRequestId: null };
@@ -699,12 +817,13 @@ export async function processStripeWebhookPayload(payload: string): Promise<Paym
   }
 
   const request = fulfillmentRequestId
-    ? await prisma.fulfillmentRequest.findUnique({ where: { id: fulfillmentRequestId } })
+    ? await prisma.fulfillmentRequest.findUnique({ where: { id: fulfillmentRequestId }, select: webhookLookupRequestSelect })
     : publicTransactionToken
-      ? await prisma.fulfillmentRequest.findUnique({ where: { publicTransactionToken } })
+      ? await prisma.fulfillmentRequest.findUnique({ where: { publicTransactionToken }, select: webhookLookupRequestSelect })
       : object?.id
         ? await prisma.fulfillmentRequest.findFirst({
             where: { depositIntents: { some: { transactionRef: `stripe:${object.id}` } } },
+            select: webhookLookupRequestSelect,
           })
         : null;
 

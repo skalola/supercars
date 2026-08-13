@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { createServiceBookingPackage } from "@/app/actions/passport";
 
@@ -12,28 +12,27 @@ type ServiceRule = {
 type ServiceShop = {
   id: string;
   name: string;
-  email: string;
   city: string | null;
   state: string | null;
   latitude: number;
   longitude: number;
+  distanceMiles: number;
 };
 
 type ServiceBookingModuleProps = {
   vin: string;
   makeName: string;
   defaultRule: ServiceRule | null;
-  serviceShops: ServiceShop[];
 };
 
 export default function ServiceBookingModule({
   vin,
   makeName,
   defaultRule,
-  serviceShops,
 }: ServiceBookingModuleProps) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(1);
+  const [serviceShops, setServiceShops] = useState<ServiceShop[]>([]);
   const [selectedShop, setSelectedShop] = useState("");
   const [userCoordinates, setUserCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationStatus, setLocationStatus] = useState("");
@@ -48,24 +47,27 @@ export default function ServiceBookingModule({
     description: "Certified service appointment",
   };
 
-  const nearbyServiceShops = useMemo(() => {
-    if (!userCoordinates) return [];
+  const loadServiceShops = useCallback(async (coordinates: { latitude: number; longitude: number }) => {
+    if (serviceShops.length > 0) return serviceShops;
 
-    return serviceShops
-      .map((shop) => ({
-        ...shop,
-        distanceMiles: calculateDistanceMiles(
-          userCoordinates.latitude,
-          userCoordinates.longitude,
-          shop.latitude,
-          shop.longitude,
-        ),
-      }))
-      .filter((shop) => shop.distanceMiles <= 100)
-      .sort((a, b) => a.distanceMiles - b.distanceMiles);
-  }, [serviceShops, userCoordinates]);
+    const search = new URLSearchParams({
+      latitude: String(coordinates.latitude),
+      longitude: String(coordinates.longitude),
+    });
+    const response = await fetch(`/api/service-shops?${search.toString()}`, {
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) {
+      throw new Error("Unable to load verified service shops right now.");
+    }
 
-  const requestServiceLocation = useCallback(() => {
+    const payload = (await response.json()) as { shops?: ServiceShop[] };
+    const shops = payload.shops || [];
+    setServiceShops(shops);
+    return shops;
+  }, [serviceShops]);
+
+  const requestServiceLocation = useCallback(async () => {
     if (!navigator.geolocation) {
       setLocationStatus("Location is unavailable in this browser, so nearby service booking cannot be shown.");
       return;
@@ -73,35 +75,31 @@ export default function ServiceBookingModule({
 
     setLocationStatus("Checking your location for shops within 100 miles...");
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const coordinates = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
         };
         setUserCoordinates(coordinates);
 
-        const nearestShop = serviceShops
-          .map((shop) => ({
-            ...shop,
-            distanceMiles: calculateDistanceMiles(
-              coordinates.latitude,
-              coordinates.longitude,
-              shop.latitude,
-              shop.longitude,
-            ),
-          }))
-          .filter((shop) => shop.distanceMiles <= 100)
-          .sort((a, b) => a.distanceMiles - b.distanceMiles)[0];
-
-        setSelectedShop((current) => current || nearestShop?.name || "");
-        setLocationStatus("Showing verified shops within 100 miles.");
+        try {
+          const shops = await loadServiceShops(coordinates);
+          setSelectedShop((current) => current || shops[0]?.name || "");
+          setLocationStatus(
+            shops.length > 0
+              ? "Showing verified shops within 100 miles."
+              : "No verified service shops with email are available within 100 miles.",
+          );
+        } catch (err) {
+          setLocationStatus(err instanceof Error ? err.message : "Unable to load verified service shops right now.");
+        }
       },
       () => {
         setLocationStatus("Location permission is required to show service shops within 100 miles.");
       },
       { enableHighAccuracy: false, timeout: 8000 },
     );
-  }, [serviceShops]);
+  }, [loadServiceShops]);
 
   const openBooking = useCallback(() => {
     const tomorrow = new Date();
@@ -176,10 +174,10 @@ export default function ServiceBookingModule({
             ) : null}
             {locationStatus ? <p className="vehicle-service-booking-status">{locationStatus}</p> : null}
             <div className="vehicle-service-booking-shops">
-              {userCoordinates && nearbyServiceShops.length === 0 ? (
+              {userCoordinates && serviceShops.length === 0 ? (
                 <div className="vehicle-service-booking-empty">No verified service shops with email are available within 100 miles.</div>
               ) : null}
-              {nearbyServiceShops.map((shop) => (
+              {serviceShops.map((shop) => (
                 <label key={shop.id} className={selectedShop === shop.name ? "is-selected" : ""}>
                   <input
                     type="radio"
@@ -264,19 +262,4 @@ export default function ServiceBookingModule({
       </section>
     </div>
   );
-}
-
-function calculateDistanceMiles(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const earthRadiusMiles = 3958.8;
-  const dLat = toRadians(lat2 - lat1);
-  const dLon = toRadians(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  return earthRadiusMiles * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function toRadians(degrees: number) {
-  return degrees * (Math.PI / 180);
 }

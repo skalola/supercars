@@ -30,11 +30,31 @@ export async function POST(request: NextRequest) {
 
   const requestRecord = await prisma.fulfillmentRequest.findUnique({
     where: { id: fulfillmentRequestId },
-    include: {
-      listing: true,
-      vehicle: true,
-      fees: true,
-      depositIntents: true,
+    select: {
+      id: true,
+      buyerId: true,
+      requestType: true,
+      status: true,
+      paymentStatus: true,
+      listingId: true,
+      publicTransactionToken: true,
+      listing: {
+        select: {
+          askingPrice: true,
+          price: true,
+        },
+      },
+      vehicle: {
+        select: {
+          vin: true,
+        },
+      },
+      fees: {
+        select: {
+          id: true,
+          feeType: true,
+        },
+      },
     },
   });
 

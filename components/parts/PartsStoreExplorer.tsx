@@ -8,7 +8,6 @@ export type PartsCategoryRow = {
   id: string;
   name: string;
   slug: string;
-  description: string | null;
   iconUrl: string;
   partCount: number;
 };
@@ -20,8 +19,6 @@ export type PartsBrandRow = {
   logoUrl: string | null;
   logoBackground: string;
   logoNeedsReview: boolean;
-  websiteUrl: string | null;
-  country: string | null;
   partCount: number;
 };
 
@@ -32,8 +29,6 @@ export type PartsStorePartRow = {
   detailPath: string;
   description: string | null;
   imageUrl: string | null;
-  sourceUrl: string | null;
-  status: string;
   priceLabel: string;
   hpGainLabel: string | null;
   torqueGainLabel: string | null;
@@ -51,18 +46,6 @@ export type PartsStorePartRow = {
     modelId: string | null;
     modelName: string | null;
   }>;
-  fitmentMakeIds: string[];
-  fitmentModelIds: string[];
-  affiliatePartnerName: string | null;
-  trackingEnabled: boolean;
-};
-
-export type PartsCatalogNodeRow = {
-  id: string;
-  name: string;
-  slug: string;
-  iconUrl: string | null;
-  categoryId: string | null;
 };
 
 export type PartsGarageCarRow = {
@@ -78,7 +61,7 @@ type PartsStoreExplorerProps = {
   categories: PartsCategoryRow[];
   brands: PartsBrandRow[];
   parts: PartsStorePartRow[];
-  catalogNodes: PartsCatalogNodeRow[];
+  catalogNodeCount: number;
   garageCars: PartsGarageCarRow[];
   initialMakeId?: string;
   initialModelId?: string;
@@ -103,7 +86,7 @@ export function PartsStoreExplorer({
   categories,
   brands,
   parts,
-  catalogNodes,
+  catalogNodeCount,
   garageCars,
   initialMakeId = "",
   initialModelId = "",
@@ -202,7 +185,7 @@ export function PartsStoreExplorer({
   const activeCategoryParts = filteredParts.slice(0, 24);
   const featuredParts = activeCategoryParts.slice(0, 4);
   const remainingParts = activeCategoryParts.slice(4);
-  const buildProgressPercent = Math.min(98, Math.max(12, Math.round((parts.length / Math.max(catalogNodes.length, 1)) * 100)));
+  const buildProgressPercent = Math.min(98, Math.max(12, Math.round((parts.length / Math.max(catalogNodeCount, 1)) * 100)));
   const buildProgressRows = displayCategories.filter((category) => category.partCount > 0).slice(0, 7);
   const activeFilterCount = [activeBrandId, activeMakeId, activeModelId].filter(Boolean).length;
   const selectedGarageCar = garageCars.find((car) => car.id === activeGarageCarId) ?? null;

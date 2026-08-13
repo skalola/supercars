@@ -1,43 +1,89 @@
 import { AdminMeetsTable, type AdminMeetRow } from "@/components/admin/AdminMeetsTable";
 import { AdminMeetPhotoModeration, type AdminMeetPhotoRow } from "@/components/admin/AdminMeetPhotoModeration";
+import { AdminPagination, parseAdminPage } from "@/components/admin/AdminPagination";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminMeetsPage() {
+const MEETS_PAGE_SIZE = 50;
+const PHOTOS_PAGE_SIZE = 40;
+
+export default async function AdminMeetsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ meetPage?: string | string[]; photoPage?: string | string[] }>;
+}) {
   const now = new Date();
-  const [meets, photos] = await Promise.all([
+  const resolvedSearchParams = await searchParams;
+  const requestedMeetPage = parseAdminPage(resolvedSearchParams?.meetPage);
+  const requestedPhotoPage = parseAdminPage(resolvedSearchParams?.photoPage);
+  const [meetCount, photoCount] = await Promise.all([
+    prisma.meet.count(),
+    prisma.meetPhoto.count(),
+  ]);
+  const meetTotalPages = Math.max(1, Math.ceil(meetCount / MEETS_PAGE_SIZE));
+  const photoTotalPages = Math.max(1, Math.ceil(photoCount / PHOTOS_PAGE_SIZE));
+  const meetPage = Math.min(requestedMeetPage, meetTotalPages);
+  const photoPage = Math.min(requestedPhotoPage, photoTotalPages);
+
+  const [meets, photos, activeMeetCount, upcomingMeetCount, completedMeetCount, totalRsvps, capacity, hosts] = await Promise.all([
     prisma.meet.findMany({
-      include: {
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        startsAt: true,
+        city: true,
+        state: true,
+        type: true,
+        visibility: true,
+        status: true,
+        capacity: true,
+        createdAt: true,
+        hostId: true,
         host: { select: { username: true, name: true, email: true } },
         _count: { select: { rsvps: true } },
       },
       orderBy: { startsAt: "desc" },
-      take: 200,
+      skip: (meetPage - 1) * MEETS_PAGE_SIZE,
+      take: MEETS_PAGE_SIZE,
     }),
     prisma.meetPhoto.findMany({
-      include: {
+      select: {
+        id: true,
+        url: true,
+        caption: true,
+        createdAt: true,
         meet: { select: { slug: true, title: true } },
         user: { select: { username: true, name: true, email: true } },
-        vehicle: { include: { model: { include: { make: true } } } },
+        vehicle: {
+          select: {
+            vin: true,
+            year: true,
+            model: { select: { name: true, make: { select: { name: true } } } },
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
-      take: 80,
+      skip: (photoPage - 1) * PHOTOS_PAGE_SIZE,
+      take: PHOTOS_PAGE_SIZE,
     }),
+    prisma.meet.count({ where: { status: { in: ["PUBLISHED", "FULL"] } } }),
+    prisma.meet.count({ where: { status: { in: ["PUBLISHED", "FULL"] }, startsAt: { gte: now } } }),
+    prisma.meet.count({ where: { status: "COMPLETED" } }),
+    prisma.meetRsvp.count(),
+    prisma.meet.aggregate({ _sum: { capacity: true } }),
+    prisma.$queryRaw<Array<{ count: bigint }>>`SELECT count(DISTINCT "hostId") AS count FROM "Meet"`,
   ]);
 
-  const activeMeetCount = meets.filter((meet) => ["PUBLISHED", "FULL"].includes(meet.status)).length;
-  const upcomingMeetCount = meets.filter((meet) => ["PUBLISHED", "FULL"].includes(meet.status) && meet.startsAt >= now).length;
-  const completedMeetCount = meets.filter((meet) => meet.status === "COMPLETED").length;
-  const totalRsvps = meets.reduce((sum, meet) => sum + meet._count.rsvps, 0);
-  const uniqueHosts = new Set(meets.map((meet) => meet.hostId)).size;
-  const totalCapacity = meets.reduce((sum, meet) => sum + (meet.capacity || 0), 0);
+  const uniqueHosts = Number(hosts[0]?.count ?? 0);
+  const totalCapacity = capacity._sum.capacity || 0;
   const meetKpis = [
     { label: "Active Meets", value: activeMeetCount.toLocaleString(), detail: `${upcomingMeetCount.toLocaleString()} upcoming` },
     { label: "Completed Meets", value: completedMeetCount.toLocaleString(), detail: "lifetime" },
     { label: "Total RSVPs", value: totalRsvps.toLocaleString(), detail: `${totalCapacity.toLocaleString()} listed capacity` },
     { label: "Active Hosts", value: uniqueHosts.toLocaleString(), detail: "unique organizers" },
-    { label: "Meet Photos", value: photos.length.toLocaleString(), detail: "recent uploads" },
+    { label: "Meet Photos", value: photoCount.toLocaleString(), detail: "lifetime uploads" },
   ];
 
   const rows: AdminMeetRow[] = meets.map((meet) => ({
@@ -82,8 +128,10 @@ export default async function AdminMeetsPage() {
           </article>
         ))}
       </section>
-      <AdminMeetsTable meets={rows} referenceTimeIso={now.toISOString()} />
+      <AdminMeetsTable meets={rows} totalCount={meetCount} referenceTimeIso={now.toISOString()} />
+      <AdminPagination pathname="/admin/meets" pageParam="meetPage" page={meetPage} totalPages={meetTotalPages} preserveParams={{ photoPage: String(photoPage) }} ariaLabel="Meet pages" />
       <AdminMeetPhotoModeration photos={photoRows} />
+      <AdminPagination pathname="/admin/meets" pageParam="photoPage" page={photoPage} totalPages={photoTotalPages} preserveParams={{ meetPage: String(meetPage) }} ariaLabel="Meet photo pages" />
     </main>
   );
 }

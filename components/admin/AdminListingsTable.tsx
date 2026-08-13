@@ -31,11 +31,13 @@ export type AdminListingRow = {
 
 export function AdminListingsTable({
   listings,
+  totalCount,
   referenceTimeIso,
   makes,
   models,
 }: {
   listings: AdminListingRow[];
+  totalCount: number;
   referenceTimeIso: string;
   makes: MakeOption[];
   models: ModelOption[];
@@ -165,7 +167,7 @@ export function AdminListingsTable({
           <h2>Vehicle Listings</h2>
         </div>
         <span>
-          {filteredListings.length.toLocaleString()} shown of {listings.length.toLocaleString()} total
+          {filteredListings.length.toLocaleString()} shown on this page · {totalCount.toLocaleString()} total
         </span>
       </div>
 

@@ -22,7 +22,24 @@ async function main() {
   // 1. Find Orphan Listings (where vehicleId is null or vehicle doesn't exist)
   const allListings = await prisma.listing.findMany({
     where: { status: "ACTIVE" },
-    include: { vehicle: true },
+    select: {
+      id: true,
+      externalListingId: true,
+      vehicleId: true,
+      vehicle: {
+        select: {
+          id: true,
+          vin: true,
+          year: true,
+          model: {
+            select: {
+              name: true,
+              make: { select: { name: true } },
+            },
+          },
+        },
+      },
+    },
   });
 
   const orphans = allListings.filter((l) => !l.vehicleId || !l.vehicle);
@@ -37,21 +54,10 @@ async function main() {
   const activeListingsWithVehicles = allListings.filter((l) => l.vehicleId && l.vehicle);
   
   // Extract unique vehicles
-  const vehiclesMap = new Map<string, any>();
+  const vehiclesMap = new Map<string, NonNullable<(typeof allListings)[number]["vehicle"]>>();
   for (const l of activeListingsWithVehicles) {
     if (l.vehicle && !vehiclesMap.has(l.vehicle.id)) {
-      // Fetch full vehicle info including model details
-      const fullVehicle = await prisma.vehicle.findUnique({
-        where: { id: l.vehicle.id },
-        include: {
-          model: {
-            include: { make: true },
-          },
-        },
-      });
-      if (fullVehicle) {
-        vehiclesMap.set(l.vehicle.id, fullVehicle);
-      }
+      vehiclesMap.set(l.vehicle.id, l.vehicle);
     }
   }
 
@@ -67,8 +73,11 @@ async function main() {
     try {
       const decoded = await decodeVin(vehicle.vin);
       return { vehicle, decoded };
-    } catch (e: any) {
-      console.error(`  [ERROR] Failed decoding VIN ${vehicle.vin}:`, e.message);
+    } catch (error: unknown) {
+      console.error(
+        `  [ERROR] Failed decoding VIN ${vehicle.vin}:`,
+        error instanceof Error ? error.message : String(error),
+      );
       return { vehicle, decoded: null };
     }
   });
@@ -101,8 +110,10 @@ async function main() {
       );
 
       // AUTO REPAIR: Find correct model in database
-      const correctMakeFormatted = decoded.make.charAt(0).toUpperCase() + decoded.make.slice(1).toLowerCase();
-      const modelMatchResult = await resolveModel(correctMakeFormatted, decoded.model);
+      const decodedMakeName = String(decoded.make);
+      const decodedModelName = String(decoded.model);
+      const correctMakeFormatted = decodedMakeName.charAt(0).toUpperCase() + decodedMakeName.slice(1).toLowerCase();
+      const modelMatchResult = await resolveModel(correctMakeFormatted, decodedModelName);
 
       if (modelMatchResult.matched && modelMatchResult.modelId) {
         console.log(`  [REPAIR] Correct model found: ${correctMakeFormatted} ${decoded.model} (ID: ${modelMatchResult.modelId})`);

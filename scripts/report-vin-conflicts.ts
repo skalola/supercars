@@ -95,9 +95,29 @@ async function main() {
   console.log(hr("═") + "\n");
 
   const vehicles = await prisma.vehicle.findMany({
-    include: {
-      model: { include: { make: true } },
-      listings: { include: { source: true } },
+    select: {
+      id: true,
+      vin: true,
+      year: true,
+      inventoryStatus: true,
+      model: {
+        select: {
+          name: true,
+          make: {
+            select: { name: true },
+          },
+        },
+      },
+      listings: {
+        select: {
+          id: true,
+          source: {
+            select: { name: true },
+          },
+        },
+        orderBy: { updatedAt: "desc" },
+        take: 1,
+      },
     },
     where: {
       // Exclude already-merged duplicates (their VINs were renamed)

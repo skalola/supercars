@@ -1,8 +1,74 @@
 import Link from "next/link";
+import type { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getNextMaintenanceRecommendation } from "@/lib/maintenance/recommendations";
 import TrackersClient, { type TrackerCard } from "./TrackersClient";
+
+const trackerUserSelect = {
+  id: true,
+  trackerPreference: {
+    select: {
+      listingTrackerEnabled: true,
+      priceTrackerEnabled: true,
+      maintenanceTrackerEnabled: true,
+      eventsTrackerEnabled: true,
+    },
+  },
+  garageItems: {
+    select: {
+      id: true,
+      model: {
+        select: {
+          name: true,
+          make: { select: { name: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+  },
+  vehicles: {
+    where: { status: "CLAIMED" },
+    select: {
+      id: true,
+      year: true,
+      mileage: true,
+      profile: {
+        select: {
+          currentMileage: true,
+        },
+      },
+      serviceRecords: {
+        select: {
+          mileage: true,
+          serviceDate: true,
+          description: true,
+        },
+        orderBy: { serviceDate: "desc" },
+        take: 24,
+      },
+      model: {
+        select: {
+          name: true,
+          make: { select: { name: true } },
+          maintenanceRules: {
+            select: {
+              id: true,
+              serviceName: true,
+              description: true,
+              intervalMiles: true,
+              intervalMonths: true,
+              priority: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+  },
+} satisfies Prisma.UserSelect;
 
 export default async function ProfileTrackersPage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params;
@@ -10,33 +76,7 @@ export default async function ProfileTrackersPage({ params }: { params: Promise<
 
   const user = await prisma.user.findUnique({
     where: { username },
-    include: {
-      trackerPreference: true,
-      garageItems: {
-        include: {
-          model: {
-            include: {
-              make: true,
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      },
-      vehicles: {
-        where: { status: "CLAIMED" },
-        include: {
-          profile: true,
-          serviceRecords: true,
-          model: {
-            include: {
-              make: true,
-              maintenanceRules: true,
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      },
-    },
+    select: trackerUserSelect,
   });
 
   if (!user) {
@@ -72,7 +112,7 @@ export default async function ProfileTrackersPage({ params }: { params: Promise<
     .map((item) => `${item.model.make.name} ${item.model.name}`);
   const maintenanceRecommendations = user.vehicles
     .map((vehicle) => {
-      const currentMileage = (vehicle as { currentMileage?: number | null }).currentMileage ?? vehicle.mileage ?? vehicle.profile?.currentMileage ?? null;
+      const currentMileage = vehicle.mileage ?? vehicle.profile?.currentMileage ?? null;
       const recommendation = getNextMaintenanceRecommendation({
         currentMileage,
         rules: vehicle.model.maintenanceRules,

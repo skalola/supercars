@@ -24,7 +24,7 @@ export type AdminMeetRow = {
   createdAtIso: string;
 };
 
-export function AdminMeetsTable({ meets, referenceTimeIso }: { meets: AdminMeetRow[]; referenceTimeIso: string }) {
+export function AdminMeetsTable({ meets, totalCount, referenceTimeIso }: { meets: AdminMeetRow[]; totalCount: number; referenceTimeIso: string }) {
   const [isPending, startTransition] = useTransition();
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -123,7 +123,7 @@ export function AdminMeetsTable({ meets, referenceTimeIso }: { meets: AdminMeetR
           <h2>Meet Operations</h2>
         </div>
         <span>
-          {filteredMeets.length.toLocaleString()} shown of {meets.length.toLocaleString()} total
+          {filteredMeets.length.toLocaleString()} shown on this page · {totalCount.toLocaleString()} total
         </span>
       </div>
 

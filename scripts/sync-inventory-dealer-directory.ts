@@ -28,6 +28,7 @@ import {
   isLikelyFakeUrl,
 } from "../lib/directory/dealer-contact-discovery";
 import { SUPPORTED_MAKES, type SupportedMake } from "../lib/supported-makes";
+import { getBatchLimit } from "./lib/script-guards";
 
 type DirectoryMake = SupportedMake;
 
@@ -36,11 +37,14 @@ const allowedMakes = new Set((process.env.DIRECTORY_MAKES || SUPPORTED_MAKES.joi
   .map((make) => make.trim())
   .filter(Boolean));
 const dryRun = process.argv.includes("--dry-run");
-const limit = parseLimit(process.argv.slice(2));
+const limit = getBatchLimit({ defaultLimit: 75, maxLimit: 200 });
 
 async function main() {
-  const candidates = await loadDealerCandidates();
-  const limited = limit ? candidates.slice(0, limit) : candidates;
+  const [candidates, trustedDealerContacts] = await Promise.all([
+    loadDealerCandidates(),
+    loadTrustedDealerContacts(),
+  ]);
+  const limited = candidates.slice(0, limit);
 
   console.log("==================================================");
   console.log("  SUPERCAR DASH Inventory Dealer Directory Sync");
@@ -60,7 +64,7 @@ async function main() {
       continue;
     }
 
-    const trusted = await findTrustedDealerContact(candidate.dealerName, candidate.make);
+    const trusted = findTrustedDealerContact(trustedDealerContacts, candidate.dealerName, candidate.make);
     const discovered = await discoverDealerContactFromInventory({
       ...candidate,
       sourceWebsite: trusted?.website || candidate.sourceWebsite,
@@ -173,6 +177,7 @@ async function loadDealerCandidates() {
       updatedAt: true,
     },
     orderBy: { updatedAt: "desc" },
+    take: Math.min(limit * 20, 2000),
   });
 
   const grouped = new Map<string, {
@@ -232,12 +237,6 @@ async function loadDealerCandidates() {
   return Array.from(grouped.values());
 }
 
-function parseLimit(args: string[]) {
-  const index = args.indexOf("--limit");
-  const parsed = index >= 0 ? Number(args[index + 1]) : undefined;
-  return Number.isFinite(parsed) && parsed! > 0 ? parsed : undefined;
-}
-
 function isLikelyFakeName(value?: string | null) {
   if (!value) return false;
   return /\b(test|demo|dummy|sprint|admin ops|transaction center|supercars 9b|financial settlement)\b/i.test(value);
@@ -277,33 +276,34 @@ function normalizeName(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
-async function findTrustedDealerContact(dealerName: string, make: string) {
-  const exact = await prisma.partnerContact.findFirst({
+async function loadTrustedDealerContacts() {
+  return prisma.partnerContact.findMany({
     where: {
       type: "DEALER",
-      makeSpecialization: make,
-      OR: [
-        { name: dealerName },
-        { name: { contains: dealerName, mode: "insensitive" } },
-      ],
       website: { not: null },
+      makeSpecialization: { in: Array.from(allowedMakes) },
     },
     orderBy: [{ active: "desc" }, { updatedAt: "desc" }],
-    select: { website: true, location: true, city: true, state: true },
-  });
-  if (exact) return exact;
-
-  const candidates = await prisma.partnerContact.findMany({
-    where: {
-      type: "DEALER",
-      makeSpecialization: make,
-      website: { not: null },
+    select: {
+      name: true,
+      makeSpecialization: true,
+      website: true,
+      location: true,
+      city: true,
+      state: true,
     },
-    select: { name: true, website: true, location: true, city: true, state: true },
+    take: 1000,
   });
+}
 
+function findTrustedDealerContact(
+  contacts: Awaited<ReturnType<typeof loadTrustedDealerContacts>>,
+  dealerName: string,
+  make: string,
+) {
   const target = normalizeName(dealerName);
-  return candidates.find((candidate) => {
+  return contacts.find((candidate) => {
+    if (candidate.makeSpecialization !== make) return false;
     const normalized = normalizeName(candidate.name);
     return normalized.includes(target) || target.includes(normalized);
   }) || null;

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { leaveClubAction, manageClubMemberAction, requestJoinClubAction, updateClubModelsAction, updateClubProfileAction } from "@/app/actions/clubs";
 import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
@@ -13,28 +14,70 @@ import ClubModelSelector from "../ClubModelSelector";
 export const dynamic = "force-dynamic";
 const DEFAULT_CLUB_LOGO = "/images/supercar-dash-wordmark.svg";
 
+function getClubDetailSelect(now = new Date()) {
+  return {
+  id: true,
+  slug: true,
+  name: true,
+  logoUrl: true,
+  city: true,
+  state: true,
+  visibility: true,
+  description: true,
+  creatorId: true,
+  status: true,
+  creator: { select: { id: true, name: true, username: true, image: true } },
+  members: {
+    where: { status: { in: ["ACTIVE", "PENDING"] } },
+    select: {
+      id: true,
+      userId: true,
+      role: true,
+      status: true,
+      user: { select: { id: true, name: true, username: true, image: true, email: true } },
+    },
+    orderBy: [{ status: "asc" }, { joinedAt: "asc" }, { createdAt: "asc" }],
+  },
+  models: {
+    select: {
+      modelId: true,
+      model: {
+        select: {
+          name: true,
+          make: { select: { logoUrl: true } },
+          images: {
+            select: { url: true },
+            orderBy: [{ type: "asc" }, { createdAt: "asc" }],
+            take: 1,
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  },
+  meets: {
+    where: { status: { in: ["PUBLISHED", "FULL"] }, startsAt: { gte: now } },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      startsAt: true,
+      city: true,
+      state: true,
+      type: true,
+    },
+    orderBy: { startsAt: "asc" },
+    take: 12,
+  },
+  } satisfies Prisma.CarClubSelect;
+}
+
 export default async function ClubDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const [club, session, catalog] = await Promise.all([
     prisma.carClub.findUnique({
       where: { slug },
-      include: {
-        creator: { select: { id: true, name: true, username: true, image: true } },
-        members: {
-          where: { status: { in: ["ACTIVE", "PENDING"] } },
-          include: { user: { select: { id: true, name: true, username: true, image: true, email: true } } },
-          orderBy: [{ status: "asc" }, { joinedAt: "asc" }, { createdAt: "asc" }],
-        },
-        models: {
-          include: { model: { include: { make: true, images: { take: 1 }, spec: true } } },
-          orderBy: { createdAt: "asc" },
-        },
-        meets: {
-          where: { status: { in: ["PUBLISHED", "FULL"] }, startsAt: { gte: new Date() } },
-          orderBy: { startsAt: "asc" },
-          take: 12,
-        },
-      },
+      select: getClubDetailSelect(),
     }),
     auth(),
     getMakeModelCatalogOptions(),
@@ -325,45 +368,64 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
 
 async function getFastestClubCar(userIds: string[]) {
   if (userIds.length === 0) return null;
-  const vehicles = await prisma.vehicle.findMany({
-    where: { ownerId: { in: userIds }, status: "CLAIMED" },
-    include: { model: { include: { make: true, spec: true } } },
-    take: 250,
-  });
-  return vehicles
-    .map((vehicle) => {
-      const horsepower = parseHorsepower(vehicle.engineHP) ?? parseHorsepower(vehicle.model.spec?.horsepower);
-      return horsepower
-        ? {
-            vin: vehicle.vin,
-            horsepower,
-            label: `${vehicle.year} ${vehicle.model.make.name} ${vehicle.model.name}`,
-          }
-        : null;
-    })
-    .filter((item): item is { vin: string; horsepower: number; label: string } => Boolean(item))
-    .sort((a, b) => b.horsepower - a.horsepower)[0] ?? null;
+  type FastestCarRow = { vin: string; year: number; makeName: string; modelName: string; horsepower: number };
+  const [vehicle] = await prisma.$queryRaw<FastestCarRow[]>`
+    SELECT
+      vehicle."vin",
+      vehicle."year",
+      make."name" AS "makeName",
+      model."name" AS "modelName",
+      substring(COALESCE(vehicle."engineHP", spec."horsepower", '') from '[0-9]{2,4}')::integer AS "horsepower"
+    FROM "Vehicle" vehicle
+    INNER JOIN "Model" model ON model."id" = vehicle."modelId"
+    INNER JOIN "Make" make ON make."id" = model."makeId"
+    LEFT JOIN "ModelSpec" spec ON spec."modelId" = model."id"
+    WHERE vehicle."ownerId" IN (${Prisma.join(userIds)})
+      AND vehicle."status" = 'CLAIMED'
+      AND substring(COALESCE(vehicle."engineHP", spec."horsepower", '') from '[0-9]{2,4}') IS NOT NULL
+    ORDER BY "horsepower" DESC
+    LIMIT 1
+  `;
+  return vehicle
+    ? {
+        vin: vehicle.vin,
+        horsepower: Math.round(vehicle.horsepower),
+        label: `${vehicle.year} ${vehicle.makeName} ${vehicle.modelName}`,
+      }
+    : null;
 }
 
 async function getMostModifiedClubCar(userIds: string[]) {
   if (userIds.length === 0) return null;
-  const vehicles = await prisma.vehicle.findMany({
-    where: { ownerId: { in: userIds }, status: "CLAIMED" },
-    include: {
-      model: { include: { make: true } },
-      modifications: { select: { id: true } },
-    },
-    take: 250,
-  });
-
-  return vehicles
-    .map((vehicle) => ({
-      vin: vehicle.vin,
-      modCount: vehicle.modifications.length,
-      label: `${vehicle.year} ${vehicle.model.make.name} ${vehicle.model.name}`,
-    }))
-    .filter((item) => item.modCount > 0)
-    .sort((a, b) => b.modCount - a.modCount)[0] ?? null;
+  type MostModifiedRow = { vin: string; year: number; makeName: string; modelName: string; modCount: number };
+  const [vehicle] = await prisma.$queryRaw<MostModifiedRow[]>`
+    SELECT
+      vehicle."vin",
+      vehicle."year",
+      make."name" AS "makeName",
+      model."name" AS "modelName",
+      (
+        SELECT count(*) FROM "VehicleModification" modification
+        WHERE modification."vehicleId" = vehicle."id"
+      )::integer + (
+        SELECT count(*) FROM "VehicleInstalledPart" installed
+        WHERE installed."vehicleId" = vehicle."id"
+      )::integer AS "modCount"
+    FROM "Vehicle" vehicle
+    INNER JOIN "Model" model ON model."id" = vehicle."modelId"
+    INNER JOIN "Make" make ON make."id" = model."makeId"
+    WHERE vehicle."ownerId" IN (${Prisma.join(userIds)})
+      AND vehicle."status" = 'CLAIMED'
+    ORDER BY "modCount" DESC
+    LIMIT 1
+  `;
+  return vehicle && vehicle.modCount > 0
+    ? {
+        vin: vehicle.vin,
+        modCount: vehicle.modCount,
+        label: `${vehicle.year} ${vehicle.makeName} ${vehicle.modelName}`,
+      }
+    : null;
 }
 
 function formatMeetDay(date: Date) {
@@ -381,10 +443,4 @@ function formatMeetDate(date: Date) {
 
 function userLabel(name?: string | null, email?: string | null) {
   return name || email || "A SUPERCAR DASH member";
-}
-
-function parseHorsepower(value: string | null | undefined) {
-  if (!value) return null;
-  const match = value.replace(/,/g, "").match(/(\d{2,4})/);
-  return match ? Number(match[1]) : null;
 }

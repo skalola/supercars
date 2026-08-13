@@ -36,24 +36,30 @@ export default async function ClubsPage({
       status: "ACTIVE",
       visibility: "PUBLIC",
     },
-      include: {
-        creator: { select: { name: true, username: true } },
-        members: { where: { status: "ACTIVE" }, select: { id: true } },
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        logoUrl: true,
+        city: true,
+        state: true,
+        createdAt: true,
         models: {
-          include: { model: { include: { make: true, images: { take: 1 } } } },
+          select: {
+            model: {
+              select: {
+                name: true,
+                make: { select: { name: true } },
+              },
+            },
+          },
           take: 6,
         },
         _count: {
           select: {
             members: { where: { status: "ACTIVE" } },
-            models: true,
             meets: { where: { status: { in: ["PUBLISHED", "FULL"] } } },
           },
-        },
-        meets: {
-          where: { status: { in: ["PUBLISHED", "FULL"] } },
-          orderBy: { startsAt: "asc" },
-          take: 2,
         },
       },
       orderBy: { createdAt: "asc" },

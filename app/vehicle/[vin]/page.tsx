@@ -1,8 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @next/next/no-img-element */
 
 import Link from "next/link";
+import type { Session } from "next-auth";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { getMarketSummary } from "@/lib/market-intelligence";
 import MarketPriceHistory from "@/components/market/MarketPriceHistory";
@@ -13,8 +14,10 @@ import { AddToFavoritesButton } from "@/components/garage/AddToFavoritesButton";
 import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
 import { calculateModifiedPerformance } from "@/lib/parts/performance";
 import { getPartDetailPath } from "@/lib/parts/routes";
-import { getExplicitPartCompatibilityWhereForVehicle } from "@/lib/parts/compatibility";
-import { auditPerformancePartTrust } from "@/lib/parts/trust";
+import {
+  getExplicitCompatibilityScopeForVehicle,
+  getExplicitPartCompatibilityWhereForVehicle,
+} from "@/lib/parts/compatibility";
 import ServiceBookingActionButton from "./ServiceBookingActionButton";
 import ServiceBookingModule from "./ServiceBookingModule";
 import AddServiceRecordButton from "./AddServiceRecordButton";
@@ -25,102 +28,184 @@ type VehiclePageProps = {
   searchParams?: Promise<{ success?: string }>;
 };
 
-export default async function VehiclePage({ params, searchParams }: VehiclePageProps) {
-  const { vin } = await params;
-  const session = (globalThis as any).mockSession !== undefined ? (globalThis as any).mockSession : await auth();
-
-  const vehicle = await prisma.vehicle.findUnique({
-    where: { vin },
-    include: {
-      model: {
-        include: {
-          make: true,
-          images: true,
-          spec: true,
+const vehiclePageSelect = {
+  id: true,
+  vin: true,
+  modelId: true,
+  year: true,
+  trim: true,
+  color: true,
+  mileage: true,
+  engine: true,
+  transmission: true,
+  drivetrain: true,
+  engineHP: true,
+  status: true,
+  ownerId: true,
+  inventoryStatus: true,
+  model: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      makeId: true,
+      make: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          logoUrl: true,
         },
       },
       images: {
-        orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
-      },
-      profile: true,
-      modifications: {
-        include: {
-          catalogInstall: true,
+        select: {
+          id: true,
+          url: true,
+          type: true,
+          sourceName: true,
+          attribution: true,
         },
-        orderBy: { createdAt: "desc" },
-      },
-      installedParts: {
-        include: {
-          part: {
-            include: {
-              category: true,
-              brand: true,
-            },
-          },
-          category: true,
-        },
-        orderBy: { createdAt: "desc" },
-      },
-      serviceRecords: {
-        orderBy: { serviceDate: "desc" },
-      },
-      awards: {
-        orderBy: { awardDate: "desc" },
-      },
-      photos: {
-        orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
-      },
-      documents: {
-        orderBy: { createdAt: "desc" },
-      },
-      listings: {
-        orderBy: { createdAt: "desc" },
-        include: {
-          seller: {
-            select: {
-              id: true,
-              name: true,
-              username: true,
-              email: true,
-            },
-          },
-        },
-      },
-      meetRsvps: {
-        where: { status: { in: ["GOING", "MAYBE", "WAITLISTED"] } },
-        include: {
-          meet: {
-            select: {
-              slug: true,
-              title: true,
-              type: true,
-              status: true,
-              startsAt: true,
-              city: true,
-              state: true,
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 6,
-      },
-      meetPhotos: {
-        include: {
-          meet: {
-            select: {
-              slug: true,
-              title: true,
-              status: true,
-              startsAt: true,
-              city: true,
-              state: true,
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ type: "asc" }, { createdAt: "asc" }],
         take: 8,
       },
+      spec: {
+        select: {
+          engine: true,
+          horsepower: true,
+          torque: true,
+        },
+      },
     },
+  },
+  images: {
+    select: {
+      id: true,
+      url: true,
+      alt: true,
+      isPrimary: true,
+      validationStatus: true,
+    },
+    orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+    take: 12,
+  },
+  profile: {
+    select: {
+      exteriorColor: true,
+      currentMileage: true,
+    },
+  },
+  modifications: {
+    select: {
+      id: true,
+      name: true,
+      brand: true,
+      installedDate: true,
+      catalogInstall: {
+        select: { id: true },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 24,
+  },
+  installedParts: {
+    select: {
+      id: true,
+      partId: true,
+      customName: true,
+      customBrandName: true,
+      installedDate: true,
+      hpGainOverride: true,
+      torqueGainOverride: true,
+      part: {
+        select: {
+          id: true,
+          name: true,
+          retailPriceCents: true,
+          estimatedHpGain: true,
+          estimatedTorqueGain: true,
+          category: {
+            select: { id: true, name: true },
+          },
+          brand: {
+            select: { id: true, name: true },
+          },
+        },
+      },
+      category: {
+        select: { id: true, name: true },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 24,
+  },
+  serviceRecords: {
+    select: {
+      id: true,
+      serviceDate: true,
+      mileage: true,
+      shopName: true,
+      description: true,
+      cost: true,
+    },
+    orderBy: { serviceDate: "desc" },
+    take: 24,
+  },
+      photos: {
+        select: {
+          id: true,
+          filePath: true,
+          caption: true,
+          isHero: true,
+        },
+    orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+    take: 12,
+  },
+} satisfies Prisma.VehicleSelect;
+
+const vehiclePageListingSelect = {
+  id: true,
+  askingPrice: true,
+  price: true,
+  priceStatus: true,
+  validationStatus: true,
+  status: true,
+  url: true,
+  imageUrl: true,
+  sellerId: true,
+  createdAt: true,
+  seller: {
+    select: {
+      name: true,
+      username: true,
+    },
+  },
+} satisfies Prisma.ListingSelect;
+
+const vehiclePageMaintenanceRuleSelect = {
+  id: true,
+  modelId: true,
+  category: true,
+  serviceName: true,
+  description: true,
+  intervalMiles: true,
+  intervalMonths: true,
+  priority: true,
+} satisfies Prisma.MaintenanceRuleSelect;
+
+type VehiclePageVehicle = Prisma.VehicleGetPayload<{ select: typeof vehiclePageSelect }>;
+type VehiclePageModelImage = VehiclePageVehicle["model"]["images"][number];
+type VehiclePageServiceRecord = VehiclePageVehicle["serviceRecords"][number];
+type VehiclePageMaintenanceRule = Prisma.MaintenanceRuleGetPayload<{ select: typeof vehiclePageMaintenanceRuleSelect }>;
+type VehiclePageSession = Session | null;
+
+export default async function VehiclePage({ params, searchParams }: VehiclePageProps) {
+  const { vin } = await params;
+  const mockSession = (globalThis as typeof globalThis & { mockSession?: VehiclePageSession }).mockSession;
+  const session: VehiclePageSession = mockSession !== undefined ? mockSession : await auth();
+
+  const vehicle = await prisma.vehicle.findUnique({
+    where: { vin },
+    select: vehiclePageSelect,
   });
 
   if (!vehicle || vehicle.inventoryStatus === "REMOVED" || vehicle.inventoryStatus === "NEEDS_REVIEW") {
@@ -140,20 +225,27 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
     );
   }
 
-  const installedCatalogPartIds = new Set(
-    (vehicle.installedParts || [])
-      .map((installedPart: any) => installedPart.partId)
-      .filter(Boolean)
+  const isAdminTestFixture = vehicle.inventoryStatus === "ADMIN_TEST";
+  const isOwner = !!(
+    (session?.user?.id && vehicle.ownerId === session.user.id && vehicle.status === "CLAIMED") ||
+    (isAdmin && isAdminTestFixture)
   );
 
-  const [maintenanceRules, market, savedFavorite, rawRecommendedParts, serviceShops] = await Promise.all([
+  const installedCatalogPartIds = new Set<string>(
+    (vehicle.installedParts || [])
+      .map((installedPart) => installedPart.partId)
+      .filter((partId): partId is string => Boolean(partId))
+  );
+
+  const [maintenanceRules, market, savedFavorite, rawRecommendedParts, listings] = await Promise.all([
     prisma.maintenanceRule.findMany({
       where: {
         OR: [
           { modelId: null },
           { modelId: vehicle.modelId }
         ]
-      }
+      },
+      select: vehiclePageMaintenanceRuleSelect,
     }),
     getMarketSummary(vehicle.modelId),
     session?.user?.id
@@ -170,19 +262,50 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
     prisma.performancePart.findMany({
       where: {
         status: "ACTIVE",
+        sourceUrl: { not: null },
+        sourceConfidence: "SOURCE_VERIFIED",
+        imageUrl: { not: null },
         id: installedCatalogPartIds.size > 0 ? { notIn: Array.from(installedCatalogPartIds) } : undefined,
         ...getExplicitPartCompatibilityWhereForVehicle(vehicle),
       },
-      include: {
-        category: true,
-        brand: true,
-        affiliatePartner: true,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        imageUrl: true,
+        sourceUrl: true,
+        sourceConfidence: true,
+        retailPriceCents: true,
+        estimatedHpGain: true,
+        estimatedTorqueGain: true,
+        status: true,
+        category: {
+          select: {
+            name: true,
+          },
+        },
+        brand: {
+          select: {
+            name: true,
+            slug: true,
+          },
+        },
         compatibility: {
-          include: {
-            make: true,
-            model: true,
+          where: getExplicitCompatibilityScopeForVehicle(vehicle),
+          select: {
+            makeId: true,
+            modelId: true,
+            yearStart: true,
+            yearEnd: true,
+            make: {
+              select: { name: true },
+            },
+            model: {
+              select: { name: true },
+            },
           },
           orderBy: { createdAt: "asc" },
+          take: 2,
         },
       },
       orderBy: [
@@ -190,26 +313,26 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
         { brand: { name: "asc" } },
         { name: "asc" },
       ],
-      take: 8,
+      take: 3,
     }),
-    prisma.partnerContact.findMany({
+    prisma.listing.findMany({
       where: {
-        type: "SERVICE_SHOP",
-        active: true,
-        email: { not: null },
-        latitude: { not: null },
-        longitude: { not: null },
+        vehicleId: vehicle.id,
+        status: "ACTIVE",
+        validationStatus: { in: isAdmin ? ["VALID", "ADMIN_TEST"] : ["VALID"] },
+        priceStatus: { not: "PRICE_INVALID" },
+        OR: [
+          { askingPrice: { gte: 10000 } },
+          { price: { gte: 10000 } },
+        ],
       },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        city: true,
-        state: true,
-        latitude: true,
-        longitude: true,
-      },
-      orderBy: { name: "asc" },
+      select: vehiclePageListingSelect,
+      orderBy: [
+        { askingPrice: "asc" },
+        { price: "asc" },
+        { createdAt: "desc" },
+      ],
+      take: 3,
     }),
   ]);
 
@@ -218,8 +341,8 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
     stockTorque: vehicle.model.spec?.torque,
     installedParts: vehicle.installedParts || [],
   });
-  const recommendedParts = rawRecommendedParts.filter((part) => auditPerformancePartTrust(part).publicEligible);
-  const unlinkedModifications = (vehicle.modifications || []).filter((mod: any) => !mod.catalogInstall);
+  const recommendedParts = rawRecommendedParts;
+  const unlinkedModifications = (vehicle.modifications || []).filter((mod) => !mod.catalogInstall);
 
   const priorityOrder: Record<string, number> = {
     REQUIRED: 1,
@@ -235,22 +358,12 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
   });
 
   // Check mileage in priority: 1. Vehicle.currentMileage, 2. Vehicle mileage decoded/imported data, 3. User-entered mileage
-  const currentMileage = (vehicle as any).currentMileage ?? vehicle.mileage ?? vehicle.profile?.currentMileage ?? null;
+  const currentMileage = vehicle.mileage ?? vehicle.profile?.currentMileage ?? null;
 
   const { success: successParam } = (await searchParams) || {};
-  const isAdminTestFixture = vehicle.inventoryStatus === "ADMIN_TEST";
-  const isOwner = !!(
-    (session?.user?.id && vehicle.ownerId === session.user.id && vehicle.status === "CLAIMED") ||
-    (isAdmin && isAdminTestFixture)
-  );
   let resolvedHeroImage = getVehicleHeroImage(vehicle);
 
-  const activeListing = [...vehicle.listings]
-    .filter((l) => {
-      const price = l.askingPrice ?? l.price ?? 0;
-      const isAdminTestListing = isAdmin && l.validationStatus === "ADMIN_TEST";
-      return l.status === "ACTIVE" && (l.validationStatus === "VALID" || isAdminTestListing) && l.priceStatus !== "PRICE_INVALID" && price >= 10000;
-    })
+  const activeListing = [...listings]
     .sort((a, b) => {
       if (Boolean(b.url) !== Boolean(a.url)) return Boolean(b.url) ? 1 : -1;
       const priceA = a.askingPrice ?? a.price ?? Infinity;
@@ -261,7 +374,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
   
   const hasOwnerPhotos = vehicle.photos && vehicle.photos.length > 0;
   const validImportedVehicleImages = (vehicle.images || []).filter(
-    (image: any) =>
+    (image) =>
       image.validationStatus !== "IMAGE_UNVERIFIED" &&
       image.validationStatus !== "IMAGE_MISMATCH" &&
       !isNonVehicleImageUrl(image.url) &&
@@ -269,7 +382,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
   );
   const modelHeroImage = getBestModelHeroImage(vehicle.model.images);
   if (!hasOwnerPhotos) {
-    const primaryImportedHero = validImportedVehicleImages.find((image: any) => image.isPrimary)?.url || validImportedVehicleImages[0]?.url || null;
+    const primaryImportedHero = validImportedVehicleImages.find((image) => image.isPrimary)?.url || validImportedVehicleImages[0]?.url || null;
     if (validImportedVehicleImages.length >= 3 && primaryImportedHero) {
       resolvedHeroImage = primaryImportedHero;
     } else if (modelHeroImage) {
@@ -286,7 +399,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
   const localSellerHref = localSeller?.username ? `/garage/${localSeller.username}` : "/garage";
   const originalListingUrl = activeListing?.sellerId
     ? null
-    : activeListing?.url || vehicle.listings.find((listing) => !listing.sellerId && listing.url)?.url || null;
+    : activeListing?.url || listings.find((listing) => !listing.sellerId && listing.url)?.url || null;
   const matchingInventoryHref = `/inventory?make=${encodeURIComponent(vehicle.model.make.slug)}&model=${encodeURIComponent(vehicle.model.slug)}`;
   const matchingPartsHref = `/parts?make=${encodeURIComponent(vehicle.model.make.slug)}&model=${encodeURIComponent(vehicle.model.slug)}`;
   const galleryImages = buildVehicleGalleryImages(vehicle, resolvedHeroImage, activeListing?.imageUrl || null);
@@ -325,17 +438,6 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
             vin={vehicle.vin}
             makeName={vehicle.model.make.name}
             defaultRule={firstMaintenanceRule}
-            serviceShops={serviceShops
-              .filter((shop) => shop.email && shop.latitude !== null && shop.longitude !== null)
-              .map((shop) => ({
-                id: shop.id,
-                name: shop.name,
-                email: shop.email as string,
-                city: shop.city,
-                state: shop.state,
-                latitude: shop.latitude as number,
-                longitude: shop.longitude as number,
-              }))}
           />
         ) : null}
         <section className="vehicle-intelligence-hero" style={heroStyle}>
@@ -502,7 +604,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
                 </div>
                 {serviceRecordCount > 0 ? (
                   <>
-                  {visibleServiceRecords.map((record: any) => (
+                  {visibleServiceRecords.map((record) => (
                     <article key={record.id}>
                       <time>{new Date(record.serviceDate).toLocaleDateString()}</time>
                       <span>{record.mileage ? `${record.mileage.toLocaleString()} mi` : "Mileage pending"}</span>
@@ -514,7 +616,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
                   {hiddenServiceRecords.length > 0 ? (
                     <details className="vehicle-intelligence-record-details">
                       <div className="vehicle-intelligence-record-extra">
-                        {hiddenServiceRecords.map((record: any) => (
+                        {hiddenServiceRecords.map((record) => (
                           <article key={record.id}>
                             <time>{new Date(record.serviceDate).toLocaleDateString()}</time>
                             <span>{record.mileage ? `${record.mileage.toLocaleString()} mi` : "Mileage pending"}</span>
@@ -612,7 +714,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
                     <span>Part / Brand</span>
                     <span>Cost / Installed</span>
                   </div>
-                  {vehicle.installedParts.map((installedPart: any) => {
+                  {vehicle.installedParts.map((installedPart) => {
                     const label = installedPart.part?.name || installedPart.customName || "Owner-reported part";
                     const brand = installedPart.part?.brand?.name || installedPart.customBrandName;
                     const category = installedPart.part?.category?.name || installedPart.category?.name;
@@ -625,7 +727,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
                       </article>
                     );
                   })}
-                  {unlinkedModifications.map((mod: any) => (
+                  {unlinkedModifications.map((mod) => (
                     <article key={mod.id}>
                       <span>Manual</span>
                       <strong>{[mod.brand, mod.name].filter(Boolean).join(" · ")}</strong>
@@ -675,7 +777,11 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
     );
 }
 
-function buildVehicleGalleryImages(vehicle: any, resolvedHeroImage: string | null, activeListingImageUrl: string | null): VehicleGalleryImage[] {
+function buildVehicleGalleryImages(
+  vehicle: VehiclePageVehicle,
+  resolvedHeroImage: string | null,
+  activeListingImageUrl: string | null,
+): VehicleGalleryImage[] {
   const seen = new Set<string>();
   const gallery: VehicleGalleryImage[] = [];
 
@@ -702,7 +808,7 @@ function buildVehicleGalleryImages(vehicle: any, resolvedHeroImage: string | nul
   }
 
   const validImportedImages = (vehicle.images || []).filter(
-    (image: any) => image.validationStatus !== "IMAGE_UNVERIFIED" && image.validationStatus !== "IMAGE_MISMATCH" && !isNonVehicleImageUrl(image.url)
+    (image) => image.validationStatus !== "IMAGE_UNVERIFIED" && image.validationStatus !== "IMAGE_MISMATCH" && !isNonVehicleImageUrl(image.url)
   );
 
   for (const image of validImportedImages) {
@@ -727,7 +833,7 @@ function isLikelyDetailHeroImage(value: string | null | undefined) {
   return /interior|wheel|rim|tire|tyre|engine|seat|dashboard|steering|badge|emblem|logo|detail|close.?up|carfax|autocheck/i.test(value);
 }
 
-function getBestModelHeroImage(images: any[] | null | undefined) {
+function getBestModelHeroImage(images: VehiclePageModelImage[] | null | undefined) {
   if (!images || images.length === 0) return null;
 
   const scoredImages = images
@@ -745,7 +851,11 @@ function getBestModelHeroImage(images: any[] | null | undefined) {
   return scoredImages[0]?.image.url || null;
 }
 
-function getMaintenanceSummary(rule: any | null, currentMileage: number | null, serviceRecords: any[]) {
+function getMaintenanceSummary(
+  rule: VehiclePageMaintenanceRule | null,
+  currentMileage: number | null,
+  serviceRecords: VehiclePageServiceRecord[]
+) {
   if (!rule) return { dueAt: "Pending", orBy: "Pending" };
   if (currentMileage === null || currentMileage === undefined) return { dueAt: "Add mileage", orBy: "Pending" };
 
@@ -770,7 +880,11 @@ function getMaintenanceSummary(rule: any | null, currentMileage: number | null, 
   return { dueAt: "Inspect", orBy: "As needed" };
 }
 
-function getMaintenanceHealth(currentMileage: number | null, sortedRules: any[], serviceRecords: any[]) {
+function getMaintenanceHealth(
+  currentMileage: number | null,
+  sortedRules: VehiclePageMaintenanceRule[],
+  serviceRecords: VehiclePageServiceRecord[]
+) {
   const systems = [
     { label: "Engine", keywords: ["oil", "engine", "spark", "belt"] },
     { label: "Transmission", keywords: ["transmission", "clutch", "gearbox"] },
@@ -821,12 +935,10 @@ function formatPartCompatibility(partCompatibility: {
   model: { name: string } | null;
   yearStart: number | null;
   yearEnd: number | null;
-  trim: string | null;
-  engine: string | null;
 }) {
   const makeModel = [partCompatibility.make?.name, partCompatibility.model?.name].filter(Boolean).join(" ");
   const years = formatPartYearRange(partCompatibility.yearStart, partCompatibility.yearEnd);
-  const details = [makeModel || "Universal", years, partCompatibility.trim, partCompatibility.engine].filter(Boolean);
+  const details = [makeModel || "Universal", years].filter(Boolean);
   return details.join(" · ");
 }
 

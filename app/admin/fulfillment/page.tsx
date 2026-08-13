@@ -1,15 +1,44 @@
 import React from "react";
 import { requireAdmin } from "@/lib/admin/auth";
-import { getAdminFulfillmentMetrics, getAdminFulfillmentRequests } from "@/lib/admin/fulfillment-ops";
+import {
+  ADMIN_FULFILLMENT_PAGE_SIZE,
+  type AdminFilterTab,
+  getAdminFulfillmentMetrics,
+  getAdminFulfillmentRequestCount,
+  getAdminFulfillmentRequests,
+} from "@/lib/admin/fulfillment-ops";
 import { AdminOpsCenterClient, AdminFulfillmentItem } from "@/components/admin/AdminOpsCenterClient";
+import { AdminPagination, parseAdminPage } from "@/components/admin/AdminPagination";
 
-export default async function AdminFulfillmentPage() {
+const filterTabs = new Set<AdminFilterTab>([
+  "ALL",
+  "STUCK_EXPIRED",
+  "ACCEPTED",
+  "DECLINED",
+  "PENDING_REFUNDS",
+  "FAILED_EMAILS",
+]);
+
+export default async function AdminFulfillmentPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ page?: string | string[]; tab?: string; type?: string; q?: string }>;
+}) {
   await requireAdmin();
+  const params = await searchParams;
+  const requestedPage = parseAdminPage(params?.page);
+  const tab = filterTabs.has(params?.tab as AdminFilterTab) ? params?.tab as AdminFilterTab : "ALL";
+  const requestType = params?.type?.trim() || undefined;
+  const search = params?.q?.trim() || undefined;
+  const filters = { requestType, search };
 
-  const [metrics, rawRequests] = await Promise.all([
+  const [metrics, totalRequests] = await Promise.all([
     getAdminFulfillmentMetrics(),
-    getAdminFulfillmentRequests("ALL"),
+    getAdminFulfillmentRequestCount(tab, filters),
   ]);
+  const totalPages = Math.max(1, Math.ceil(totalRequests / ADMIN_FULFILLMENT_PAGE_SIZE));
+  const page = Math.min(requestedPage, totalPages);
+  const rawRequests = await getAdminFulfillmentRequests(tab, filters, page);
 
   const items: AdminFulfillmentItem[] = rawRequests.map((req) => ({
     id: req.id,
@@ -20,10 +49,7 @@ export default async function AdminFulfillmentPage() {
     expectedPlatformFee: req.expectedPlatformFee,
     expectedPartnerCommission: req.expectedPartnerCommission,
     collectedAmount: req.collectedAmount,
-    refundableAmount: req.refundableAmount,
     payoutStatus: req.payoutStatus,
-    cancellationReason: req.cancellationReason,
-    cancelledByActor: req.cancelledByActor,
     createdAt: req.createdAt,
     updatedAt: req.updatedAt,
     vehicle: req.vehicle
@@ -34,7 +60,6 @@ export default async function AdminFulfillmentPage() {
           model: req.vehicle.model.name,
           trim: req.vehicle.trim,
           vin: req.vehicle.vin,
-          image: req.vehicle.photos[0]?.filePath || null,
         }
       : null,
     parties: req.parties.map((p) => ({
@@ -44,26 +69,8 @@ export default async function AdminFulfillmentPage() {
       email: p.email,
       companyName: p.companyName,
     })),
-    fees: req.fees.map((f) => ({
-      id: f.id,
-      feeType: f.feeType,
-      amount: f.amount,
-      status: f.status,
-    })),
-    depositIntents: req.depositIntents.map((d) => ({
-      id: d.id,
-      amount: d.amount,
-      currency: d.currency,
-      status: d.status,
-    })),
-    partnerTokens: req.partnerTokens.map((t) => ({
-      id: t.id,
-      token: t.token,
-      partnerName: t.partnerName,
-      partnerEmail: t.partnerEmail,
-      expiresAt: t.expiresAt,
-      actionTaken: t.actionTaken,
-    })),
+    attentionDepositCount: req._count.depositIntents,
+    attentionFeeCount: req._count.fees,
     events: req.events.map((e) => ({
       id: e.id,
       createdAt: e.createdAt,
@@ -74,5 +81,22 @@ export default async function AdminFulfillmentPage() {
     })),
   }));
 
-  return <AdminOpsCenterClient metrics={metrics} requests={items} />;
+  return (
+    <>
+      <AdminOpsCenterClient
+        metrics={metrics}
+        requests={items}
+        activeTab={tab}
+        searchQuery={search || ""}
+        requestTypeFilter={requestType || ""}
+      />
+      <AdminPagination
+        pathname="/admin/fulfillment"
+        page={page}
+        totalPages={totalPages}
+        preserveParams={{ tab, type: requestType, q: search }}
+        ariaLabel="Fulfillment request pages"
+      />
+    </>
+  );
 }

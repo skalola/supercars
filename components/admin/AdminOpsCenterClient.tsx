@@ -30,10 +30,7 @@ export interface AdminFulfillmentItem {
   expectedPlatformFee: number;
   expectedPartnerCommission: number;
   collectedAmount: number;
-  refundableAmount: number;
   payoutStatus: string;
-  cancellationReason?: string | null;
-  cancelledByActor?: string | null;
   createdAt: string | Date;
   updatedAt: string | Date;
   vehicle?: {
@@ -43,7 +40,6 @@ export interface AdminFulfillmentItem {
     model: string;
     trim?: string | null;
     vin: string;
-    image?: string | null;
   } | null;
   parties?: Array<{
     id: string;
@@ -52,26 +48,8 @@ export interface AdminFulfillmentItem {
     email?: string | null;
     companyName?: string | null;
   }>;
-  fees?: Array<{
-    id: string;
-    feeType: string;
-    amount: number;
-    status: string;
-  }>;
-  depositIntents?: Array<{
-    id: string;
-    amount: number;
-    currency: string;
-    status: string;
-  }>;
-  partnerTokens?: Array<{
-    id: string;
-    token: string;
-    partnerName?: string | null;
-    partnerEmail?: string | null;
-    expiresAt?: string | Date | null;
-    actionTaken?: string | null;
-  }>;
+  attentionDepositCount: number;
+  attentionFeeCount: number;
   events?: Array<{
     id: string;
     createdAt: string | Date;
@@ -85,49 +63,34 @@ export interface AdminFulfillmentItem {
 interface AdminOpsCenterClientProps {
   metrics: AdminFulfillmentMetrics;
   requests: AdminFulfillmentItem[];
+  activeTab: AdminFilterTab;
+  searchQuery: string;
+  requestTypeFilter: string;
 }
 
-export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClientProps) {
+const requestTypeOptions = ["DEALER_PURCHASE", "INSURANCE_QUOTE", "SERVICE_BOOKING", "TRANSPORT_QUOTE"];
+
+export function AdminOpsCenterClient({
+  metrics,
+  requests,
+  activeTab,
+  searchQuery: initialSearchQuery,
+  requestTypeFilter,
+}: AdminOpsCenterClientProps) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<AdminFilterTab>("ALL");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [requestTypeFilter, setRequestTypeFilter] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [actionMessage, setActionMessage] = useState<{ id: string; msg: string; type: "success" | "error" } | null>(null);
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [isProcessingExpired, setIsProcessingExpired] = useState(false);
-  const requestTypeOptions = Array.from(new Set(requests.map((req) => req.requestType))).sort();
-
-  // Client-side filtering
-  const filteredRequests = requests.filter((req) => {
-    if (requestTypeFilter && req.requestType !== requestTypeFilter) return false;
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const idMatch = req.id.toLowerCase().includes(q);
-      const typeMatch = formatRequestType(req.requestType).toLowerCase().includes(q);
-      const vinMatch = req.vehicle?.vin.toLowerCase().includes(q);
-      const makeMatch = req.vehicle?.make.toLowerCase().includes(q);
-      const modelMatch = req.vehicle?.model.toLowerCase().includes(q);
-      const partyMatch = req.parties?.some((p) => p.name.toLowerCase().includes(q) || p.email?.toLowerCase().includes(q));
-      if (!idMatch && !typeMatch && !vinMatch && !makeMatch && !modelMatch && !partyMatch) return false;
+  const updateFilters = (changes: Record<string, string>) => {
+    const params = new URLSearchParams(window.location.search);
+    params.delete("page");
+    for (const [key, value] of Object.entries(changes)) {
+      if (value) params.set(key, value);
+      else params.delete(key);
     }
-
-    switch (activeTab) {
-      case "STUCK_EXPIRED":
-        return req.status === "EXPIRED" || req.status === "DRAFT";
-      case "ACCEPTED":
-        return req.status === "ACCEPTED";
-      case "DECLINED":
-        return req.status === "DECLINED";
-      case "PENDING_REFUNDS":
-        return hasRefundOrSettlementAttention(req);
-      case "FAILED_EMAILS":
-        return req.events?.some((e) => e.note?.includes("HELD") || e.note?.includes("BLOCKED") || e.note?.includes("UNRESOLVED"));
-      case "ALL":
-      default:
-        return true;
-    }
-  });
+    router.push(`/admin/fulfillment?${params.toString()}`);
+  };
 
   // Action handlers
   const handleResend = async (requestId: string) => {
@@ -314,7 +277,7 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
             <button
               key={card.id}
               type="button"
-              onClick={() => setActiveTab(card.id)}
+              onClick={() => updateFilters({ tab: card.id })}
               className={[
                 "admin-ops-kpi-card",
                 card.tone ? `is-${card.tone}` : "",
@@ -330,7 +293,13 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
         })}
       </div>
 
-      <div className="admin-ops-search-bar">
+      <form
+        className="admin-ops-search-bar"
+        onSubmit={(event) => {
+          event.preventDefault();
+          updateFilters({ q: searchQuery.trim() });
+        }}
+      >
         <input
           type="text"
           placeholder="Search by Request ID, VIN, Make, Model, or Partner Email..."
@@ -341,7 +310,7 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
         <select
           aria-label="Filter by request type"
           value={requestTypeFilter}
-          onChange={(e) => setRequestTypeFilter(e.target.value)}
+          onChange={(e) => updateFilters({ type: e.target.value })}
           className="admin-ops-type-filter"
         >
           <option value="">All Request Types</option>
@@ -351,12 +320,13 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
             </option>
           ))}
         </select>
-        {searchQuery && (
-          <button onClick={() => setSearchQuery("")} className="admin-ops-clear-button">
+        <button type="submit" className="admin-ops-clear-button">Search</button>
+        {initialSearchQuery && (
+          <button type="button" onClick={() => { setSearchQuery(""); updateFilters({ q: "" }); }} className="admin-ops-clear-button">
             Clear
           </button>
         )}
-      </div>
+      </form>
 
       <div className="mobile-scroll admin-table-shell admin-ops-table-shell">
         <table className="admin-ops-table">
@@ -381,14 +351,14 @@ export function AdminOpsCenterClient({ metrics, requests }: AdminOpsCenterClient
             </tr>
           </thead>
           <tbody>
-            {filteredRequests.length === 0 ? (
+            {requests.length === 0 ? (
               <tr>
                 <td colSpan={7} className="admin-ops-empty">
                   No fulfillment requests match the selected filter.
                 </td>
               </tr>
             ) : (
-              filteredRequests.map((req) => {
+              requests.map((req) => {
                 const partner = req.parties?.find((p) => p.partyType !== "BUYER" && p.partyType !== "SELLER" && p.partyType !== "PLATFORM");
                 const buyer = req.parties?.find((p) => p.partyType === "BUYER");
                 const latestEvent = req.events?.[0];
@@ -549,8 +519,8 @@ function hasRefundOrSettlementAttention(req: AdminFulfillmentItem) {
   return (
     req.payoutStatus === "PENDING_RECONCILIATION" ||
     ["AUTHORIZATION_PENDING", "AUTHORIZED", "CAPTURE_PENDING", "CAPTURED"].includes(req.paymentStatus) ||
-    Boolean(req.depositIntents?.some((d) => ["AUTHORIZED", "HELD", "CAPTURED"].includes(d.status))) ||
-    Boolean(req.fees?.some((f) => ["AUTHORIZED", "CAPTURED"].includes(f.status)))
+    req.attentionDepositCount > 0 ||
+    req.attentionFeeCount > 0
   );
 }
 

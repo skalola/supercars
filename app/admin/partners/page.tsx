@@ -1,9 +1,10 @@
 import DirectoryTabs, { DirectoryVendor, DirectoryVendorType } from "@/app/directory/DirectoryTabs";
 import { AdminDirectoryActions } from "@/components/admin/AdminDirectoryActions";
+import { AdminPagination, parseAdminPage } from "@/components/admin/AdminPagination";
 import { requireAdmin } from "@/lib/admin/auth";
+import { ADMIN_DIRECTORY_PAGE_SIZE, getAdminDirectoryPage } from "@/lib/admin/directory-ops";
 import { formatCityState, normalizePartnerLocation, normalizePhoneNumber } from "@/lib/directory/partner-contact-format";
 import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
-import { prisma } from "@/lib/prisma";
 
 const allowedTypes = new Set<DirectoryVendorType>([
   "DEALER",
@@ -12,30 +13,39 @@ const allowedTypes = new Set<DirectoryVendorType>([
   "INSURER",
 ]);
 
-export default async function AdminPartnersPage() {
+export default async function AdminPartnersPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{
+    page?: string | string[];
+    type?: string;
+    make?: string;
+    location?: string;
+    lat?: string;
+    lng?: string;
+  }>;
+}) {
   await requireAdmin();
+  const params = await searchParams;
+  const requestedPage = parseAdminPage(params?.page);
+  const type = allowedTypes.has(params?.type as DirectoryVendorType)
+    ? params?.type as DirectoryVendorType
+    : "DEALER";
+  const make = params?.make?.trim() || "ALL";
+  const location = params?.location?.trim() || "";
+  const latitude = parseCoordinate(params?.lat, -90, 90);
+  const longitude = parseCoordinate(params?.lng, -180, 180);
 
-  const [contacts, catalog] = await Promise.all([
-    prisma.partnerContact.findMany({
-      where: {
-        active: true,
-        website: { not: null },
-        city: { not: null },
-        state: { not: null },
-        type: {
-          in: Array.from(allowedTypes),
-        },
-      },
-      orderBy: [
-        { updatedAt: "desc" },
-        { name: "asc" },
-      ],
-    }),
-    getMakeModelCatalogOptions(),
-  ]);
+  const catalog = await getMakeModelCatalogOptions();
+  const firstResult = await getAdminDirectoryPage({ type, make, location, latitude, longitude }, requestedPage);
+  const totalPages = Math.max(1, Math.ceil(firstResult.totalCount / ADMIN_DIRECTORY_PAGE_SIZE));
+  const page = Math.min(requestedPage, totalPages);
+  const result = page === requestedPage
+    ? firstResult
+    : await getAdminDirectoryPage({ type, make, location, latitude, longitude }, page);
 
   const vendors = dedupeVendors(
-    contacts
+    result.rows
       .map((contact) => {
         const location = normalizePartnerLocation(contact);
 
@@ -53,6 +63,7 @@ export default async function AdminPartnersPage() {
           makeSpecialization: contact.makeSpecialization,
           latitude: contact.latitude ?? getLocationCoordinates(contact.location)?.latitude ?? null,
           longitude: contact.longitude ?? getLocationCoordinates(contact.location)?.longitude ?? null,
+          distanceMiles: contact.distanceMiles,
         };
       }),
   );
@@ -70,9 +81,35 @@ export default async function AdminPartnersPage() {
         <AdminDirectoryActions makeOptions={catalog.makes} />
       </section>
 
-      <DirectoryTabs vendors={vendors} makeOptions={catalog.makes} />
+      <DirectoryTabs
+        vendors={vendors}
+        makeOptions={catalog.makes}
+        activeTab={type}
+        makeFilter={make}
+        locationFilter={location}
+        counts={result.counts}
+      />
+      <AdminPagination
+        pathname="/admin/partners"
+        page={page}
+        totalPages={totalPages}
+        preserveParams={{
+          type,
+          make,
+          location,
+          lat: latitude === undefined ? undefined : String(latitude),
+          lng: longitude === undefined ? undefined : String(longitude),
+        }}
+        ariaLabel="Vendor directory pages"
+      />
     </main>
   );
+}
+
+function parseCoordinate(value: string | undefined, min: number, max: number) {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= min && parsed <= max ? parsed : undefined;
 }
 
 function dedupeVendors(vendors: DirectoryVendor[]) {

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { SUPPORTED_MAKES } from "@/lib/supported-makes";
+import { getBatchLimit, isExecuteMode, logScriptMode } from "./lib/script-guards";
 
 type ListingCandidate = {
   id: string;
@@ -73,15 +74,6 @@ const BLOCKED_NON_TARGET_MAKE_SIGNALS = [
 
 const USER_AGENT =
   "SUPERCAR-DASH-InventoryVerifier/1.0 (+https://supercardash.vercel.app)";
-
-function getArgValue(name: string) {
-  const prefix = `${name}=`;
-  return process.argv.find((arg) => arg.startsWith(prefix))?.slice(prefix.length);
-}
-
-function isExecuteMode() {
-  return process.argv.includes("--execute");
-}
 
 function isVehicleSpecificUrl(url: string, vin: string) {
   const normalizedUrl = url.toUpperCase();
@@ -184,7 +176,7 @@ async function verifyListing(
   }
 }
 
-async function removeBadListing(candidate: ListingCandidate, reason: string) {
+async function removeBadListing(candidate: ListingCandidate) {
   const hasAuditHistory = candidate._count.purchases > 0 || candidate._count.fulfillmentRequests > 0;
 
   if (hasAuditHistory) {
@@ -207,7 +199,8 @@ async function removeBadListing(candidate: ListingCandidate, reason: string) {
 
 async function main() {
   const execute = isExecuteMode();
-  const limit = Number(getArgValue("--limit") || 250);
+  const limit = getBatchLimit({ defaultLimit: 150, maxLimit: 500 });
+  logScriptMode("verify-live-listings", execute, limit);
 
   const nonTargetMakeNames = (
     await prisma.make.findMany({
@@ -264,7 +257,7 @@ async function main() {
     let action = "kept";
 
     if (!result.live) {
-      action = execute ? await removeBadListing(candidate, result.reason) : "would_remove";
+      action = execute ? await removeBadListing(candidate) : "would_remove";
     }
 
     results.push({

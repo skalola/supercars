@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import VehicleEditorForm from "./VehicleEditorForm";
@@ -9,6 +10,117 @@ type EditPageProps = {
   params: Promise<{ vin: string }>;
 };
 
+const vehicleEditSelect = {
+  id: true,
+  vin: true,
+  year: true,
+  ownerId: true,
+  status: true,
+  engineHP: true,
+  model: {
+    select: {
+      name: true,
+      make: { select: { name: true } },
+      spec: {
+        select: {
+          horsepower: true,
+          torque: true,
+        },
+      },
+    },
+  },
+  profile: {
+    select: {
+      exteriorColor: true,
+      interiorColor: true,
+      currentMileage: true,
+      ownerNotes: true,
+    },
+  },
+  modifications: {
+    select: {
+      id: true,
+      name: true,
+      brand: true,
+      description: true,
+      installedDate: true,
+      catalogInstall: {
+        select: { id: true },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  },
+  installedParts: {
+    select: {
+      id: true,
+      legacyModificationId: true,
+      customName: true,
+      customBrandName: true,
+      installedDate: true,
+      notes: true,
+      hpGainOverride: true,
+      torqueGainOverride: true,
+      part: {
+        select: {
+          name: true,
+          estimatedHpGain: true,
+          estimatedTorqueGain: true,
+          category: { select: { name: true } },
+          brand: { select: { name: true } },
+        },
+      },
+      category: { select: { name: true } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  },
+  serviceRecords: {
+    select: {
+      id: true,
+      serviceDate: true,
+      mileage: true,
+      shopName: true,
+      description: true,
+      cost: true,
+    },
+    orderBy: { serviceDate: "desc" },
+    take: 100,
+  },
+  awards: {
+    select: {
+      id: true,
+      title: true,
+      eventName: true,
+      awardDate: true,
+      description: true,
+    },
+    orderBy: { awardDate: "desc" },
+    take: 100,
+  },
+  photos: {
+    select: {
+      id: true,
+      filePath: true,
+      caption: true,
+      isHero: true,
+    },
+    orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+    take: 100,
+  },
+  documents: {
+    select: {
+      id: true,
+      title: true,
+      documentType: true,
+      filePath: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  },
+} satisfies Prisma.VehicleSelect;
+
 export default async function VehicleEditPage({ params }: EditPageProps) {
   const { vin } = await params;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -17,55 +129,7 @@ export default async function VehicleEditPage({ params }: EditPageProps) {
 
   const vehicle = await prisma.vehicle.findUnique({
     where: { vin },
-    include: {
-      model: {
-        include: {
-          make: true,
-          spec: true,
-        },
-      },
-      profile: true,
-      modifications: {
-        include: {
-          catalogInstall: {
-            include: {
-              part: {
-                include: {
-                  category: true,
-                  brand: true,
-                },
-              },
-              category: true,
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      },
-      installedParts: {
-        include: {
-          part: {
-            include: {
-              category: true,
-              brand: true,
-            },
-          },
-          category: true,
-        },
-        orderBy: { createdAt: "desc" },
-      },
-      serviceRecords: {
-        orderBy: { serviceDate: "desc" },
-      },
-      awards: {
-        orderBy: { awardDate: "desc" },
-      },
-      photos: {
-        orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
-      },
-      documents: {
-        orderBy: { createdAt: "desc" },
-      },
-    },
+    select: vehicleEditSelect,
   });
 
   // Verify ownership
@@ -76,6 +140,11 @@ export default async function VehicleEditPage({ params }: EditPageProps) {
   const [partCategories, partBrands] = await Promise.all([
     prisma.partCategory.findMany({
       where: { active: true },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+      },
       orderBy: [
         { displayOrder: "asc" },
         { name: "asc" },

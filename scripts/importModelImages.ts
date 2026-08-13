@@ -3,11 +3,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { prisma } from "../lib/prisma";
 import { normalizeSupportedMake, SUPPORTED_MAKE_SLUGS } from "../lib/supported-makes";
+import { getArgValue, getBatchLimit } from "./lib/script-guards";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
 const publicModelsRoot = path.join(projectRoot, "public", "images", "models");
-const makeArg = process.argv.find((arg) => arg.startsWith("--make="))?.split("=")[1];
+const makeArg = getArgValue("--make");
+const limit = getBatchLimit({ defaultLimit: 80, maxLimit: 250 });
 const targetMakeSlug = makeArg ? normalizeSupportedMake(makeArg)?.toLowerCase() : null;
 
 const catalogSources: Record<string, string[]> = {
@@ -227,8 +229,18 @@ async function importModelImagesForModel(model: { id: string; make: { slug: stri
 
 async function main() {
   const models = await prisma.model.findMany({
-    include: { make: true },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      make: {
+        select: {
+          slug: true,
+        },
+      },
+    },
     orderBy: [{ make: { name: "asc" } }, { name: "asc" }],
+    take: limit,
   });
 
   const targetModels = models.filter((model) => {

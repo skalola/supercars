@@ -78,15 +78,22 @@ export async function toggleGarageAlert(itemId: string, alertType: GarageAlertTy
       id: itemId,
       userId: session.user.id as string,
     },
-    include: {
+    select: {
+      id: true,
+      modelId: true,
       user: {
         select: {
           username: true,
         },
       },
       model: {
-        include: {
-          make: true,
+        select: {
+          name: true,
+          make: {
+            select: {
+              name: true,
+            },
+          },
         },
       },
     },

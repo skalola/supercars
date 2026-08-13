@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { getLiveInventoryListingStats } from "@/lib/admin/listing-filters";
+import { getAdminPartnerCoverageStats } from "@/lib/admin/partner-stats";
 import { realFulfillmentWhere, withRealFulfillmentWhere } from "@/lib/admin/fulfillment-filters";
-import { emailMatchesWebsiteDomain } from "@/lib/directory/contact-domain-policy";
-import { isValidEmail } from "@/lib/fulfillment/partner-registry";
 import { prisma } from "@/lib/prisma";
 
 const RECENT_TRANSACTION_WINDOW_DAYS = 30;
@@ -65,7 +64,7 @@ export default async function AdminOverviewPage({
   const [
     activeSessions,
     liveInventoryStats,
-    partnerContacts,
+    partnerCoverage,
     recentTransactions,
     recentVolume,
     previousVolume,
@@ -77,24 +76,12 @@ export default async function AdminOverviewPage({
     salesRequestStats,
     completedSalesStats,
   ] = await Promise.all([
-      prisma.session.findMany({
+      prisma.session.groupBy({
+        by: ["userId"],
         where: { expires: { gt: now } },
-        distinct: ["userId"],
-        select: { userId: true },
       }),
       getLiveInventoryListingStats(),
-      prisma.partnerContact.findMany({
-        where: { active: true },
-        select: {
-          type: true,
-          email: true,
-          website: true,
-          phone: true,
-          city: true,
-          state: true,
-          contactStatus: true,
-        },
-      }),
+      getAdminPartnerCoverageStats(),
       prisma.fulfillmentRequest.count({
         where: withRealFulfillmentWhere({ createdAt: { gte: recentWindowStart } }),
       }),
@@ -169,7 +156,6 @@ export default async function AdminOverviewPage({
       }),
     ]);
 
-  const inventoryListings = liveInventoryStats.listings;
   const activeListingCount = liveInventoryStats.liveListingCount;
   const recentTransactionAmount = recentVolume._sum.collectedAmount || 0;
   const previousTransactionAmount = previousVolume._sum.collectedAmount || 0;
@@ -178,37 +164,11 @@ export default async function AdminOverviewPage({
   const pricedListingCount = liveInventoryStats.pricedListingCount;
   const avgListingPrice = liveInventoryStats.averageLiveListingPrice;
   const listingsWithoutPrice = activeListingCount - pricedListingCount;
-  const publicEligiblePartners = partnerContacts.filter(
-    (partner) =>
-      isValidEmail(partner.email) &&
-      emailMatchesWebsiteDomain(partner.email, partner.website) &&
-      Boolean(partner.phone) &&
-      Boolean(partner.website) &&
-      Boolean(partner.city) &&
-      Boolean(partner.state)
-  );
-  const unresolvedVendorCount = partnerContacts.length - publicEligiblePartners.length;
+  const publicEligiblePartnerCount = partnerCoverage.eligibleByType.reduce((sum, row) => sum + row.value, 0);
+  const unresolvedVendorCount = partnerCoverage.activeCount - publicEligiblePartnerCount;
 
-  const listingsByMake = Array.from(
-    inventoryListings.reduce((map, listing) => {
-      const make = listing.vehicle?.model.make.name || listing.model.make.name;
-      map.set(make, (map.get(make) || 0) + 1);
-      return map;
-    }, new Map<string, number>())
-  )
-    .map(([label, value]) => ({ label, value }))
-    .sort((a, b) => b.value - a.value);
-
-  const topSources = Array.from(
-    inventoryListings.reduce((map, listing) => {
-      const source = listing.source?.name || listing.dealerName || "Unknown";
-      map.set(source, (map.get(source) || 0) + 1);
-      return map;
-    }, new Map<string, number>())
-  )
-    .map(([label, value]) => ({ label, value }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 5);
+  const listingsByMake = liveInventoryStats.listingsByMake;
+  const topSources = liveInventoryStats.topSources;
 
   const pipelineRows = fulfillmentByStatus
     .map((row) => ({ label: row.status, value: row._count.id }))
@@ -301,13 +261,8 @@ export default async function AdminOverviewPage({
     },
   ];
 
-  const vendorRows = Array.from(
-    publicEligiblePartners.reduce((map, partner) => {
-      map.set(partner.type, (map.get(partner.type) || 0) + 1);
-      return map;
-    }, new Map<string, number>())
-  )
-    .map(([type, value]) => ({ label: labelPartnerType(type), value }))
+  const vendorRows = partnerCoverage.eligibleByType
+    .map(({ type, value }) => ({ label: labelPartnerType(type), value }))
     .sort((a, b) => b.value - a.value);
   const vendorTotal = vendorRows.reduce((sum, row) => sum + row.value, 0);
 
@@ -357,7 +312,7 @@ export default async function AdminOverviewPage({
       label: "Partner Portal",
       value: vendorTotal.toLocaleString(),
       detail: `${unresolvedVendorCount.toLocaleString()} admin-only partner gaps`,
-      percent: getPercent(vendorTotal, partnerContacts.length),
+      percent: getPercent(vendorTotal, partnerCoverage.activeCount),
     },
     {
       label: "30-Day Volume",

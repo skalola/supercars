@@ -23,8 +23,22 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
   const garageVehicles = session?.user?.id
     ? await prisma.vehicle.findMany({
         where: { ownerId: session.user.id as string, status: "CLAIMED" },
-        include: { model: { include: { make: true } } },
+        select: {
+          id: true,
+          year: true,
+          model: {
+            select: {
+              name: true,
+              make: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+        },
         orderBy: { createdAt: "desc" },
+        take: 50,
       }).catch(() => [])
     : [];
   const viewerUserId = session?.user?.id as string | undefined;
@@ -50,9 +64,26 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
           hostId: true,
           rsvps: {
             where: isHost ? { status: { not: "CANCELLED" } } : { userId: viewerUserId, status: { in: ["GOING", "MAYBE", "WAITLISTED"] } },
-            include: {
+            select: {
+              id: true,
+              userId: true,
+              status: true,
               user: { select: { name: true, username: true, email: true } },
-              vehicle: { include: { model: { include: { make: true } } } },
+              vehicle: {
+                select: {
+                  year: true,
+                  model: {
+                    select: {
+                      name: true,
+                      make: {
+                        select: {
+                          name: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
             },
             orderBy: { createdAt: "asc" },
             take: isHost ? 250 : 1,

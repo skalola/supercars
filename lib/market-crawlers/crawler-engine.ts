@@ -20,7 +20,49 @@ type IngestCounters = {
   skipped: string[];
 };
 
-type DecodedVinValues = Record<string, any>;
+type DecodedVinValues = Record<string, string | number | null | undefined>;
+
+type VpicDecodeResponse = {
+  Results?: Array<Record<string, string | undefined>>;
+};
+
+type CachedSource = { id: string };
+
+const sourceCache = new Map<string, Promise<CachedSource>>();
+const vinDecodeCache = new Map<string, Promise<DecodedVinValues>>();
+
+function getOrCreateSource(listing: NormalizedCrawlerListing) {
+  const cacheKey = `${listing.sourceName}:${listing.sourceType}`;
+  const cached = sourceCache.get(cacheKey);
+  if (cached) return cached;
+
+  const sourceWebsite = getCrawlerSourceWebsite(listing);
+  const source = prisma.marketSource.upsert({
+    where: { name: listing.sourceName },
+    update: {
+      type: listing.sourceType,
+      website: sourceWebsite || undefined,
+      active: true,
+    },
+    create: {
+      name: listing.sourceName,
+      type: listing.sourceType,
+      website: sourceWebsite || undefined,
+      active: true,
+    },
+    select: { id: true },
+  });
+  sourceCache.set(cacheKey, source);
+  return source;
+}
+
+function getDecodedVin(vin: string) {
+  const cached = vinDecodeCache.get(vin);
+  if (cached) return cached;
+  const decoded = decodeVin(vin);
+  vinDecodeCache.set(vin, decoded);
+  return decoded;
+}
 
 export async function crawlInventory(
   sources: PublicInventorySource[] = defaultInventorySources()
@@ -83,6 +125,8 @@ export async function crawlInventory(
     sourceResults.push(sourceResult);
   }
 
+  await deactivateDiscoveriesWithoutActiveSources();
+
   return {
     startedAt: startedAt.toISOString(),
     finishedAt: new Date().toISOString(),
@@ -104,11 +148,43 @@ export async function ingestCrawlerListings(
 
   const seenThisRun = new Set<string>();
 
-  for (const listing of listings) {
-    if (seenThisRun.has(`${listing.sourceName}:${listing.vin}:${listing.url}`)) continue;
-    seenThisRun.add(`${listing.sourceName}:${listing.vin}:${listing.url}`);
+  const uniqueListings = listings.filter((listing) => {
+    const key = `${listing.sourceName}:${listing.vin}:${listing.url}`;
+    if (seenThisRun.has(key)) return false;
+    seenThisRun.add(key);
+    return true;
+  });
 
-    const decoded = await decodeVin(listing.vin);
+  const sourceEntries = await Promise.all(
+    Array.from(new Map(uniqueListings.map((listing) => [
+      `${listing.sourceName}:${listing.sourceType}`,
+      listing,
+    ])).entries()).map(async ([key, listing]) => [key, await getOrCreateSource(listing)] as const),
+  );
+  const sourcesByKey = new Map(sourceEntries);
+  const existingVehicles = await prisma.vehicle.findMany({
+    where: { vin: { in: Array.from(new Set(uniqueListings.map((listing) => listing.vin))) } },
+    select: { id: true, vin: true },
+  });
+  const vehiclesByVin = new Map(existingVehicles.map((vehicle) => [vehicle.vin, vehicle.id]));
+
+  const sourceIds = Array.from(new Set(sourceEntries.map(([, source]) => source.id)));
+  const externalListingIds = Array.from(new Set(uniqueListings.map((listing) => listing.externalListingId)));
+  const existingListings = await prisma.listing.findMany({
+    where: {
+      sourceId: { in: sourceIds },
+      externalListingId: { in: externalListingIds },
+    },
+    select: { id: true, sourceId: true, externalListingId: true, price: true, askingPrice: true },
+  });
+  const listingsBySourceIdentity = new Map(existingListings.map((listing) => [
+    `${listing.sourceId}:${listing.externalListingId}`,
+    listing,
+  ]));
+  const synchronizedPartners = new Set<string>();
+
+  for (const listing of uniqueListings) {
+    const decoded = await getDecodedVin(listing.vin);
     let validationStatus = "VALID";
 
     const decodedMake = decoded.make ? String(decoded.make).trim().toLowerCase() : null;
@@ -125,17 +201,18 @@ export async function ingestCrawlerListings(
       const yearMatch = decodedYear === listingYear;
 
       if (!makeMatch || !modelMatchCheck || !yearMatch) {
-        const decodedSupportedMake = normalizeSupportedMake(decoded.make);
+        const decodedSupportedMake = normalizeSupportedMake(String(decoded.make));
         if (!decodedSupportedMake) {
           validationStatus = "MODEL_MISMATCH";
         }
 
         // VIN decode is the source of truth when public page card/context text is noisy.
-        listing.make = (
-          decodedSupportedMake ??
-          (decoded.make.charAt(0).toUpperCase() + decoded.make.slice(1).toLowerCase())
-        ) as any;
-        listing.model = decoded.model as string;
+        if (!decodedSupportedMake) {
+          counters.skipped.push(`${listing.vin}: decoded make is not supported`);
+          continue;
+        }
+        listing.make = decodedSupportedMake;
+        listing.model = String(decoded.model);
         listing.year = decodedYear;
 
         console.warn(
@@ -150,26 +227,13 @@ export async function ingestCrawlerListings(
       continue;
     }
 
-    const sourceWebsite = getCrawlerSourceWebsite(listing);
-    const source = await prisma.marketSource.upsert({
-      where: { name: listing.sourceName },
-      update: {
-        type: listing.sourceType,
-        website: sourceWebsite || undefined,
-        active: true,
-      },
-      create: {
-        name: listing.sourceName,
-        type: listing.sourceType,
-        website: sourceWebsite || undefined,
-        active: true,
-      },
-    });
+    const source = sourcesByKey.get(`${listing.sourceName}:${listing.sourceType}`)!;
 
     // Register partner contact. Dealer-owned domains may use the standard sales@domain inbox.
     // Marketplace/reseller pages must remain unresolved until the actual holding dealer is extracted.
     const fallbackDealerEmail = buildSalesEmailForWebsite(listing.dealerWebsite || listing.url);
-    if (listing.sourceType === "DEALER" || listing.dealerWebsite || fallbackDealerEmail) {
+    const partnerKey = `${listing.dealerName || listing.sourceName}:${getUrlOrigin(listing.dealerWebsite || listing.url) || listing.sourceName}`;
+    if (!synchronizedPartners.has(partnerKey) && (listing.sourceType === "DEALER" || listing.dealerWebsite || fallbackDealerEmail)) {
       await upsertPartnerContact({
         name: listing.dealerName || listing.sourceName,
         type: "DEALER",
@@ -180,14 +244,12 @@ export async function ingestCrawlerListings(
         confidence: "PUBLIC_SOURCE",
         email: fallbackDealerEmail,
       });
+      synchronizedPartners.add(partnerKey);
     }
 
-    const existingVehicle = await prisma.vehicle.findUnique({
-      where: { vin: listing.vin },
-      select: { id: true },
-    });
+    const existingVehicleId = vehiclesByVin.get(listing.vin);
 
-    const vehicle = existingVehicle
+    const vehicle = existingVehicleId
       ? await prisma.vehicle.update({
           where: { vin: listing.vin },
           data: {
@@ -212,8 +274,11 @@ export async function ingestCrawlerListings(
           select: { id: true },
         });
 
-    if (existingVehicle) counters.updatedVehicles++;
-    else counters.createdVehicles++;
+    if (existingVehicleId) counters.updatedVehicles++;
+    else {
+      counters.createdVehicles++;
+      vehiclesByVin.set(listing.vin, vehicle.id);
+    }
 
     await attachVehicleImages(
       vehicle.id,
@@ -222,15 +287,8 @@ export async function ingestCrawlerListings(
     );
     await upsertVinDiscovery(listing, source.id, vehicle.id);
 
-    const previousListing = await prisma.listing.findUnique({
-      where: {
-        sourceId_externalListingId: {
-          sourceId: source.id,
-          externalListingId: listing.externalListingId,
-        },
-      },
-      select: { id: true, price: true, askingPrice: true },
-    });
+    const listingIdentity = `${source.id}:${listing.externalListingId}`;
+    const previousListing = listingsBySourceIdentity.get(listingIdentity);
 
     const listingImageUrl = listing.images[0] || null;
     const hasUsablePrice = listing.price !== null && listing.price > 0;
@@ -299,6 +357,13 @@ export async function ingestCrawlerListings(
         freshnessStatus,
       },
     });
+    listingsBySourceIdentity.set(listingIdentity, {
+      id: savedListing.id,
+      sourceId: source.id,
+      externalListingId: listing.externalListingId,
+      price: savedListing.price,
+      askingPrice: savedListing.askingPrice,
+    });
 
     if (previousListing) {
       counters.updatedListings++;
@@ -355,32 +420,32 @@ async function attachVehicleImages(vehicleId: string, images: string[], validati
   const uniqueImages = Array.from(new Set(images.filter(Boolean))).slice(0, 12);
   if (uniqueImages.length === 0) return;
 
-  const existingValidCount = await prisma.vehicleImage.count({
+  const existingValidImage = await prisma.vehicleImage.findFirst({
     where: { vehicleId, validationStatus: "VALID" },
+    select: { id: true },
   });
-  if (existingValidCount > 0) return;
+  if (existingValidImage) return;
 
   if (validationStatus === "VALID") {
     await prisma.vehicleImage.deleteMany({
       where: { vehicleId },
     });
   } else {
-    const existingCount = await prisma.vehicleImage.count({
+    const existingImage = await prisma.vehicleImage.findFirst({
       where: { vehicleId },
+      select: { id: true },
     });
-    if (existingCount > 0) return;
+    if (existingImage) return;
   }
 
-  for (const [index, url] of uniqueImages.entries()) {
-    await prisma.vehicleImage.create({
-      data: {
+  await prisma.vehicleImage.createMany({
+    data: uniqueImages.map((url, index) => ({
         vehicleId,
         url,
         isPrimary: index === 0,
         validationStatus,
-      },
-    });
-  }
+      })),
+  });
 }
 
 async function upsertVinDiscovery(
@@ -438,20 +503,20 @@ async function deactivateStaleSourceDiscoveries(sourceName: string, sourceStarte
     data: { active: false },
   });
 
-  const activeSources = await prisma.vinDiscoverySource.findMany({
-    where: { active: true },
-    select: { discoveryId: true },
-    distinct: ["discoveryId"],
-  });
-  const activeDiscoveryIds = activeSources.map((source: { discoveryId: string }) => source.discoveryId);
+}
 
-  await prisma.vinDiscovery.updateMany({
-    where: {
-      active: true,
-      id: activeDiscoveryIds.length > 0 ? { notIn: activeDiscoveryIds } : undefined,
-    },
-    data: { active: false },
-  });
+async function deactivateDiscoveriesWithoutActiveSources() {
+  await prisma.$executeRaw`
+    UPDATE "VinDiscovery" discovery
+    SET "active" = false, "updatedAt" = NOW()
+    WHERE discovery."active" = true
+      AND NOT EXISTS (
+        SELECT 1
+        FROM "VinDiscoverySource" source
+        WHERE source."discoveryId" = discovery."id"
+          AND source."active" = true
+      )
+  `;
 }
 
 export async function decodeVin(vin: string): Promise<DecodedVinValues> {
@@ -463,7 +528,7 @@ export async function decodeVin(vin: string): Promise<DecodedVinValues> {
     );
     if (!response.ok) return {};
 
-    const data = await response.json() as any;
+    const data = await response.json() as VpicDecodeResponse;
     const result = data.Results?.[0];
     if (!result || result.ErrorCode === "0;14") return {};
 

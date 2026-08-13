@@ -1,11 +1,13 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @next/next/no-img-element */
+/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import Image from "next/image";
+import type { Session } from "next-auth";
+import type { Prisma } from "@prisma/client";
 import { auth, signIn } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { toggleGarageItem } from "@/app/actions/garage";
 import { getMarketSummary } from "@/lib/market-intelligence";
-import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
+import { isNonVehicleImageUrl } from "@/lib/vehicle-images";
 import MarketPriceHistory from "@/components/market/MarketPriceHistory";
 import { isListingMatchForModel } from "@/lib/inventory/validate-listing-identity";
 import { getPartDetailPath } from "@/lib/parts/routes";
@@ -39,13 +41,7 @@ function getDisplayableModelImages(images: ModelImageRecord[]) {
   );
 }
 
-function getListingImage(listing: any) {
-  const hasOwnerPhotos = listing.vehicle?.photos && listing.vehicle.photos.length > 0;
-  if (!hasOwnerPhotos && listing.imageUrl && !isNonVehicleImageUrl(listing.imageUrl)) {
-    return listing.imageUrl;
-  }
-  const vehicleHero = getVehicleHeroImage(listing.vehicle);
-  if (vehicleHero && vehicleHero !== "/images/placeholder.jpg") return vehicleHero;
+function getListingImage(listing: ModelListingPreview) {
   if (listing.imageUrl && !isNonVehicleImageUrl(listing.imageUrl)) return listing.imageUrl;
   return "/images/placeholder.jpg";
 }
@@ -91,24 +87,6 @@ function formatPartPrice(value: number | null) {
   }).format(value / 100);
 }
 
-function buildDisplayMarketRange(listings: any[]) {
-  const prices = listings
-    .map((listing) => listing.askingPrice ?? listing.price)
-    .filter((price): price is number => typeof price === "number" && price >= 10000);
-
-  if (prices.length === 0) return null;
-
-  const sorted = [...prices].sort((a, b) => a - b);
-  const average = Math.round(prices.reduce((sum, price) => sum + price, 0) / prices.length);
-
-  return {
-    lowestPrice: sorted[0],
-    highestPrice: sorted[sorted.length - 1],
-    averageAskingPrice: average,
-    activeListingCount: prices.length,
-  };
-}
-
 function ModelEmptyState({
   title,
   detail,
@@ -129,84 +107,125 @@ function ModelEmptyState({
   );
 }
 
-type ModelDetail = {
-  id: string;
-  makeId: string;
-  name: string;
-  slug: string;
-  years: string | null;
-  productionStartYear: number | null;
-  productionEndYear: number | null;
-  category: string | null;
-  bodyStyle: string | null;
-  productionCount: number | null;
-  description: string | null;
-  metadataStatus: string;
-  metadataConfidence: number | null;
-  metadataSource: string | null;
-  metadataSourceUrl: string | null;
-  lastMetadataAuditAt: Date | null;
+const modelPageSelect = {
+  id: true,
+  makeId: true,
+  name: true,
+  slug: true,
+  years: true,
+  productionStartYear: true,
+  productionEndYear: true,
+  category: true,
+  bodyStyle: true,
+  productionCount: true,
+  description: true,
+  metadataStatus: true,
+  metadataSource: true,
+  metadataSourceUrl: true,
   make: {
-    id: string;
-    name: string;
-    slug: string;
-    logoUrl: string | null;
-    createdAt: Date;
-    updatedAt: Date;
-  };
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      logoUrl: true,
+    },
+  },
   spec: {
-    id: string;
-    modelId: string;
-    engine: string | null;
-    displacement: string | null;
-    cylinders: string | null;
-    horsepower: string | null;
-    torque: string | null;
-    transmission: string | null;
-    drivetrain: string | null;
-    topSpeed: string | null;
-    zeroToSixty: string | null;
-    weight: string | null;
-    createdAt: Date;
-    updatedAt: Date;
-  } | null;
-  variants: Array<{
-    id: string;
-    modelId: string;
-    name: string;
-    slug: string;
-    productionStartYear: number | null;
-    productionEndYear: number | null;
-    productionCount: number | null;
-    description: string | null;
-    createdAt: Date;
-    updatedAt: Date;
-  }>;
-  images: ModelImageRecord[];
-  vehicles: Array<{
-    id: string;
-    vin: string;
-    modelId: string;
-    year: number;
-    color: string | null;
-    mileage: number | null;
-    transmission: string | null;
-    drivetrain: string | null;
-    engine: string | null;
-    status: string;
-    createdAt: Date;
-    updatedAt: Date;
-  }>;
-};
+    select: {
+      engine: true,
+      displacement: true,
+      cylinders: true,
+      horsepower: true,
+      torque: true,
+      transmission: true,
+      drivetrain: true,
+      topSpeed: true,
+      zeroToSixty: true,
+      weight: true,
+    },
+  },
+  variants: {
+    select: {
+      id: true,
+      name: true,
+      productionStartYear: true,
+      productionEndYear: true,
+      productionCount: true,
+      description: true,
+    },
+    orderBy: [{ productionStartYear: "asc" }, { name: "asc" }],
+    take: 24,
+  },
+  images: {
+    select: {
+      id: true,
+      url: true,
+      type: true,
+      source: true,
+      sourceUrl: true,
+      sourceName: true,
+      license: true,
+      attribution: true,
+      attributionUrl: true,
+      confidence: true,
+      reviewStatus: true,
+    },
+    orderBy: [{ type: "asc" }, { createdAt: "asc" }],
+    take: 12,
+  },
+} satisfies Prisma.ModelSelect;
+
+type ModelListingPreview = Prisma.ListingGetPayload<{
+  select: typeof modelListingPreviewSelect;
+}>;
+
+const modelListingPreviewSelect = {
+  id: true,
+  dealerName: true,
+  askingPrice: true,
+  price: true,
+  mileage: true,
+  url: true,
+  imageUrl: true,
+  createdAt: true,
+  validationStatus: true,
+  source: {
+    select: {
+      name: true,
+      type: true,
+    },
+  },
+  vehicle: {
+    select: {
+      vin: true,
+      year: true,
+      vinIdentityStatus: true,
+      model: {
+        select: {
+          name: true,
+          slug: true,
+          make: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+    },
+  },
+} satisfies Prisma.ListingSelect;
+
+type ModelPageSession = Session | null;
 
 export default async function ModelPage({ params }: ModelPageProps) {
   const { slug, modelSlug } = await params;
-  const session = (globalThis as any).mockSession !== undefined ? (globalThis as any).mockSession : await auth();
+  const mockSession = (globalThis as typeof globalThis & { mockSession?: ModelPageSession }).mockSession;
+  const session: ModelPageSession = mockSession !== undefined ? mockSession : await auth();
 
   const make = await prisma.make.findUnique({
     where: { slug },
+    select: { id: true, name: true },
   });
-
   if (!make) {
     return (
       <main className="garage-page-shell auth-page-shell">
@@ -219,26 +238,15 @@ export default async function ModelPage({ params }: ModelPageProps) {
     );
   }
 
-  const model = (await prisma.model.findUnique({
+  const model = await prisma.model.findUnique({
     where: {
       makeId_slug: {
         makeId: make.id,
         slug: modelSlug,
       },
     },
-    include: {
-      make: true,
-      variants: {
-        orderBy: [{ productionStartYear: "asc" }, { name: "asc" }],
-      },
-      images: {
-        orderBy: [{ type: "asc" }, { createdAt: "asc" }],
-      },
-      vehicles: {
-        orderBy: [{ year: "asc" }, { vin: "asc" }],
-      },
-    },
-  })) as ModelDetail | null;
+    select: modelPageSelect,
+  });
 
   if (!model) {
     return (
@@ -252,14 +260,7 @@ export default async function ModelPage({ params }: ModelPageProps) {
     );
   }
 
-  const [spec, modelImages, market, rawListings, maintenanceRules, recommendedParts] = await Promise.all([
-    prisma.modelSpec.findUnique({
-      where: { modelId: model.id },
-    }),
-    prisma.modelImage.findMany({
-      where: { modelId: model.id },
-      orderBy: [{ type: "asc" }, { createdAt: "asc" }],
-    }),
+  const [market, rawListings, maintenanceRules, recommendedParts, garageItem, claimedVehicle] = await Promise.all([
     getMarketSummary(model.id),
     // Public model inventory preview follows the same source-backed trust rules as market pages.
     prisma.listing.findMany({
@@ -295,31 +296,9 @@ export default async function ModelPage({ params }: ModelPageProps) {
           { externalListingId: { contains: "test", mode: "insensitive" } },
         ]
       },
-      include: {
-        source: {
-          select: {
-            name: true,
-            type: true,
-          },
-        },
-        vehicle: {
-          include: {
-            photos: {
-              orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }]
-            },
-            images: {
-              orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }]
-            },
-            model: {
-              include: {
-                images: true,
-                make: true,
-              }
-            }
-          }
-        }
-      },
-      orderBy: { createdAt: "desc" }
+      select: modelListingPreviewSelect,
+      orderBy: { createdAt: "desc" },
+      take: 12,
     }),
     prisma.maintenanceRule.findMany({
       where: {
@@ -373,13 +352,33 @@ export default async function ModelPage({ params }: ModelPageProps) {
           },
         ],
       },
-      include: {
-        category: true,
-        brand: true,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        imageUrl: true,
+        retailPriceCents: true,
+        category: {
+          select: {
+            name: true,
+          },
+        },
+        brand: {
+          select: {
+            name: true,
+            slug: true,
+          },
+        },
         compatibility: {
-          include: {
-            make: true,
-            model: true,
+          select: {
+            makeId: true,
+            modelId: true,
+            make: {
+              select: { name: true },
+            },
+            model: {
+              select: { name: true },
+            },
           },
           orderBy: { createdAt: "asc" },
         },
@@ -391,13 +390,33 @@ export default async function ModelPage({ params }: ModelPageProps) {
       ],
       take: 4,
     }),
+    session?.user
+      ? prisma.garageItem.findUnique({
+          where: {
+            userId_modelId: {
+              userId: session.user.id,
+              modelId: model.id,
+            },
+          },
+          select: { id: true },
+        })
+      : null,
+    session?.user
+      ? prisma.vehicle.findFirst({
+          where: {
+            modelId: model.id,
+            ownerId: session.user.id,
+          },
+          select: { vin: true },
+        })
+      : null,
   ]);
 
   // Validate and filter listings to ensure they match current make and model
   const validListings = rawListings.filter((l) => isListingMatchForModel(l, model));
 
   // Group active listings by vehicle VIN and choose the newest + lowest price
-  const groups = new Map<string, any[]>();
+  const groups = new Map<string, ModelListingPreview[]>();
   for (const l of validListings) {
     const vin = l.vehicle?.vin;
     if (!vin) continue;
@@ -407,7 +426,7 @@ export default async function ModelPage({ params }: ModelPageProps) {
     groups.get(vin)!.push(l);
   }
 
-  const dedupedListings: any[] = [];
+  const dedupedListings: ModelListingPreview[] = [];
   for (const list of groups.values()) {
     list.sort((a, b) => {
       const dateA = new Date(a.createdAt || 0).getTime();
@@ -424,24 +443,8 @@ export default async function ModelPage({ params }: ModelPageProps) {
     return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
   });
 
-  const garageItem = session?.user ? await prisma.garageItem.findUnique({
-    where: {
-      userId_modelId: {
-        userId: session.user.id as string,
-        modelId: model.id,
-      },
-    },
-  }) : null;
-
-  const claimedVehicle = session?.user ? await prisma.vehicle.findFirst({
-    where: {
-      modelId: model.id,
-      ownerId: session.user.id as string,
-    },
-  }) : null;
-
-  const displayableModelImages = getDisplayableModelImages(modelImages);
-  const heroImage = getHeroImage(modelImages);
+  const displayableModelImages = getDisplayableModelImages(model.images);
+  const heroImage = getHeroImage(model.images);
   const galleryImages = displayableModelImages
     .filter((image) => image.url !== heroImage?.url)
     .slice(0, 5);
@@ -451,16 +454,16 @@ export default async function ModelPage({ params }: ModelPageProps) {
   const heroImageCreditUrl = heroImage?.attributionUrl || heroImage?.sourceUrl || null;
 
   const specs = [
-    ["Engine", spec?.engine],
-    ["Displacement", spec?.displacement],
-    ["Cylinders", spec?.cylinders],
-    ["Horsepower", spec?.horsepower],
-    ["Torque", spec?.torque],
-    ["Transmission", spec?.transmission],
-    ["Drivetrain", spec?.drivetrain],
-    ["Top speed", spec?.topSpeed],
-    ["0-60 mph", spec?.zeroToSixty],
-    ["Weight", spec?.weight],
+    ["Engine", model.spec?.engine],
+    ["Displacement", model.spec?.displacement],
+    ["Cylinders", model.spec?.cylinders],
+    ["Horsepower", model.spec?.horsepower],
+    ["Torque", model.spec?.torque],
+    ["Transmission", model.spec?.transmission],
+    ["Drivetrain", model.spec?.drivetrain],
+    ["Top speed", model.spec?.topSpeed],
+    ["0-60 mph", model.spec?.zeroToSixty],
+    ["Weight", model.spec?.weight],
   ].filter((entry): entry is [string, string] => Boolean(entry[1]));
   const modelTitle = `${model.make.name} ${model.name}`;
   const inventoryHref = `/inventory?make=${encodeURIComponent(model.make.slug)}&model=${encodeURIComponent(model.slug)}`;
@@ -483,16 +486,16 @@ export default async function ModelPage({ params }: ModelPageProps) {
     model.bodyStyle,
   ].filter((value): value is string => Boolean(value));
   const displayListings = listings.filter((listing) => getListingImage(listing) !== "/images/placeholder.jpg");
-  const displayMarketRange = buildDisplayMarketRange(displayListings);
+  const displayMarketRange = market.range;
   const displayMarketRangeLabel = displayMarketRange
     ? `$${displayMarketRange.lowestPrice.toLocaleString()} - $${displayMarketRange.highestPrice.toLocaleString()}`
     : null;
   const marketHasDisplayData = Boolean(displayMarketRange || market.recentSales.salesCount > 0 || market.trend);
   const heroStats = [
     productionYears ? ["Production Years", productionYears] : null,
-    ["Horsepower", spec?.horsepower],
-    ["0-60 MPH", spec?.zeroToSixty],
-    ["Top Speed", spec?.topSpeed],
+    ["Horsepower", model.spec?.horsepower],
+    ["0-60 MPH", model.spec?.zeroToSixty],
+    ["Top Speed", model.spec?.topSpeed],
     displayMarketRangeLabel ? ["Market Range", displayMarketRangeLabel] : null,
   ].filter((entry): entry is [string, string] => Boolean(entry?.[1]));
   const modelFamilyItems = [
@@ -722,7 +725,7 @@ export default async function ModelPage({ params }: ModelPageProps) {
                   <article>
                     <span>Active Listings</span>
                     <Link href={inventoryHref}>
-                      <strong>{displayListings.length.toLocaleString()}</strong>
+                      <strong>{market.supply.activeListingCount.toLocaleString()}</strong>
                     </Link>
                   </article>
                   <article>

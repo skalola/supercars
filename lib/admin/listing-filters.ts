@@ -1,6 +1,10 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
+import { isNonVehicleImageUrl } from "@/lib/vehicle-images";
+
+const SUPPORTED_INVENTORY_MAKES = ["Ferrari", "Lamborghini", "McLaren"];
+const ADMIN_LISTING_LIMIT = 1000;
+export const ADMIN_LISTINGS_PAGE_SIZE = 50;
 
 export const inventoryDashboardListingWhere: Prisma.ListingWhereInput = {
   status: "ACTIVE",
@@ -19,27 +23,88 @@ export const inventoryDashboardListingWhere: Prisma.ListingWhereInput = {
   ],
 };
 
-export async function getInventoryDashboardListings() {
-  const rawListings = await prisma.listing.findMany({
-    where: inventoryDashboardListingWhere,
-    include: {
+const liveInventoryWhere: Prisma.ListingWhereInput = {
+  ...inventoryDashboardListingWhere,
+  imageUrl: { not: null },
+  vehicle: {
+    is: {
+      inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
       model: {
-        include: {
-          make: true,
+        make: { name: { in: SUPPORTED_INVENTORY_MAKES } },
+      },
+    },
+  },
+};
+
+const adminInventoryListingSelect = {
+  id: true,
+  imageUrl: true,
+  status: true,
+  validationStatus: true,
+  priceStatus: true,
+  freshnessStatus: true,
+  askingPrice: true,
+  price: true,
+  mileage: true,
+  dealerName: true,
+  location: true,
+  externalListingId: true,
+  url: true,
+  updatedAt: true,
+  source: {
+    select: {
+      name: true,
+      website: true,
+      type: true,
+    },
+  },
+  vehicle: {
+    select: {
+      trim: true,
+      year: true,
+      vin: true,
+      model: {
+        select: {
+          name: true,
+          make: {
+            select: {
+              name: true,
+            },
+          },
         },
       },
+    },
+  },
+} satisfies Prisma.ListingSelect;
+
+export async function getInventoryDashboardListings() {
+  const rawListings = await prisma.listing.findMany({
+    where: liveInventoryWhere,
+    select: {
+      id: true,
+      modelId: true,
+      imageUrl: true,
+      askingPrice: true,
+      price: true,
+      dealerName: true,
       vehicle: {
-        include: {
-          photos: {
-            orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
-          },
-          images: {
-            orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
-          },
+        select: {
           model: {
-            include: {
-              images: true,
-              make: true,
+            select: {
+              make: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      model: {
+        select: {
+          make: {
+            select: {
+              name: true,
             },
           },
         },
@@ -51,11 +116,12 @@ export async function getInventoryDashboardListings() {
       },
     },
     orderBy: { createdAt: "desc" },
+    take: ADMIN_LISTING_LIMIT,
   });
   return rawListings.filter(hasCleanInventoryDisplayImage);
 }
 
-export async function getAdminInventoryListings() {
+export async function getAdminInventoryListings(page = 1) {
   return prisma.listing.findMany({
     where: {
       vehicleId: { not: null },
@@ -64,59 +130,101 @@ export async function getAdminInventoryListings() {
         { url: { contains: "bringatrailer.com", mode: "insensitive" } },
       ],
     },
-    include: {
-      model: {
-        include: {
-          make: true,
-        },
-      },
-      vehicle: {
-        include: {
-          model: {
-            include: {
-              make: true,
-            },
-          },
-        },
-      },
-      source: {
-        select: {
-          name: true,
-          website: true,
-          type: true,
-        },
-      },
-    },
+    select: adminInventoryListingSelect,
     orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
+    skip: (page - 1) * ADMIN_LISTINGS_PAGE_SIZE,
+    take: ADMIN_LISTINGS_PAGE_SIZE,
+  });
+}
+
+export async function getAdminInventoryListingCount() {
+  return prisma.listing.count({
+    where: {
+      vehicleId: { not: null },
+      NOT: [
+        { source: { is: { type: "AUCTION" } } },
+        { url: { contains: "bringatrailer.com", mode: "insensitive" } },
+      ],
+    },
   });
 }
 
 function hasCleanInventoryDisplayImage(listing: {
   imageUrl?: string | null;
-  vehicle?: unknown;
 }) {
-  const vehicleHero = getVehicleHeroImage(listing.vehicle as Parameters<typeof getVehicleHeroImage>[0]);
-  if (vehicleHero && vehicleHero !== "/images/placeholder.jpg" && !isNonVehicleImageUrl(vehicleHero)) return true;
   return Boolean(listing.imageUrl && !isNonVehicleImageUrl(listing.imageUrl));
 }
 
 export async function getInventoryDashboardListingCount() {
-  const listings = await getInventoryDashboardListings();
-  return listings.length;
+  const listings = await prisma.listing.findMany({
+    where: liveInventoryWhere,
+    select: { imageUrl: true },
+  });
+  return listings.filter(hasCleanInventoryDisplayImage).length;
 }
 
 export async function getLiveInventoryListingStats() {
-  const listings = await getInventoryDashboardListings();
-  const prices = listings
-    .map((listing) => listing.askingPrice ?? listing.price ?? 0)
-    .filter((price) => price > 0);
+  type InventoryStatsRow = {
+    liveListingCount: number;
+    pricedListingCount: number;
+    totalLiveListingValue: number;
+    averageLiveListingPrice: number;
+    listingsByMake: Array<{ label: string; value: number }>;
+    topSources: Array<{ label: string; value: number }>;
+  };
+
+  const [stats] = await prisma.$queryRaw<InventoryStatsRow[]>`
+    WITH clean_listings AS (
+      SELECT
+        COALESCE(listing."askingPrice", listing."price", 0)::double precision AS value,
+        make."name" AS make_name,
+        COALESCE(source."name", listing."dealerName", 'Unknown') AS source_name
+      FROM "Listing" listing
+      INNER JOIN "Vehicle" vehicle ON vehicle."id" = listing."vehicleId"
+      INNER JOIN "Model" model ON model."id" = vehicle."modelId"
+      INNER JOIN "Make" make ON make."id" = model."makeId"
+      LEFT JOIN "MarketSource" source ON source."id" = listing."sourceId"
+      WHERE listing."status" = 'ACTIVE'
+        AND listing."validationStatus" = 'VALID'
+        AND vehicle."inventoryStatus" IN ('ACTIVE', 'VALID', 'WARNING')
+        AND listing."priceStatus" IS DISTINCT FROM 'PRICE_INVALID'
+        AND (listing."askingPrice" >= 10000 OR listing."price" >= 10000)
+        AND listing."imageUrl" IS NOT NULL
+        AND listing."imageUrl" !~* 'placeholder|logo|icon|favicon|spinner|loading|avatar|profile|badge|sprite|transparent|blank|noimage|comingsoon|autocheck|carfax|e6-static-thumber'
+        AND make."name" IN ('Ferrari', 'Lamborghini', 'McLaren')
+        AND (source."type" IS NULL OR source."type" <> 'AUCTION')
+        AND (listing."url" IS NULL OR listing."url" NOT ILIKE '%bringatrailer.com%')
+    ),
+    make_counts AS (
+      SELECT make_name AS label, COUNT(*)::int AS value
+      FROM clean_listings
+      GROUP BY make_name
+      ORDER BY value DESC, label ASC
+    ),
+    source_counts AS (
+      SELECT source_name AS label, COUNT(*)::int AS value
+      FROM clean_listings
+      GROUP BY source_name
+      ORDER BY value DESC, label ASC
+      LIMIT 5
+    )
+    SELECT
+      COUNT(*)::int AS "liveListingCount",
+      COUNT(*) FILTER (WHERE value > 0)::int AS "pricedListingCount",
+      COALESCE(SUM(value), 0)::double precision AS "totalLiveListingValue",
+      COALESCE(AVG(value) FILTER (WHERE value > 0), 0)::double precision AS "averageLiveListingPrice",
+      COALESCE((SELECT json_agg(make_counts) FROM make_counts), '[]'::json) AS "listingsByMake",
+      COALESCE((SELECT json_agg(source_counts) FROM source_counts), '[]'::json) AS "topSources"
+    FROM clean_listings
+  `;
 
   return {
-    listings,
-    liveListingCount: listings.length,
-    pricedListingCount: prices.length,
-    totalLiveListingValue: prices.reduce((sum, price) => sum + price, 0),
-    averageLiveListingPrice:
-      prices.length > 0 ? prices.reduce((sum, price) => sum + price, 0) / prices.length : 0,
+    listings: [],
+    listingsByMake: stats?.listingsByMake ?? [],
+    topSources: stats?.topSources ?? [],
+    liveListingCount: stats?.liveListingCount ?? 0,
+    pricedListingCount: stats?.pricedListingCount ?? 0,
+    totalLiveListingValue: stats?.totalLiveListingValue ?? 0,
+    averageLiveListingPrice: stats?.averageLiveListingPrice ?? 0,
   };
 }

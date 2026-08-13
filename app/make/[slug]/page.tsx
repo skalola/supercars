@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
 
 type MakePageProps = {
   params: Promise<{ slug: string }>;
@@ -8,14 +8,14 @@ type MakePageProps = {
 export default async function MakePage({ params }: MakePageProps) {
   const { slug } = await params;
 
-  const make = await prisma.make.findUnique({
-    where: { slug },
-    include: {
-      models: {
-        orderBy: { name: "asc" },
-      },
-    },
-  });
+  const catalog = await getMakeModelCatalogOptions();
+  const makeOption = catalog.makes.find((make) => make.slug === slug);
+  const make = makeOption
+    ? {
+        ...makeOption,
+        models: catalog.models.filter((model) => model.makeId === makeOption.id),
+      }
+    : null;
 
   if (!make) {
     return (

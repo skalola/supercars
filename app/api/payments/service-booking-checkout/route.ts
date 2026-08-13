@@ -24,10 +24,25 @@ export async function POST(request: NextRequest) {
 
   const booking = await prisma.fulfillmentRequest.findUnique({
     where: { id: fulfillmentRequestId },
-    include: {
-      vehicle: true,
-      fees: true,
-      depositIntents: true,
+    select: {
+      id: true,
+      buyerId: true,
+      requestType: true,
+      status: true,
+      paymentStatus: true,
+      vehicleId: true,
+      publicTransactionToken: true,
+      vehicle: {
+        select: {
+          vin: true,
+        },
+      },
+      fees: {
+        select: {
+          id: true,
+          feeType: true,
+        },
+      },
     },
   });
 

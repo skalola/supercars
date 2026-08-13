@@ -75,7 +75,7 @@ export async function getUpcomingMeetEvents() {
       where: {
         status: { in: ["PUBLISHED", "FULL", "COMPLETED"] },
       },
-      include: meetInclude,
+      select: meetSelect,
       orderBy: { startsAt: "asc" },
       take: 24,
     });
@@ -89,7 +89,7 @@ export async function getMeetBySlug(slug: string) {
   try {
     const row = await prisma.meet.findUnique({
       where: { slug },
-      include: meetInclude,
+      select: meetSelect,
     });
     if (row) return serializeMeet(row);
   } catch {
@@ -98,18 +98,59 @@ export async function getMeetBySlug(slug: string) {
   return null;
 }
 
-const meetInclude = {
+const meetSelect = {
+  id: true,
+  slug: true,
+  title: true,
+  startsAt: true,
+  city: true,
+  state: true,
+  type: true,
+  status: true,
+  visibility: true,
+  capacity: true,
+  hostId: true,
+  locationName: true,
+  locationDetail: true,
+  description: true,
+  allowedMakes: true,
+  latitude: true,
+  longitude: true,
+  mapX: true,
+  mapY: true,
+  heroImageUrl: true,
   host: { select: { username: true, name: true } },
   club: { select: { name: true, slug: true } },
   rsvps: {
     where: { status: { in: ["GOING", "MAYBE", "WAITLISTED"] } },
-    include: {
+    select: {
+      status: true,
       user: { select: { username: true, name: true } },
       vehicle: {
-        include: {
-          photos: { orderBy: [{ isHero: "desc" }, { displayOrder: "asc" }, { createdAt: "asc" }], take: 1 },
-          images: { orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }], take: 1 },
-          model: { include: { make: true, images: { take: 1 } } },
+        select: {
+          vin: true,
+          year: true,
+          photos: {
+            select: { filePath: true },
+            orderBy: [{ isHero: "desc" }, { displayOrder: "asc" }, { createdAt: "asc" }],
+            take: 1,
+          },
+          images: {
+            select: { url: true },
+            orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+            take: 1,
+          },
+          model: {
+            select: {
+              name: true,
+              make: { select: { name: true } },
+              images: {
+                select: { url: true },
+                orderBy: [{ type: "asc" }, { createdAt: "asc" }],
+                take: 1,
+              },
+            },
+          },
         },
       },
     },
@@ -117,20 +158,31 @@ const meetInclude = {
     take: 12,
   },
   photos: {
-    include: {
+    select: {
+      id: true,
+      url: true,
+      caption: true,
+      createdAt: true,
       user: { select: { username: true, name: true } },
       vehicle: {
-        include: {
-          model: { include: { make: true } },
+        select: {
+          vin: true,
+          year: true,
+          model: {
+            select: {
+              name: true,
+              make: { select: { name: true } },
+            },
+          },
         },
       },
     },
     orderBy: { createdAt: "desc" },
     take: 24,
   },
-} satisfies Prisma.MeetInclude;
+} satisfies Prisma.MeetSelect;
 
-type MeetRow = Prisma.MeetGetPayload<{ include: typeof meetInclude }>;
+type MeetRow = Prisma.MeetGetPayload<{ select: typeof meetSelect }>;
 
 function serializeMeet(row: MeetRow): MeetEvent {
   const allowedMakes = parseAllowedMakes(row.allowedMakes);

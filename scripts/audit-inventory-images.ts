@@ -50,6 +50,7 @@ async function main() {
               validationStatus: true,
             },
             orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+            take: 24,
           },
           model: {
             select: {

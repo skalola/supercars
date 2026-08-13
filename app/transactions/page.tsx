@@ -1,13 +1,57 @@
 import React from "react";
 import { auth } from "@/auth";
-import { getUserFulfillmentTransactions } from "@/lib/fulfillment/service";
-import { TransactionCenterClient, TransactionCenterItem } from "@/components/transactions/TransactionCenterClient";
+import {
+  getUserFulfillmentSummary,
+  getUserFulfillmentTransactionCount,
+  getUserFulfillmentTransactions,
+  USER_FULFILLMENT_PAGE_SIZE,
+  type UserFulfillmentCategory,
+} from "@/lib/fulfillment/service";
+import { TransactionCenterClient, type TransactionCenterItem } from "@/components/transactions/TransactionCenterClient";
+import { AdminPagination, parseAdminPage } from "@/components/admin/AdminPagination";
 
-export default async function TransactionsPage() {
+const transactionCategories = new Set<UserFulfillmentCategory>([
+  "ALL",
+  "BUYING",
+  "SELLING",
+  "SERVICE_BOOKINGS",
+  "INSURANCE_REQUESTS",
+  "TRANSPORT_REQUESTS",
+]);
+
+export default async function TransactionsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ page?: string | string[]; tab?: string; q?: string }>;
+}) {
   const session = await auth();
   const userId = session?.user?.id;
+  const params = await searchParams;
+  const requestedPage = parseAdminPage(params?.page);
+  const category = transactionCategories.has(params?.tab as UserFulfillmentCategory)
+    ? params?.tab as UserFulfillmentCategory
+    : "ALL";
+  const search = params?.q?.trim() || undefined;
+  const filters = { category, search };
 
-  const rawTransactions = userId ? await getUserFulfillmentTransactions(userId) : [];
+  const [summary, totalTransactions] = userId
+    ? await Promise.all([
+        getUserFulfillmentSummary(userId),
+        getUserFulfillmentTransactionCount(userId, filters),
+      ])
+    : [
+        {
+          total: 0,
+          active: 0,
+          attention: 0,
+          captured: 0,
+          tabCounts: Object.fromEntries([...transactionCategories].map((key) => [key, 0])) as Record<UserFulfillmentCategory, number>,
+        },
+        0,
+      ];
+  const totalPages = Math.max(1, Math.ceil(totalTransactions / USER_FULFILLMENT_PAGE_SIZE));
+  const page = Math.min(requestedPage, totalPages);
+  const rawTransactions = userId ? await getUserFulfillmentTransactions(userId, filters, page) : [];
 
   const items: TransactionCenterItem[] = rawTransactions.map((tx) => {
     const isOwnerView = Boolean(
@@ -23,8 +67,6 @@ export default async function TransactionsPage() {
       expectedPlatformFee: tx.expectedPlatformFee,
       expectedPartnerCommission: tx.expectedPartnerCommission,
       collectedAmount: tx.collectedAmount,
-      refundableAmount: tx.refundableAmount,
-      payoutStatus: tx.payoutStatus,
       createdAt: tx.createdAt,
       updatedAt: tx.updatedAt,
       isOwnerView,
@@ -47,12 +89,6 @@ export default async function TransactionsPage() {
         companyName: p.companyName,
         roleDescription: p.roleDescription,
       })),
-      fees: tx.fees.map((f) => ({
-        id: f.id,
-        feeType: f.feeType,
-        amount: f.amount,
-        status: f.status,
-      })),
       depositIntents: tx.depositIntents.map((d) => ({
         id: d.id,
         amount: d.amount,
@@ -68,5 +104,22 @@ export default async function TransactionsPage() {
     };
   });
 
-  return <TransactionCenterClient userId={userId} transactions={items} />;
+  return (
+    <>
+      <TransactionCenterClient
+        userId={userId}
+        transactions={items}
+        activeTab={category}
+        searchQuery={search || ""}
+        summary={summary}
+      />
+      <AdminPagination
+        pathname="/transactions"
+        page={page}
+        totalPages={totalPages}
+        preserveParams={{ tab: category, q: search }}
+        ariaLabel="Transaction pages"
+      />
+    </>
+  );
 }

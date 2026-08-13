@@ -1,13 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { normalizeSupportedMake, SUPPORTED_MAKES } from "@/lib/supported-makes";
+import { getArgValue, getBatchLimit, hasArg, isExecuteMode, logScriptMode } from "./lib/script-guards";
 
-const makeArg = process.argv.find((arg) => arg.startsWith("--make="))?.split("=")[1];
-const limitArg = Number(process.argv.find((arg) => arg.startsWith("--limit="))?.split("=")[1] ?? 100);
-const deactivateUnresolved = process.argv.includes("--deactivate-unresolved");
+const makeArg = getArgValue("--make");
+const deactivateUnresolved = hasArg("--deactivate-unresolved");
+const execute = isExecuteMode();
 const targetMakes = makeArg
   ? [normalizeSupportedMake(makeArg)].filter((make): make is (typeof SUPPORTED_MAKES)[number] => Boolean(make))
   : [...SUPPORTED_MAKES];
-const limit = Number.isFinite(limitArg) && limitArg > 0 ? limitArg : 100;
+const limit = getBatchLimit({ defaultLimit: 75, maxLimit: 250 });
 
 const HEADERS = {
   accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
@@ -22,6 +23,7 @@ const detailLinksCache = new Map<string, Promise<string[]>>();
 
 async function main() {
   if (targetMakes.length === 0) throw new Error(`Unsupported make: ${makeArg}`);
+  logScriptMode("repair-listing-detail-urls", execute, limit);
 
   const listings = await prisma.listing.findMany({
     where: {
@@ -84,7 +86,7 @@ async function main() {
     const match = await findDetailPageForVin(listing.url, listing.vehicle.vin);
     if (!match) {
       skipped++;
-      if (deactivateUnresolved) {
+      if (deactivateUnresolved && execute) {
         await prisma.listing.update({
           where: { id: listing.id },
           data: {
@@ -94,6 +96,9 @@ async function main() {
           },
         });
         deactivated++;
+      } else if (deactivateUnresolved) {
+        deactivated++;
+        console.log(`WOULD_DEACTIVATE ${listing.vehicle.vin} | unresolved detail URL | ${listing.url}`);
       }
       continue;
     }
@@ -105,17 +110,19 @@ async function main() {
       listing.model.name,
     ]);
 
-    await prisma.listing.update({
-      where: { id: listing.id },
-      data: {
-        url: match.url,
-        imageUrl,
-        externalListingId: listing.externalListingId || idFromUrl(match.url) || `${listing.vehicle.vin}:${match.url}`,
-        status: "ACTIVE",
-        freshnessStatus: "ACTIVE",
-        lastSeen: new Date(),
-      },
-    });
+    if (execute) {
+      await prisma.listing.update({
+        where: { id: listing.id },
+        data: {
+          url: match.url,
+          imageUrl,
+          externalListingId: listing.externalListingId || idFromUrl(match.url) || `${listing.vehicle.vin}:${match.url}`,
+          status: "ACTIVE",
+          freshnessStatus: "ACTIVE",
+          lastSeen: new Date(),
+        },
+      });
+    }
 
     if (imageUrl) {
       const existingImage = await prisma.vehicleImage.findFirst({
@@ -126,7 +133,7 @@ async function main() {
         select: { id: true },
       });
 
-      if (!existingImage) {
+      if (!existingImage && execute) {
         const existingPrimary = await prisma.vehicleImage.count({
           where: { vehicleId: listing.vehicle.id, isPrimary: true },
         });
@@ -143,10 +150,10 @@ async function main() {
     }
 
     repaired++;
-    console.log(`FIX ${listing.vehicle.vin} | ${match.url} | ${imageUrl || "no image"}`);
+    console.log(`${execute ? "FIX" : "WOULD_FIX"} ${listing.vehicle.vin} | ${match.url} | ${imageUrl || "no image"}`);
   }
 
-  console.log(JSON.stringify({ targetMakes, inspected: listings.length, repaired, deactivated, skipped }, null, 2));
+  console.log(JSON.stringify({ execute, targetMakes, inspected: listings.length, repaired, deactivated, skipped }, null, 2));
 }
 
 async function findDetailPageForVin(sourceUrl: string, vin: string): Promise<HtmlPage | null> {

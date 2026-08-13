@@ -32,6 +32,11 @@ type MeetEmailContext = {
   host: MeetEmailUser;
 };
 
+export type MeetReminderRecipient = {
+  meet: MeetEmailContext;
+  user: MeetEmailUser;
+};
+
 export async function notifyMeetCreated(meetId: string) {
   const meet = await getMeetEmailContext(meetId);
   if (!meet) return;
@@ -153,19 +158,21 @@ export async function notifyMeetUpdated(meetId: string, actorUserId?: string | n
   }
 }
 
-export async function notifyMeetReminder(meetId: string, userId: string) {
+export async function notifyMeetReminder(meetId: string, userId: string, skipExistingCheck = false) {
   const [meet, user] = await Promise.all([getMeetEmailContext(meetId), getMeetUser(userId)]);
   if (!meet || !user) return;
 
-  const existing = await prisma.meetNotification.findFirst({
-    where: {
-      meetId,
-      userId,
-      notificationType: "MEET_REMINDER_ATTENDEE",
-    },
-    select: { id: true },
-  });
-  if (existing) return;
+  if (!skipExistingCheck) {
+    const existing = await prisma.meetNotification.findFirst({
+      where: {
+        meetId,
+        userId,
+        notificationType: "MEET_REMINDER_ATTENDEE",
+      },
+      select: { id: true },
+    });
+    if (existing) return;
+  }
 
   await sendMeetNotification({
     meet,
@@ -176,6 +183,20 @@ export async function notifyMeetReminder(meetId: string, userId: string) {
     body: `${meet.title} is coming up soon. Review the meet page for location details, roll call, and arrival expectations.`,
     ctaLabel: "View Meet",
   });
+}
+
+export async function notifyMeetReminderBatch(recipients: MeetReminderRecipient[]) {
+  for (const { meet, user } of recipients) {
+    await sendMeetNotification({
+      meet,
+      user,
+      type: "MEET_REMINDER_ATTENDEE",
+      subject: `[SUPERCAR DASH] Meet Reminder - ${meet.title}`,
+      headline: "Your meet is coming up",
+      body: `${meet.title} is coming up soon. Review the meet page for location details, roll call, and arrival expectations.`,
+      ctaLabel: "View Meet",
+    });
+  }
 }
 
 async function sendMeetNotification({

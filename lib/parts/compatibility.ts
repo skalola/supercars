@@ -12,34 +12,40 @@ type VehicleFitmentTarget = {
 export function getExplicitPartCompatibilityWhereForVehicle(vehicle: VehicleFitmentTarget): Prisma.PerformancePartWhereInput {
   return {
     compatibility: {
-      some: {
-        AND: [
+      some: getExplicitCompatibilityScopeForVehicle(vehicle),
+    },
+  };
+}
+
+export function getExplicitCompatibilityScopeForVehicle(
+  vehicle: VehicleFitmentTarget,
+): Prisma.PartCompatibilityWhereInput {
+  return {
+    AND: [
+      {
+        OR: [
+          { modelId: vehicle.modelId },
           {
-            OR: [
-              { modelId: vehicle.modelId },
-              {
-                AND: [
-                  { modelId: null },
-                  { makeId: vehicle.model.makeId },
-                ],
-              },
-            ],
-          },
-          {
-            OR: [
-              { yearStart: null },
-              { yearStart: { lte: vehicle.year } },
-            ],
-          },
-          {
-            OR: [
-              { yearEnd: null },
-              { yearEnd: { gte: vehicle.year } },
+            AND: [
+              { modelId: null },
+              { makeId: vehicle.model.makeId },
             ],
           },
         ],
       },
-    },
+      {
+        OR: [
+          { yearStart: null },
+          { yearStart: { lte: vehicle.year } },
+        ],
+      },
+      {
+        OR: [
+          { yearEnd: null },
+          { yearEnd: { gte: vehicle.year } },
+        ],
+      },
+    ],
   };
 }
 
@@ -55,15 +61,56 @@ export async function getCompatiblePerformancePartsForVehicle(vehicle: {
       status: { in: ["ACTIVE", "MANUAL_REVIEW"] },
       ...getExplicitPartCompatibilityWhereForVehicle(vehicle),
     },
-    include: {
-      category: true,
-      brand: true,
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      partNumber: true,
+      description: true,
+      imageUrl: true,
+      sourceUrl: true,
+      sourceConfidence: true,
+      status: true,
+      retailPriceCents: true,
+      estimatedHpGain: true,
+      estimatedTorqueGain: true,
+      categoryId: true,
+      brandId: true,
+      category: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+        },
+      },
+      brand: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+        },
+      },
       compatibility: {
-        include: {
-          make: true,
-          model: true,
+        select: {
+          makeId: true,
+          modelId: true,
+          yearStart: true,
+          yearEnd: true,
+          trim: true,
+          engine: true,
+          make: {
+            select: {
+              name: true,
+            },
+          },
+          model: {
+            select: {
+              name: true,
+            },
+          },
         },
         orderBy: { createdAt: "asc" },
+        take: 12,
       },
     },
     orderBy: [
@@ -71,6 +118,7 @@ export async function getCompatiblePerformancePartsForVehicle(vehicle: {
       { brand: { name: "asc" } },
       { name: "asc" },
     ],
+    take: 50,
   });
 
   return parts;

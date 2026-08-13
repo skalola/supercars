@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import { canonicalBaseModelName } from "@/lib/model-catalog/base-model";
 import { fetchCommonsImageMetadata } from "@/lib/model-catalog/sources/commons";
 import { normalizeCatalogText } from "@/lib/model-catalog/normalizer";
+import { isExecuteMode, logScriptMode } from "./lib/script-guards";
 
 const prisma = new PrismaClient();
 
@@ -14,6 +15,7 @@ type CliOptions = {
   wikidataLimit: number;
   openverseLimit: number;
   delayMs: number;
+  execute: boolean;
 };
 
 type CommonsCategorySearchResponse = {
@@ -102,12 +104,22 @@ const OPENVERSE_LICENSES = ["cc0", "by", "by-sa", "by-nc", "by-nc-sa", "pdm"];
 
 async function main() {
   const options = parseOptions(process.argv.slice(2));
+  logScriptMode("build-model-image-candidate-pool", options.execute, options.limitMakes);
   const makes = await prisma.make.findMany({
     where: options.make ? { name: { equals: options.make, mode: "insensitive" } } : {},
-    include: {
+    select: {
+      id: true,
+      name: true,
       models: {
-        include: {
-          images: true,
+        select: {
+          id: true,
+          name: true,
+          images: {
+            select: {
+              type: true,
+              reviewStatus: true,
+            },
+          },
         },
         orderBy: { name: "asc" },
       },
@@ -139,7 +151,7 @@ async function main() {
           const metadata = await fetchCommonsImageMetadata(file.title).catch(() => null);
           if (!metadata?.imageUrl || !metadata.license) continue;
           const title = file.title.replace(/^File:/i, "");
-          const result = await upsertCandidate({
+          const result = await upsertCandidate(options.execute, {
             makeName: make.name,
             url: metadata.imageUrl,
             source: "COMMONS_CATEGORY_POOL",
@@ -174,7 +186,7 @@ async function main() {
         const metadata = await fetchCommonsImageMetadata(file.title).catch(() => null);
         if (!metadata?.imageUrl || !metadata.license) continue;
         const title = file.title.replace(/^File:/i, "");
-        const result = await upsertCandidate({
+        const result = await upsertCandidate(options.execute, {
           makeName: make.name,
           url: metadata.imageUrl,
           source: "COMMONS_FILE_POOL",
@@ -215,7 +227,7 @@ async function main() {
         if (imageFilename) {
           const metadata = await fetchCommonsImageMetadata(imageFilename).catch(() => null);
           if (metadata?.imageUrl && metadata.license) {
-            const result = await upsertCandidate({
+            const result = await upsertCandidate(options.execute, {
               makeName: make.name,
               url: metadata.imageUrl,
               source: "WIKIDATA_COMMONS_POOL",
@@ -241,7 +253,7 @@ async function main() {
             const metadata = await fetchCommonsImageMetadata(file.title).catch(() => null);
             if (!metadata?.imageUrl || !metadata.license) continue;
             const title = file.title.replace(/^File:/i, "");
-            const result = await upsertCandidate({
+            const result = await upsertCandidate(options.execute, {
               makeName: make.name,
               url: metadata.imageUrl,
               source: "WIKIDATA_COMMONS_CATEGORY_POOL",
@@ -267,7 +279,7 @@ async function main() {
       const results = await searchOpenverse(`${make.name} ${family} car`).catch(() => []);
       for (const item of results) {
         if (!item.url || !item.license) continue;
-        const result = await upsertCandidate({
+        const result = await upsertCandidate(options.execute, {
           makeName: make.name,
           url: item.url,
           source: "OPENVERSE_POOL",
@@ -352,7 +364,7 @@ async function searchCommonsFiles(query: string) {
     .sort((a, b) => scoreContext(`${b.title} ${b.snippet || ""}`, query) - scoreContext(`${a.title} ${a.snippet || ""}`, query));
 }
 
-async function upsertCandidate(input: {
+async function upsertCandidate(execute: boolean, input: {
   makeName: string;
   url: string;
   source: string;
@@ -366,6 +378,8 @@ async function upsertCandidate(input: {
   context: string | null;
   baseModelName: string | null;
 }) {
+  if (!execute) return { created: false };
+
   const existing = await prisma.modelImageCandidate.findUnique({
     where: {
       source_url_makeName: {
@@ -549,6 +563,7 @@ function parseOptions(args: string[]): CliOptions {
     wikidataLimit: Math.max(0, Number(getValue("wikidata-limit")) || 20),
     openverseLimit: Math.max(0, Number(getValue("openverse-limit")) || 8),
     delayMs: Math.max(0, Number(getValue("delay-ms")) || 1200),
+    execute: isExecuteMode(),
   };
 }
 

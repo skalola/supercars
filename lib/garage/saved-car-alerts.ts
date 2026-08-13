@@ -190,7 +190,9 @@ async function notifySavedCarSubscribers({
         email: { not: null },
       },
     },
-    include: {
+    select: {
+      id: true,
+      priceTrackerBaseline: true,
       user: {
         select: {
           id: true,

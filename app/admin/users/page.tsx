@@ -1,6 +1,9 @@
 import { requireAdmin } from "@/lib/admin/auth";
 import { prisma } from "@/lib/prisma";
 import { AdminUsersTable, AdminUserRow } from "@/components/admin/AdminUsersTable";
+import { AdminPagination, parseAdminPage } from "@/components/admin/AdminPagination";
+
+const USERS_PAGE_SIZE = 50;
 
 function formatDate(value: Date) {
   return new Intl.DateTimeFormat("en-US", {
@@ -10,12 +13,25 @@ function formatDate(value: Date) {
   }).format(value);
 }
 
-export default async function AdminUsersPage() {
+export default async function AdminUsersPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ page?: string | string[] }>;
+}) {
   const session = await requireAdmin();
   const now = new Date();
+  const requestedPage = parseAdminPage((await searchParams)?.page);
 
+  const totalUsers = await prisma.user.count();
+  const totalPages = Math.max(1, Math.ceil(totalUsers / USERS_PAGE_SIZE));
+  const page = Math.min(requestedPage, totalPages);
   const users = await prisma.user.findMany({
-    include: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      createdAt: true,
       sessions: {
         where: { expires: { gt: now } },
         select: { id: true },
@@ -29,6 +45,8 @@ export default async function AdminUsersPage() {
       },
     },
     orderBy: { createdAt: "desc" },
+    skip: (page - 1) * USERS_PAGE_SIZE,
+    take: USERS_PAGE_SIZE,
   });
 
   const rows: AdminUserRow[] = users.map((user) => ({
@@ -46,7 +64,8 @@ export default async function AdminUsersPage() {
 
   return (
     <main className="page-shell wide">
-      <AdminUsersTable users={rows} />
+      <AdminUsersTable users={rows} totalCount={totalUsers} />
+      <AdminPagination pathname="/admin/users" page={page} totalPages={totalPages} />
     </main>
   );
 }

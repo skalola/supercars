@@ -25,6 +25,7 @@ import type {
   FulfillmentStatus,
   PartnerDecisionInput,
 } from "./types";
+import { Prisma } from "@prisma/client";
 
 const TERMINAL_FULFILLMENT_STATUSES = new Set([
   "ACCEPTED",
@@ -36,6 +37,488 @@ const TERMINAL_FULFILLMENT_STATUSES = new Set([
   "SERVICE_COMPLETED",
   "REFUNDED",
 ]);
+
+const transactionVehicleSelect = {
+  id: true,
+  ownerId: true,
+  year: true,
+  trim: true,
+  vin: true,
+  model: {
+    select: {
+      name: true,
+      make: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  },
+  photos: {
+    select: {
+      filePath: true,
+    },
+    take: 1,
+  },
+};
+
+const transactionPartySelect = {
+  id: true,
+  userId: true,
+  partyType: true,
+  name: true,
+  email: true,
+  companyName: true,
+  address: true,
+  roleDescription: true,
+};
+
+const transactionFeeSelect = {
+  id: true,
+  feeType: true,
+  amount: true,
+  currency: true,
+  status: true,
+  description: true,
+};
+
+const transactionDepositSelect = {
+  id: true,
+  amount: true,
+  currency: true,
+  status: true,
+};
+
+const depositSettlementSelect = {
+  id: true,
+  amount: true,
+  status: true,
+  transactionRef: true,
+};
+
+const feeSettlementSelect = {
+  id: true,
+  feeType: true,
+  status: true,
+};
+
+const transactionDetailEventSelect = {
+  id: true,
+  fulfillmentRequestId: true,
+  previousStatus: true,
+  newStatus: true,
+  actorType: true,
+  actorId: true,
+  note: true,
+  metadata: true,
+  createdAt: true,
+};
+
+const transactionListRequestSelect = {
+  id: true,
+  publicTransactionToken: true,
+  requestType: true,
+  status: true,
+  paymentStatus: true,
+  expectedPlatformFee: true,
+  expectedPartnerCommission: true,
+  collectedAmount: true,
+  createdAt: true,
+  updatedAt: true,
+  vehicle: {
+    select: transactionVehicleSelect,
+  },
+  listing: {
+    select: {
+      sellerId: true,
+    },
+  },
+} satisfies Prisma.FulfillmentRequestSelect;
+
+export const USER_FULFILLMENT_PAGE_SIZE = 25;
+
+export type UserFulfillmentCategory =
+  | "ALL"
+  | "BUYING"
+  | "SELLING"
+  | "SERVICE_BOOKINGS"
+  | "INSURANCE_REQUESTS"
+  | "TRANSPORT_REQUESTS";
+
+export type UserFulfillmentFilters = {
+  category?: UserFulfillmentCategory;
+  search?: string;
+};
+
+function getUserFulfillmentWhere(userId: string, filters?: UserFulfillmentFilters) {
+  const accessWhere: Prisma.FulfillmentRequestWhereInput = {
+    OR: [
+      { buyerId: userId },
+      { parties: { some: { userId } } },
+      { vehicle: { ownerId: userId } },
+      { listing: { sellerId: userId } },
+    ],
+  };
+  const predicates: Prisma.FulfillmentRequestWhereInput[] = [accessWhere];
+
+  switch (filters?.category) {
+    case "BUYING":
+      predicates.push({
+        requestType: "DEALER_PURCHASE",
+        NOT: {
+          OR: [
+            { vehicle: { ownerId: userId } },
+            { listing: { sellerId: userId } },
+          ],
+        },
+      });
+      break;
+    case "SELLING":
+      predicates.push({
+        requestType: "DEALER_PURCHASE",
+        OR: [
+          { vehicle: { ownerId: userId } },
+          { listing: { sellerId: userId } },
+        ],
+      });
+      break;
+    case "SERVICE_BOOKINGS":
+      predicates.push({ requestType: "SERVICE_BOOKING" });
+      break;
+    case "INSURANCE_REQUESTS":
+      predicates.push({ requestType: "INSURANCE_QUOTE" });
+      break;
+    case "TRANSPORT_REQUESTS":
+      predicates.push({ requestType: "TRANSPORT_QUOTE" });
+      break;
+  }
+
+  const search = filters?.search?.trim();
+  if (search) {
+    predicates.push({
+      OR: [
+        { vehicle: { vin: { contains: search, mode: "insensitive" } } },
+        { vehicle: { model: { name: { contains: search, mode: "insensitive" } } } },
+        { vehicle: { model: { make: { name: { contains: search, mode: "insensitive" } } } } },
+        { parties: { some: { name: { contains: search, mode: "insensitive" } } } },
+      ],
+    });
+  }
+
+  return { AND: predicates } satisfies Prisma.FulfillmentRequestWhereInput;
+}
+
+const transactionDetailRequestSelect = {
+  id: true,
+  buyerId: true,
+  publicTransactionToken: true,
+  requestType: true,
+  status: true,
+  paymentStatus: true,
+  expectedPlatformFee: true,
+  expectedPartnerCommission: true,
+  collectedAmount: true,
+  refundableAmount: true,
+  payoutStatus: true,
+  cancellationReason: true,
+  cancelledByActor: true,
+  createdAt: true,
+  updatedAt: true,
+  parties: {
+    select: transactionPartySelect,
+  },
+  packages: {
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      scope: true,
+    },
+    take: 1,
+  },
+  events: {
+    select: transactionDetailEventSelect,
+    orderBy: { createdAt: "desc" as const },
+    take: 100,
+  },
+  fees: {
+    select: transactionFeeSelect,
+    take: 10,
+  },
+  depositIntents: {
+    select: transactionDepositSelect,
+    take: 10,
+  },
+  vehicle: {
+    select: transactionVehicleSelect,
+  },
+  listing: {
+    select: {
+      id: true,
+      sellerId: true,
+      askingPrice: true,
+    },
+  },
+};
+
+const buyerFulfillmentTransactionSelect = {
+  id: true,
+  publicTransactionToken: true,
+  requestType: true,
+  status: true,
+  paymentStatus: true,
+  parties: {
+    select: transactionPartySelect,
+    take: 10,
+  },
+  events: {
+    select: {
+      id: true,
+      previousStatus: true,
+      newStatus: true,
+      actorType: true,
+      actorId: true,
+      note: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: "desc" as const },
+    take: 100,
+  },
+  fees: {
+    select: transactionFeeSelect,
+    take: 10,
+  },
+  depositIntents: {
+    select: transactionDepositSelect,
+    take: 10,
+  },
+  vehicle: {
+    select: {
+      year: true,
+      trim: true,
+      vin: true,
+      model: {
+        select: {
+          name: true,
+          make: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+const partnerFulfillmentPackageTokenSelect = {
+  id: true,
+  token: true,
+  actionTaken: true,
+  actionTakenAt: true,
+  expiresAt: true,
+  viewedAt: true,
+  partnerName: true,
+  fulfillmentRequest: {
+    select: {
+      id: true,
+      requestType: true,
+      status: true,
+      paymentStatus: true,
+      createdAt: true,
+      packages: {
+        select: {
+          title: true,
+          description: true,
+          scope: true,
+        },
+        take: 1,
+      },
+      vehicle: {
+        select: {
+          id: true,
+          year: true,
+          trim: true,
+          vin: true,
+          model: {
+            select: {
+              name: true,
+              make: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+          photos: {
+            select: {
+              filePath: true,
+            },
+            take: 1,
+          },
+        },
+      },
+      depositIntents: {
+        select: {
+          amount: true,
+          currency: true,
+          status: true,
+        },
+        take: 1,
+      },
+    },
+  },
+};
+
+const partnerDecisionTokenSelect = {
+  id: true,
+  token: true,
+  actionTaken: true,
+  expiresAt: true,
+  viewedAt: true,
+  partnerName: true,
+  partnerEmail: true,
+  fulfillmentRequest: {
+    select: {
+      id: true,
+      requestType: true,
+      status: true,
+      paymentStatus: true,
+      collectedAmount: true,
+      publicTransactionToken: true,
+      depositIntents: {
+        select: depositSettlementSelect,
+      },
+      fees: {
+        select: feeSettlementSelect,
+      },
+      parties: {
+        select: {
+          id: true,
+          partyType: true,
+          name: true,
+          email: true,
+        },
+      },
+      vehicle: {
+        select: {
+          year: true,
+          vin: true,
+          model: {
+            select: {
+              name: true,
+              make: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+const cancellationFulfillmentRequestSelect = {
+  id: true,
+  status: true,
+  paymentStatus: true,
+  publicTransactionToken: true,
+  collectedAmount: true,
+  depositIntents: {
+    select: depositSettlementSelect,
+  },
+  fees: {
+    select: feeSettlementSelect,
+  },
+  parties: {
+    select: {
+      id: true,
+      partyType: true,
+      name: true,
+      email: true,
+    },
+  },
+};
+
+const partnerServiceCancellationTokenSelect = {
+  id: true,
+  actionTaken: true,
+  partnerName: true,
+  partnerEmail: true,
+  fulfillmentRequest: {
+    select: {
+      id: true,
+      requestType: true,
+      status: true,
+      paymentStatus: true,
+      publicTransactionToken: true,
+      depositIntents: {
+        select: depositSettlementSelect,
+      },
+      fees: {
+        select: feeSettlementSelect,
+      },
+      parties: {
+        select: {
+          id: true,
+          partyType: true,
+          name: true,
+          email: true,
+        },
+      },
+      vehicle: {
+        select: {
+          year: true,
+          vin: true,
+          model: {
+            select: {
+              name: true,
+              make: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
+const expirePartnerDecisionTokenSelect = {
+  id: true,
+  actionTaken: true,
+  fulfillmentRequestId: true,
+  fulfillmentRequest: {
+    select: {
+      id: true,
+      status: true,
+      paymentStatus: true,
+      publicTransactionToken: true,
+      parties: {
+        where: { partyType: "BUYER" },
+        select: {
+          name: true,
+          email: true,
+        },
+        take: 1,
+      },
+      depositIntents: {
+        select: depositSettlementSelect,
+      },
+      fees: {
+        select: feeSettlementSelect,
+      },
+    },
+  },
+};
+
+type ExpirePartnerDecisionTokenRecord = Prisma.PartnerDecisionTokenGetPayload<{
+  select: typeof expirePartnerDecisionTokenSelect;
+}>;
 
 function getDefaultPartnerTtlDays(requestType: FulfillmentRequestType): number {
   switch (requestType) {
@@ -253,22 +736,7 @@ export async function createFulfillmentRequest(input: CreateFulfillmentRequestIn
 export async function getPartnerFulfillmentPackage(token: string) {
   const tokenRecord = await prisma.partnerDecisionToken.findUnique({
     where: { token },
-    include: {
-      fulfillmentRequest: {
-        include: {
-          packages: true,
-          vehicle: {
-            include: {
-              model: { include: { make: true } },
-              photos: { take: 1 },
-            },
-          },
-          fees: true,
-          depositIntents: true,
-          parties: true,
-        },
-      },
-    },
+    select: partnerFulfillmentPackageTokenSelect,
   });
 
   if (!tokenRecord) {
@@ -400,19 +868,7 @@ function sanitizePartnerScopedData(value: unknown): unknown {
 export async function getBuyerFulfillmentTransaction(publicToken: string) {
   const req = await prisma.fulfillmentRequest.findUnique({
     where: { publicTransactionToken: publicToken },
-    include: {
-      parties: true,
-      packages: true,
-      events: { orderBy: { createdAt: "asc" } },
-      fees: true,
-      depositIntents: true,
-      vehicle: {
-        include: {
-          model: { include: { make: true } },
-          photos: { take: 1 },
-        },
-      },
-    },
+    select: buyerFulfillmentTransactionSelect,
   });
 
   if (!req) {
@@ -421,7 +877,10 @@ export async function getBuyerFulfillmentTransaction(publicToken: string) {
 
   return {
     success: true,
-    request: req,
+    request: {
+      ...req,
+      events: [...req.events].reverse(),
+    },
   };
 }
 
@@ -432,20 +891,7 @@ export async function getBuyerFulfillmentTransaction(publicToken: string) {
 export async function submitPartnerDecision(input: PartnerDecisionInput) {
   const tokenRecord = await prisma.partnerDecisionToken.findUnique({
     where: { token: input.token },
-    include: {
-      fulfillmentRequest: {
-        include: {
-          depositIntents: true,
-          fees: true,
-          parties: true,
-          vehicle: {
-            include: {
-              model: { include: { make: true } },
-            },
-          },
-        },
-      },
-    },
+    select: partnerDecisionTokenSelect,
   });
 
   if (!tokenRecord) {
@@ -760,36 +1206,167 @@ export async function updateFulfillmentStatus(
 /**
  * Returns user profile transaction list for authenticated buyers / owners / sellers.
  */
-export async function getUserFulfillmentTransactions(userId: string) {
+export async function getUserFulfillmentTransactions(
+  userId: string,
+  filters?: UserFulfillmentFilters,
+  page = 1,
+) {
   const requests = await prisma.fulfillmentRequest.findMany({
-    where: {
-      OR: [
-        { buyerId: userId },
-        { parties: { some: { userId } } },
-        { vehicle: { ownerId: userId } },
-        { listing: { sellerId: userId } },
-      ],
-    },
-    include: {
-      vehicle: {
-        include: {
-          model: { include: { make: true } },
-          photos: { take: 1 },
-        },
-      },
-      listing: { select: { sellerId: true } },
-      parties: true,
-      fees: true,
-      depositIntents: true,
-      events: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
-      },
-    },
+    where: getUserFulfillmentWhere(userId, filters),
+    select: transactionListRequestSelect,
     orderBy: { updatedAt: "desc" },
+    skip: (Math.max(1, page) - 1) * USER_FULFILLMENT_PAGE_SIZE,
+    take: USER_FULFILLMENT_PAGE_SIZE,
   });
 
-  return requests;
+  if (requests.length === 0) return [];
+
+  type LatestEventRow = {
+    id: string;
+    fulfillmentRequestId: string;
+    createdAt: Date;
+    newStatus: string;
+    note: string | null;
+  };
+  type SummaryPartyRow = {
+    id: string;
+    fulfillmentRequestId: string;
+    partyType: string;
+    name: string;
+    email: string | null;
+    companyName: string | null;
+    roleDescription: string | null;
+  };
+  type SummaryDepositRow = {
+    id: string;
+    fulfillmentRequestId: string;
+    amount: number;
+    currency: string;
+    status: string;
+  };
+  const requestIds = requests.map((request) => request.id);
+  const [latestEvents, summaryParties, latestDeposits] = await Promise.all([
+    prisma.$queryRaw<LatestEventRow[]>(Prisma.sql`
+      SELECT DISTINCT ON (event."fulfillmentRequestId")
+        event."id", event."fulfillmentRequestId", event."createdAt", event."newStatus", event."note"
+      FROM "FulfillmentEvent" event
+      WHERE event."fulfillmentRequestId" IN (${Prisma.join(requestIds)})
+      ORDER BY event."fulfillmentRequestId", event."createdAt" DESC
+    `),
+    prisma.$queryRaw<SummaryPartyRow[]>(Prisma.sql`
+      WITH ranked_parties AS (
+        SELECT party."id", party."fulfillmentRequestId", party."partyType", party."name",
+          party."email", party."companyName", party."roleDescription",
+          ROW_NUMBER() OVER (
+            PARTITION BY party."fulfillmentRequestId"
+            ORDER BY
+              CASE
+                WHEN party."partyType" NOT IN ('BUYER', 'SELLER', 'PLATFORM') THEN 0
+                WHEN party."partyType" = 'SELLER' THEN 1
+                ELSE 2
+              END,
+              party."createdAt" ASC
+          ) AS party_rank
+        FROM "FulfillmentParty" party
+        WHERE party."fulfillmentRequestId" IN (${Prisma.join(requestIds)})
+      )
+      SELECT "id", "fulfillmentRequestId", "partyType", "name", "email", "companyName", "roleDescription"
+      FROM ranked_parties
+      WHERE party_rank = 1
+    `),
+    prisma.$queryRaw<SummaryDepositRow[]>(Prisma.sql`
+      SELECT DISTINCT ON (deposit."fulfillmentRequestId")
+        deposit."id", deposit."fulfillmentRequestId", deposit."amount", deposit."currency", deposit."status"
+      FROM "DepositIntent" deposit
+      WHERE deposit."fulfillmentRequestId" IN (${Prisma.join(requestIds)})
+      ORDER BY deposit."fulfillmentRequestId", deposit."createdAt" DESC
+    `),
+  ]);
+  const eventByRequestId = new Map(latestEvents.map((event) => [event.fulfillmentRequestId, event]));
+  const partyByRequestId = new Map(summaryParties.map((party) => [party.fulfillmentRequestId, party]));
+  const depositByRequestId = new Map(latestDeposits.map((deposit) => [deposit.fulfillmentRequestId, deposit]));
+
+  return requests.map((request) => ({
+    ...request,
+    parties: partyByRequestId.has(request.id) ? [partyByRequestId.get(request.id)!] : [],
+    fees: [],
+    depositIntents: depositByRequestId.has(request.id) ? [depositByRequestId.get(request.id)!] : [],
+    events: eventByRequestId.has(request.id) ? [eventByRequestId.get(request.id)!] : [],
+  }));
+}
+
+export function getUserFulfillmentTransactionCount(userId: string, filters?: UserFulfillmentFilters) {
+  return prisma.fulfillmentRequest.count({ where: getUserFulfillmentWhere(userId, filters) });
+}
+
+export async function getUserFulfillmentSummary(userId: string) {
+  type SummaryRow = {
+    total: bigint;
+    active: bigint;
+    attention: bigint;
+    captured: number | null;
+    buying: bigint;
+    selling: bigint;
+    service: bigint;
+    insurance: bigint;
+    transport: bigint;
+  };
+  const [summary] = await prisma.$queryRaw<SummaryRow[]>(Prisma.sql`
+    WITH accessible AS (
+      SELECT request."id", request."requestType", request."status", request."paymentStatus",
+        request."collectedAmount", request."vehicleId", request."listingId"
+      FROM "FulfillmentRequest" request
+      WHERE request."buyerId" = ${userId}
+        OR EXISTS (
+          SELECT 1 FROM "FulfillmentParty" party
+          WHERE party."fulfillmentRequestId" = request."id" AND party."userId" = ${userId}
+        )
+        OR EXISTS (
+          SELECT 1 FROM "Vehicle" vehicle
+          WHERE vehicle."id" = request."vehicleId" AND vehicle."ownerId" = ${userId}
+        )
+        OR EXISTS (
+          SELECT 1 FROM "Listing" listing
+          WHERE listing."id" = request."listingId" AND listing."sellerId" = ${userId}
+        )
+    ), classified AS (
+      SELECT accessible.*,
+        EXISTS (
+          SELECT 1 FROM "Vehicle" vehicle
+          WHERE vehicle."id" = accessible."vehicleId" AND vehicle."ownerId" = ${userId}
+        ) OR EXISTS (
+          SELECT 1 FROM "Listing" listing
+          WHERE listing."id" = accessible."listingId" AND listing."sellerId" = ${userId}
+        ) AS is_owner
+      FROM accessible
+    )
+    SELECT
+      COUNT(*)::bigint AS total,
+      COUNT(*) FILTER (WHERE "status" IN ('SENT', 'VIEWED', 'ACCEPTED', 'READY_TO_SEND'))::bigint AS active,
+      COUNT(*) FILTER (WHERE "status" IN ('DECLINED', 'EXPIRED', 'FAILED') OR "paymentStatus" = 'FAILED')::bigint AS attention,
+      COALESCE(SUM("collectedAmount"), 0)::double precision AS captured,
+      COUNT(*) FILTER (WHERE "requestType" = 'DEALER_PURCHASE' AND NOT is_owner)::bigint AS buying,
+      COUNT(*) FILTER (WHERE "requestType" = 'DEALER_PURCHASE' AND is_owner)::bigint AS selling,
+      COUNT(*) FILTER (WHERE "requestType" = 'SERVICE_BOOKING')::bigint AS service,
+      COUNT(*) FILTER (WHERE "requestType" = 'INSURANCE_QUOTE')::bigint AS insurance,
+      COUNT(*) FILTER (WHERE "requestType" = 'TRANSPORT_QUOTE')::bigint AS transport
+    FROM classified
+  `);
+
+  return {
+    total: Number(summary?.total ?? 0),
+    active: Number(summary?.active ?? 0),
+    attention: Number(summary?.attention ?? 0),
+    captured: summary?.captured ?? 0,
+    tabCounts: {
+      ALL: Number(summary?.total ?? 0),
+      BUYING: Number(summary?.buying ?? 0),
+      SELLING: Number(summary?.selling ?? 0),
+      SERVICE_BOOKINGS: Number(summary?.service ?? 0),
+      INSURANCE_REQUESTS: Number(summary?.insurance ?? 0),
+      TRANSPORT_REQUESTS: Number(summary?.transport ?? 0),
+    } satisfies Record<UserFulfillmentCategory, number>,
+  };
 }
 
 /**
@@ -804,23 +1381,7 @@ export async function getFulfillmentByIdForUser(idOrToken: string, userId?: stri
     where: {
       OR: [{ id: idOrToken }, { publicTransactionToken: idOrToken }],
     },
-    include: {
-      parties: true,
-      packages: true,
-      events: { orderBy: { createdAt: "asc" } },
-      fees: true,
-      depositIntents: true,
-      vehicle: {
-        include: {
-          model: { include: { make: true } },
-          photos: { take: 1 },
-          owner: { select: { id: true, name: true, email: true } },
-        },
-      },
-      listing: {
-        select: { id: true, sellerId: true, askingPrice: true },
-      },
-    },
+    select: transactionDetailRequestSelect,
   });
 
   if (!req) {
@@ -851,6 +1412,7 @@ export async function getFulfillmentByIdForUser(idOrToken: string, userId?: stri
 
   // Parse package scope
   const primaryPackage = req.packages[0];
+  const userFacingEvents = sanitizeUserFacingEvents([...req.events].reverse());
   let parsedScope: Record<string, unknown> = {};
   if (primaryPackage?.scope) {
     try {
@@ -907,7 +1469,7 @@ export async function getFulfillmentByIdForUser(idOrToken: string, userId?: stri
               status: req.depositIntents[0].status,
             }
           : null,
-        events: sanitizeUserFacingEvents(req.events),
+        events: userFacingEvents,
       },
     };
   }
@@ -951,7 +1513,7 @@ export async function getFulfillmentByIdForUser(idOrToken: string, userId?: stri
       parties: req.parties,
       fees: req.fees,
       depositIntents: req.depositIntents,
-      events: sanitizeUserFacingEvents(req.events),
+      events: userFacingEvents,
       nextSteps: getNextStepsForStatus(req.status),
     },
   };
@@ -1123,7 +1685,7 @@ export interface CancelFulfillmentRequestParams {
 export async function cancelFulfillmentRequest(params: CancelFulfillmentRequestParams) {
   const req = await prisma.fulfillmentRequest.findUnique({
     where: { id: params.fulfillmentRequestId },
-    include: { depositIntents: true, fees: true, parties: true },
+    select: cancellationFulfillmentRequestSelect,
   });
 
   if (!req) {
@@ -1281,20 +1843,7 @@ export async function cancelFulfillmentRequest(params: CancelFulfillmentRequestP
 export async function cancelConfirmedServiceBookingByPartner(token: string) {
   const tokenRecord = await prisma.partnerDecisionToken.findUnique({
     where: { token },
-    include: {
-      fulfillmentRequest: {
-        include: {
-          depositIntents: true,
-          fees: true,
-          parties: true,
-          vehicle: {
-            include: {
-              model: { include: { make: true } },
-            },
-          },
-        },
-      },
-    },
+    select: partnerServiceCancellationTokenSelect,
   });
 
   if (!tokenRecord) {
@@ -1427,7 +1976,9 @@ export async function processExpiredFulfillmentRequests() {
       expiresAt: { lte: new Date() },
       actionTaken: null,
     },
-    include: { fulfillmentRequest: true },
+    select: expirePartnerDecisionTokenSelect,
+    orderBy: { expiresAt: "asc" },
+    take: 100,
   });
 
   let count = 0;
@@ -1435,15 +1986,10 @@ export async function processExpiredFulfillmentRequests() {
     const req = tokenRecord.fulfillmentRequest;
     if (!req) continue;
 
-    const expiration = await expirePartnerDecisionToken(tokenRecord.id);
+    const expiration = await expirePartnerDecisionToken(tokenRecord.id, tokenRecord);
     if (!expiration.processed) continue;
 
-    // Dispatch expiration notification to buyer party
-    const reqWithParties = await prisma.fulfillmentRequest.findUnique({
-      where: { id: req.id },
-      include: { parties: true },
-    });
-    const buyerParty = reqWithParties?.parties.find((p) => p.partyType === "BUYER");
+    const buyerParty = req.parties[0];
     if (buyerParty && buyerParty.email) {
       await sendFulfillmentEmail({
         fulfillmentRequestId: req.id,
@@ -1462,18 +2008,14 @@ export async function processExpiredFulfillmentRequests() {
   return { processedCount: count };
 }
 
-async function expirePartnerDecisionToken(tokenId: string) {
-  const tokenRecord = await prisma.partnerDecisionToken.findUnique({
-    where: { id: tokenId },
-    include: {
-      fulfillmentRequest: {
-        include: {
-          depositIntents: true,
-          fees: true,
-        },
-      },
-    },
-  });
+async function expirePartnerDecisionToken(
+  tokenId: string,
+  existingTokenRecord?: ExpirePartnerDecisionTokenRecord,
+) {
+  const tokenRecord = existingTokenRecord ?? await prisma.partnerDecisionToken.findUnique({
+      where: { id: tokenId },
+      select: expirePartnerDecisionTokenSelect,
+    });
 
   if (!tokenRecord || tokenRecord.actionTaken) {
     return { processed: false, requestId: tokenRecord?.fulfillmentRequestId || null };

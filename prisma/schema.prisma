@@ -49,6 +49,7 @@ model Model {
   listings          Listing[]
   marketSales       MarketSale[]
   marketSnapshots   MarketSnapshot[]
+  marketSummary     MarketModelSummary?
   partCompatibility PartCompatibility[]
 
   createdAt DateTime @default(now())
@@ -249,6 +250,9 @@ model VehicleImage {
   updatedAt        DateTime @updatedAt
 
   vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId, validationStatus])
+  @@index([vehicleId, isPrimary])
 }
 
 model User {
@@ -566,6 +570,8 @@ model VehicleModification {
 
   vehicle        Vehicle               @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   catalogInstall VehicleInstalledPart?
+
+  @@index([vehicleId])
 }
 
 // ──────────────────────────────────────────────
@@ -805,6 +811,8 @@ model ServiceRecord {
   updatedAt   DateTime @updatedAt
 
   vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId, serviceDate])
 }
 
 model VehicleAward {
@@ -856,6 +864,8 @@ model MaintenanceRule {
   updatedAt      DateTime @updatedAt
 
   model Model? @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@index([modelId, priority])
 }
 
 // ──────────────────────────────────────────────
@@ -918,6 +928,10 @@ model Listing {
   sourceConfidence String? @default("MEDIUM")
 
   @@unique([sourceId, externalListingId])
+  @@index([sourceId, url])
+  @@index([status, validationStatus, modelId])
+  @@index([vehicleId, status])
+  @@index([modelId, firstSeen])
 }
 
 model VinDiscovery {
@@ -953,6 +967,7 @@ model VinDiscoverySource {
 
   @@unique([discoveryId, sourceKey])
   @@index([sourceName, active])
+  @@index([discoveryId, active])
 }
 
 model MarketSale {
@@ -971,6 +986,10 @@ model MarketSale {
 
   model  Model        @relation(fields: [modelId], references: [id])
   source MarketSource @relation(fields: [sourceId], references: [id])
+
+  @@index([modelId, saleDate])
+  @@index([sourceId, url])
+  @@index([modelId, sourceId, saleDate, salePrice])
 }
 
 model MarketSnapshot {
@@ -987,6 +1006,38 @@ model MarketSnapshot {
   createdAt          DateTime @default(now())
 
   model Model @relation(fields: [modelId], references: [id])
+
+  @@unique([modelId, date])
+}
+
+model MarketModelSummary {
+  modelId                   String    @id
+  activeListingCount        Int       @default(0)
+  lowestListingPrice        Float?
+  highestListingPrice       Float?
+  averageAskingPrice        Float?
+  medianAskingPrice         Float?
+  totalActiveInventoryValue Float     @default(0)
+  recentSalesCount          Int       @default(0)
+  averageSalePrice          Float?
+  medianSalePrice           Float?
+  averageSaleMileage        Float?
+  averageSoldPrice          Float?
+  askingVsSoldDifference    Float?
+  askingVsSoldDifferencePct Float?
+  trendDirection            String?
+  trendChangePercent        Float?
+  trendSnapshotCount        Int       @default(0)
+  lastListingSeenAt         DateTime?
+  lastSaleSeenAt            DateTime?
+  refreshedAt               DateTime  @default(now())
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  model Model @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@index([activeListingCount])
+  @@index([refreshedAt])
 }
 
 model Purchase {
@@ -1206,6 +1257,7 @@ model PartnerDecisionToken {
 
   @@index([token])
   @@index([fulfillmentRequestId])
+  @@index([actionTaken, expiresAt])
 }
 
 // ──────────────────────────────────────────────

@@ -14,12 +14,27 @@
 
 import { prisma } from "../lib/prisma";
 import { normalizePartnerLocation, normalizePhoneNumber } from "../lib/directory/partner-contact-format";
+import { getBatchLimit, hasArg, isExecuteMode, logScriptMode } from "./lib/script-guards";
 
 async function main() {
-  const dryRun = process.argv.includes("--dry-run");
+  const execute = isExecuteMode() && !hasArg("--dry-run");
+  const limit = getBatchLimit({ defaultLimit: 150, maxLimit: 1000 });
+  logScriptMode("normalize-partner-directory", execute, limit);
   const contacts = await prisma.partnerContact.findMany({
     where: { active: true },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      phone: true,
+      streetAddress: true,
+      city: true,
+      state: true,
+      postalCode: true,
+      location: true,
+    },
     orderBy: [{ type: "asc" }, { name: "asc" }],
+    take: limit,
   });
 
   let updated = 0;
@@ -28,7 +43,7 @@ async function main() {
   console.log("==================================================");
   console.log("  SUPERCAR DASH Partner Directory Normalize");
   console.log("==================================================");
-  console.log(`Mode: ${dryRun ? "dry run" : "update rows"}`);
+  console.log(`Mode: ${execute ? "update rows" : "dry run"}`);
   console.log(`Contacts: ${contacts.length}\n`);
 
   for (const contact of contacts) {
@@ -50,9 +65,9 @@ async function main() {
 
     data.lastVerifiedAt = new Date();
     updated++;
-    console.log(`${dryRun ? "DRY " : "UPDT"} ${contact.type} | ${contact.name} | ${Object.keys(data).join(", ")}`);
+    console.log(`${execute ? "UPDT" : "DRY "} ${contact.type} | ${contact.name} | ${Object.keys(data).join(", ")}`);
 
-    if (!dryRun) {
+    if (execute) {
       await prisma.partnerContact.update({
         where: { id: contact.id },
         data,

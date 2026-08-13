@@ -16,7 +16,7 @@ import {
   refundDeposit,
   voidDeposit,
 } from "@/lib/payments/payment-service";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 export interface AdminFulfillmentMetrics {
   totalRequests: number;
@@ -61,6 +61,8 @@ export interface AdminFilters {
   paymentState?: string;
   /** Stuck/expired flag – true to include only EXPIRED or DRAFT */
   stuckOrExpired?: boolean;
+  /** Search request identity, vehicle, or party fields. */
+  search?: string;
 }
 
 const refundOrSettlementAttentionWhere: Prisma.FulfillmentRequestWhereInput = {
@@ -71,6 +73,50 @@ const refundOrSettlementAttentionWhere: Prisma.FulfillmentRequestWhereInput = {
     { fees: { some: { status: { in: ["AUTHORIZED", "CAPTURED"] } } } },
   ],
 };
+
+export const ADMIN_FULFILLMENT_PAGE_SIZE = 25;
+
+const adminFulfillmentRequestSelect = {
+  id: true,
+  publicTransactionToken: true,
+  requestType: true,
+  status: true,
+  paymentStatus: true,
+  expectedPlatformFee: true,
+  expectedPartnerCommission: true,
+  collectedAmount: true,
+  payoutStatus: true,
+  createdAt: true,
+  updatedAt: true,
+  vehicle: {
+    select: {
+      id: true,
+      year: true,
+      trim: true,
+      vin: true,
+      model: {
+        select: {
+          name: true,
+          make: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+    },
+  },
+  _count: {
+    select: {
+      depositIntents: {
+        where: { status: { in: ["AUTHORIZED", "HELD", "CAPTURED"] } },
+      },
+      fees: {
+        where: { status: { in: ["AUTHORIZED", "CAPTURED"] } },
+      },
+    },
+  },
+} satisfies Prisma.FulfillmentRequestSelect;
 
 
 /**
@@ -172,7 +218,7 @@ export async function getAdminFulfillmentMetrics(): Promise<AdminFulfillmentMetr
 /**
  * Returns list of fulfillment requests filtered by operational status tab.
  */
-export async function getAdminFulfillmentRequests(
+function getAdminFulfillmentWhere(
   filter: AdminFilterTab = "ALL",
   options?: AdminFilters
 ) {
@@ -240,27 +286,120 @@ export async function getAdminFulfillmentRequests(
     if (options.stuckOrExpired) {
       whereClause = { ...whereClause, status: { in: ["EXPIRED", "DRAFT"] } };
     }
+    if (options.search?.trim()) {
+      const search = options.search.trim();
+      whereClause = {
+        AND: [
+          whereClause,
+          {
+            OR: [
+              { id: { contains: search, mode: "insensitive" } },
+              { publicTransactionToken: { contains: search, mode: "insensitive" } },
+              { vehicle: { vin: { contains: search, mode: "insensitive" } } },
+              { vehicle: { model: { name: { contains: search, mode: "insensitive" } } } },
+              { vehicle: { model: { make: { name: { contains: search, mode: "insensitive" } } } } },
+              { parties: { some: { name: { contains: search, mode: "insensitive" } } } },
+              { parties: { some: { email: { contains: search, mode: "insensitive" } } } },
+              { parties: { some: { companyName: { contains: search, mode: "insensitive" } } } },
+            ],
+          },
+        ],
+      };
+    }
   }
+
+  return whereClause;
+}
+
+export async function getAdminFulfillmentRequests(
+  filter: AdminFilterTab = "ALL",
+  options?: AdminFilters,
+  page = 1,
+) {
+  const whereClause = getAdminFulfillmentWhere(filter, options);
 
   const requests = await prisma.fulfillmentRequest.findMany({
     where: whereClause,
-    include: {
-      vehicle: {
-        include: {
-          model: { include: { make: true } },
-          photos: { take: 1 },
-        },
-      },
-      parties: true,
-      fees: true,
-      depositIntents: true,
-      partnerTokens: true,
-      events: { orderBy: { createdAt: "desc" } },
-    },
+    select: adminFulfillmentRequestSelect,
     orderBy: { updatedAt: "desc" },
+    skip: (page - 1) * ADMIN_FULFILLMENT_PAGE_SIZE,
+    take: ADMIN_FULFILLMENT_PAGE_SIZE,
   });
 
-  return requests;
+  if (requests.length === 0) return [];
+
+  type LatestEventRow = {
+    id: string;
+    fulfillmentRequestId: string;
+    createdAt: Date;
+    actorType: string;
+    newStatus: string;
+    note: string | null;
+    metadata: string | null;
+  };
+  type SummaryPartyRow = {
+    id: string;
+    fulfillmentRequestId: string;
+    partyType: string;
+    name: string;
+    email: string | null;
+    companyName: string | null;
+  };
+  const requestIds = requests.map((request) => request.id);
+  const [latestEvents, summaryParties] = await Promise.all([
+    prisma.$queryRaw<LatestEventRow[]>(Prisma.sql`
+      SELECT DISTINCT ON (event."fulfillmentRequestId")
+        event."id", event."fulfillmentRequestId", event."createdAt", event."actorType",
+        event."newStatus", event."note", event."metadata"
+      FROM "FulfillmentEvent" event
+      WHERE event."fulfillmentRequestId" IN (${Prisma.join(requestIds)})
+      ORDER BY event."fulfillmentRequestId", event."createdAt" DESC
+    `),
+    prisma.$queryRaw<SummaryPartyRow[]>(Prisma.sql`
+      WITH ranked_parties AS (
+        SELECT party."id", party."fulfillmentRequestId", party."partyType", party."name",
+          party."email", party."companyName",
+          ROW_NUMBER() OVER (
+            PARTITION BY party."fulfillmentRequestId",
+              CASE
+                WHEN party."partyType" = 'BUYER' THEN 'BUYER'
+                WHEN party."partyType" NOT IN ('SELLER', 'PLATFORM') THEN 'PARTNER'
+                ELSE party."partyType"
+              END
+            ORDER BY party."createdAt" ASC
+          ) AS party_rank
+        FROM "FulfillmentParty" party
+        WHERE party."fulfillmentRequestId" IN (${Prisma.join(requestIds)})
+          AND (party."partyType" = 'BUYER' OR party."partyType" NOT IN ('SELLER', 'PLATFORM'))
+      )
+      SELECT "id", "fulfillmentRequestId", "partyType", "name", "email", "companyName"
+      FROM ranked_parties
+      WHERE party_rank = 1
+      ORDER BY "fulfillmentRequestId", "partyType"
+    `),
+  ]);
+  const eventByRequestId = new Map(latestEvents.map((event) => [event.fulfillmentRequestId, event]));
+  const partiesByRequestId = new Map<string, SummaryPartyRow[]>();
+  for (const party of summaryParties) {
+    const parties = partiesByRequestId.get(party.fulfillmentRequestId) ?? [];
+    parties.push(party);
+    partiesByRequestId.set(party.fulfillmentRequestId, parties);
+  }
+
+  return requests.map((request) => ({
+    ...request,
+    events: eventByRequestId.has(request.id) ? [eventByRequestId.get(request.id)!] : [],
+    parties: partiesByRequestId.get(request.id) ?? [],
+  }));
+}
+
+export function getAdminFulfillmentRequestCount(
+  filter: AdminFilterTab = "ALL",
+  options?: AdminFilters,
+) {
+  return prisma.fulfillmentRequest.count({
+    where: getAdminFulfillmentWhere(filter, options),
+  });
 }
 
 /**
@@ -269,7 +408,51 @@ export async function getAdminFulfillmentRequests(
 export async function resendFulfillmentEmailAdmin(requestId: string) {
   const req = await prisma.fulfillmentRequest.findUnique({
     where: { id: requestId },
-    include: { parties: true, partnerTokens: true, vehicle: { include: { model: { include: { make: true } } } } },
+    select: {
+      id: true,
+      publicTransactionToken: true,
+      requestType: true,
+      status: true,
+      parties: {
+        select: {
+          partyType: true,
+          name: true,
+          email: true,
+        },
+      },
+      partnerTokens: {
+        where: {
+          actionTaken: null,
+          OR: [
+            { expiresAt: null },
+            { expiresAt: { gt: new Date() } },
+          ],
+        },
+        select: {
+          token: true,
+          partnerName: true,
+          partnerEmail: true,
+        },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+      vehicle: {
+        select: {
+          year: true,
+          vin: true,
+          model: {
+            select: {
+              name: true,
+              make: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   });
 
   if (!req) {
@@ -376,38 +559,35 @@ export async function adminProcessExpiredPartnerRequests() {
  * Admin Action: Manually marks a fulfillment request as COMPLETED.
  */
 export async function adminMarkCompleted(requestId: string, note?: string) {
-  const req = await prisma.fulfillmentRequest.findUnique({
-    where: { id: requestId },
-  });
-
-  if (!req) {
-    throw new Error(`FulfillmentRequest not found: ${requestId}`);
-  }
-
-  const previousStatus = req.status;
-  if (previousStatus !== "ACCEPTED") {
-    throw new Error(`Only ACCEPTED fulfillment requests can be marked completed. Current status: ${previousStatus}`);
-  }
-
-  await prisma.$transaction([
-    prisma.fulfillmentRequest.update({
-      where: { id: requestId },
+  await prisma.$transaction(async (tx) => {
+    const update = await tx.fulfillmentRequest.updateMany({
+      where: { id: requestId, status: "ACCEPTED" },
       data: {
         status: "COMPLETED",
         completedAt: new Date(),
         payoutStatus: "RECONCILED",
       },
-    }),
-    prisma.fulfillmentEvent.create({
+    });
+
+    if (update.count !== 1) {
+      const current = await tx.fulfillmentRequest.findUnique({
+        where: { id: requestId },
+        select: { status: true },
+      });
+      if (!current) throw new Error(`FulfillmentRequest not found: ${requestId}`);
+      throw new Error(`Only ACCEPTED fulfillment requests can be marked completed. Current status: ${current.status}`);
+    }
+
+    await tx.fulfillmentEvent.create({
       data: {
         fulfillmentRequestId: requestId,
-        previousStatus,
+        previousStatus: "ACCEPTED",
         newStatus: "COMPLETED",
         actorType: "ADMIN",
         note: note || "Admin marked fulfillment request completed manually. Financial payout reconciled.",
       },
-    }),
-  ]);
+    });
+  });
 
   return {
     success: true,
@@ -422,7 +602,27 @@ export async function adminMarkCompleted(requestId: string, note?: string) {
 export async function adminReleaseRefund(requestId: string, note?: string) {
   const req = await prisma.fulfillmentRequest.findUnique({
     where: { id: requestId },
-    include: { depositIntents: true, fees: true },
+    select: {
+      id: true,
+      status: true,
+      paymentStatus: true,
+      payoutStatus: true,
+      collectedAmount: true,
+      depositIntents: {
+        select: {
+          id: true,
+          amount: true,
+          status: true,
+          transactionRef: true,
+        },
+      },
+      fees: {
+        select: {
+          id: true,
+          status: true,
+        },
+      },
+    },
   });
 
   if (!req) {

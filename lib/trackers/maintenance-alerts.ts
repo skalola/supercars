@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { isValidEmail } from "@/lib/fulfillment/partner-registry";
 import { getNextMaintenanceRecommendation } from "@/lib/maintenance/recommendations";
 import { shouldSendMarketingAutomation } from "@/lib/admin/marketing-automation";
+import { Prisma } from "@prisma/client";
 
 type ProviderSendInput = {
   to: string;
@@ -67,94 +68,178 @@ export async function processMaintenanceTrackerAlerts(options: ProcessMaintenanc
   const gate = await shouldSendMarketingAutomation("maintenance_alerts");
   if (!gate.enabled) return { scanned: 0, sent: 0, skipped: gate.skipped };
 
-  const users = await prisma.user.findMany({
+  const vehicles = await prisma.vehicle.findMany({
     where: {
-      email: { not: null },
-      trackerPreference: {
-        maintenanceTrackerEnabled: true,
-      },
-    },
-    include: {
-      vehicles: {
-        where: { status: "CLAIMED" },
-        include: {
-          profile: true,
-          serviceRecords: true,
-          model: {
-            include: {
-              make: true,
-              maintenanceRules: true,
-            },
+      status: "CLAIMED",
+      owner: {
+        is: {
+          email: { not: null },
+          trackerPreference: {
+            is: { maintenanceTrackerEnabled: true },
           },
         },
       },
     },
+    select: {
+      id: true,
+      vin: true,
+      modelId: true,
+      year: true,
+      mileage: true,
+      owner: {
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          email: true,
+        },
+      },
+      profile: {
+        select: { currentMileage: true },
+      },
+      model: {
+        select: {
+          name: true,
+          make: { select: { name: true } },
+        },
+      },
+    },
+    take: 500,
   });
 
-  let scanned = 0;
+  const modelIds = Array.from(new Set(vehicles.map((vehicle) => vehicle.modelId)));
+  const vehicleIds = vehicles.map((vehicle) => vehicle.id);
+  const [rules, serviceRecords] = await Promise.all([
+    modelIds.length === 0
+      ? []
+      : prisma.maintenanceRule.findMany({
+          where: { modelId: { in: modelIds } },
+          select: {
+            id: true,
+            modelId: true,
+            serviceName: true,
+            description: true,
+            intervalMiles: true,
+            intervalMonths: true,
+            priority: true,
+          },
+          orderBy: [{ modelId: "asc" }, { priority: "asc" }, { intervalMiles: "asc" }],
+        }),
+    getRecentServiceRecords(vehicleIds),
+  ]);
+  const rulesByModelId = groupBy(rules, (rule) => rule.modelId!);
+  const recordsByVehicleId = groupBy(serviceRecords, (record) => record.vehicleId);
+
+  const candidates = vehicles.flatMap((vehicle) => {
+    if (!vehicle.owner || !isValidEmail(vehicle.owner.email)) return [];
+
+    const currentMileage = vehicle.mileage ?? vehicle.profile?.currentMileage ?? null;
+    const recommendation = getNextMaintenanceRecommendation({
+      currentMileage,
+      rules: rulesByModelId.get(vehicle.modelId) ?? [],
+      serviceRecords: recordsByVehicleId.get(vehicle.id) ?? [],
+    });
+    if (!recommendation || recommendation.status === "UPCOMING") return [];
+
+    return [{
+      vehicle,
+      recommendation,
+      alertKey: `${vehicle.id}:${recommendation.alertKey}:${recommendation.status}`,
+    }];
+  });
+
+  const deliveredKeys = candidates.length === 0
+    ? new Set<string>()
+    : new Set(
+        (await prisma.trackerAlertDelivery.findMany({
+          where: {
+            alertType: "MAINTENANCE",
+            OR: candidates.map((candidate) => ({
+              userId: candidate.vehicle.owner!.id,
+              alertKey: candidate.alertKey,
+            })),
+          },
+          select: { userId: true, alertKey: true },
+        })).map((delivery) => `${delivery.userId}:${delivery.alertKey}`),
+      );
+
+  const scanned = vehicles.length;
   let sent = 0;
 
-  for (const user of users) {
-    if (!isValidEmail(user.email)) continue;
+  for (const candidate of candidates) {
+    const { vehicle, recommendation, alertKey } = candidate;
+    const user = vehicle.owner!;
+    if (deliveredKeys.has(`${user.id}:${alertKey}`)) continue;
 
-    for (const vehicle of user.vehicles) {
-      scanned++;
-      const currentMileage =
-        (vehicle as { currentMileage?: number | null }).currentMileage ??
-        vehicle.mileage ??
-        vehicle.profile?.currentMileage ??
-        null;
-      const recommendation = getNextMaintenanceRecommendation({
-        currentMileage,
-        rules: vehicle.model.maintenanceRules,
-        serviceRecords: vehicle.serviceRecords,
+    const email = buildMaintenanceEmail({
+      recipientName: user.name || user.username || "there",
+      vin: vehicle.vin,
+      vehicleLabel: `${vehicle.year} ${vehicle.model.make.name} ${vehicle.model.name}`,
+      recommendation,
+    });
+
+    if (!options.dryRun) {
+      await sendTrackerEmail({
+        to: user.email!,
+        ...email,
       });
 
-      if (!recommendation || recommendation.status === "UPCOMING") continue;
-
-      const alertKey = `${vehicle.id}:${recommendation.alertKey}:${recommendation.status}`;
-      const alreadySent = await prisma.trackerAlertDelivery.findUnique({
-        where: {
-          userId_alertType_alertKey: {
-            userId: user.id,
-            alertType: "MAINTENANCE",
-            alertKey,
-          },
+      await prisma.trackerAlertDelivery.create({
+        data: {
+          userId: user.id,
+          vehicleId: vehicle.id,
+          modelId: vehicle.modelId,
+          alertType: "MAINTENANCE",
+          alertKey,
         },
-        select: { id: true },
       });
-
-      if (alreadySent) continue;
-
-      const email = buildMaintenanceEmail({
-        recipientName: user.name || user.username || "there",
-        vin: vehicle.vin,
-        vehicleLabel: `${vehicle.year} ${vehicle.model.make.name} ${vehicle.model.name}`,
-        recommendation,
-      });
-
-      if (!options.dryRun) {
-        await sendTrackerEmail({
-          to: user.email!,
-          ...email,
-        });
-
-        await prisma.trackerAlertDelivery.create({
-          data: {
-            userId: user.id,
-            vehicleId: vehicle.id,
-            modelId: vehicle.modelId,
-            alertType: "MAINTENANCE",
-            alertKey,
-          },
-        });
-      }
-
-      sent++;
     }
+
+    sent++;
   }
 
   return { scanned, sent };
+}
+
+type RecentServiceRecord = {
+  vehicleId: string;
+  mileage: number | null;
+  serviceDate: Date;
+  description: string | null;
+};
+
+async function getRecentServiceRecords(vehicleIds: string[]): Promise<RecentServiceRecord[]> {
+  if (vehicleIds.length === 0) return [];
+
+  return prisma.$queryRaw<RecentServiceRecord[]>`
+    SELECT ranked."vehicleId", ranked."mileage", ranked."serviceDate", ranked."description"
+    FROM (
+      SELECT
+        record."vehicleId",
+        record."mileage",
+        record."serviceDate",
+        record."description",
+        row_number() OVER (
+          PARTITION BY record."vehicleId"
+          ORDER BY record."serviceDate" DESC
+        ) AS row_number
+      FROM "ServiceRecord" record
+      WHERE record."vehicleId" IN (${Prisma.join(vehicleIds)})
+    ) ranked
+    WHERE ranked.row_number <= 24
+    ORDER BY ranked."vehicleId", ranked."serviceDate" DESC
+  `;
+}
+
+function groupBy<T>(rows: T[], keyFor: (row: T) => string) {
+  const grouped = new Map<string, T[]>();
+  for (const row of rows) {
+    const key = keyFor(row);
+    const existing = grouped.get(key) ?? [];
+    existing.push(row);
+    grouped.set(key, existing);
+  }
+  return grouped;
 }
 
 function buildMaintenanceEmail({

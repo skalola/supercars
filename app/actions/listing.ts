@@ -23,8 +23,20 @@ async function verifyOwnership(vin: string) {
 
   const vehicle = await prisma.vehicle.findUnique({
     where: { vin },
-    include: {
-      profile: true,
+    select: {
+      id: true,
+      ownerId: true,
+      status: true,
+      modelId: true,
+      year: true,
+      mileage: true,
+      color: true,
+      profile: {
+        select: {
+          currentMileage: true,
+          exteriorColor: true,
+        },
+      },
     },
   });
 

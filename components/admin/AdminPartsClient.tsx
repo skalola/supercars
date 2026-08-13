@@ -10,6 +10,7 @@ import {
   updatePerformancePartAffiliateAction,
 } from "@/app/actions/admin-parts";
 import type { MakeOption, ModelOption } from "@/lib/makes/catalog";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export type AdminPartCategoryRow = {
   id: string;
@@ -106,6 +107,18 @@ type AdminPartsClientProps = {
   brands: AdminPartBrandRow[];
   affiliatePartners: AdminAffiliatePartnerRow[];
   parts: AdminPerformancePartRow[];
+  catalogSummary: {
+    totalParts: number;
+    publicReadyParts: number;
+    needsReviewParts: number;
+  };
+  activeFilters: {
+    search: string;
+    category: string;
+    brand: string;
+    status: string;
+    trust: string;
+  };
   affiliateAnalytics: AdminAffiliateAnalytics;
   makes: MakeOption[];
   models: ModelOption[];
@@ -188,10 +201,15 @@ export function AdminPartsClient({
   brands,
   affiliatePartners,
   parts,
+  catalogSummary,
+  activeFilters,
   affiliateAnalytics,
   makes,
   models,
 }: AdminPartsClientProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [activeModal, setActiveModal] = useState<"category" | "brand" | "part" | "affiliatePart" | "affiliatePartners" | null>(null);
@@ -211,53 +229,22 @@ export function AdminPartsClient({
   const [affiliatePartnerForm, setAffiliatePartnerForm] = useState<AffiliatePartnerFormState>(() =>
     toAffiliatePartnerForm(affiliatePartners[0] ?? null)
   );
-  const [searchQuery, setSearchQuery] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("");
-  const [brandFilter, setBrandFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [trustFilter, setTrustFilter] = useState("");
+  const [searchQuery, setSearchQuery] = useState(activeFilters.search);
 
   const filteredModels = useMemo(
     () => models.filter((model) => !partForm.makeId || model.makeId === partForm.makeId),
     [models, partForm.makeId]
   );
 
-  const filteredParts = parts.filter((part) => {
-    if (categoryFilter && part.categoryName !== categoryFilter) return false;
-    if (brandFilter && part.brandName !== brandFilter) return false;
-    if (statusFilter && part.status !== statusFilter) return false;
-    if (trustFilter === "PUBLIC_READY" && !part.publicEligible) return false;
-    if (trustFilter === "NEEDS_REVIEW" && part.publicEligible) return false;
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const haystack = [
-        part.name,
-        part.partNumber,
-        part.categoryName,
-        part.brandName,
-        part.sourceConfidence,
-        part.trackingStatus,
-        part.publicEligible ? "public ready" : "needs review",
-        ...part.trustIssues,
-        ...part.trustWarnings,
-        ...part.compatibility,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      if (!haystack.includes(q)) return false;
+  const updateFilters = (updates: Record<string, string>) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("page");
+    for (const [key, value] of Object.entries(updates)) {
+      if (value) params.set(key, value);
+      else params.delete(key);
     }
-
-    return true;
-  });
-
-  const resetFilters = () => {
-    setSearchQuery("");
-    setCategoryFilter("");
-    setBrandFilter("");
-    setStatusFilter("");
-    setTrustFilter("");
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname);
   };
 
   const updatePartForm = (field: keyof PartFormState, value: string) => {
@@ -431,9 +418,9 @@ export function AdminPartsClient({
       <div className="admin-parts-kpi-grid" aria-label="Parts catalog summary">
         <SummaryCard label="Categories" value={categories.length.toLocaleString()} />
         <SummaryCard label="Brands" value={brands.length.toLocaleString()} />
-        <SummaryCard label="Parts Captured" value={parts.length.toLocaleString()} />
-        <SummaryCard label="Public Ready" value={parts.filter((part) => part.publicEligible).length.toLocaleString()} />
-        <SummaryCard label="Needs Review" value={parts.filter((part) => !part.publicEligible).length.toLocaleString()} />
+        <SummaryCard label="Parts Captured" value={catalogSummary.totalParts.toLocaleString()} />
+        <SummaryCard label="Public Ready" value={catalogSummary.publicReadyParts.toLocaleString()} />
+        <SummaryCard label="Needs Review" value={catalogSummary.needsReviewParts.toLocaleString()} />
         <SummaryCard label="Affiliate Candidates" value={affiliatePartners.length.toLocaleString()} />
       </div>
 
@@ -478,7 +465,14 @@ export function AdminPartsClient({
 
       {message && <div className={`admin-action-message ${message.type}`}>{message.text}</div>}
 
-      <div className="admin-filter-toolbar admin-parts-filter-toolbar" aria-label="Parts filters">
+      <form
+        className="admin-filter-toolbar admin-parts-filter-toolbar"
+        aria-label="Parts filters"
+        onSubmit={(event) => {
+          event.preventDefault();
+          updateFilters({ q: searchQuery.trim() });
+        }}
+      >
         <label>
           <span>Search</span>
           <input
@@ -490,7 +484,7 @@ export function AdminPartsClient({
         </label>
         <label>
           <span>Category</span>
-          <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+          <select value={activeFilters.category} onChange={(event) => updateFilters({ category: event.target.value })}>
             <option value="">All Categories</option>
             {categories.map((category) => (
               <option key={category.id} value={category.name}>
@@ -501,7 +495,7 @@ export function AdminPartsClient({
         </label>
         <label>
           <span>Brand</span>
-          <select value={brandFilter} onChange={(event) => setBrandFilter(event.target.value)}>
+          <select value={activeFilters.brand} onChange={(event) => updateFilters({ brand: event.target.value })}>
             <option value="">All Brands</option>
             {brands.map((brand) => (
               <option key={brand.id} value={brand.name}>
@@ -512,7 +506,7 @@ export function AdminPartsClient({
         </label>
         <label>
           <span>Status</span>
-          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+          <select value={activeFilters.status} onChange={(event) => updateFilters({ status: event.target.value })}>
             <option value="">All Statuses</option>
             <option value="DRAFT">Draft</option>
             <option value="MANUAL_REVIEW">Manual Review</option>
@@ -522,16 +516,17 @@ export function AdminPartsClient({
         </label>
         <label>
           <span>Catalog Trust</span>
-          <select value={trustFilter} onChange={(event) => setTrustFilter(event.target.value)}>
+          <select value={activeFilters.trust} onChange={(event) => updateFilters({ trust: event.target.value })}>
             <option value="">All Trust States</option>
             <option value="PUBLIC_READY">Public Ready</option>
             <option value="NEEDS_REVIEW">Needs Review</option>
           </select>
         </label>
-        <button type="button" onClick={resetFilters}>
+        <button type="submit">Search</button>
+        <button type="button" onClick={() => { setSearchQuery(""); router.push(pathname); }}>
           Reset
         </button>
-      </div>
+      </form>
 
       <div className="mobile-scroll admin-management-table-shell admin-parts-table-shell">
         <table className="admin-management-table admin-parts-table">
@@ -550,14 +545,14 @@ export function AdminPartsClient({
             </tr>
           </thead>
           <tbody>
-            {filteredParts.length === 0 ? (
+            {parts.length === 0 ? (
               <tr>
                 <td colSpan={10} className="admin-management-empty">
                   No performance parts match the selected filters.
                 </td>
               </tr>
             ) : (
-              filteredParts.map((part) => (
+              parts.map((part) => (
                 <tr key={part.id}>
                   <td data-label="Part">
                     <strong>{part.name}</strong>

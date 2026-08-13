@@ -26,6 +26,11 @@ async function verifyOwnership(vin: string) {
 
   const vehicle = await prisma.vehicle.findUnique({
     where: { vin },
+    select: {
+      id: true,
+      ownerId: true,
+      status: true,
+    },
   });
 
   if (!vehicle) {
@@ -81,6 +86,12 @@ export async function deleteVehiclePhoto(vin: string, photoId: string) {
 
   const photo = await prisma.vehiclePhoto.findUnique({
     where: { id: photoId },
+    select: {
+      id: true,
+      vehicleId: true,
+      filePath: true,
+      isHero: true,
+    },
   });
 
   if (!photo || photo.vehicleId !== vehicleId) {
@@ -99,6 +110,7 @@ export async function deleteVehiclePhoto(vin: string, photoId: string) {
     const nextPhoto = await prisma.vehiclePhoto.findFirst({
       where: { vehicleId },
       orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+      select: { id: true },
     });
     if (nextPhoto) {
       await prisma.vehiclePhoto.update({
@@ -116,6 +128,10 @@ export async function setHeroPhoto(vin: string, photoId: string) {
 
   const photo = await prisma.vehiclePhoto.findUnique({
     where: { id: photoId },
+    select: {
+      id: true,
+      vehicleId: true,
+    },
   });
 
   if (!photo || photo.vehicleId !== vehicleId) {
@@ -195,6 +211,11 @@ export async function deleteVehicleDocument(vin: string, docId: string) {
 
   const doc = await prisma.vehicleDocument.findUnique({
     where: { id: docId },
+    select: {
+      id: true,
+      vehicleId: true,
+      filePath: true,
+    },
   });
 
   if (!doc || doc.vehicleId !== vehicleId) {

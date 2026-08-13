@@ -3,11 +3,37 @@ import { isInvalidVin } from "../lib/data-quality/vin-validator";
 
 async function main() {
   const vehicles = await prisma.vehicle.findMany({
-    include: {
-      model: { include: { make: true } },
-      listings: { include: { source: true } }
-    }
+    select: {
+      vin: true,
+      year: true,
+      inventoryStatus: true,
+      vinIdentityStatus: true,
+      imageValidationStatus: true,
+      mileageStatus: true,
+      model: {
+        select: {
+          name: true,
+          make: {
+            select: { name: true },
+          },
+        },
+      },
+      listings: {
+        select: {
+          priceStatus: true,
+          freshnessStatus: true,
+          validationStatus: true,
+          source: {
+            select: { name: true },
+          },
+        },
+      },
+    },
   });
+  const vinCounts = vehicles.reduce((counts, vehicle) => {
+    counts.set(vehicle.vin, (counts.get(vehicle.vin) ?? 0) + 1);
+    return counts;
+  }, new Map<string, number>());
 
   const totalVehicles = vehicles.length;
   // VALID and WARNING are publicly displayable. NEEDS_REVIEW and REMOVED are hidden.
@@ -28,7 +54,7 @@ async function main() {
   const affectedDetails: string[] = [];
 
   for (const v of vehicles) {
-    const isDuplicate = v.vin.includes("-DUP-") || vehicles.filter(x => x.vin === v.vin).length > 1;
+    const isDuplicate = v.vin.includes("-DUP-") || (vinCounts.get(v.vin) ?? 0) > 1;
     const isMissingVin = !v.vin || v.vin.trim() === "";
     const isInvalid = isInvalidVin(v.vin) && !isDuplicate && !isMissingVin;
     const hasVinIdentityConflict = v.vinIdentityStatus !== "VALID";

@@ -1,23 +1,26 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
 import { getMakeMetadata } from "@/lib/makes/make-metadata";
 
 const regionOrder = ["Japan", "Europe", "United Kingdom", "United States", "Korea", "China", "Specialist / Tuner"];
 
 export default async function MakesPage() {
-  const makes = await prisma.make.findMany({
-    include: {
-      models: {
-        orderBy: { name: "asc" },
-        take: 4,
-      },
-      _count: {
-        select: {
-          models: true,
-        },
-      },
-    },
-    orderBy: { name: "asc" },
+  const catalog = await getMakeModelCatalogOptions();
+  const modelsByMakeId = new Map<string, typeof catalog.models>();
+
+  for (const model of catalog.models) {
+    const models = modelsByMakeId.get(model.makeId) ?? [];
+    models.push(model);
+    modelsByMakeId.set(model.makeId, models);
+  }
+
+  const makes = catalog.makes.map((make) => {
+    const models = modelsByMakeId.get(make.id) ?? [];
+    return {
+      ...make,
+      models,
+      modelCount: models.length,
+    };
   });
 
   const groupedMakes = regionOrder
@@ -25,7 +28,7 @@ export default async function MakesPage() {
       region,
       makes: makes
         .filter((make) => (make.region || getMakeMetadata(make.slug).region) === region)
-        .sort((a, b) => b._count.models - a._count.models || a.name.localeCompare(b.name)),
+        .sort((a, b) => b.modelCount - a.modelCount || a.name.localeCompare(b.name)),
     }))
     .filter((group) => group.makes.length > 0);
 
@@ -44,7 +47,7 @@ export default async function MakesPage() {
           </article>
           <article>
             <span>Models</span>
-            <strong>{makes.reduce((sum, make) => sum + make._count.models, 0)}</strong>
+            <strong>{catalog.models.length}</strong>
           </article>
         </div>
       </section>
@@ -67,10 +70,10 @@ export default async function MakesPage() {
                     )}
                   </span>
                   <span className="makes-logo-name">{make.name}</span>
-                  <small>{make._count.models.toLocaleString()} models</small>
+                  <small>{make.modelCount.toLocaleString()} models</small>
                   {make.models.length > 0 ? (
                     <span className="makes-model-preview">
-                      {make.models.map((model) => model.name).join(" · ")}
+                      {make.models.slice(0, 4).map((model) => model.name).join(" · ")}
                     </span>
                   ) : null}
                 </Link>

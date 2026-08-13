@@ -2,19 +2,20 @@ import { prisma } from "@/lib/prisma";
 import { validateVehicleImageContentFromUrl } from "@/lib/data-quality/vehicle-image-content-validator";
 import { isKnownInactiveListingUrl } from "@/lib/inventory/listing-url-quality";
 import { normalizeSupportedMake, SUPPORTED_MAKES } from "@/lib/supported-makes";
+import { getArgValue, getBatchLimit, hasArg, isExecuteMode, logScriptMode } from "./lib/script-guards";
 
-const makeArg = process.argv.find((arg) => arg.startsWith("--make="))?.split("=")[1];
-const vinArg = process.argv.find((arg) => arg.startsWith("--vin="))?.split("=")[1]?.toUpperCase();
-const limitArg = Number(process.argv.find((arg) => arg.startsWith("--limit="))?.split("=")[1] ?? 100);
-const maxImagesArg = Number(process.argv.find((arg) => arg.startsWith("--max-images="))?.split("=")[1] ?? 12);
-const updateExistingImages = process.argv.includes("--update-existing-images");
-const validateExistingImages = process.argv.includes("--validate-existing-images");
-const updatePrices = process.argv.includes("--update-prices");
-const includeExistingGallery = process.argv.includes("--include-existing-gallery");
+const makeArg = getArgValue("--make");
+const vinArg = getArgValue("--vin")?.toUpperCase();
+const maxImagesArg = Number(getArgValue("--max-images") ?? 12);
+const updateExistingImages = hasArg("--update-existing-images");
+const validateExistingImages = hasArg("--validate-existing-images");
+const updatePrices = hasArg("--update-prices");
+const includeExistingGallery = hasArg("--include-existing-gallery");
+const execute = isExecuteMode();
 const targetMakes = makeArg
   ? [normalizeSupportedMake(makeArg)].filter((make): make is (typeof SUPPORTED_MAKES)[number] => Boolean(make))
   : [...SUPPORTED_MAKES];
-const limit = Number.isFinite(limitArg) && limitArg > 0 ? limitArg : 100;
+const limit = getBatchLimit({ defaultLimit: 75, maxLimit: 250 });
 const maxImages = Number.isFinite(maxImagesArg) && maxImagesArg > 0 ? Math.min(Math.round(maxImagesArg), 24) : 12;
 
 const HEADERS = {
@@ -27,6 +28,7 @@ const VIN_RE = /\b[A-HJ-NPR-Z0-9]{17}\b/g;
 
 async function main() {
   if (targetMakes.length === 0) throw new Error(`Unsupported make: ${makeArg}`);
+  logScriptMode("backfill-listing-images-from-pages", execute, limit);
 
   const vehicleFilter: Record<string, unknown> = {
     inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
@@ -90,9 +92,9 @@ async function main() {
   for (const listing of listings) {
     if (!listing.url || !listing.vehicleId) continue;
     if (isKnownInactiveListingUrl(listing.url) || isKnownInactiveListingUrl(listing.imageUrl)) {
-      await deactivateStaleListingMedia(listing.id, listing.vehicleId);
+      if (execute) await deactivateStaleListingMedia(listing.id, listing.vehicleId);
       staleListingsDeactivated++;
-      console.log(`STALE ${listing.model.make.name} ${listing.model.name} | sold/archive media | ${listing.url}`);
+      console.log(`${execute ? "STALE" : "WOULD_STALE"} ${listing.model.make.name} ${listing.model.name} | sold/archive media | ${listing.url}`);
       continue;
     }
     if (!includeExistingGallery && (listing.vehicle?._count.images || 0) >= maxImages) {
@@ -134,7 +136,7 @@ async function main() {
     const validImages = imageValidation.validImages;
     const rejectedImages = [...imageValidation.rejectedImages];
     if (invalidExistingHero && listing.imageUrl) rejectedImages.push(listing.imageUrl);
-    await markRejectedVehicleImages(listing.vehicleId, rejectedImages);
+    if (execute) await markRejectedVehicleImages(listing.vehicleId, rejectedImages);
 
     const imageUrl = validImages[0] || null;
 
@@ -151,19 +153,21 @@ async function main() {
       data.priceStatus = "VALID_PRICE";
     }
 
-    const addedImages = await attachPageVehicleImages({
-      vehicleId: listing.vehicleId,
-      images: validImages,
-      alt: `${listing.year} ${listing.model.make.name} ${listing.model.name}`,
-      primaryUrl: data.imageUrl,
-    });
+    const addedImages = execute
+      ? await attachPageVehicleImages({
+          vehicleId: listing.vehicleId,
+          images: validImages,
+          alt: `${listing.year} ${listing.model.make.name} ${listing.model.name}`,
+          primaryUrl: data.imageUrl,
+        })
+      : estimateNewImageCount(validImages, maxImages);
 
     if (Object.keys(data).length === 0 && addedImages === 0) {
       skipped++;
       continue;
     }
 
-    if (Object.keys(data).length > 0) {
+    if (execute && Object.keys(data).length > 0) {
       await prisma.listing.update({
         where: { id: listing.id },
         data,
@@ -175,11 +179,11 @@ async function main() {
     if (data.price) pricesUpdated++;
     updated++;
     console.log(
-      `PAGE ${listing.model.make.name} ${listing.model.name} | ${data.price ? `$${data.price.toLocaleString()}` : "price unchanged"} | ${data.imageUrl || "hero unchanged"} | +${addedImages} gallery image${addedImages === 1 ? "" : "s"} | ${rejectedImages.length} rejected`,
+      `${execute ? "PAGE" : "WOULD_UPDATE"} ${listing.model.make.name} ${listing.model.name} | ${data.price ? `$${data.price.toLocaleString()}` : "price unchanged"} | ${data.imageUrl || "hero unchanged"} | +${addedImages} possible gallery image${addedImages === 1 ? "" : "s"} | ${rejectedImages.length} rejected`,
     );
   }
 
-  console.log(JSON.stringify({ targetMakes, inspected: listings.length, updated, listingsWithImagesUpdated, vehicleImagesAdded, pricesUpdated, staleListingsDeactivated, skipped }, null, 2));
+  console.log(JSON.stringify({ execute, targetMakes, inspected: listings.length, updated, listingsWithImagesUpdated, vehicleImagesAdded, pricesUpdated, staleListingsDeactivated, skipped }, null, 2));
 }
 
 async function fetchHtml(url: string) {
@@ -243,22 +247,19 @@ async function attachPageVehicleImages({
   let hasPrimary = existing.some((image) => image.isPrimary);
   let added = 0;
 
-  for (const url of images) {
-    if (existingUrls.has(url)) continue;
-
-    await prisma.vehicleImage.create({
-      data: {
+  const newImages = images.filter((url) => !existingUrls.has(url));
+  if (newImages.length > 0) {
+    await prisma.vehicleImage.createMany({
+      data: newImages.map((url, index) => ({
         vehicleId,
         url,
         alt,
-        isPrimary: primaryUrl ? url === primaryUrl : !hasPrimary,
+        isPrimary: primaryUrl ? url === primaryUrl : !hasPrimary && index === 0,
         validationStatus: "VALID",
-      },
+      })),
     });
-
-    existingUrls.add(url);
     hasPrimary = true;
-    added++;
+    added = newImages.length;
   }
 
   if (primaryUrl) {
@@ -273,6 +274,10 @@ async function attachPageVehicleImages({
   }
 
   return added;
+}
+
+function estimateNewImageCount(images: string[] | null, limit: number) {
+  return Math.min(images?.length ?? 0, limit);
 }
 
 async function validateCandidateImages(images: string[], limit: number) {

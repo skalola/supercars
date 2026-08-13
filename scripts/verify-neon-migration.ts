@@ -47,7 +47,16 @@ async function main() {
   const representativeVehicles = await prisma.vehicle.findMany({
     take: 5,
     orderBy: { updatedAt: "desc" },
-    include: { model: { include: { make: true } }, images: true, listings: true },
+    select: {
+      vin: true,
+      model: {
+        select: {
+          name: true,
+          make: { select: { name: true } },
+        },
+      },
+      _count: { select: { images: true, listings: true } },
+    },
   });
 
   const diagnostics = {
@@ -64,8 +73,8 @@ async function main() {
       vin: vehicle.vin,
       make: vehicle.model.make.name,
       model: vehicle.model.name,
-      imageCount: vehicle.images.length,
-      listingCount: vehicle.listings.length,
+      imageCount: vehicle._count.images,
+      listingCount: vehicle._count.listings,
     })),
   };
 

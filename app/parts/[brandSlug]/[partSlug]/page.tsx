@@ -9,6 +9,8 @@ import { isAffiliateTrackingReady, isSafeOutboundUrl } from "@/lib/parts/affilia
 import { getPartDetailPath } from "@/lib/parts/routes";
 import { auditPerformancePartTrust } from "@/lib/parts/trust";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
+import { unstable_cache } from "next/cache";
 
 type PartDetailPageProps = {
   params: Promise<{
@@ -17,38 +19,122 @@ type PartDetailPageProps = {
   }>;
 };
 
+const partDetailSelect = {
+  id: true,
+  categoryId: true,
+  brandId: true,
+  name: true,
+  slug: true,
+  partNumber: true,
+  description: true,
+  imageUrl: true,
+  sourceUrl: true,
+  sourceName: true,
+  sourceConfidence: true,
+  status: true,
+  retailPriceCents: true,
+  retailerName: true,
+  affiliateUrl: true,
+  trackingStatus: true,
+  lastCheckedAt: true,
+  estimatedHpGain: true,
+  estimatedTorqueGain: true,
+  gainBasis: true,
+  installComplexity: true,
+  notes: true,
+  category: {
+    select: {
+      name: true,
+      slug: true,
+    },
+  },
+  catalogNode: {
+    select: { name: true },
+  },
+  brand: {
+    select: {
+      name: true,
+      slug: true,
+      logoUrl: true,
+    },
+  },
+  affiliatePartner: {
+    select: {
+      name: true,
+      active: true,
+      status: true,
+    },
+  },
+  compatibility: {
+    select: {
+      makeId: true,
+      modelId: true,
+      yearStart: true,
+      yearEnd: true,
+      trim: true,
+      engine: true,
+      make: {
+        select: { name: true },
+      },
+      model: {
+        select: { name: true },
+      },
+    },
+    orderBy: [
+      { make: { name: "asc" } },
+      { model: { name: "asc" } },
+      { yearStart: "asc" },
+    ],
+    take: 100,
+  },
+} satisfies Prisma.PerformancePartSelect;
+
+const relatedPartSelect = {
+  id: true,
+  categoryId: true,
+  brandId: true,
+  name: true,
+  slug: true,
+  imageUrl: true,
+  sourceUrl: true,
+  sourceConfidence: true,
+  status: true,
+  retailPriceCents: true,
+  estimatedHpGain: true,
+  estimatedTorqueGain: true,
+  category: {
+    select: { name: true },
+  },
+  brand: {
+    select: {
+      name: true,
+      slug: true,
+    },
+  },
+  compatibility: {
+    select: {
+      makeId: true,
+      modelId: true,
+      yearStart: true,
+      yearEnd: true,
+    },
+    orderBy: [
+      { make: { name: "asc" } },
+      { model: { name: "asc" } },
+    ],
+    take: 24,
+  },
+} satisfies Prisma.PerformancePartSelect;
+
+type RelatedPart = Prisma.PerformancePartGetPayload<{ select: typeof relatedPartSelect }>;
+
 export default async function PartDetailPage({ params }: PartDetailPageProps) {
   const { brandSlug, partSlug } = await params;
   const session = await auth();
   const userId = session?.user?.id as string | undefined;
 
   const [part, garageCars] = await Promise.all([
-    prisma.performancePart.findFirst({
-      where: {
-        slug: partSlug,
-        brand: {
-          slug: brandSlug,
-        },
-        status: "ACTIVE",
-      },
-      include: {
-        category: true,
-        catalogNode: true,
-        brand: true,
-        affiliatePartner: true,
-        compatibility: {
-          include: {
-            make: true,
-            model: true,
-          },
-          orderBy: [
-            { make: { name: "asc" } },
-            { model: { name: "asc" } },
-            { yearStart: "asc" },
-          ],
-        },
-      },
-    }),
+    getPublicPartDetail(brandSlug, partSlug),
     getClaimedGarageCars(userId),
   ]);
 
@@ -394,6 +480,30 @@ async function getClaimedGarageCars(userId: string | undefined): Promise<PartDet
   }));
 }
 
+const getPublicPartDetail = unstable_cache(
+  (brandSlug: string, partSlug: string) => prisma.performancePart.findFirst({
+    where: {
+      slug: partSlug,
+      brand: { slug: brandSlug },
+      status: "ACTIVE",
+      sourceUrl: { not: null },
+      sourceConfidence: "SOURCE_VERIFIED",
+      imageUrl: { not: null },
+      compatibility: {
+        some: {
+          OR: [
+            { makeId: { not: null } },
+            { modelId: { not: null } },
+          ],
+        },
+      },
+    },
+    select: partDetailSelect,
+  }),
+  ["public-part-detail-v1"],
+  { revalidate: 60 * 60, tags: ["parts-catalog"] },
+);
+
 async function getRelatedParts(
   partId: string,
   categoryId: string,
@@ -414,18 +524,13 @@ async function getRelatedParts(
       status: "ACTIVE",
       OR: relatedConditions,
     },
-    include: {
-      category: true,
-      brand: true,
-      affiliatePartner: true,
-      compatibility: { include: { make: true, model: true } },
-    },
+    select: relatedPartSelect,
     orderBy: [
       { category: { displayOrder: "asc" } },
       { brand: { name: "asc" } },
       { name: "asc" },
     ],
-    take: 40,
+    take: 20,
   });
 
   return parts
@@ -466,11 +571,7 @@ function scoreRelatedPart(
 }
 
 function getRecommendationLabel(
-  part: {
-    categoryId: string;
-    brandId: string;
-    compatibility: Array<{ makeId: string | null; modelId: string | null }>;
-  },
+  part: RelatedPart,
   current: { categoryId: string; brandId: string; makeIds: string[]; modelIds: string[] },
 ) {
   const partMakeIds = new Set(part.compatibility.map((fitment) => fitment.makeId).filter(isPresent));
@@ -530,8 +631,6 @@ function formatRelatedFitment(
   compatibility: Array<{
     makeId: string | null;
     modelId: string | null;
-    make: { name: string } | null;
-    model: { name: string } | null;
     yearStart: number | null;
     yearEnd: number | null;
   }>,
@@ -542,7 +641,15 @@ function formatRelatedFitment(
     compatibility.find((fitment) => fitment.modelId && current.modelIds.includes(fitment.modelId)) ||
     compatibility.find((fitment) => fitment.makeId && current.makeIds.includes(fitment.makeId)) ||
     compatibility[0];
-  const makeModel = [first.make?.name, first.model?.name].filter(Boolean).join(" ");
+  const makeModel = first.modelId
+    ? current.modelIds.includes(first.modelId)
+      ? "Same model"
+      : "Model fitment"
+    : first.makeId
+      ? current.makeIds.includes(first.makeId)
+        ? "Same make"
+        : "Make fitment"
+      : "Universal";
   const years = formatPartYearRange(first.yearStart, first.yearEnd);
   const suffix = compatibility.length > 1 ? ` +${(compatibility.length - 1).toLocaleString()} more` : "";
   return [makeModel || "Universal", years].filter(Boolean).join(" · ") + suffix;

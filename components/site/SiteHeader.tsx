@@ -132,9 +132,14 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
             </button>
 
             <div className="site-account-dropdown" role="menu" aria-label="Account menu">
-              <Link href={profileHref} className="site-account-link" role="menuitem" onClick={closeMenus}>
-                {isAdmin ? "Admin Portal" : "Profile"}
+              <Link href="/profile/edit" className="site-account-link" role="menuitem" onClick={closeMenus}>
+                Edit Profile
               </Link>
+              {isAdmin ? (
+                <Link href="/admin" className="site-account-link" role="menuitem" onClick={closeMenus}>
+                  Admin Portal
+                </Link>
+              ) : null}
               <Link href={garageHref} className="site-account-link" role="menuitem" onClick={closeMenus}>
                 My Garage
               </Link>

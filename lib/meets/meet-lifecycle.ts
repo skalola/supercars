@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { notifyMeetReminder } from "@/lib/meets/meet-notifications";
+import { notifyMeetReminderBatch } from "@/lib/meets/meet-notifications";
 
 type ProcessMeetLifecycleOptions = {
   now?: Date;
@@ -28,6 +28,37 @@ export async function processMeetLifecycle(options: ProcessMeetLifecycleOptions 
     select: {
       meetId: true,
       userId: true,
+      meet: {
+        select: {
+          id: true,
+          slug: true,
+          title: true,
+          type: true,
+          startsAt: true,
+          city: true,
+          state: true,
+          locationName: true,
+          visibility: true,
+          host: {
+            select: {
+              id: true,
+              name: true,
+              username: true,
+              email: true,
+              trackerPreference: { select: { eventsTrackerEnabled: true } },
+            },
+          },
+        },
+      },
+      user: {
+        select: {
+          id: true,
+          name: true,
+          username: true,
+          email: true,
+          trackerPreference: { select: { eventsTrackerEnabled: true } },
+        },
+      },
     },
     take: 500,
   });
@@ -53,12 +84,11 @@ export async function processMeetLifecycle(options: ProcessMeetLifecycleOptions 
           ).map((notification) => `${notification.meetId}:${notification.userId}`)
         );
 
-  let reminderCount = 0;
-  for (const candidate of reminderCandidates) {
-    if (existingReminderKeys.has(`${candidate.meetId}:${candidate.userId}`)) continue;
-    await notifyMeetReminder(candidate.meetId, candidate.userId);
-    reminderCount += 1;
-  }
+  const pendingReminders = reminderCandidates
+    .filter((candidate) => !existingReminderKeys.has(`${candidate.meetId}:${candidate.userId}`))
+    .map((candidate) => ({ meet: candidate.meet, user: candidate.user }));
+  await notifyMeetReminderBatch(pendingReminders);
+  const reminderCount = pendingReminders.length;
 
   const completed = await prisma.meet.updateMany({
     where: {

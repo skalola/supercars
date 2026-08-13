@@ -8,14 +8,23 @@
  */
 
 import { prisma } from "../lib/prisma";
+import { getBatchLimit, logScriptMode } from "./lib/script-guards";
 
 async function main() {
+  const limit = getBatchLimit({ defaultLimit: 100, maxLimit: 500 });
+  logScriptMode("verify-partner-websites", false, limit);
   const contacts = await prisma.partnerContact.findMany({
     where: {
       active: true,
       website: { not: null },
     },
+    select: {
+      name: true,
+      type: true,
+      website: true,
+    },
     orderBy: [{ type: "asc" }, { name: "asc" }],
+    take: limit,
   });
 
   console.log(`Checking ${contacts.length} partner websites...`);

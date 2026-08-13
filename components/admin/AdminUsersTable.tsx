@@ -16,7 +16,7 @@ export type AdminUserRow = {
   isCurrentAdmin: boolean;
 };
 
-export function AdminUsersTable({ users }: { users: AdminUserRow[] }) {
+export function AdminUsersTable({ users, totalCount }: { users: AdminUserRow[]; totalCount: number }) {
   const [isPending, startTransition] = useTransition();
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -46,7 +46,7 @@ export function AdminUsersTable({ users }: { users: AdminUserRow[] }) {
           <p className="eyebrow">Users</p>
           <h2>All Users</h2>
         </div>
-        <span>{users.length.toLocaleString()} total</span>
+        <span>{users.length.toLocaleString()} shown of {totalCount.toLocaleString()} total</span>
       </div>
 
       {message && (

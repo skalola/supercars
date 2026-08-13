@@ -4,11 +4,20 @@ async function main() {
   console.log("=== VIN Identity Validation Report (Sprint 6.12) ===");
 
   const listings = await prisma.listing.findMany({
-    include: {
+    select: {
+      id: true,
+      url: true,
+      validationStatus: true,
       vehicle: {
-        include: {
+        select: {
+          vin: true,
           model: {
-            include: { make: true },
+            select: {
+              name: true,
+              make: {
+                select: { name: true },
+              },
+            },
           },
         },
       },

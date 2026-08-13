@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { isNonVehicleImageUrl } from "@/lib/vehicle-images";
 
 type MakeObj = {
   id: string;
@@ -32,11 +33,7 @@ type ListingObj = {
   vehicleId: string | null;
   vehicle: {
     vin: string;
-    photos: Array<{ id: string; filePath: string; isHero: boolean }>;
-    images: Array<{ id: string; url: string; isPrimary: boolean; validationStatus?: string | null }>;
-    model?: {
-      images?: Array<{ url: string; type: string | null }> | null;
-    } | null;
+    heroImageUrl: string | null;
   } | null;
   model: ModelObj;
 };
@@ -45,13 +42,22 @@ type InventoryExplorerProps = {
   listings: ListingObj[];
   makes: MakeObj[];
   models: ModelObj[];
+  availableYears: number[];
+  totalListings: number;
+  totalValue: number;
+  page: number;
+  pageSize: number;
   initialMake?: string;
   initialModel?: string;
+  initialYear?: string;
+  initialMinPrice?: string;
+  initialMaxPrice?: string;
 };
 
 function getListingImage(listing: ListingObj) {
-  const vehicleHero = getVehicleHeroImage(listing.vehicle);
-  if (vehicleHero && vehicleHero !== "/images/placeholder.jpg") return vehicleHero;
+  if (listing.vehicle?.heroImageUrl && !isNonVehicleImageUrl(listing.vehicle.heroImageUrl)) {
+    return listing.vehicle.heroImageUrl;
+  }
   if (listing.imageUrl && !isNonVehicleImageUrl(listing.imageUrl)) return listing.imageUrl;
   return "/images/placeholder.jpg";
 }
@@ -60,45 +66,78 @@ export default function InventoryExplorer({
   listings,
   makes,
   models,
+  availableYears,
+  totalListings,
+  totalValue,
+  page,
+  pageSize,
   initialMake,
   initialModel,
+  initialYear,
+  initialMinPrice,
+  initialMaxPrice,
 }: InventoryExplorerProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const initialMakeId = resolveMakeId(makes, initialMake);
   const initialModelId = resolveModelId(models, initialModel, initialMakeId);
-  const [selectedMakeId, setSelectedMakeId] = useState(initialMakeId);
-  const [selectedModelId, setSelectedModelId] = useState(initialModelId);
-  const [selectedYear, setSelectedYear] = useState("");
-  const [minPrice, setMinPrice] = useState("");
-  const [maxPrice, setMaxPrice] = useState("");
+  const selectedMakeId = initialMakeId;
+  const selectedModelId = initialModelId;
+  const selectedYear = initialYear || "";
+  const [minPrice, setMinPrice] = useState(initialMinPrice || "");
+  const [maxPrice, setMaxPrice] = useState(initialMaxPrice || "");
 
   // Dynamically filter models list based on selected make
-  const filteredModels = selectedMakeId
-    ? models.filter((m) => m.makeId === selectedMakeId)
-    : models;
+  const filteredModels = useMemo(
+    () => (selectedMakeId ? models.filter((m) => m.makeId === selectedMakeId) : models),
+    [models, selectedMakeId]
+  );
 
-  // Filter listings
-  const filteredListings = listings.filter((l) => {
-    if (selectedMakeId && l.model.makeId !== selectedMakeId) return false;
-    if (selectedModelId && l.modelId !== selectedModelId) return false;
-    if (selectedYear && l.year.toString() !== selectedYear) return false;
-
-    const price = l.askingPrice || l.price || 0;
-    if (minPrice && price < parseFloat(minPrice)) return false;
-    if (maxPrice && price > parseFloat(maxPrice)) return false;
-
-    return true;
-  });
-
-  // Get unique years list from listings for filter
-  const uniqueYears = Array.from(new Set(listings.map((l) => l.year))).sort((a, b) => b - a);
-  const visibleValue = filteredListings.reduce((sum, listing) => sum + (listing.askingPrice || listing.price || 0), 0);
+  const uniqueYears = useMemo(
+    () => Array.from(new Set(availableYears)).sort((a, b) => b - a),
+    [availableYears]
+  );
+  const totalPages = Math.max(1, Math.ceil(totalListings / pageSize));
+  const pageStart = totalListings === 0 ? 0 : (page - 1) * pageSize + 1;
+  const pageEnd = Math.min(totalListings, page * pageSize);
 
   const resetFilters = () => {
-    setSelectedMakeId("");
-    setSelectedModelId("");
-    setSelectedYear("");
     setMinPrice("");
     setMaxPrice("");
+    router.push(pathname, { scroll: false });
+  };
+
+  const updateFilters = (updates: Record<string, string | null>) => {
+    const params = new URLSearchParams(searchParams.toString());
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
+    });
+    params.delete("page");
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
+
+  const buildPageHref = (targetPage: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (targetPage > 1) {
+      params.set("page", targetPage.toString());
+    } else {
+      params.delete("page");
+    }
+    const query = params.toString();
+    return query ? `${pathname}?${query}` : pathname;
+  };
+
+  const applyPriceFilters = () => {
+    updateFilters({
+      minPrice: minPrice.trim() || null,
+      maxPrice: maxPrice.trim() || null,
+    });
   };
 
   return (
@@ -112,11 +151,11 @@ export default function InventoryExplorer({
         <div className="market-stat-grid" aria-label="Market summary">
           <article>
             <span>Listings</span>
-            <strong>{filteredListings.length}</strong>
+            <strong>{totalListings}</strong>
           </article>
           <article>
             <span>Value</span>
-            <strong className="market-value-number">{formatFullCurrency(visibleValue)}</strong>
+            <strong className="market-value-number">{formatFullCurrency(totalValue)}</strong>
           </article>
         </div>
       </section>
@@ -140,8 +179,11 @@ export default function InventoryExplorer({
           <select
             value={selectedMakeId}
             onChange={(e) => {
-              setSelectedMakeId(e.target.value);
-              setSelectedModelId(""); // Reset model when make changes
+              const make = makes.find((m) => m.id === e.target.value);
+              updateFilters({
+                make: make?.slug || null,
+                model: null,
+              });
             }}
           >
             <option value="">All Makes</option>
@@ -156,7 +198,10 @@ export default function InventoryExplorer({
           <label>Model</label>
           <select
             value={selectedModelId}
-            onChange={(e) => setSelectedModelId(e.target.value)}
+            onChange={(e) => {
+              const model = models.find((m) => m.id === e.target.value);
+              updateFilters({ model: model?.slug || null });
+            }}
           >
             <option value="">All Models</option>
             {filteredModels.map((m) => (
@@ -170,7 +215,7 @@ export default function InventoryExplorer({
           <label>Year</label>
           <select
             value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value)}
+            onChange={(e) => updateFilters({ year: e.target.value || null })}
           >
             <option value="">All Years</option>
             {uniqueYears.map((yr) => (
@@ -188,6 +233,9 @@ export default function InventoryExplorer({
               placeholder="Min"
               value={minPrice}
               onChange={(e) => setMinPrice(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") applyPriceFilters();
+              }}
             />
             <span>&ndash;</span>
             <input
@@ -195,8 +243,14 @@ export default function InventoryExplorer({
               placeholder="Max"
               value={maxPrice}
               onChange={(e) => setMaxPrice(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") applyPriceFilters();
+              }}
             />
           </div>
+          <button type="button" className="market-filter-apply-button" onClick={applyPriceFilters}>
+            Apply Price
+          </button>
         </div>
       </aside>
 
@@ -207,18 +261,20 @@ export default function InventoryExplorer({
             Available Vehicles
           </h2>
           <span>
-            {filteredListings.length} {filteredListings.length === 1 ? "listing" : "listings"} found
+            {totalListings === 0
+              ? "No listings found"
+              : `Showing ${pageStart}-${pageEnd} of ${totalListings} ${totalListings === 1 ? "listing" : "listings"}`}
           </span>
         </div>
 
-        {filteredListings.length === 0 ? (
+        {listings.length === 0 ? (
           <div className="market-empty-state">
             <h3>No listings found</h3>
             <p>Try adjusting your filters or search criteria.</p>
           </div>
         ) : (
           <div className="inventory-card-grid">
-            {filteredListings.map((lst) => {
+            {listings.map((lst) => {
               const image = getListingImage(lst);
               const price = lst.askingPrice || lst.price || null;
               return (
@@ -284,6 +340,27 @@ export default function InventoryExplorer({
             })}
           </div>
         )}
+        {totalPages > 1 ? (
+          <nav className="market-pagination" aria-label="Inventory pages">
+            <Link
+              href={buildPageHref(Math.max(1, page - 1))}
+              className={page <= 1 ? "market-pagination-link is-disabled" : "market-pagination-link"}
+              aria-disabled={page <= 1}
+            >
+              Previous
+            </Link>
+            <span>
+              Page {page} of {totalPages}
+            </span>
+            <Link
+              href={buildPageHref(Math.min(totalPages, page + 1))}
+              className={page >= totalPages ? "market-pagination-link is-disabled" : "market-pagination-link"}
+              aria-disabled={page >= totalPages}
+            >
+              Next
+            </Link>
+          </nav>
+        ) : null}
       </main>
       </div>
     </div>

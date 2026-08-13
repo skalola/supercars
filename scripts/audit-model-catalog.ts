@@ -1,8 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { findModelMetadataCandidates, type ModelAuditRow, type ModelCatalogRecord, type ModelCoverageStatus } from "@/lib/model-catalog";
-import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
 
 const prisma = new PrismaClient();
 
@@ -13,51 +12,18 @@ type CliOptions = {
 
 async function main() {
   const options = parseOptions(process.argv.slice(2));
-  const models = await prisma.model.findMany({
-    include: {
-      make: true,
-      spec: true,
-      images: true,
-      variants: { select: { id: true } },
-      maintenanceRules: { select: { id: true } },
-      _count: {
-        select: {
-          marketSales: true,
-          marketSnapshots: true,
-          listings: true,
-        },
-      },
-    },
-    orderBy: [
-      { make: { name: "asc" } },
-      { name: "asc" },
-    ],
-  });
-
-  const rows: ModelAuditRow[] = [];
   const auditedAt = new Date();
-  const globalMaintenanceRuleCount = await prisma.maintenanceRule.count({
-    where: { modelId: null },
-  });
+  const models = await getCatalogAuditRows();
+  const rows: ModelAuditRow[] = [];
 
   for (const model of models) {
-    const [sourceBackedInventoryRows, compatiblePartCount] = await Promise.all([
-      getSourceBackedInventoryRows(model.id),
-      countCompatibleParts(model),
-    ]);
-    const visibleInventoryCount = sourceBackedInventoryRows.filter((listing) => hasCleanDisplayImage(listing)).length;
-    const row = buildAuditRow(model, {
-      compatiblePartCount,
-      globalMaintenanceRuleCount,
-      sourceBackedInventoryCount: sourceBackedInventoryRows.length,
-      visibleInventoryCount,
-    });
+    const row = buildAuditRow(model);
     const sourceIndex = rows.length;
 
     if (options.sourceLimit > sourceIndex && row.status !== "READY") {
       const record: ModelCatalogRecord = {
         modelId: model.id,
-        makeName: model.make.name,
+        makeName: model.makeName,
         modelName: model.name,
         slug: model.slug,
         years: model.years,
@@ -102,205 +68,209 @@ async function main() {
   console.log(`[model-catalog-audit] Markdown report: ${markdownPath}`);
 }
 
-type AuditedModel = Prisma.ModelGetPayload<{
-  include: {
-    make: true;
-    spec: true;
-    images: true;
-    variants: { select: { id: true } };
-    maintenanceRules: { select: { id: true } };
-    _count: {
-      select: {
-        marketSales: true;
-        marketSnapshots: true;
-        listings: true;
-      };
-    };
-  };
-}>;
-
-type SourceBackedInventoryRow = Awaited<ReturnType<typeof getSourceBackedInventoryRows>>[number];
-
-async function getSourceBackedInventoryRows(modelId: string) {
-  return prisma.listing.findMany({
-    where: {
-      status: "ACTIVE",
-      modelId,
-      vehicleId: { not: null },
-      sourceId: { not: null },
-      externalListingId: { not: null },
-      url: { not: null },
-      sellerId: null,
-      vehicle: {
-        is: {
-          inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
-        },
-      },
-      validationStatus: "VALID",
-      priceStatus: { not: "PRICE_INVALID" },
-      OR: [
-        { askingPrice: { gte: 10000 } },
-        { price: { gte: 10000 } },
-      ],
-      NOT: [
-        { source: { is: { type: "AUCTION" } } },
-        { url: { contains: "bringatrailer.com", mode: "insensitive" } },
-        { externalListingId: { contains: "sprint-", mode: "insensitive" } },
-        { externalListingId: { contains: "admin-ops", mode: "insensitive" } },
-        { externalListingId: { contains: "demo", mode: "insensitive" } },
-        { externalListingId: { contains: "test", mode: "insensitive" } },
-      ],
-    },
-    select: {
-      imageUrl: true,
-      vehicle: {
-        select: {
-          photos: {
-            orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
-            select: {
-              filePath: true,
-              isHero: true,
-            },
-          },
-          images: {
-            orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
-            select: {
-              url: true,
-              isPrimary: true,
-              validationStatus: true,
-            },
-          },
-          model: {
-            select: {
-              images: {
-                select: {
-                  url: true,
-                  type: true,
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-  });
-}
-
-function hasCleanDisplayImage(listing: SourceBackedInventoryRow) {
-  const vehicleHero = getVehicleHeroImage(listing.vehicle);
-  if (vehicleHero && vehicleHero !== "/images/placeholder.jpg" && !isNonVehicleImageUrl(vehicleHero)) return true;
-  return Boolean(listing.imageUrl && !isNonVehicleImageUrl(listing.imageUrl));
-}
-
-async function countCompatibleParts(model: AuditedModel) {
-  return prisma.performancePart.count({
-    where: {
-      status: "ACTIVE",
-      OR: [
-        { compatibility: { none: {} } },
-        {
-          compatibility: {
-            some: {
-              AND: [
-                {
-                  OR: [
-                    { makeId: null },
-                    { makeId: model.makeId },
-                  ],
-                },
-                {
-                  OR: [
-                    { modelId: null },
-                    { modelId: model.id },
-                  ],
-                },
-                {
-                  OR: [
-                    { yearStart: null },
-                    { yearStart: { lte: model.productionEndYear ?? model.productionStartYear ?? 9999 } },
-                  ],
-                },
-                {
-                  OR: [
-                    { yearEnd: null },
-                    { yearEnd: { gte: model.productionStartYear ?? model.productionEndYear ?? 0 } },
-                  ],
-                },
-              ],
-            },
-          },
-        },
-      ],
-    },
-  });
-}
-
-type ModelPageCoverage = {
-  compatiblePartCount: number;
-  globalMaintenanceRuleCount: number;
+type CatalogAuditRow = {
+  id: string;
+  name: string;
+  slug: string;
+  years: string | null;
+  productionStartYear: number | null;
+  productionEndYear: number | null;
+  makeName: string;
+  hasDescription: boolean;
+  hasProductionYears: boolean;
+  hasCategory: boolean;
+  hasBodyStyle: boolean;
+  hasSpecs: boolean;
+  approvedImageCount: number;
+  variantCount: number;
+  modelMaintenanceRuleCount: number;
+  renderedMaintenanceRuleCount: number;
+  marketDataCount: number;
+  listingCount: number;
   sourceBackedInventoryCount: number;
   visibleInventoryCount: number;
+  compatiblePartCount: number;
 };
 
-function buildAuditRow(model: AuditedModel, coverage: ModelPageCoverage): ModelAuditRow {
-  const hasSpecs = Boolean(
-    model.spec &&
-      [
-        model.spec.engine,
-        model.spec.displacement,
-        model.spec.cylinders,
-        model.spec.horsepower,
-        model.spec.torque,
-        model.spec.transmission,
-        model.spec.drivetrain,
-        model.spec.topSpeed,
-        model.spec.zeroToSixty,
-        model.spec.weight,
-      ].some((value) => typeof value === "string" && value.trim().length > 0),
-  );
-  const hasProductionYears = Boolean(model.years || model.productionStartYear || model.productionEndYear);
-  const approvedImageCount = model.images.filter((image) => image.type?.toLowerCase() !== "candidate" && image.reviewStatus !== "NEEDS_REVIEW").length;
-  const hasHeroImage = approvedImageCount > 0;
-  const hasMarketData = model._count.marketSales > 0 || model._count.marketSnapshots > 0;
-  const hasListings = model._count.listings > 0;
-  const renderedMaintenanceRuleCount = model.maintenanceRules.length + coverage.globalMaintenanceRuleCount;
+async function getCatalogAuditRows() {
+  return prisma.$queryRaw<CatalogAuditRow[]>`
+    WITH global_rules AS (
+      SELECT COUNT(*)::int AS count FROM "MaintenanceRule" WHERE "modelId" IS NULL
+    ),
+    image_counts AS (
+      SELECT "modelId", COUNT(*)::int AS count
+      FROM "ModelImage"
+      WHERE "reviewStatus" <> 'NEEDS_REVIEW'
+        AND (type IS NULL OR LOWER(type) <> 'candidate')
+      GROUP BY "modelId"
+    ),
+    variant_counts AS (
+      SELECT "modelId", COUNT(*)::int AS count FROM "ModelVariant" GROUP BY "modelId"
+    ),
+    model_rule_counts AS (
+      SELECT "modelId", COUNT(*)::int AS count
+      FROM "MaintenanceRule" WHERE "modelId" IS NOT NULL GROUP BY "modelId"
+    ),
+    market_counts AS (
+      SELECT "modelId", SUM(count)::int AS count
+      FROM (
+        SELECT "modelId", COUNT(*)::int AS count FROM "MarketSale" GROUP BY "modelId"
+        UNION ALL
+        SELECT "modelId", COUNT(*)::int AS count FROM "MarketSnapshot" GROUP BY "modelId"
+      ) market_rows
+      GROUP BY "modelId"
+    ),
+    listing_counts AS (
+      SELECT "modelId", COUNT(*)::int AS count FROM "Listing" GROUP BY "modelId"
+    ),
+    inventory_candidates AS (
+      SELECT
+        listing."modelId",
+        listing."imageUrl" AS listing_image_url,
+        (
+          SELECT photo."filePath" FROM "VehiclePhoto" photo
+          WHERE photo."vehicleId" = vehicle.id
+          ORDER BY photo."isHero" DESC, photo."displayOrder" ASC, photo."createdAt" ASC
+          LIMIT 1
+        ) AS photo_url,
+        (
+          SELECT image.url FROM "VehicleImage" image
+          WHERE image."vehicleId" = vehicle.id
+            AND image."validationStatus" NOT IN ('IMAGE_UNVERIFIED', 'IMAGE_MISMATCH')
+          ORDER BY image."isPrimary" DESC, image."createdAt" ASC
+          LIMIT 1
+        ) AS vehicle_image_url,
+        (
+          SELECT image.url FROM "ModelImage" image
+          WHERE image."modelId" = vehicle."modelId"
+          ORDER BY image.type ASC, image."createdAt" ASC
+          LIMIT 1
+        ) AS model_image_url
+      FROM "Listing" listing
+      INNER JOIN "Vehicle" vehicle ON vehicle.id = listing."vehicleId"
+      INNER JOIN "MarketSource" source ON source.id = listing."sourceId"
+      WHERE listing.status = 'ACTIVE'
+        AND listing."externalListingId" IS NOT NULL
+        AND listing.url IS NOT NULL
+        AND listing."sellerId" IS NULL
+        AND vehicle."inventoryStatus" IN ('ACTIVE', 'VALID', 'WARNING')
+        AND listing."validationStatus" = 'VALID'
+        AND listing."priceStatus" IS DISTINCT FROM 'PRICE_INVALID'
+        AND (listing."askingPrice" >= 10000 OR listing.price >= 10000)
+        AND source.type <> 'AUCTION'
+        AND listing.url NOT ILIKE '%bringatrailer.com%'
+        AND listing."externalListingId" NOT ILIKE '%sprint-%'
+        AND listing."externalListingId" NOT ILIKE '%admin-ops%'
+        AND listing."externalListingId" NOT ILIKE '%demo%'
+        AND listing."externalListingId" NOT ILIKE '%test%'
+    ),
+    inventory_coverage AS (
+      SELECT
+        "modelId",
+        COUNT(*)::int AS "sourceBackedInventoryCount",
+        COUNT(*) FILTER (WHERE
+          (photo_url IS NOT NULL AND photo_url !~* 'placeholder|logo|icon|favicon|spinner|loading|avatar|profile|badge|sprite|transparent|blank|noimage|comingsoon|autocheck|carfax|e6-static-thumber') OR
+          (vehicle_image_url IS NOT NULL AND vehicle_image_url !~* 'placeholder|logo|icon|favicon|spinner|loading|avatar|profile|badge|sprite|transparent|blank|noimage|comingsoon|autocheck|carfax|e6-static-thumber') OR
+          (model_image_url IS NOT NULL AND model_image_url !~* 'placeholder|logo|icon|favicon|spinner|loading|avatar|profile|badge|sprite|transparent|blank|noimage|comingsoon|autocheck|carfax|e6-static-thumber') OR
+          (listing_image_url IS NOT NULL AND listing_image_url !~* 'placeholder|logo|icon|favicon|spinner|loading|avatar|profile|badge|sprite|transparent|blank|noimage|comingsoon|autocheck|carfax|e6-static-thumber')
+        )::int AS "visibleInventoryCount"
+      FROM inventory_candidates
+      GROUP BY "modelId"
+    )
+    SELECT
+      model.id,
+      model.name,
+      model.slug,
+      model.years,
+      model."productionStartYear",
+      model."productionEndYear",
+      make.name AS "makeName",
+      (model.description IS NOT NULL AND BTRIM(model.description) <> '') AS "hasDescription",
+      (model.years IS NOT NULL OR model."productionStartYear" IS NOT NULL OR model."productionEndYear" IS NOT NULL) AS "hasProductionYears",
+      (model.category IS NOT NULL AND BTRIM(model.category) <> '') AS "hasCategory",
+      (model."bodyStyle" IS NOT NULL AND BTRIM(model."bodyStyle") <> '') AS "hasBodyStyle",
+      (spec.id IS NOT NULL AND CONCAT_WS('', spec.engine, spec.displacement, spec.cylinders,
+        spec.horsepower, spec.torque, spec.transmission, spec.drivetrain, spec."topSpeed",
+        spec."zeroToSixty", spec.weight) <> '') AS "hasSpecs",
+      COALESCE(image_counts.count, 0)::int AS "approvedImageCount",
+      COALESCE(variant_counts.count, 0)::int AS "variantCount",
+      COALESCE(model_rule_counts.count, 0)::int AS "modelMaintenanceRuleCount",
+      (COALESCE(model_rule_counts.count, 0) + global_rules.count)::int AS "renderedMaintenanceRuleCount",
+      COALESCE(market_counts.count, 0)::int AS "marketDataCount",
+      COALESCE(listing_counts.count, 0)::int AS "listingCount",
+      COALESCE(inventory."sourceBackedInventoryCount", 0)::int AS "sourceBackedInventoryCount",
+      COALESCE(inventory."visibleInventoryCount", 0)::int AS "visibleInventoryCount",
+      (
+        SELECT COUNT(*)::int
+        FROM "PerformancePart" part
+        WHERE part.status = 'ACTIVE'
+          AND (
+            NOT EXISTS (SELECT 1 FROM "PartCompatibility" compatibility WHERE compatibility."partId" = part.id)
+            OR EXISTS (
+              SELECT 1 FROM "PartCompatibility" compatibility
+              WHERE compatibility."partId" = part.id
+                AND (compatibility."makeId" IS NULL OR compatibility."makeId" = model."makeId")
+                AND (compatibility."modelId" IS NULL OR compatibility."modelId" = model.id)
+                AND (compatibility."yearStart" IS NULL OR compatibility."yearStart" <= COALESCE(model."productionEndYear", model."productionStartYear", 9999))
+                AND (compatibility."yearEnd" IS NULL OR compatibility."yearEnd" >= COALESCE(model."productionStartYear", model."productionEndYear", 0))
+            )
+          )
+      ) AS "compatiblePartCount"
+    FROM "Model" model
+    INNER JOIN "Make" make ON make.id = model."makeId"
+    LEFT JOIN "ModelSpec" spec ON spec."modelId" = model.id
+    LEFT JOIN image_counts ON image_counts."modelId" = model.id
+    LEFT JOIN variant_counts ON variant_counts."modelId" = model.id
+    LEFT JOIN model_rule_counts ON model_rule_counts."modelId" = model.id
+    LEFT JOIN market_counts ON market_counts."modelId" = model.id
+    LEFT JOIN listing_counts ON listing_counts."modelId" = model.id
+    LEFT JOIN inventory_coverage inventory ON inventory."modelId" = model.id
+    CROSS JOIN global_rules
+    ORDER BY make.name ASC, model.name ASC
+  `;
+}
+
+function buildAuditRow(model: CatalogAuditRow): ModelAuditRow {
+  const hasHeroImage = model.approvedImageCount > 0;
+  const hasMarketData = model.marketDataCount > 0;
+  const hasListings = model.listingCount > 0;
   const missing = [
     !hasHeroImage ? "heroImage" : null,
-    !model.description ? "description" : null,
-    !hasProductionYears ? "productionYears" : null,
-    !model.category ? "category" : null,
-    !model.bodyStyle ? "bodyStyle" : null,
-    !hasSpecs ? "specs" : null,
-    model.variants.length === 0 ? "variants" : null,
-    renderedMaintenanceRuleCount === 0 ? "maintenanceRules" : null,
+    !model.hasDescription ? "description" : null,
+    !model.hasProductionYears ? "productionYears" : null,
+    !model.hasCategory ? "category" : null,
+    !model.hasBodyStyle ? "bodyStyle" : null,
+    !model.hasSpecs ? "specs" : null,
+    model.variantCount === 0 ? "variants" : null,
+    model.renderedMaintenanceRuleCount === 0 ? "maintenanceRules" : null,
     !hasMarketData ? "marketData" : null,
-    coverage.compatiblePartCount === 0 ? "compatibleParts" : null,
-    coverage.visibleInventoryCount === 0 ? "visibleInventory" : null,
+    model.compatiblePartCount === 0 ? "compatibleParts" : null,
+    model.visibleInventoryCount === 0 ? "visibleInventory" : null,
   ].filter((item): item is string => Boolean(item));
 
   return {
     modelId: model.id,
-    make: model.make.name.trim(),
+    make: model.makeName.trim(),
     model: model.name.trim(),
     slug: model.slug,
     status: getCoverageStatus(missing),
     missing,
-    approvedImageCount,
-    sourceBackedInventoryCount: coverage.sourceBackedInventoryCount,
-    visibleInventoryCount: coverage.visibleInventoryCount,
-    compatiblePartCount: coverage.compatiblePartCount,
-    modelMaintenanceRuleCount: model.maintenanceRules.length,
-    renderedMaintenanceRuleCount,
+    approvedImageCount: model.approvedImageCount,
+    sourceBackedInventoryCount: model.sourceBackedInventoryCount,
+    visibleInventoryCount: model.visibleInventoryCount,
+    compatiblePartCount: model.compatiblePartCount,
+    modelMaintenanceRuleCount: model.modelMaintenanceRuleCount,
+    renderedMaintenanceRuleCount: model.renderedMaintenanceRuleCount,
     hasHeroImage,
-    hasDescription: Boolean(model.description),
-    hasProductionYears,
-    hasCategory: Boolean(model.category),
-    hasBodyStyle: Boolean(model.bodyStyle),
-    hasSpecs,
-    hasVariants: model.variants.length > 0,
-    hasCompatibleParts: coverage.compatiblePartCount > 0,
-    hasVisibleInventory: coverage.visibleInventoryCount > 0,
-    hasMaintenanceRules: renderedMaintenanceRuleCount > 0,
+    hasDescription: model.hasDescription,
+    hasProductionYears: model.hasProductionYears,
+    hasCategory: model.hasCategory,
+    hasBodyStyle: model.hasBodyStyle,
+    hasSpecs: model.hasSpecs,
+    hasVariants: model.variantCount > 0,
+    hasCompatibleParts: model.compatiblePartCount > 0,
+    hasVisibleInventory: model.visibleInventoryCount > 0,
+    hasMaintenanceRules: model.renderedMaintenanceRuleCount > 0,
     hasMarketData,
     hasListings,
   };
@@ -314,22 +284,33 @@ function getCoverageStatus(missing: string[]): ModelCoverageStatus {
 }
 
 async function persistAuditStatus(rows: ModelAuditRow[], auditedAt: Date) {
-  for (const row of rows) {
-    await prisma.model.update({
-      where: { id: row.modelId },
-      data: {
-        metadataStatus: row.status,
-        ...(row.sourceCandidate
-          ? {
-              metadataConfidence: row.sourceCandidate.confidence,
-              metadataSource: row.sourceCandidate.sourceName,
-              metadataSourceUrl: row.sourceCandidate.sourceUrl || null,
-            }
-          : {}),
-        lastMetadataAuditAt: auditedAt,
-      },
-    });
-  }
+  const statuses: ModelCoverageStatus[] = ["READY", "PARTIAL", "NEEDS_REVIEW"];
+  const groupedUpdates = statuses.flatMap((status) => {
+    const ids = rows
+      .filter((row) => row.status === status && !row.sourceCandidate)
+      .map((row) => row.modelId);
+    return ids.length > 0
+      ? [prisma.model.updateMany({
+          where: { id: { in: ids } },
+          data: { metadataStatus: status, lastMetadataAuditAt: auditedAt },
+        })]
+      : [];
+  });
+  const candidateUpdates = rows.flatMap((row) => row.sourceCandidate
+    ? [prisma.model.update({
+        where: { id: row.modelId },
+        data: {
+          metadataStatus: row.status,
+          metadataConfidence: row.sourceCandidate.confidence,
+          metadataSource: row.sourceCandidate.sourceName,
+          metadataSourceUrl: row.sourceCandidate.sourceUrl || null,
+          lastMetadataAuditAt: auditedAt,
+        },
+      })]
+    : []
+  );
+
+  await prisma.$transaction([...groupedUpdates, ...candidateUpdates]);
 }
 
 function buildReport(rows: ModelAuditRow[], auditedAt: Date, options: CliOptions) {

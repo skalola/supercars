@@ -15,27 +15,27 @@ const steps: Step[] = [
   {
     label: "Resolve inventory dealers into directory",
     command: "npm",
-    args: ["run", "sync-inventory-dealer-directory"],
+    args: ["run", "sync-inventory-dealer-directory", "--", "--limit=75"],
   },
   {
     label: "Crawl discovered dealer-owned inventory sites",
     command: "npm",
-    args: ["run", "crawl-directory-dealer-inventory"],
+    args: ["run", "crawl-directory-dealer-inventory", "--", "--limit=40"],
   },
   {
     label: "Crawl official dealer inventory sources",
     command: "npm",
-    args: ["run", "crawl-dealer-inventory"],
+    args: ["run", "crawl-dealer-inventory", "--", "--limit=40"],
   },
   {
     label: "Backfill listing images from vehicle image records",
     command: "npm",
-    args: ["run", "backfill-listing-images"],
+    args: ["run", "backfill-listing-images", "--", "--limit=500"],
   },
   {
     label: "Backfill listing images from live listing pages",
     command: "npm",
-    args: ["run", "backfill-listing-images-from-pages", "--", "--limit=500"],
+    args: ["run", "backfill-listing-images-from-pages", "--", "--limit=250"],
   },
   {
     label: "Polish public inventory quality gate",
@@ -51,6 +51,11 @@ const steps: Step[] = [
     label: "Apply inventory and directory trust policy",
     command: "npm",
     args: ["run", "apply-inventory-directory-policy"],
+  },
+  {
+    label: "Refresh materialized market summaries",
+    command: "npm",
+    args: ["run", "refresh-market-summaries", "--", "--limit=1000"],
   },
 ];
 

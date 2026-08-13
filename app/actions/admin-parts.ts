@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { assertAdmin } from "@/lib/admin/auth";
 import { prisma } from "@/lib/prisma";
 import { toPartSlug } from "@/lib/parts/slug";
@@ -404,6 +404,8 @@ function normalizeEnum(value: string | null | undefined, allowed: Set<string>, f
 }
 
 function revalidateParts() {
+  revalidateTag("parts-catalog", "max");
+  revalidatePath("/parts");
   revalidatePath("/admin/parts");
   revalidatePath("/admin/overview");
 }

@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/lib/admin/auth";
-import { getAdminInventoryListings } from "@/lib/admin/listing-filters";
+import { ADMIN_LISTINGS_PAGE_SIZE, getAdminInventoryListingCount, getAdminInventoryListings } from "@/lib/admin/listing-filters";
 import { AdminListingsTable, AdminListingRow } from "@/components/admin/AdminListingsTable";
+import { AdminPagination, parseAdminPage } from "@/components/admin/AdminPagination";
 import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
 
 function formatDate(value: Date) {
@@ -25,13 +26,21 @@ function formatMileage(value: number | null | undefined) {
   return `${value.toLocaleString()} mi`;
 }
 
-export default async function AdminListingsPage() {
+export default async function AdminListingsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ page?: string | string[] }>;
+}) {
   await requireAdmin();
+  const requestedPage = parseAdminPage((await searchParams)?.page);
 
-  const [listings, catalog] = await Promise.all([
-    getAdminInventoryListings(),
+  const [totalListings, catalog] = await Promise.all([
+    getAdminInventoryListingCount(),
     getMakeModelCatalogOptions(),
   ]);
+  const totalPages = Math.max(1, Math.ceil(totalListings / ADMIN_LISTINGS_PAGE_SIZE));
+  const page = Math.min(requestedPage, totalPages);
+  const listings = await getAdminInventoryListings(page);
   const referenceTimeIso = new Date().toISOString();
 
   const rows: AdminListingRow[] = listings.flatMap((listing) => {
@@ -71,7 +80,8 @@ export default async function AdminListingsPage() {
 
   return (
     <main className="page-shell wide">
-      <AdminListingsTable listings={rows} referenceTimeIso={referenceTimeIso} makes={catalog.makes} models={catalog.models} />
+      <AdminListingsTable listings={rows} totalCount={totalListings} referenceTimeIso={referenceTimeIso} makes={catalog.makes} models={catalog.models} />
+      <AdminPagination pathname="/admin/listings" page={page} totalPages={totalPages} />
     </main>
   );
 }

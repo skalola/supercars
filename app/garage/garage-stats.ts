@@ -1,7 +1,7 @@
 export type GarageStatsVehicle = {
   vin: string;
   model: { name: string; make: { name: string }; spec: { horsepower: string | null; topSpeed: string | null } | null };
-  modifications: unknown[];
+  _count: { modifications: number };
   listings: Array<{ askingPrice: number | null; price: number | null }>;
 };
 
@@ -18,7 +18,7 @@ export function getGarageStats(vehicles: GarageStatsVehicle[], totalCars: number
     .map((vehicle) => ({ vehicle, hp: parseHorsepower(vehicle.model.spec?.horsepower) }))
     .filter((item): item is { vehicle: GarageStatsVehicle; hp: number } => item.hp !== null)
     .sort((a, b) => b.hp - a.hp)[0];
-  const modCount = vehicles.reduce((sum, vehicle) => sum + vehicle.modifications.length, 0);
+  const modCount = vehicles.reduce((sum, vehicle) => sum + vehicle._count.modifications, 0);
 
   return {
     totalCars,

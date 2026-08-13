@@ -1,10 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { SUPPORTED_MAKES } from "@/lib/supported-makes";
+import { getBatchLimit } from "./lib/script-guards";
 
 const VIN_RE = /\b[A-HJ-NPR-Z0-9]{17}\b/g;
 const execute = process.argv.includes("--execute");
-const limitArg = Number(process.argv.find((arg) => arg.startsWith("--limit="))?.split("=")[1] ?? 1000);
-const limit = Number.isFinite(limitArg) && limitArg > 0 ? limitArg : 1000;
+const limit = getBatchLimit({ defaultLimit: 500, maxLimit: 1000 });
 
 type ListingRow = Awaited<ReturnType<typeof getListings>>[number];
 
@@ -106,8 +106,10 @@ async function getListings() {
           year: true,
           inventoryStatus: true,
           images: {
+            where: { validationStatus: "VALID" },
             select: { url: true, validationStatus: true, isPrimary: true, createdAt: true },
             orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+            take: 12,
           },
           model: {
             select: {

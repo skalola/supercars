@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { unstable_cache } from "next/cache";
 
 export type MakeOption = {
   id: string;
@@ -16,10 +17,22 @@ export type ModelOption = {
   make: MakeOption;
 };
 
-export async function getMakeModelCatalogOptions() {
+export const getMakeModelCatalogOptions = unstable_cache(
+  async () => {
   const makes = await prisma.make.findMany({
-    include: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      region: true,
+      logoUrl: true,
       models: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          makeId: true,
+        },
         orderBy: { name: "asc" },
       },
     },
@@ -54,13 +67,20 @@ export async function getMakeModelCatalogOptions() {
     makes: makeOptions,
     models: modelOptions,
   };
-}
+  },
+  ["make-model-catalog-options-v1"],
+  { revalidate: 86_400, tags: ["make-model-catalog"] }
+);
 
-export async function getCatalogMakeNames() {
+export const getCatalogMakeNames = unstable_cache(
+  async () => {
   const makes = await prisma.make.findMany({
     select: { name: true },
     orderBy: { name: "asc" },
   });
 
   return makes.map((make) => make.name.trim()).filter(Boolean);
-}
+  },
+  ["catalog-make-names-v1"],
+  { revalidate: 86_400, tags: ["make-model-catalog"] }
+);

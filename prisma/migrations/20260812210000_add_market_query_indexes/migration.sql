@@ -1,0 +1,16 @@
+CREATE INDEX "Listing_status_validationStatus_modelId_idx" ON "Listing"("status", "validationStatus", "modelId");
+CREATE INDEX "Listing_vehicleId_status_idx" ON "Listing"("vehicleId", "status");
+CREATE INDEX "Listing_modelId_firstSeen_idx" ON "Listing"("modelId", "firstSeen");
+CREATE INDEX "Listing_sourceId_url_idx" ON "Listing"("sourceId", "url");
+CREATE INDEX "MarketSale_modelId_saleDate_idx" ON "MarketSale"("modelId", "saleDate");
+CREATE INDEX "MarketSale_sourceId_url_idx" ON "MarketSale"("sourceId", "url");
+CREATE INDEX "MarketSale_modelId_sourceId_saleDate_salePrice_idx" ON "MarketSale"("modelId", "sourceId", "saleDate", "salePrice");
+UPDATE "MarketSnapshot" SET "date" = date_trunc('day', "date") WHERE "date" <> date_trunc('day', "date");
+CREATE UNIQUE INDEX "MarketSnapshot_modelId_date_key" ON "MarketSnapshot"("modelId", "date");
+CREATE INDEX "ServiceRecord_vehicleId_serviceDate_idx" ON "ServiceRecord"("vehicleId", "serviceDate");
+CREATE INDEX "MaintenanceRule_modelId_priority_idx" ON "MaintenanceRule"("modelId", "priority");
+CREATE INDEX "PartnerDecisionToken_actionTaken_expiresAt_idx" ON "PartnerDecisionToken"("actionTaken", "expiresAt");
+CREATE INDEX "VehicleImage_vehicleId_validationStatus_idx" ON "VehicleImage"("vehicleId", "validationStatus");
+CREATE INDEX "VehicleImage_vehicleId_isPrimary_idx" ON "VehicleImage"("vehicleId", "isPrimary");
+CREATE INDEX "VinDiscoverySource_discoveryId_active_idx" ON "VinDiscoverySource"("discoveryId", "active");
+CREATE INDEX "VehicleModification_vehicleId_idx" ON "VehicleModification"("vehicleId");

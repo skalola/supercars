@@ -11,7 +11,8 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
+import { unstable_cache } from "next/cache";
+import { Prisma } from "@prisma/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -63,26 +64,16 @@ export type MarketSummary = {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function median(values: number[]): number {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1] + sorted[mid]) / 2
-    : sorted[mid];
-}
-
-function mean(values: number[]): number {
-  if (values.length === 0) return 0;
-  return values.reduce((a, b) => a + b, 0) / values.length;
-}
-
 function trendLabel(direction: TrendDirection, pct: number | null): string {
   if (pct === null) return "Insufficient data";
   const pctStr = Math.abs(pct).toFixed(1);
   if (direction === "UP") return `Increasing +${pctStr}%`;
   if (direction === "DOWN") return `Decreasing -${pctStr}%`;
   return "Stable";
+}
+
+function toTrendDirection(value: string): TrendDirection {
+  return value === "UP" || value === "DOWN" || value === "STABLE" ? value : "STABLE";
 }
 
 function sourceBackedInventoryListingWhere(modelId: string): Prisma.ListingWhereInput {
@@ -116,75 +107,235 @@ function sourceBackedInventoryListingWhere(modelId: string): Prisma.ListingWhere
   };
 }
 
-// ─── 1. Market Range ─────────────────────────────────────────────────────────
-
-export async function getMarketRange(modelId: string): Promise<MarketRange | null> {
-  // Market range is based only on active inventory with source-backed listing identity.
-  const listings = await prisma.listing.findMany({
-    where: sourceBackedInventoryListingWhere(modelId),
-    select: { price: true, askingPrice: true },
+async function getMarketModelSummaryRow(modelId: string) {
+  return prisma.marketModelSummary.findUnique({
+    where: { modelId },
+    select: {
+      modelId: true,
+      activeListingCount: true,
+      lowestListingPrice: true,
+      highestListingPrice: true,
+      averageAskingPrice: true,
+      medianAskingPrice: true,
+      recentSalesCount: true,
+      averageSalePrice: true,
+      medianSalePrice: true,
+      averageSaleMileage: true,
+      averageSoldPrice: true,
+      askingVsSoldDifference: true,
+      askingVsSoldDifferencePct: true,
+      trendDirection: true,
+      trendChangePercent: true,
+      trendSnapshotCount: true,
+    },
   });
+}
 
-  const prices = listings
-    .map((l) => l.askingPrice ?? l.price)
-    .filter((p): p is number => p !== null);
+type MarketRangeAggregate = {
+  lowestPrice: number | null;
+  highestPrice: number | null;
+  averageAskingPrice: number | null;
+  medianAskingPrice: number | null;
+  activeListingCount: number;
+};
 
-  if (prices.length === 0) return null;
+async function calculateMarketRange(modelId: string): Promise<MarketRange | null> {
+  const [aggregate] = await prisma.$queryRaw<MarketRangeAggregate[]>(Prisma.sql`
+    SELECT
+      MIN(COALESCE(listing."askingPrice", listing."price"))::double precision AS "lowestPrice",
+      MAX(COALESCE(listing."askingPrice", listing."price"))::double precision AS "highestPrice",
+      AVG(COALESCE(listing."askingPrice", listing."price"))::double precision AS "averageAskingPrice",
+      percentile_cont(0.5) WITHIN GROUP (
+        ORDER BY COALESCE(listing."askingPrice", listing."price")
+      )::double precision AS "medianAskingPrice",
+      COUNT(*)::int AS "activeListingCount"
+    FROM "Listing" listing
+    INNER JOIN "Vehicle" vehicle ON vehicle."id" = listing."vehicleId"
+    LEFT JOIN "MarketSource" source ON source."id" = listing."sourceId"
+    WHERE listing."modelId" = ${modelId}
+      AND listing."status" = 'ACTIVE'
+      AND listing."validationStatus" = 'VALID'
+      AND listing."vehicleId" IS NOT NULL
+      AND listing."sourceId" IS NOT NULL
+      AND listing."externalListingId" IS NOT NULL
+      AND listing."url" IS NOT NULL
+      AND listing."sellerId" IS NULL
+      AND listing."priceStatus" IS DISTINCT FROM 'PRICE_INVALID'
+      AND vehicle."inventoryStatus" IN ('ACTIVE', 'VALID', 'WARNING')
+      AND COALESCE(listing."askingPrice", listing."price") >= 10000
+      AND (source."type" IS NULL OR source."type" <> 'AUCTION')
+      AND listing."url" NOT ILIKE '%bringatrailer.com%'
+      AND listing."externalListingId" NOT ILIKE '%sprint-%'
+      AND listing."externalListingId" NOT ILIKE '%admin-ops%'
+      AND listing."externalListingId" NOT ILIKE '%demo%'
+      AND listing."externalListingId" NOT ILIKE '%test%'
+  `);
+
+  if (!aggregate || aggregate.activeListingCount === 0) return null;
 
   return {
-    lowestPrice: Math.min(...prices),
-    highestPrice: Math.max(...prices),
-    averageAskingPrice: Math.round(mean(prices)),
-    medianAskingPrice: Math.round(median(prices)),
-    activeListingCount: prices.length,
+    lowestPrice: aggregate.lowestPrice ?? 0,
+    highestPrice: aggregate.highestPrice ?? 0,
+    averageAskingPrice: Math.round(aggregate.averageAskingPrice ?? 0),
+    medianAskingPrice: Math.round(aggregate.medianAskingPrice ?? aggregate.averageAskingPrice ?? 0),
+    activeListingCount: aggregate.activeListingCount,
   };
 }
 
+type RecentSalesAggregate = {
+  salesCount: number;
+  averageSalePrice: number | null;
+  medianSalePrice: number | null;
+  averageMileage: number | null;
+};
+
+async function calculateRecentSales(modelId: string, periodDays: number): Promise<RecentSalesPerformance> {
+  const since = new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000);
+  const [aggregate] = await prisma.$queryRaw<RecentSalesAggregate[]>(Prisma.sql`
+    SELECT
+      COUNT(*)::int AS "salesCount",
+      AVG(sale."salePrice")::double precision AS "averageSalePrice",
+      percentile_cont(0.5) WITHIN GROUP (ORDER BY sale."salePrice")::double precision AS "medianSalePrice",
+      AVG(sale."mileage")::double precision AS "averageMileage"
+    FROM "MarketSale" sale
+    WHERE sale."modelId" = ${modelId}
+      AND sale."saleDate" >= ${since}
+      AND sale."salePrice" BETWEEN 10000 AND 20000000
+  `);
+
+  return {
+    salesCount: aggregate?.salesCount ?? 0,
+    averageSalePrice: aggregate?.averageSalePrice === null || aggregate?.averageSalePrice === undefined
+      ? null
+      : Math.round(aggregate.averageSalePrice),
+    medianSalePrice: aggregate?.medianSalePrice === null || aggregate?.medianSalePrice === undefined
+      ? null
+      : Math.round(aggregate.medianSalePrice),
+    averageMileage: aggregate?.averageMileage === null || aggregate?.averageMileage === undefined
+      ? null
+      : Math.round(aggregate.averageMileage),
+    periodDays,
+  };
+}
+
+type TrendAggregate = {
+  firstPrice: number | null;
+  lastPrice: number | null;
+  snapshotCount: number;
+};
+
+async function calculateMarketTrend(modelId: string, monthsBack: number): Promise<MarketTrend | null> {
+  const since = new Date();
+  since.setMonth(since.getMonth() - monthsBack);
+
+  const [aggregate] = await prisma.$queryRaw<TrendAggregate[]>(Prisma.sql`
+    SELECT
+      (array_agg(snapshot."averagePrice" ORDER BY snapshot."date" ASC))[1]::double precision AS "firstPrice",
+      (array_agg(snapshot."averagePrice" ORDER BY snapshot."date" DESC))[1]::double precision AS "lastPrice",
+      COUNT(*)::int AS "snapshotCount"
+    FROM "MarketSnapshot" snapshot
+    WHERE snapshot."modelId" = ${modelId}
+      AND snapshot."date" >= ${since}
+      AND snapshot."averagePrice" IS NOT NULL
+  `);
+
+  if (!aggregate || aggregate.snapshotCount < 2 || aggregate.firstPrice === null || aggregate.lastPrice === null) {
+    return null;
+  }
+
+  const changePercent = aggregate.firstPrice !== 0
+    ? Math.round(((aggregate.lastPrice - aggregate.firstPrice) / aggregate.firstPrice) * 1000) / 10
+    : null;
+  let direction: TrendDirection = "STABLE";
+  if (changePercent !== null) {
+    if (changePercent > 1) direction = "UP";
+    else if (changePercent < -1) direction = "DOWN";
+  }
+
+  return {
+    direction,
+    changePercent,
+    snapshotCount: aggregate.snapshotCount,
+    label: trendLabel(direction, changePercent),
+  };
+}
+
+// ─── 1. Market Range ─────────────────────────────────────────────────────────
+
+export const getMarketRange = unstable_cache(
+  async (modelId: string): Promise<MarketRange | null> => {
+  const summary = await getMarketModelSummaryRow(modelId);
+  if (summary) {
+    return summary.activeListingCount > 0 ? {
+      lowestPrice: summary.lowestListingPrice ?? 0,
+      highestPrice: summary.highestListingPrice ?? 0,
+      averageAskingPrice: Math.round(summary.averageAskingPrice ?? 0),
+      medianAskingPrice: Math.round(summary.medianAskingPrice ?? summary.averageAskingPrice ?? 0),
+      activeListingCount: summary.activeListingCount,
+    } : null;
+  }
+
+  return calculateMarketRange(modelId);
+  },
+  ["market-range-v2"],
+  { revalidate: 900, tags: ["market-intelligence"] }
+);
+
 // ─── 2. Market Supply ────────────────────────────────────────────────────────
 
-export async function getMarketSupply(modelId: string): Promise<MarketSupply> {
+export const getMarketSupply = unstable_cache(
+  async (modelId: string): Promise<MarketSupply> => {
+  const summary = await getMarketModelSummaryRow(modelId);
+  if (summary) return { activeListingCount: summary.activeListingCount };
+
   // Supply uses the same source-backed active inventory filter as market range.
   const activeListingCount = await prisma.listing.count({
     where: sourceBackedInventoryListingWhere(modelId),
   });
   return { activeListingCount };
-}
+  },
+  ["market-supply-v2"],
+  { revalidate: 900, tags: ["market-intelligence"] }
+);
 
 // ─── 3. Recent Sales Performance ─────────────────────────────────────────────
 
-export async function getRecentSales(
+export const getRecentSales = unstable_cache(
+  async (
   modelId: string,
   periodDays = 90
-): Promise<RecentSalesPerformance> {
-  const since = new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000);
+): Promise<RecentSalesPerformance> => {
+  const summary = periodDays === 90 ? await getMarketModelSummaryRow(modelId) : null;
+  if (summary) {
+    return {
+      salesCount: summary.recentSalesCount,
+      averageSalePrice: summary.averageSalePrice === null ? null : Math.round(summary.averageSalePrice),
+      medianSalePrice: summary.medianSalePrice === null ? null : Math.round(summary.medianSalePrice),
+      averageMileage: summary.averageSaleMileage === null ? null : Math.round(summary.averageSaleMileage),
+      periodDays,
+    };
+  }
 
-  // This protects market intelligence from invalid source pricing.
-  const sales = await prisma.marketSale.findMany({
-    where: {
-      modelId,
-      saleDate: { gte: since },
-      salePrice: { gte: 10000, lte: 20000000 },
-    },
-    select: { salePrice: true, mileage: true },
-  });
-
-  const prices = sales.map((s) => s.salePrice);
-  const mileages = sales
-    .map((s) => s.mileage)
-    .filter((m): m is number => m !== null);
-
-  return {
-    salesCount: sales.length,
-    averageSalePrice: prices.length > 0 ? Math.round(mean(prices)) : null,
-    medianSalePrice: prices.length > 0 ? Math.round(median(prices)) : null,
-    averageMileage: mileages.length > 0 ? Math.round(mean(mileages)) : null,
-    periodDays,
-  };
-}
+  return calculateRecentSales(modelId, periodDays);
+  },
+  ["recent-sales-v2"],
+  { revalidate: 3_600, tags: ["market-intelligence"] }
+);
 
 // ─── 4. Asking vs Sold Difference ────────────────────────────────────────────
 
-export async function getAskingVsSold(modelId: string): Promise<AskingVsSold> {
+export const getAskingVsSold = unstable_cache(
+  async (modelId: string): Promise<AskingVsSold> => {
+  const summary = await getMarketModelSummaryRow(modelId);
+  if (summary) {
+    return {
+      averageAskingPrice: summary.averageAskingPrice === null ? null : Math.round(summary.averageAskingPrice),
+      averageSoldPrice: summary.averageSoldPrice === null ? null : Math.round(summary.averageSoldPrice),
+      difference: summary.askingVsSoldDifference === null ? null : Math.round(summary.askingVsSoldDifference),
+      differencePercent: summary.askingVsSoldDifferencePct,
+    };
+  }
+
   const [range, sales] = await Promise.all([
     getMarketRange(modelId),
     getRecentSales(modelId, 90),
@@ -209,57 +360,102 @@ export async function getAskingVsSold(modelId: string): Promise<AskingVsSold> {
     difference: Math.round(difference),
     differencePercent,
   };
-}
+  },
+  ["asking-vs-sold-v2"],
+  { revalidate: 900, tags: ["market-intelligence"] }
+);
 
 // ─── 5. Market Trend ─────────────────────────────────────────────────────────
 
-export async function getMarketTrend(
+export const getMarketTrend = unstable_cache(
+  async (
   modelId: string,
   monthsBack = 12
-): Promise<MarketTrend | null> {
-  const since = new Date();
-  since.setMonth(since.getMonth() - monthsBack);
-
-  const snapshots = await prisma.marketSnapshot.findMany({
-    where: { modelId, date: { gte: since }, averagePrice: { not: null } },
-    orderBy: { date: "asc" },
-    select: { averagePrice: true, date: true },
-  });
-
-  if (snapshots.length < 2) return null;
-
-  const firstPrice = snapshots[0].averagePrice as number;
-  const lastPrice = snapshots[snapshots.length - 1].averagePrice as number;
-
-  const changePercent =
-    firstPrice !== 0
-      ? Math.round(((lastPrice - firstPrice) / firstPrice) * 1000) / 10
-      : null;
-
-  let direction: TrendDirection = "STABLE";
-  if (changePercent !== null) {
-    if (changePercent > 1) direction = "UP";
-    else if (changePercent < -1) direction = "DOWN";
+): Promise<MarketTrend | null> => {
+  const summary = monthsBack === 12 ? await getMarketModelSummaryRow(modelId) : null;
+  if (summary) {
+    if (!summary.trendDirection) return null;
+    const direction = toTrendDirection(summary.trendDirection);
+    return {
+      direction,
+      changePercent: summary.trendChangePercent,
+      snapshotCount: summary.trendSnapshotCount,
+      label: trendLabel(direction, summary.trendChangePercent),
+    };
   }
 
-  return {
-    direction,
-    changePercent,
-    snapshotCount: snapshots.length,
-    label: trendLabel(direction, changePercent),
-  };
-}
+  return calculateMarketTrend(modelId, monthsBack);
+  },
+  ["market-trend-v2"],
+  { revalidate: 3_600, tags: ["market-intelligence"] }
+);
 
 // ─── 6. Composite Market Summary ─────────────────────────────────────────────
 
-export async function getMarketSummary(modelId: string): Promise<MarketSummary> {
-  const [range, supply, recentSales, askingVsSold, trend] = await Promise.all([
-    getMarketRange(modelId),
-    getMarketSupply(modelId),
-    getRecentSales(modelId),
-    getAskingVsSold(modelId),
-    getMarketTrend(modelId),
+export const getMarketSummary = unstable_cache(
+  async (modelId: string): Promise<MarketSummary> => {
+  const summary = await getMarketModelSummaryRow(modelId);
+  if (summary) {
+    const range = summary.activeListingCount > 0
+      ? {
+          lowestPrice: summary.lowestListingPrice ?? 0,
+          highestPrice: summary.highestListingPrice ?? 0,
+          averageAskingPrice: Math.round(summary.averageAskingPrice ?? 0),
+          medianAskingPrice: Math.round(summary.medianAskingPrice ?? summary.averageAskingPrice ?? 0),
+          activeListingCount: summary.activeListingCount,
+        }
+      : null;
+    const direction = summary.trendDirection ? toTrendDirection(summary.trendDirection) : null;
+    const trend = direction
+      ? {
+          direction,
+          changePercent: summary.trendChangePercent,
+          snapshotCount: summary.trendSnapshotCount,
+          label: trendLabel(direction, summary.trendChangePercent),
+        }
+      : null;
+
+    return {
+      modelId,
+      range,
+      supply: { activeListingCount: summary.activeListingCount },
+      recentSales: {
+        salesCount: summary.recentSalesCount,
+        averageSalePrice: summary.averageSalePrice === null ? null : Math.round(summary.averageSalePrice),
+        medianSalePrice: summary.medianSalePrice === null ? null : Math.round(summary.medianSalePrice),
+        averageMileage: summary.averageSaleMileage === null ? null : Math.round(summary.averageSaleMileage),
+        periodDays: 90,
+      },
+      askingVsSold: {
+        averageAskingPrice: summary.averageAskingPrice === null ? null : Math.round(summary.averageAskingPrice),
+        averageSoldPrice: summary.averageSoldPrice === null ? null : Math.round(summary.averageSoldPrice),
+        difference: summary.askingVsSoldDifference === null ? null : Math.round(summary.askingVsSoldDifference),
+        differencePercent: summary.askingVsSoldDifferencePct,
+      },
+      trend,
+      hasData: summary.activeListingCount > 0 || summary.recentSalesCount > 0,
+    };
+  }
+
+  const [range, recentSales, trend] = await Promise.all([
+    calculateMarketRange(modelId),
+    calculateRecentSales(modelId, 90),
+    calculateMarketTrend(modelId, 12),
   ]);
+  const supply = { activeListingCount: range?.activeListingCount ?? 0 };
+  const averageAskingPrice = range?.averageAskingPrice ?? null;
+  const averageSoldPrice = recentSales.averageSalePrice;
+  const difference = averageAskingPrice !== null && averageSoldPrice !== null
+    ? averageSoldPrice - averageAskingPrice
+    : null;
+  const askingVsSold: AskingVsSold = {
+    averageAskingPrice,
+    averageSoldPrice,
+    difference: difference === null ? null : Math.round(difference),
+    differencePercent: difference === null || averageAskingPrice === null || averageAskingPrice === 0
+      ? null
+      : Math.round((difference / averageAskingPrice) * 1000) / 10,
+  };
 
   const hasData =
     range !== null ||
@@ -267,7 +463,10 @@ export async function getMarketSummary(modelId: string): Promise<MarketSummary> 
     recentSales.salesCount > 0;
 
   return { modelId, range, supply, recentSales, askingVsSold, trend, hasData };
-}
+  },
+  ["market-summary-v2"],
+  { revalidate: 900, tags: ["market-intelligence"] }
+);
 
 // ─── 7. Historical Sales Price History ───────────────────────────────────────
 
@@ -279,97 +478,91 @@ export type MarketPriceHistoryItem = {
   listingCount: number;
 };
 
-export async function getMarketPriceHistory(modelId: string): Promise<MarketPriceHistoryItem[]> {
+export const getMarketPriceHistory = unstable_cache(
+  async (modelId: string): Promise<MarketPriceHistoryItem[]> => {
   const [sales, listings] = await Promise.all([
-    prisma.marketSale.findMany({
-      where: {
-        modelId,
-        salePrice: { gte: 10000, lte: 20000000 },
-      },
-      select: { saleDate: true, salePrice: true },
-      orderBy: { saleDate: "asc" },
-    }),
-    prisma.listing.findMany({
-      where: {
-        modelId,
-        validationStatus: "VALID",
-        priceStatus: { not: "PRICE_INVALID" },
-        vehicleId: { not: null },
-        vehicle: {
-          is: {
-            inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
-          },
-        },
-        OR: [
-          { askingPrice: { gte: 10000, lte: 20000000 } },
-          { price: { gte: 10000, lte: 20000000 } },
-        ],
-        NOT: [
-          { source: { is: { type: "AUCTION" } } },
-          { url: { contains: "bringatrailer.com", mode: "insensitive" } },
-        ],
-      },
-      select: { firstSeen: true, createdAt: true, askingPrice: true, price: true },
-      orderBy: { firstSeen: "asc" },
-    }),
+    prisma.$queryRaw<Array<{ month: string; averageSalePrice: number | null; salesCount: bigint | number }>>`
+      SELECT
+        to_char(date_trunc('month', "saleDate"), 'YYYY-MM') AS month,
+        ROUND(AVG("salePrice"))::int AS "averageSalePrice",
+        COUNT(*) AS "salesCount"
+      FROM "MarketSale"
+      WHERE "modelId" = ${modelId}
+        AND "salePrice" BETWEEN 10000 AND 20000000
+      GROUP BY date_trunc('month', "saleDate")
+      ORDER BY month ASC
+    `,
+    prisma.$queryRaw<Array<{ month: string; averageListingPrice: number | null; listingCount: bigint | number }>>`
+      SELECT
+        to_char(date_trunc('month', COALESCE(listing."firstSeen", listing."createdAt")), 'YYYY-MM') AS month,
+        ROUND(AVG(COALESCE(listing."askingPrice", listing."price")))::int AS "averageListingPrice",
+        COUNT(*) AS "listingCount"
+      FROM "Listing" listing
+      LEFT JOIN "Vehicle" vehicle ON vehicle."id" = listing."vehicleId"
+      LEFT JOIN "MarketSource" source ON source."id" = listing."sourceId"
+      WHERE listing."modelId" = ${modelId}
+        AND listing."validationStatus" = 'VALID'
+        AND listing."priceStatus" IS DISTINCT FROM 'PRICE_INVALID'
+        AND listing."vehicleId" IS NOT NULL
+        AND vehicle."inventoryStatus" IN ('ACTIVE', 'VALID', 'WARNING')
+        AND COALESCE(listing."askingPrice", listing."price") BETWEEN 10000 AND 20000000
+        AND (source."type" IS NULL OR source."type" <> 'AUCTION')
+        AND (listing."url" IS NULL OR listing."url" NOT ILIKE '%bringatrailer.com%')
+      GROUP BY date_trunc('month', COALESCE(listing."firstSeen", listing."createdAt"))
+      ORDER BY month ASC
+    `,
   ]);
 
   if (sales.length === 0 && listings.length === 0) return [];
 
   const groups: Record<string, {
-    saleSum: number;
+    averageSalePrice: number | null;
     saleCount: number;
-    listingSum: number;
+    averageListingPrice: number | null;
     listingCount: number;
   }> = {};
 
   for (const sale of sales) {
-    const key = monthKey(sale.saleDate);
+    const key = sale.month;
     if (!key) continue;
 
     if (!groups[key]) {
       groups[key] = emptyHistoryGroup();
     }
-    groups[key].saleSum += sale.salePrice;
-    groups[key].saleCount += 1;
+    groups[key].averageSalePrice = sale.averageSalePrice;
+    groups[key].saleCount = Number(sale.salesCount);
   }
 
   for (const listing of listings) {
-    const key = monthKey(listing.firstSeen || listing.createdAt);
-    const price = listing.askingPrice ?? listing.price;
-    if (!key || !price) continue;
+    const key = listing.month;
+    if (!key) continue;
 
     if (!groups[key]) {
       groups[key] = emptyHistoryGroup();
     }
-    groups[key].listingSum += price;
-    groups[key].listingCount += 1;
+    groups[key].averageListingPrice = listing.averageListingPrice;
+    groups[key].listingCount = Number(listing.listingCount);
   }
 
   return Object.keys(groups)
     .sort()
     .map((key) => ({
       month: key,
-      averageSalePrice: groups[key].saleCount > 0 ? Math.round(groups[key].saleSum / groups[key].saleCount) : null,
-      averageListingPrice: groups[key].listingCount > 0 ? Math.round(groups[key].listingSum / groups[key].listingCount) : null,
+      averageSalePrice: groups[key].averageSalePrice,
+      averageListingPrice: groups[key].averageListingPrice,
       salesCount: groups[key].saleCount,
       listingCount: groups[key].listingCount,
     }));
-}
+  },
+  ["market-price-history-v1"],
+  { revalidate: 3_600, tags: ["market-intelligence"] }
+);
 
 function emptyHistoryGroup() {
   return {
-    saleSum: 0,
+    averageSalePrice: null,
     saleCount: 0,
-    listingSum: 0,
+    averageListingPrice: null,
     listingCount: 0,
   };
-}
-
-function monthKey(value: Date | string) {
-  const date = new Date(value);
-  if (isNaN(date.getTime())) return null;
-  const year = date.getUTCFullYear();
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  return `${year}-${month}`;
 }

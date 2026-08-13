@@ -43,22 +43,31 @@ export async function toggleTrackerPreference(type: TrackerType, enabled: boolea
   }
 
   if (type === "price") {
-    const items = await prisma.garageItem.findMany({
-      where: { userId },
-      select: { id: true, modelId: true },
-    });
-
-    await Promise.all(
-      items.map(async (item) =>
-        prisma.garageItem.update({
-          where: { id: item.id },
-          data: {
-            priceTrackerAlertsEnabled: enabled,
-            priceTrackerBaseline: enabled ? await getCurrentLowestListingPrice(item.modelId) : null,
-          },
-        })
-      )
-    );
+    if (enabled) {
+      await prisma.$executeRaw`
+        UPDATE "GarageItem" item
+        SET
+          "priceTrackerAlertsEnabled" = true,
+          "priceTrackerBaseline" = (
+            SELECT min(COALESCE(listing."askingPrice", listing."price"))
+            FROM "Listing" listing
+            WHERE listing."modelId" = item."modelId"
+              AND listing."status" = 'ACTIVE'
+              AND listing."priceStatus" IS DISTINCT FROM 'PRICE_INVALID'
+              AND COALESCE(listing."askingPrice", listing."price") > 0
+          ),
+          "updatedAt" = now()
+        WHERE item."userId" = ${userId}
+      `;
+    } else {
+      await prisma.garageItem.updateMany({
+        where: { userId },
+        data: {
+          priceTrackerAlertsEnabled: false,
+          priceTrackerBaseline: null,
+        },
+      });
+    }
   }
 
   const user = await prisma.user.findUnique({
@@ -73,22 +82,4 @@ export async function toggleTrackerPreference(type: TrackerType, enabled: boolea
   }
 
   return { ok: true, type, enabled };
-}
-
-async function getCurrentLowestListingPrice(modelId: string) {
-  const listing = await prisma.listing.findFirst({
-    where: {
-      modelId,
-      status: "ACTIVE",
-      priceStatus: { not: "PRICE_INVALID" },
-      OR: [{ askingPrice: { gt: 0 } }, { price: { gt: 0 } }],
-    },
-    orderBy: [{ askingPrice: "asc" }, { price: "asc" }],
-    select: {
-      askingPrice: true,
-      price: true,
-    },
-  });
-
-  return listing?.askingPrice || listing?.price || null;
 }

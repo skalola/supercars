@@ -27,6 +27,7 @@ import {
 } from "../lib/market-crawlers/sources/authorized-dealers";
 import { ALL_AUTHORIZED_DEALERS } from "../lib/market-crawlers/dealer-registry";
 import { SUPPORTED_MAKES } from "../lib/supported-makes";
+import { getBatchLimit, getBatchOffset, getRotatingBatchOffset } from "./lib/script-guards";
 
 function hr(char = "═", length = 58): string {
   return char.repeat(length);
@@ -40,6 +41,8 @@ async function main() {
   const startedAt = Date.now();
   const dealerArg = process.argv.find((arg) => arg.startsWith("--dealer="))?.split("=").slice(1).join("=").trim();
   const useStaticRegistry = process.argv.includes("--static-registry");
+  const limit = getBatchLimit({ defaultLimit: 40, maxLimit: 100 });
+  const requestedOffset = getBatchOffset();
 
   console.log("\n" + hr());
   console.log("  Inventory Expansion Engine");
@@ -66,13 +69,16 @@ async function main() {
     ? createAuthorizedDealerSources()
     : await createAuthorizedDealerSourcesFromDirectory();
 
-  const sources = baseSources.filter((source) => {
+  const matchingSources = baseSources.filter((source) => {
     if (!dealerArg) return true;
     return source.sourceName.toLowerCase().includes(dealerArg.toLowerCase());
   });
-  if (dealerArg && sources.length === 0) {
+  if (dealerArg && matchingSources.length === 0) {
     throw new Error(`No authorized dealer source matched "${dealerArg}".`);
   }
+  const offset = dealerArg ? 0 : getRotatingBatchOffset(matchingSources.length, limit, requestedOffset);
+  const sources = dealerArg ? matchingSources.slice(0, limit) : matchingSources.slice(offset, offset + limit);
+  console.log(`  Eligible sources: ${matchingSources.length} | batch offset: ${offset} | batch limit: ${limit}`);
   const result = await crawlInventory(sources);
 
   // ── Post-crawl counts ──────────────────────────────────────────────────

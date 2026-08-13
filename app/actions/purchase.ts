@@ -18,6 +18,87 @@ import {
 } from "@/lib/fulfillment/transport-package";
 import { isSupportedMake } from "@/lib/supported-makes";
 
+const packageVehicleSelect = {
+  id: true,
+  ownerId: true,
+  year: true,
+  trim: true,
+  vin: true,
+  model: {
+    select: {
+      name: true,
+      make: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  },
+  owner: {
+    select: {
+      id: true,
+      name: true,
+      username: true,
+      email: true,
+    },
+  },
+};
+
+const packageListingSelect = {
+  id: true,
+  vehicleId: true,
+  sellerId: true,
+  askingPrice: true,
+  price: true,
+  dealerName: true,
+  location: true,
+  url: true,
+  externalListingId: true,
+  vehicle: {
+    select: packageVehicleSelect,
+  },
+  model: {
+    select: {
+      name: true,
+      make: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  },
+  source: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+  seller: {
+    select: {
+      id: true,
+      name: true,
+      username: true,
+      email: true,
+    },
+  },
+};
+
+const purchasePackageSelect = {
+  id: true,
+  amount: true,
+  listing: {
+    select: packageListingSelect,
+  },
+  buyer: {
+    select: {
+      id: true,
+      name: true,
+      username: true,
+      email: true,
+    },
+  },
+};
+
 async function getAuthenticatedUser() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const session = (globalThis as any).mockSession !== undefined ? (globalThis as any).mockSession : await auth();
@@ -55,17 +136,7 @@ export async function createDealerPurchasePackage(
 
   const listing = await prisma.listing.findUnique({
     where: { id: input.listingId },
-    include: {
-      vehicle: {
-        include: {
-          model: { include: { make: true } },
-          owner: true,
-        },
-      },
-      model: { include: { make: true } },
-      source: true,
-      seller: true,
-    },
+    select: packageListingSelect,
   });
 
   if (!listing) {
@@ -74,6 +145,12 @@ export async function createDealerPurchasePackage(
 
   const buyer = await prisma.user.findUnique({
     where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      username: true,
+      email: true,
+    },
   });
 
   // 1. Create Purchase Record (Status remains PENDING, NOT COMPLETED!)
@@ -239,15 +316,7 @@ export async function createInsuranceQuotePackage(
 
   const purchase = await prisma.purchase.findUnique({
     where: { id: input.purchaseId },
-    include: {
-      listing: {
-        include: {
-          vehicle: { include: { model: { include: { make: true } } } },
-          model: { include: { make: true } },
-        },
-      },
-      buyer: true,
-    },
+    select: purchasePackageSelect,
   });
 
   if (!purchase) {
@@ -405,16 +474,7 @@ export async function createTransportQuotePackage(
 
   const purchase = await prisma.purchase.findUnique({
     where: { id: input.purchaseId },
-    include: {
-      listing: {
-        include: {
-          vehicle: { include: { model: { include: { make: true } } } },
-          model: { include: { make: true } },
-          source: true,
-        },
-      },
-      buyer: true,
-    },
+    select: purchasePackageSelect,
   });
 
   if (!purchase) {

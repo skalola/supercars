@@ -17,12 +17,11 @@ async function main() {
   console.log("Starting Vehicle Data Quality & Validation run...");
 
   const vehicles = await prisma.vehicle.findMany({
-    include: {
-      model: { include: { make: true } },
-      profile: true,
-      listings: { include: { source: true } },
-      images: true,
-    }
+    select: {
+      id: true,
+      vin: true,
+      ownerId: true,
+    },
   });
 
   // Track issues for the report
@@ -141,17 +140,55 @@ async function main() {
 
   // Refetch vehicles after merges to continue clean checks
   const cleanVehicles = await prisma.vehicle.findMany({
-    include: {
-      model: { include: { make: true } },
-      profile: true,
-      listings: { include: { source: true } },
-      images: true,
-    }
+    select: {
+      id: true,
+      vin: true,
+      ownerId: true,
+      modelId: true,
+      year: true,
+      mileage: true,
+      model: {
+        select: {
+          name: true,
+          slug: true,
+          make: { select: { name: true } },
+        },
+      },
+      profile: {
+        select: { currentMileage: true },
+      },
+      listings: {
+        select: {
+          id: true,
+          mileage: true,
+          price: true,
+          status: true,
+          lastSeen: true,
+          dealerName: true,
+          source: { select: { type: true } },
+        },
+      },
+      images: {
+        where: {
+          validationStatus: { in: ["IMAGE_UNVERIFIED", "IMAGE_MISMATCH"] },
+        },
+        select: {
+          url: true,
+          validationStatus: true,
+        },
+        take: 1,
+      },
+    },
   });
 
   // All models for mapping corrections
   const allModels = await prisma.model.findMany({
-    include: { make: true }
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      make: { select: { name: true } },
+    },
   });
 
   for (const vehicle of cleanVehicles) {

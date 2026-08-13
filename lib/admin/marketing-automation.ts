@@ -5,28 +5,28 @@ import {
   type MarketingAutomationSettingKey,
 } from "./marketing-settings";
 
+const GATE_CACHE_TTL_MS = 5 * 60 * 1000;
+const gateCache = new Map<MarketingAutomationSettingKey, { enabled: boolean; expiresAt: number }>();
+
 export async function isMarketingAutomationEnabled(key: MarketingAutomationSettingKey) {
   const definition = MARKETING_AUTOMATION_SETTINGS.find((setting) => setting.key === key);
   if (!definition) return false;
 
-  const setting = await prisma.globalSetting.upsert({
+  const cached = gateCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.enabled;
+
+  const setting = await prisma.globalSetting.findUnique({
     where: { key },
-    update: {
-      label: definition.label,
-      description: definition.description,
-      category: "MARKETING_AUTOMATION",
-    },
-    create: {
-      key,
-      label: definition.label,
-      description: definition.description,
-      category: "MARKETING_AUTOMATION",
-      enabled: definition.defaultEnabled,
-    },
     select: { enabled: true },
   });
+  const enabled = setting?.enabled ?? definition.defaultEnabled;
+  gateCache.set(key, { enabled, expiresAt: Date.now() + GATE_CACHE_TTL_MS });
+  return enabled;
+}
 
-  return setting?.enabled === true;
+export function clearMarketingAutomationGateCache(key?: MarketingAutomationSettingKey) {
+  if (key) gateCache.delete(key);
+  else gateCache.clear();
 }
 
 export async function shouldSendMarketingAutomation(key: MarketingAutomationSettingKey) {

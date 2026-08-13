@@ -3,14 +3,125 @@ import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
 import { isAffiliateTrackingReady } from "@/lib/parts/affiliate-tracking";
 import { auditPerformancePartTrust } from "@/lib/parts/trust";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
+import { AdminPagination, parseAdminPage } from "@/components/admin/AdminPagination";
 
-export default async function AdminPartsPage() {
+const ADMIN_PARTS_PAGE_LIMIT = 50;
+
+const publicReadyPartWhere = {
+  status: "ACTIVE",
+  sourceUrl: { not: null },
+  sourceConfidence: "SOURCE_VERIFIED",
+  imageUrl: { not: null },
+  compatibility: {
+    some: {
+      OR: [
+        { makeId: { not: null } },
+        { modelId: { not: null } },
+      ],
+    },
+  },
+} satisfies Prisma.PerformancePartWhereInput;
+
+const adminPartSelect = {
+  id: true,
+  name: true,
+  partNumber: true,
+  status: true,
+  sourceUrl: true,
+  sourceConfidence: true,
+  imageUrl: true,
+  trackingStatus: true,
+  retailPriceCents: true,
+  estimatedHpGain: true,
+  estimatedTorqueGain: true,
+  affiliatePartnerId: true,
+  affiliateUrl: true,
+  commissionRateBps: true,
+  updatedAt: true,
+  category: {
+    select: { name: true },
+  },
+  brand: {
+    select: { name: true },
+  },
+  affiliatePartner: {
+    select: {
+      name: true,
+      status: true,
+      active: true,
+    },
+  },
+  _count: {
+    select: {
+      clicks: true,
+    },
+  },
+  compatibility: {
+    select: {
+      make: {
+        select: { name: true },
+      },
+      model: {
+        select: { name: true },
+      },
+      yearStart: true,
+      yearEnd: true,
+      trim: true,
+      engine: true,
+      makeId: true,
+      modelId: true,
+    },
+    orderBy: [
+      { createdAt: "asc" },
+    ],
+  },
+} satisfies Prisma.PerformancePartSelect;
+
+export default async function AdminPartsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{
+    page?: string | string[];
+    q?: string;
+    category?: string;
+    brand?: string;
+    status?: string;
+    trust?: string;
+  }>;
+}) {
+  const params = await searchParams;
+  const requestedPage = parseAdminPage(params?.page);
+  const filters = {
+    search: params?.q?.trim() || "",
+    category: params?.category?.trim() || "",
+    brand: params?.brand?.trim() || "",
+    status: params?.status?.trim() || "",
+    trust: params?.trust?.trim() || "",
+  };
+  const partWhere = getAdminPartWhere(filters);
   const recentWindowStart = new Date();
   recentWindowStart.setDate(recentWindowStart.getDate() - 30);
 
-  const [categories, brands, affiliatePartners, parts, recentClicks, totalClicks, recentClickCount, catalog] = await Promise.all([
+  const [
+    categories,
+    brands,
+    affiliatePartners,
+    totalParts,
+    publicReadyParts,
+    filteredPartCount,
+    recentClicks,
+    totalClicks,
+    recentClickCount,
+    configuredParts,
+    catalog,
+  ] = await Promise.all([
     prisma.partCategory.findMany({
-      include: {
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
         _count: {
           select: { parts: true },
         },
@@ -21,7 +132,12 @@ export default async function AdminPartsPage() {
       ],
     }),
     prisma.partBrand.findMany({
-      include: {
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        websiteUrl: true,
+        country: true,
         _count: {
           select: { parts: true },
         },
@@ -29,48 +145,45 @@ export default async function AdminPartsPage() {
       orderBy: { name: "asc" },
     }),
     prisma.affiliatePartner.findMany({
-      include: {
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        network: true,
+        websiteUrl: true,
+        commissionLabel: true,
+        trackingTemplate: true,
+        disclosure: true,
+        active: true,
         _count: {
           select: { parts: true },
         },
       },
       orderBy: { name: "asc" },
     }),
-    prisma.performancePart.findMany({
-      include: {
-        category: true,
-        brand: true,
-        affiliatePartner: true,
-        _count: {
-          select: {
-            clicks: true,
-          },
-        },
-        compatibility: {
-          include: {
-            make: true,
-            model: true,
-          },
-          orderBy: [
-            { createdAt: "asc" },
-          ],
-        },
-      },
-      orderBy: [
-        { updatedAt: "desc" },
-        { name: "asc" },
-      ],
-      take: 500,
-    }),
+    prisma.performancePart.count(),
+    prisma.performancePart.count({ where: publicReadyPartWhere }),
+    prisma.performancePart.count({ where: partWhere }),
     prisma.partAffiliateClick.findMany({
-      include: {
+      select: {
+        id: true,
+        sourcePath: true,
+        outboundUrl: true,
+        createdAt: true,
         part: {
-          include: {
-            brand: true,
-            category: true,
+          select: {
+            name: true,
+            brand: {
+              select: { name: true },
+            },
+            category: {
+              select: { name: true },
+            },
           },
         },
-        affiliatePartner: true,
+        affiliatePartner: {
+          select: { name: true },
+        },
         user: {
           select: {
             name: true,
@@ -85,8 +198,30 @@ export default async function AdminPartsPage() {
     prisma.partAffiliateClick.count({
       where: { createdAt: { gte: recentWindowStart } },
     }),
+    prisma.performancePart.count({
+      where: {
+        trackingStatus: "CONFIGURED",
+        affiliateUrl: { not: null },
+        affiliatePartner: {
+          active: true,
+          status: { in: ["APPROVED", "ACTIVE"] },
+        },
+      },
+    }),
     getMakeModelCatalogOptions(),
   ]);
+  const totalPages = Math.max(1, Math.ceil(filteredPartCount / ADMIN_PARTS_PAGE_LIMIT));
+  const page = Math.min(requestedPage, totalPages);
+  const parts = await prisma.performancePart.findMany({
+    where: partWhere,
+    select: adminPartSelect,
+    orderBy: [
+      { updatedAt: "desc" },
+      { name: "asc" },
+    ],
+    skip: (page - 1) * ADMIN_PARTS_PAGE_LIMIT,
+    take: ADMIN_PARTS_PAGE_LIMIT,
+  });
 
   const categoryRows: AdminPartCategoryRow[] = categories.map((category) => ({
     id: category.id,
@@ -153,7 +288,7 @@ export default async function AdminPartsPage() {
     };
   });
 
-  const analyticsRows = buildAffiliateAnalyticsRows(parts);
+  const analyticsRows = await getAffiliateAnalyticsRows();
   const clickRouteCounts = countClickRoutes(recentClicks);
   const recentClickRows: AdminRecentAffiliateClickRow[] = recentClicks.map((click) => ({
     id: click.id,
@@ -174,11 +309,7 @@ export default async function AdminPartsPage() {
     }).format(click.createdAt),
   }));
 
-  const configuredParts = parts.filter((part) => isAffiliateTrackingReady(part)).length;
-  const estimatedCommissionCents = parts.reduce((sum, part) => {
-    if (!part.commissionRateBps || !part.retailPriceCents || part._count.clicks === 0) return sum;
-    return sum + Math.round((part.retailPriceCents * part.commissionRateBps * part._count.clicks) / 10000);
-  }, 0);
+  const estimatedCommissionCents = analyticsRows.estimatedCommissionCents;
 
   return (
     <main className="page-shell wide">
@@ -197,6 +328,12 @@ export default async function AdminPartsPage() {
         brands={brandRows}
         affiliatePartners={affiliatePartnerRows}
         parts={partRows}
+        catalogSummary={{
+          totalParts,
+          publicReadyParts,
+          needsReviewParts: Math.max(0, totalParts - publicReadyParts),
+        }}
+        activeFilters={filters}
         affiliateAnalytics={{
           totalClicks,
           recentClickCount,
@@ -211,8 +348,51 @@ export default async function AdminPartsPage() {
         makes={catalog.makes}
         models={catalog.models}
       />
+      <AdminPagination
+        pathname="/admin/parts"
+        page={page}
+        totalPages={totalPages}
+        preserveParams={{
+          q: filters.search,
+          category: filters.category,
+          brand: filters.brand,
+          status: filters.status,
+          trust: filters.trust,
+        }}
+        ariaLabel="Parts catalog pages"
+      />
     </main>
   );
+}
+
+type AdminPartFilters = {
+  search: string;
+  category: string;
+  brand: string;
+  status: string;
+  trust: string;
+};
+
+function getAdminPartWhere(filters: AdminPartFilters): Prisma.PerformancePartWhereInput {
+  const predicates: Prisma.PerformancePartWhereInput[] = [];
+  if (filters.category) predicates.push({ category: { name: filters.category } });
+  if (filters.brand) predicates.push({ brand: { name: filters.brand } });
+  if (filters.status) predicates.push({ status: filters.status });
+  if (filters.trust === "PUBLIC_READY") predicates.push(publicReadyPartWhere);
+  if (filters.trust === "NEEDS_REVIEW") predicates.push({ NOT: publicReadyPartWhere });
+  if (filters.search) {
+    predicates.push({
+      OR: [
+        { name: { contains: filters.search, mode: "insensitive" } },
+        { partNumber: { contains: filters.search, mode: "insensitive" } },
+        { category: { name: { contains: filters.search, mode: "insensitive" } } },
+        { brand: { name: { contains: filters.search, mode: "insensitive" } } },
+        { compatibility: { some: { make: { name: { contains: filters.search, mode: "insensitive" } } } } },
+        { compatibility: { some: { model: { name: { contains: filters.search, mode: "insensitive" } } } } },
+      ],
+    });
+  }
+  return predicates.length > 0 ? { AND: predicates } : {};
 }
 
 function countClickRoutes(clicks: Array<{ sourcePath: string | null }>) {
@@ -240,56 +420,57 @@ function getClickRouteSource(sourcePath: string | null) {
   return sourcePath;
 }
 
-function buildAffiliateAnalyticsRows(parts: Array<{
-  name: string;
-  retailPriceCents: number | null;
-  commissionRateBps: number | null;
-  brand: { name: string };
-  category: { name: string };
-  affiliatePartner: { name: string } | null;
-  _count: { clicks: number };
-}>) {
-  const topParts: AdminAffiliateAnalyticsRow[] = parts
-    .filter((part) => part._count.clicks > 0)
-    .map((part) => ({
-      label: part.name,
-      detail: [part.brand.name, part.category.name, part.affiliatePartner?.name].filter(Boolean).join(" · "),
-      clicks: part._count.clicks,
-      estimatedCommissionLabel: formatCents(estimateCommissionCents(part.retailPriceCents, part.commissionRateBps, part._count.clicks)),
-    }))
-    .sort((a, b) => b.clicks - a.clicks)
-    .slice(0, 6);
+async function getAffiliateAnalyticsRows() {
+  type AnalyticsRow = {
+    label: string;
+    detail: string;
+    clicks: bigint;
+    estimatedCommissionCents: number;
+  };
+  const [topParts, topBrands, commission] = await Promise.all([
+    prisma.$queryRaw<AnalyticsRow[]>(Prisma.sql`
+      SELECT part."name" AS label,
+        concat_ws(' · ', brand."name", category."name", affiliate."name") AS detail,
+        COUNT(click."id")::bigint AS clicks,
+        COALESCE(part."retailPriceCents" * part."commissionRateBps" * COUNT(click."id") / 10000.0, 0)::double precision AS "estimatedCommissionCents"
+      FROM "PartAffiliateClick" click
+      JOIN "PerformancePart" part ON part."id" = click."partId"
+      JOIN "PartBrand" brand ON brand."id" = part."brandId"
+      JOIN "PartCategory" category ON category."id" = part."categoryId"
+      LEFT JOIN "AffiliatePartner" affiliate ON affiliate."id" = part."affiliatePartnerId"
+      GROUP BY part."id", brand."name", category."name", affiliate."name"
+      ORDER BY clicks DESC, part."name" ASC
+      LIMIT 6
+    `),
+    prisma.$queryRaw<AnalyticsRow[]>(Prisma.sql`
+      SELECT brand."name" AS label, 'Brand' AS detail,
+        COUNT(click."id")::bigint AS clicks,
+        COALESCE(SUM(part."retailPriceCents" * part."commissionRateBps" / 10000.0), 0)::double precision AS "estimatedCommissionCents"
+      FROM "PartAffiliateClick" click
+      JOIN "PerformancePart" part ON part."id" = click."partId"
+      JOIN "PartBrand" brand ON brand."id" = part."brandId"
+      GROUP BY brand."id"
+      ORDER BY clicks DESC, brand."name" ASC
+      LIMIT 6
+    `),
+    prisma.$queryRaw<Array<{ total: number }>>(Prisma.sql`
+      SELECT COALESCE(SUM(part."retailPriceCents" * part."commissionRateBps" / 10000.0), 0)::double precision AS total
+      FROM "PartAffiliateClick" click
+      JOIN "PerformancePart" part ON part."id" = click."partId"
+    `),
+  ]);
+  const mapRow = (row: AnalyticsRow): AdminAffiliateAnalyticsRow => ({
+    label: row.label,
+    detail: row.detail,
+    clicks: Number(row.clicks),
+    estimatedCommissionLabel: formatCents(Math.round(row.estimatedCommissionCents)),
+  });
 
-  const brandMap = parts.reduce((map, part) => {
-    const current = map.get(part.brand.name) ?? {
-      label: part.brand.name,
-      detail: "Brand",
-      clicks: 0,
-      estimatedCommissionCents: 0,
-    };
-    current.clicks += part._count.clicks;
-    current.estimatedCommissionCents += estimateCommissionCents(part.retailPriceCents, part.commissionRateBps, part._count.clicks);
-    map.set(part.brand.name, current);
-    return map;
-  }, new Map<string, { label: string; detail: string; clicks: number; estimatedCommissionCents: number }>());
-
-  const topBrands: AdminAffiliateAnalyticsRow[] = Array.from(brandMap.values())
-    .filter((row) => row.clicks > 0)
-    .map((row) => ({
-      label: row.label,
-      detail: row.detail,
-      clicks: row.clicks,
-      estimatedCommissionLabel: formatCents(row.estimatedCommissionCents),
-    }))
-    .sort((a, b) => b.clicks - a.clicks)
-    .slice(0, 6);
-
-  return { topParts, topBrands };
-}
-
-function estimateCommissionCents(retailPriceCents: number | null, commissionRateBps: number | null, clicks: number) {
-  if (!retailPriceCents || !commissionRateBps || clicks <= 0) return 0;
-  return Math.round((retailPriceCents * commissionRateBps * clicks) / 10000);
+  return {
+    topParts: topParts.map(mapRow),
+    topBrands: topBrands.map(mapRow),
+    estimatedCommissionCents: Math.round(commission[0]?.total ?? 0),
+  };
 }
 
 function formatCents(value: number | null) {
