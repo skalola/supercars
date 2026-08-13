@@ -1,27 +1,12 @@
 import Link from "next/link";
-import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
+import { getCatalogMakeSummaries } from "@/lib/makes/catalog";
 import { getMakeMetadata } from "@/lib/makes/make-metadata";
 
 const regionOrder = ["Japan", "Europe", "United Kingdom", "United States", "Korea", "China", "Specialist / Tuner"];
 
 export default async function MakesPage() {
-  const catalog = await getMakeModelCatalogOptions();
-  const modelsByMakeId = new Map<string, typeof catalog.models>();
-
-  for (const model of catalog.models) {
-    const models = modelsByMakeId.get(model.makeId) ?? [];
-    models.push(model);
-    modelsByMakeId.set(model.makeId, models);
-  }
-
-  const makes = catalog.makes.map((make) => {
-    const models = modelsByMakeId.get(make.id) ?? [];
-    return {
-      ...make,
-      models,
-      modelCount: models.length,
-    };
-  });
+  const makes = await getCatalogMakeSummaries();
+  const totalModels = makes.reduce((total, make) => total + make.modelCount, 0);
 
   const groupedMakes = regionOrder
     .map((region) => ({
@@ -47,7 +32,7 @@ export default async function MakesPage() {
           </article>
           <article>
             <span>Models</span>
-            <strong>{catalog.models.length}</strong>
+            <strong>{totalModels}</strong>
           </article>
         </div>
       </section>
@@ -71,9 +56,9 @@ export default async function MakesPage() {
                   </span>
                   <span className="makes-logo-name">{make.name}</span>
                   <small>{make.modelCount.toLocaleString()} models</small>
-                  {make.models.length > 0 ? (
+                  {make.modelPreviewNames.length > 0 ? (
                     <span className="makes-model-preview">
-                      {make.models.slice(0, 4).map((model) => model.name).join(" · ")}
+                      {make.modelPreviewNames.join(" · ")}
                     </span>
                   ) : null}
                 </Link>

@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { unstable_cache } from "next/cache";
 
@@ -15,6 +16,21 @@ export type ModelOption = {
   slug: string;
   makeId: string;
   make: MakeOption;
+};
+
+export type CatalogMakeSummary = MakeOption & {
+  modelCount: number;
+  modelPreviewNames: string[];
+};
+
+type CatalogMakeSummaryRow = {
+  id: string;
+  name: string;
+  slug: string;
+  region: string | null;
+  logoUrl: string | null;
+  modelCount: number;
+  modelPreviewNames: string[];
 };
 
 export const getMakeModelCatalogOptions = unstable_cache(
@@ -108,6 +124,47 @@ export const getCatalogMakeOptions = unstable_cache(
   },
   ["catalog-make-options-v1"],
   { revalidate: 86_400, tags: ["make-model-catalog"] }
+);
+
+export const getCatalogMakeSummaries = unstable_cache(
+  async (): Promise<CatalogMakeSummary[]> => {
+    const rows = await prisma.$queryRaw<CatalogMakeSummaryRow[]>(Prisma.sql`
+      WITH ranked_models AS (
+        SELECT
+          model."makeId",
+          model."name",
+          ROW_NUMBER() OVER (
+            PARTITION BY model."makeId"
+            ORDER BY model."name" ASC
+          ) AS model_rank,
+          COUNT(*) OVER (PARTITION BY model."makeId")::int AS model_count
+        FROM "Model" model
+      )
+      SELECT
+        make."id",
+        make."name",
+        make."slug",
+        make."region",
+        make."logoUrl",
+        COALESCE(MAX(ranked.model_count), 0)::int AS "modelCount",
+        COALESCE(
+          ARRAY_AGG(ranked."name" ORDER BY ranked."name" ASC)
+            FILTER (WHERE ranked.model_rank <= 4),
+          ARRAY[]::text[]
+        ) AS "modelPreviewNames"
+      FROM "Make" make
+      LEFT JOIN ranked_models ranked ON ranked."makeId" = make."id"
+      GROUP BY make."id", make."name", make."slug", make."region", make."logoUrl"
+      ORDER BY make."region" ASC NULLS FIRST, make."name" ASC
+    `);
+
+    return rows.map((row) => ({
+      ...row,
+      name: row.name.trim(),
+    }));
+  },
+  ["catalog-make-summaries-v1"],
+  { revalidate: 86_400, tags: ["make-model-catalog"] },
 );
 
 export const getCatalogMakeWithModels = unstable_cache(
