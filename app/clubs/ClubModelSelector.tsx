@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import type { MakeOption, ModelOption } from "@/lib/makes/catalog";
+import type { MakeOption, ModelEditorOption } from "@/lib/makes/catalog";
 
 export default function ClubModelSelector({
   makes,
@@ -10,7 +10,7 @@ export default function ClubModelSelector({
   initialModelIds = [],
 }: {
   makes: MakeOption[];
-  models: ModelOption[];
+  models: ModelEditorOption[];
   initialModelIds?: string[];
 }) {
   const [openMenu, setOpenMenu] = useState<"make" | "model" | null>(null);
@@ -18,12 +18,16 @@ export default function ClubModelSelector({
     () => new Set(models.filter((model) => initialModelIds.includes(model.id)).map((model) => model.makeId)),
   );
   const [selectedModelIds, setSelectedModelIds] = useState<Set<string>>(() => new Set(initialModelIds));
+  const makeNamesById = new Map(makes.map((make) => [make.id, make.name]));
 
   const sortedMakes = [...makes].sort((a, b) => a.name.localeCompare(b.name));
   const availableModels = selectedMakeIds.size > 0
     ? models
         .filter((model) => selectedMakeIds.has(model.makeId))
-        .sort((a, b) => a.make.name.localeCompare(b.make.name) || a.name.localeCompare(b.name))
+        .sort((a, b) =>
+          (makeNamesById.get(a.makeId) || "").localeCompare(makeNamesById.get(b.makeId) || "") ||
+          a.name.localeCompare(b.name)
+        )
     : [];
   const availableModelIds = new Set(availableModels.map((model) => model.id));
   const selectedVisibleModelCount = [...selectedModelIds].filter((modelId) => availableModelIds.has(modelId)).length;
@@ -141,7 +145,7 @@ export default function ClubModelSelector({
           <label key={model.id} className="club-multi-option">
             <input type="checkbox" checked={selectedModelIds.has(model.id)} onChange={() => toggleModel(model.id)} />
             <span>
-              {model.make.name} {model.name}
+              {makeNamesById.get(model.makeId)} {model.name}
             </span>
           </label>
         ))}

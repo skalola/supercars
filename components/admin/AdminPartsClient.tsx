@@ -9,7 +9,7 @@ import {
   updateAffiliatePartnerAction,
   updatePerformancePartAffiliateAction,
 } from "@/app/actions/admin-parts";
-import type { MakeOption, ModelOption } from "@/lib/makes/catalog";
+import type { MakeOption, ModelEditorOption } from "@/lib/makes/catalog";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export type AdminPartCategoryRow = {
@@ -121,7 +121,7 @@ type AdminPartsClientProps = {
   };
   affiliateAnalytics: AdminAffiliateAnalytics;
   makes: MakeOption[];
-  models: ModelOption[];
+  models: ModelEditorOption[];
 };
 
 type PartFormState = {

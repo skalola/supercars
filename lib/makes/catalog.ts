@@ -18,6 +18,12 @@ export type ModelOption = {
   make: MakeOption;
 };
 
+export type ModelEditorOption = {
+  id: string;
+  name: string;
+  makeId: string;
+};
+
 export type CatalogMakeSummary = MakeOption & {
   modelCount: number;
   modelPreviewNames: string[];
@@ -46,7 +52,6 @@ export const getMakeModelCatalogOptions = unstable_cache(
         select: {
           id: true,
           name: true,
-          slug: true,
           makeId: true,
         },
         orderBy: { name: "asc" },
@@ -66,25 +71,20 @@ export const getMakeModelCatalogOptions = unstable_cache(
     logoUrl: make.logoUrl,
   }));
 
-  const modelOptions: ModelOption[] = makes.flatMap((make) => {
-    const mappedMake = makeOptions.find((option) => option.id === make.id);
-    if (!mappedMake) return [];
-
-    return make.models.map((model) => ({
+  const modelOptions: ModelEditorOption[] = makes.flatMap((make) =>
+    make.models.map((model) => ({
       id: model.id,
       name: model.name.trim(),
-      slug: model.slug,
       makeId: model.makeId,
-      make: mappedMake,
-    }));
-  });
+    })),
+  );
 
   return {
     makes: makeOptions,
     models: modelOptions,
   };
   },
-  ["make-model-catalog-options-v1"],
+  ["make-model-catalog-options-v2"],
   { revalidate: 86_400, tags: ["make-model-catalog"] }
 );
 
