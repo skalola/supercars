@@ -62,7 +62,7 @@ export default async function AdminOverviewPage({
   previousWindowStart.setDate(recentWindowStart.getDate() - RECENT_TRANSACTION_WINDOW_DAYS);
 
   const [
-    activeSessions,
+    activeSessionRows,
     liveInventoryStats,
     partnerCoverage,
     recentTransactions,
@@ -76,10 +76,11 @@ export default async function AdminOverviewPage({
     salesRequestStats,
     completedSalesStats,
   ] = await Promise.all([
-      prisma.session.groupBy({
-        by: ["userId"],
-        where: { expires: { gt: now } },
-      }),
+      prisma.$queryRaw<Array<{ count: number }>>`
+        SELECT COUNT(DISTINCT session."userId")::int AS count
+        FROM "Session" session
+        WHERE session."expires" > ${now}
+      `,
       getLiveInventoryListingStats(),
       getAdminPartnerCoverageStats(),
       prisma.fulfillmentRequest.count({
@@ -156,6 +157,7 @@ export default async function AdminOverviewPage({
       }),
     ]);
 
+  const activeSessionCount = activeSessionRows[0]?.count ?? 0;
   const activeListingCount = liveInventoryStats.liveListingCount;
   const recentTransactionAmount = recentVolume._sum.collectedAmount || 0;
   const previousTransactionAmount = previousVolume._sum.collectedAmount || 0;
@@ -292,9 +294,9 @@ export default async function AdminOverviewPage({
   const metrics = [
     {
       label: "Active Sessions",
-      value: activeSessions.length.toLocaleString(),
+      value: activeSessionCount.toLocaleString(),
       detail: "Currently valid logged-in sessions",
-      percent: getPercent(activeSessions.length, Math.max(activeSessions.length + 1, 1)),
+      percent: getPercent(activeSessionCount, Math.max(activeSessionCount + 1, 1)),
     },
     {
       label: "Live Listing Value",
