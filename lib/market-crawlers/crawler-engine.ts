@@ -376,6 +376,11 @@ export async function ingestCrawlerListings(
         priceStatus,
         freshnessStatus,
       },
+      select: {
+        id: true,
+        price: true,
+        askingPrice: true,
+      },
     });
     listingsBySourceIdentity.set(listingIdentity, {
       id: savedListing.id,
@@ -487,6 +492,7 @@ async function upsertVinDiscovery(
       vehicleId,
       active: true,
     },
+    select: { id: true },
   });
 
   await prisma.vinDiscoverySource.upsert({
@@ -512,6 +518,7 @@ async function upsertVinDiscovery(
       externalListingId: listing.externalListingId,
       active: true,
     },
+    select: { id: true },
   });
 }
 
