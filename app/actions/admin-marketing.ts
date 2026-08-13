@@ -28,6 +28,13 @@ export async function updateMarketingAutomationSettingAction(key: string, enable
       select: { enabled: true },
     });
 
+    if (previous?.enabled === enabled) {
+      return {
+        success: true,
+        message: `${setting.label} is already ${enabled ? "enabled" : "disabled"}.`,
+      };
+    }
+
     await prisma.$transaction(async (tx) => {
       await tx.globalSetting.upsert({
         where: { key },

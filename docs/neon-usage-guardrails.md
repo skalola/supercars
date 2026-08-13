@@ -54,3 +54,5 @@ Meet reminder processing uses deterministic RSVP keyset batches of 100, with a h
 Saved-car listing and price alerts read subscribers in deterministic keyset batches of 100. Popular models therefore cannot create an unbounded user relation payload during inventory ingestion. Recipient validation, price baselines, delivery timestamps, and successful-send update semantics remain unchanged.
 
 Meet update and cancellation broadcasts fetch only RSVP IDs and recipient fields in deterministic batches of 100. The shared event-automation gate remains cached for five minutes, so a large broadcast does not repeat the same GlobalSetting query for every attendee.
+
+The admin marketing page reads all six automation settings in one query. It creates only missing defaults instead of running six upserts on every page view, and no-op toggle submissions do not write duplicate audit records.

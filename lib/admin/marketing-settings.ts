@@ -46,38 +46,44 @@ export function isMarketingAutomationSettingKey(key: string): key is MarketingAu
 }
 
 export async function getMarketingAutomationSettings() {
-  const rows = await Promise.all(
-    MARKETING_AUTOMATION_SETTINGS.map((setting) =>
-      prisma.globalSetting.upsert({
-        where: { key: setting.key },
-        update: {
-          label: setting.label,
-          description: setting.description,
-          category: "MARKETING_AUTOMATION",
-        },
-        create: {
-          key: setting.key,
-          label: setting.label,
-          description: setting.description,
-          category: "MARKETING_AUTOMATION",
-          enabled: setting.defaultEnabled,
-        },
-        include: {
-          audits: {
-            orderBy: { createdAt: "desc" },
-            take: 1,
-          },
-          _count: {
-            select: { audits: true },
-          },
-        },
-      })
-    )
-  );
+  let rows = await readMarketingAutomationSettings();
+  const existingKeys = new Set(rows.map((row) => row.key));
+  const missingSettings = MARKETING_AUTOMATION_SETTINGS.filter((setting) => !existingKeys.has(setting.key));
+
+  if (missingSettings.length > 0) {
+    await prisma.globalSetting.createMany({
+      data: missingSettings.map((setting) => ({
+        key: setting.key,
+        label: setting.label,
+        description: setting.description,
+        category: "MARKETING_AUTOMATION",
+        enabled: setting.defaultEnabled,
+      })),
+      skipDuplicates: true,
+    });
+    rows = await readMarketingAutomationSettings();
+  }
 
   return rows.sort((a, b) => {
     const aIndex = MARKETING_AUTOMATION_SETTINGS.findIndex((setting) => setting.key === a.key);
     const bIndex = MARKETING_AUTOMATION_SETTINGS.findIndex((setting) => setting.key === b.key);
     return aIndex - bIndex;
+  });
+}
+
+function readMarketingAutomationSettings() {
+  return prisma.globalSetting.findMany({
+    where: {
+      key: { in: MARKETING_AUTOMATION_SETTINGS.map((setting) => setting.key) },
+    },
+    include: {
+      audits: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+      _count: {
+        select: { audits: true },
+      },
+    },
   });
 }
