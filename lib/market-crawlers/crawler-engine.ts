@@ -16,6 +16,7 @@ import type {
 type IngestCounters = {
   createdVehicles: number;
   updatedVehicles: number;
+  unchangedVehicles: number;
   createdListings: number;
   updatedListings: number;
   skipped: string[];
@@ -30,6 +31,93 @@ type VpicDecodeResponse = {
 type CachedSource = { id: string };
 type VehicleImageState = "NONE" | "UNVERIFIED" | "VALID";
 type VehicleImageStateRow = { vehicleId: string; hasValidImage: boolean };
+
+const crawlerVehicleStateSelect = {
+  id: true,
+  vin: true,
+  trim: true,
+  series: true,
+  manufacturer: true,
+  destinationMarket: true,
+  color: true,
+  mileage: true,
+  bodyStyle: true,
+  vehicleType: true,
+  doors: true,
+  fuelType: true,
+  engine: true,
+  engineConfiguration: true,
+  engineCylinders: true,
+  displacement: true,
+  turbo: true,
+  transmission: true,
+  transmissionSpeeds: true,
+  drivetrain: true,
+  engineHP: true,
+  engineKW: true,
+  engineManufacturer: true,
+  plantCountry: true,
+  plantCity: true,
+  plantState: true,
+  abs: true,
+  esc: true,
+  tpms: true,
+  rearVisibilitySystem: true,
+  parkAssist: true,
+  adaptiveDrivingBeam: true,
+  airBagLocFront: true,
+  airBagLocKnee: true,
+  airBagLocSide: true,
+  pretensioner: true,
+  seatBeltsAll: true,
+  gvwr: true,
+  brakeSystem: true,
+  electrificationLevel: true,
+} satisfies Prisma.VehicleSelect;
+
+type CrawlerVehicleState = Prisma.VehicleGetPayload<{
+  select: typeof crawlerVehicleStateSelect;
+}>;
+type MutableCrawlerVehicleValues = Partial<Omit<CrawlerVehicleState, "id" | "vin">>;
+
+const decodedVehicleKeys = [
+  "transmission",
+  "drivetrain",
+  "engine",
+  "bodyStyle",
+  "fuelType",
+  "manufacturer",
+  "plantCountry",
+  "trim",
+  "series",
+  "vehicleType",
+  "doors",
+  "engineConfiguration",
+  "engineCylinders",
+  "displacement",
+  "turbo",
+  "transmissionSpeeds",
+  "plantCity",
+  "gvwr",
+  "brakeSystem",
+  "electrificationLevel",
+  "destinationMarket",
+  "engineHP",
+  "engineKW",
+  "engineManufacturer",
+  "plantState",
+  "abs",
+  "esc",
+  "tpms",
+  "rearVisibilitySystem",
+  "parkAssist",
+  "adaptiveDrivingBeam",
+  "airBagLocFront",
+  "airBagLocKnee",
+  "airBagLocSide",
+  "pretensioner",
+  "seatBeltsAll",
+] as const satisfies readonly (keyof MutableCrawlerVehicleValues)[];
 
 const sourceCache = new Map<string, Promise<CachedSource>>();
 const vinDecodeCache = new Map<string, Promise<DecodedVinValues>>();
@@ -77,6 +165,7 @@ export async function crawlInventory(
     normalizedListings: 0,
     createdVehicles: 0,
     updatedVehicles: 0,
+    unchangedVehicles: 0,
     createdListings: 0,
     updatedListings: 0,
     skipped: 0,
@@ -114,6 +203,7 @@ export async function crawlInventory(
 
       totals.createdVehicles += ingestResult.createdVehicles;
       totals.updatedVehicles += ingestResult.updatedVehicles;
+      totals.unchangedVehicles += ingestResult.unchangedVehicles;
       totals.createdListings += ingestResult.createdListings;
       totals.updatedListings += ingestResult.updatedListings;
     } catch (error) {
@@ -144,6 +234,7 @@ export async function ingestCrawlerListings(
   const counters: IngestCounters = {
     createdVehicles: 0,
     updatedVehicles: 0,
+    unchangedVehicles: 0,
     createdListings: 0,
     updatedListings: 0,
     skipped: [],
@@ -167,9 +258,9 @@ export async function ingestCrawlerListings(
   const sourcesByKey = new Map(sourceEntries);
   const existingVehicles = await prisma.vehicle.findMany({
     where: { vin: { in: Array.from(new Set(uniqueListings.map((listing) => listing.vin))) } },
-    select: { id: true, vin: true },
+    select: crawlerVehicleStateSelect,
   });
-  const vehiclesByVin = new Map(existingVehicles.map((vehicle) => [vehicle.vin, vehicle.id]));
+  const vehiclesByVin = new Map(existingVehicles.map((vehicle) => [vehicle.vin, vehicle]));
   const existingVehicleIds = existingVehicles.map((vehicle) => vehicle.id);
   const existingImageRows = existingVehicleIds.length > 0
     ? await prisma.$queryRaw<VehicleImageStateRow[]>(Prisma.sql`
@@ -265,37 +356,39 @@ export async function ingestCrawlerListings(
       synchronizedPartners.add(partnerKey);
     }
 
-    const existingVehicleId = vehiclesByVin.get(listing.vin);
+    const existingVehicle = vehiclesByVin.get(listing.vin);
+    const incomingVehicleValues = buildCrawlerVehicleValues(listing, decoded);
+    let vehicle: Pick<CrawlerVehicleState, "id">;
 
-    const vehicle = existingVehicleId
-      ? await prisma.vehicle.update({
-          where: { vin: listing.vin },
-          data: {
-            mileage: listing.mileage ?? undefined,
-            color: listing.color ?? undefined,
-            trim: listing.trim ?? undefined,
-            ...nonEmptyDecodedValues(decoded),
-          },
-          select: { id: true },
-        })
-      : await prisma.vehicle.create({
+    if (existingVehicle) {
+      const changedValues = getChangedVehicleValues(existingVehicle, incomingVehicleValues);
+      if (Object.keys(changedValues).length > 0) {
+        const updatedVehicle = await prisma.vehicle.update({
+          where: { id: existingVehicle.id },
+          data: changedValues,
+          select: crawlerVehicleStateSelect,
+        });
+        vehiclesByVin.set(listing.vin, updatedVehicle);
+        vehicle = updatedVehicle;
+        counters.updatedVehicles++;
+      } else {
+        vehicle = existingVehicle;
+        counters.unchangedVehicles++;
+      }
+    } else {
+      const createdVehicle = await prisma.vehicle.create({
           data: {
             vin: listing.vin,
             modelId: modelMatch.modelId,
             year: listing.year,
             status: "UNCLAIMED",
-            mileage: listing.mileage,
-            color: listing.color,
-            trim: listing.trim,
-            ...nonEmptyDecodedValues(decoded),
+            ...incomingVehicleValues,
           },
-          select: { id: true },
+          select: crawlerVehicleStateSelect,
         });
-
-    if (existingVehicleId) counters.updatedVehicles++;
-    else {
+      vehicle = createdVehicle;
       counters.createdVehicles++;
-      vehiclesByVin.set(listing.vin, vehicle.id);
+      vehiclesByVin.set(listing.vin, createdVehicle);
       imageStateByVehicleId.set(vehicle.id, "NONE");
     }
 
@@ -608,11 +701,33 @@ export async function decodeVin(vin: string): Promise<DecodedVinValues> {
   }
 }
 
-function nonEmptyDecodedValues(decoded: DecodedVinValues) {
-  const excludeKeys = new Set(["model", "make", "year"]);
+function buildCrawlerVehicleValues(
+  listing: NormalizedCrawlerListing,
+  decoded: DecodedVinValues,
+): MutableCrawlerVehicleValues {
+  const values: MutableCrawlerVehicleValues = {};
+  if (listing.mileage !== null) values.mileage = listing.mileage;
+  if (listing.color !== null && listing.color.trim() !== "") values.color = listing.color;
+  if (listing.trim !== null && listing.trim.trim() !== "") values.trim = listing.trim;
+  return { ...values, ...nonEmptyDecodedValues(decoded) };
+}
+
+function getChangedVehicleValues(
+  existing: CrawlerVehicleState,
+  incoming: MutableCrawlerVehicleValues,
+): MutableCrawlerVehicleValues {
   return Object.fromEntries(
-    Object.entries(decoded).filter(
-      ([key, value]) => !excludeKeys.has(key) && typeof value === "string" && value.trim() !== ""
-    )
-  );
+    Object.entries(incoming).filter(([key, value]) => (
+      existing[key as keyof CrawlerVehicleState] !== value
+    )),
+  ) as MutableCrawlerVehicleValues;
+}
+
+function nonEmptyDecodedValues(decoded: DecodedVinValues): MutableCrawlerVehicleValues {
+  return Object.fromEntries(
+    decodedVehicleKeys.flatMap((key) => {
+      const value = decoded[key];
+      return typeof value === "string" && value.trim() !== "" ? [[key, value]] : [];
+    }),
+  ) as MutableCrawlerVehicleValues;
 }

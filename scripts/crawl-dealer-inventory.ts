@@ -137,6 +137,7 @@ async function main() {
   console.log(`  ${pad("Vehicles discovered")}         ${result.totals.normalizedListings}`);
   console.log(`  ${pad("Vehicles created")}         ${result.totals.createdVehicles}`);
   console.log(`  ${pad("Vehicles updated")}         ${result.totals.updatedVehicles}`);
+  console.log(`  ${pad("Vehicles unchanged")}         ${result.totals.unchangedVehicles}`);
   console.log(`  ${pad("Listings created")}         ${result.totals.createdListings}`);
   console.log(`  ${pad("Listings updated")}         ${result.totals.updatedListings}`);
   console.log(`  ${pad("Records skipped")}         ${result.totals.skipped}`);

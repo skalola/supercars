@@ -69,6 +69,7 @@ export type InventoryCrawlResult = {
     normalizedListings: number;
     createdVehicles: number;
     updatedVehicles: number;
+    unchangedVehicles: number;
     createdListings: number;
     updatedListings: number;
     skipped: number;
