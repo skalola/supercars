@@ -29,8 +29,7 @@ const LIMITS = {
   vehicleImageAverageRows: 50,
   broadVehicleAverageRows: 100,
   listingAverageRows: 200,
-  publicPartsWarning: 200,
-  publicPartsFailure: 240,
+  publicPartsPageAverageRows: 24,
 } as const;
 
 async function main() {
@@ -52,20 +51,8 @@ async function main() {
   });
 
   const findings = evaluateQueryStats(stats);
-  if (publicPartCount >= LIMITS.publicPartsFailure) {
-    findings.push({
-      level: "FAIL",
-      message: `Public parts catalog contains ${publicPartCount} products; the storefront ceiling is ${LIMITS.publicPartsFailure}. Add server-side pagination before publishing more parts.`,
-    });
-  } else if (publicPartCount >= LIMITS.publicPartsWarning) {
-    findings.push({
-      level: "WARN",
-      message: `Public parts catalog contains ${publicPartCount} products and is approaching the ${LIMITS.publicPartsFailure}-product storefront ceiling.`,
-    });
-  }
-
   console.log(`Observed query shapes: ${stats.length.toLocaleString()}`);
-  console.log(`Public catalog products: ${publicPartCount.toLocaleString()} / ${LIMITS.publicPartsFailure.toLocaleString()}`);
+  console.log(`Public catalog products: ${publicPartCount.toLocaleString()} (server-paginated)`);
 
   if (findings.length === 0) {
     console.log("\nPASS: no Neon usage guardrails were exceeded.\n");
@@ -159,6 +146,15 @@ function evaluateQueryStats(stats: QueryStat[]): Finding[] {
       continue;
     }
 
+    if (isPublicPartsPageQuery(normalized) && stat.averageRows > LIMITS.publicPartsPageAverageRows) {
+      findings.push({
+        level: "FAIL",
+        message: `Public parts storefront returned more than ${LIMITS.publicPartsPageAverageRows} products per call.`,
+        query: stat,
+      });
+      continue;
+    }
+
     if (stat.averageRows > LIMITS.anyQueryAverageRows) {
       findings.push({
         level: "FAIL",
@@ -181,6 +177,12 @@ function isBroadVehicleQuery(query: string, selectedColumnCount: number) {
 
 function isListingRowQuery(query: string) {
   return /^SELECT /i.test(query) && /FROM "public"\."Listing"/i.test(query) && !/^SELECT (COUNT|SUM|AVG|MIN|MAX)\(/i.test(query);
+}
+
+function isPublicPartsPageQuery(query: string) {
+  return /^SELECT /i.test(query)
+    && /FROM "public"\."PerformancePart"/i.test(query)
+    && /"public"\."PerformancePart"\."description"/i.test(query);
 }
 
 function compactQuery(query: string) {

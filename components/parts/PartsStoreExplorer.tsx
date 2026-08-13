@@ -2,7 +2,8 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { PartsStorePage } from "@/lib/parts/storefront";
 
 export type PartsCategoryRow = {
   id: string;
@@ -60,9 +61,12 @@ export type PartsGarageCarRow = {
 type PartsStoreExplorerProps = {
   categories: PartsCategoryRow[];
   brands: PartsBrandRow[];
-  parts: PartsStorePartRow[];
+  initialPage: PartsStorePage;
+  initialCategoryId: string;
   catalogNodeCount: number;
   garageCars: PartsGarageCarRow[];
+  fitmentMakes: Array<{ id: string; name: string }>;
+  fitmentModels: Array<{ id: string; name: string; makeId: string }>;
   initialMakeId?: string;
   initialModelId?: string;
 };
@@ -85,118 +89,127 @@ const SHOP_CATEGORY_ORDER = [
 export function PartsStoreExplorer({
   categories,
   brands,
-  parts,
+  initialPage,
+  initialCategoryId,
   catalogNodeCount,
   garageCars,
+  fitmentMakes,
+  fitmentModels,
   initialMakeId = "",
   initialModelId = "",
 }: PartsStoreExplorerProps) {
   const displayCategories = useMemo(() => sortShopCategories(categories), [categories]);
-  const [activeCategoryId, setActiveCategoryId] = useState(displayCategories[0]?.id ?? "");
+  const [activeCategoryId, setActiveCategoryId] = useState(initialCategoryId);
   const [activeBrandId, setActiveBrandId] = useState("");
   const [activeMakeId, setActiveMakeId] = useState(initialMakeId);
   const [activeModelId, setActiveModelId] = useState(initialModelId);
   const [activeGarageCarId, setActiveGarageCarId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [catalogPage, setCatalogPage] = useState(initialPage);
+  const [page, setPage] = useState(initialPage.page);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const initialRequest = useRef(true);
 
-  const categoryRowsForSelectedCar = useMemo(() => {
-    const hasCarFilter = Boolean(activeMakeId || activeModelId);
-    if (!hasCarFilter) return displayCategories;
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
 
-    const counts = new Map<string, number>();
-    for (const part of parts) {
-      if (!partMatchesFitment(part, activeMakeId, activeModelId)) continue;
-      counts.set(part.categoryId, (counts.get(part.categoryId) ?? 0) + 1);
+  useEffect(() => {
+    if (initialRequest.current) {
+      initialRequest.current = false;
+      return;
     }
 
+    const controller = new AbortController();
+    const params = new URLSearchParams();
+    if (activeCategoryId) params.set("category", activeCategoryId);
+    if (activeBrandId) params.set("brand", activeBrandId);
+    if (activeMakeId) params.set("make", activeMakeId);
+    if (activeModelId) params.set("model", activeModelId);
+    if (debouncedSearch) params.set("q", debouncedSearch);
+    params.set("page", String(page));
+
+    setIsLoading(true);
+    setLoadError("");
+    fetch(`/api/parts/catalog?${params.toString()}`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Unable to load parts");
+        return response.json() as Promise<PartsStorePage>;
+      })
+      .then((result) => {
+        setCatalogPage(result);
+        if (result.page !== page) setPage(result.page);
+        if (activeCategoryId && !result.categoryCounts[activeCategoryId]) {
+          const fallbackCategory = displayCategories.find((category) => result.categoryCounts[category.id] > 0);
+          if (fallbackCategory) {
+            setActiveCategoryId(fallbackCategory.id);
+            setActiveBrandId("");
+            setPage(1);
+          }
+        }
+      })
+      .catch((error) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setLoadError("Parts could not be loaded. Please try again.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [activeBrandId, activeCategoryId, activeMakeId, activeModelId, debouncedSearch, displayCategories, page]);
+
+  const categoryRowsForSelectedCar = useMemo(() => {
     return displayCategories
       .map((category) => ({
         ...category,
-        partCount: counts.get(category.id) ?? 0,
+        partCount: catalogPage.categoryCounts[category.id] ?? 0,
       }))
       .filter((category) => category.partCount > 0);
-  }, [activeMakeId, activeModelId, displayCategories, parts]);
+  }, [catalogPage.categoryCounts, displayCategories]);
   const categoryHasSelectedCarResults = Boolean(activeMakeId || activeModelId);
   const effectiveActiveCategoryId = categoryRowsForSelectedCar.some((category) => category.id === activeCategoryId)
     ? activeCategoryId
     : categoryRowsForSelectedCar[0]?.id ?? (categoryHasSelectedCarResults ? "__empty__" : "");
   const activeCategory = categoryRowsForSelectedCar.find((category) => category.id === effectiveActiveCategoryId) ?? categoryRowsForSelectedCar[0] ?? null;
-  const categoryScopedParts = parts.filter((part) => !effectiveActiveCategoryId || part.categoryId === effectiveActiveCategoryId);
+
   const visibleBrands = useMemo(() => {
-    const brandIds = new Set(categoryScopedParts.map((part) => part.brandId));
-    return brands.filter((brand) => brandIds.has(brand.id)).sort((a, b) => a.name.localeCompare(b.name));
-  }, [brands, categoryScopedParts]);
+    return brands
+      .map((brand) => ({ ...brand, partCount: catalogPage.brandCounts[brand.id] ?? 0 }))
+      .filter((brand) => brand.partCount > 0)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [brands, catalogPage.brandCounts]);
 
   const makeOptions = useMemo(() => {
-    const options = new Map<string, { id: string; name: string; count: number }>();
-    for (const part of categoryScopedParts) {
-      for (const fitment of part.fitments) {
-        if (!fitment.makeId || !fitment.makeName) continue;
-        const current = options.get(fitment.makeId);
-        options.set(fitment.makeId, {
-          id: fitment.makeId,
-          name: fitment.makeName,
-          count: (current?.count ?? 0) + 1,
-        });
-      }
-    }
-    return Array.from(options.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [categoryScopedParts]);
+    return fitmentMakes.map((make) => ({ ...make, count: 0 }));
+  }, [fitmentMakes]);
 
   const modelOptions = useMemo(() => {
-    const options = new Map<string, { id: string; name: string; makeId: string; count: number }>();
-    for (const part of categoryScopedParts) {
-      for (const fitment of part.fitments) {
-        if (!fitment.modelId || !fitment.modelName || !fitment.makeId) continue;
-        if (activeMakeId && fitment.makeId !== activeMakeId) continue;
-        const current = options.get(fitment.modelId);
-        options.set(fitment.modelId, {
-          id: fitment.modelId,
-          name: fitment.modelName,
-          makeId: fitment.makeId,
-          count: (current?.count ?? 0) + 1,
-        });
-      }
-    }
-    return Array.from(options.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [activeMakeId, categoryScopedParts]);
+    return fitmentModels
+      .filter((model) => !activeMakeId || model.makeId === activeMakeId)
+      .map((model) => ({ ...model, count: 0 }));
+  }, [activeMakeId, fitmentModels]);
 
-  const filteredParts = categoryScopedParts.filter((part) => {
-    if (activeBrandId && part.brandId !== activeBrandId) return false;
-    if (!partMatchesFitment(part, activeMakeId, activeModelId)) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const haystack = [
-        part.name,
-        part.partNumber,
-        part.description,
-        part.categoryName,
-        part.brandName,
-        ...part.compatibility,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      if (!haystack.includes(q)) return false;
-    }
-    return true;
-  });
-
-  const activeCategoryParts = filteredParts.slice(0, 24);
+  const activeCategoryParts = catalogPage.parts;
   const featuredParts = activeCategoryParts.slice(0, 4);
   const remainingParts = activeCategoryParts.slice(4);
-  const buildProgressPercent = Math.min(98, Math.max(12, Math.round((parts.length / Math.max(catalogNodeCount, 1)) * 100)));
+  const catalogPartCount = Object.values(catalogPage.categoryCounts).reduce((sum, count) => sum + count, 0);
+  const buildProgressPercent = Math.min(98, Math.max(12, Math.round((catalogPartCount / Math.max(catalogNodeCount, 1)) * 100)));
   const buildProgressRows = displayCategories.filter((category) => category.partCount > 0).slice(0, 7);
   const activeFilterCount = [activeBrandId, activeMakeId, activeModelId].filter(Boolean).length;
   const selectedGarageCar = garageCars.find((car) => car.id === activeGarageCarId) ?? null;
 
   const resetFilters = () => {
-    setActiveCategoryId(displayCategories[0]?.id ?? "");
+    setActiveCategoryId(initialCategoryId);
     setActiveBrandId("");
     setActiveMakeId("");
     setActiveModelId("");
     setActiveGarageCarId("");
     setSearchQuery("");
+    setPage(1);
   };
 
   return (
@@ -233,6 +246,7 @@ export function PartsStoreExplorer({
                   onClick={() => {
                     setActiveCategoryId(category.id);
                     setActiveBrandId("");
+                    setPage(1);
                   }}
                 >
                   <CategoryLineIcon slug={category.slug} />
@@ -262,7 +276,10 @@ export function PartsStoreExplorer({
               <input
                 type="search"
                 value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value);
+                  setPage(1);
+                }}
                 placeholder="Part, brand, model, fitment"
               />
             </label>
@@ -271,19 +288,19 @@ export function PartsStoreExplorer({
           <details className="parts-mobile-filter-drawer">
             <summary>
               <span>Filters</span>
-              <strong>{activeFilterCount > 0 ? `${activeFilterCount} active` : `${filteredParts.length.toLocaleString()} shown`}</strong>
+              <strong>{activeFilterCount > 0 ? `${activeFilterCount} active` : `${catalogPage.total.toLocaleString()} results`}</strong>
             </summary>
             <div className="parts-mobile-filter-body">
               <div className="parts-mobile-filter-group">
                 <div className="parts-mobile-filter-heading">
                   <span>Brand</span>
-                  <button type="button" onClick={() => setActiveBrandId("")}>All Brands</button>
+                  <button type="button" onClick={() => { setActiveBrandId(""); setPage(1); }}>All Brands</button>
                 </div>
                 <div className="parts-mobile-brand-list" aria-label="Mobile brand filters">
                   <button
                     type="button"
                     className={`parts-mobile-brand-chip${activeBrandId === "" ? " is-active" : ""}`}
-                    onClick={() => setActiveBrandId("")}
+                    onClick={() => { setActiveBrandId(""); setPage(1); }}
                   >
                     All
                   </button>
@@ -292,7 +309,7 @@ export function PartsStoreExplorer({
                       key={brand.id}
                       type="button"
                       className={`parts-mobile-brand-chip${activeBrandId === brand.id ? " is-active" : ""}`}
-                      onClick={() => setActiveBrandId(brand.id)}
+                      onClick={() => { setActiveBrandId(brand.id); setPage(1); }}
                     >
                       {brand.name}
                     </button>
@@ -305,13 +322,13 @@ export function PartsStoreExplorer({
           <div className="parts-brand-section parts-brand-section-primary">
             <div className="parts-section-heading">
               <span>Shop By Brand</span>
-              <button type="button" onClick={() => setActiveBrandId("")}>View All Brands</button>
+              <button type="button" onClick={() => { setActiveBrandId(""); setPage(1); }}>View All Brands</button>
             </div>
             <div className="parts-brand-strip" aria-label="Brands in selected category">
               <button
                 type="button"
                 className={`parts-brand-chip${activeBrandId === "" ? " is-active" : ""}`}
-                onClick={() => setActiveBrandId("")}
+                onClick={() => { setActiveBrandId(""); setPage(1); }}
               >
                 All Brands
               </button>
@@ -320,7 +337,7 @@ export function PartsStoreExplorer({
                   key={brand.id}
                   brand={brand}
                   isActive={activeBrandId === brand.id}
-                  onSelect={() => setActiveBrandId(brand.id)}
+                  onSelect={() => { setActiveBrandId(brand.id); setPage(1); }}
                 />
               ))}
               {visibleBrands.length === 0 ? (
@@ -341,6 +358,8 @@ export function PartsStoreExplorer({
             </div>
           </div>
 
+          {loadError ? <div className="parts-load-error" role="alert">{loadError}</div> : null}
+          <div className={isLoading ? "parts-results-loading" : undefined} aria-busy={isLoading}>
           {activeCategoryParts.length === 0 ? (
             <div className="parts-empty-state">
               <h3>No parts captured yet</h3>
@@ -439,6 +458,18 @@ export function PartsStoreExplorer({
               ) : null}
             </>
           )}
+          </div>
+          {catalogPage.totalPages > 1 ? (
+            <nav className="parts-pagination" aria-label="Parts catalog pages">
+              <button type="button" disabled={page <= 1 || isLoading} onClick={() => setPage((current) => Math.max(1, current - 1))}>
+                Previous
+              </button>
+              <span>Page {catalogPage.page.toLocaleString()} of {catalogPage.totalPages.toLocaleString()}</span>
+              <button type="button" disabled={page >= catalogPage.totalPages || isLoading} onClick={() => setPage((current) => current + 1)}>
+                Next
+              </button>
+            </nav>
+          ) : null}
         </section>
 
         <aside className="parts-build-panel" aria-label="Parts catalog status">
@@ -458,26 +489,30 @@ export function PartsStoreExplorer({
               modelOptions={modelOptions}
               activeMakeId={activeMakeId}
               activeModelId={activeModelId}
-              shownCount={filteredParts.length}
+              shownCount={catalogPage.total}
               onGarageCarChange={(garageCarId) => {
                 setActiveGarageCarId(garageCarId);
                 const garageCar = garageCars.find((car) => car.id === garageCarId);
                 if (!garageCar) {
                   setActiveMakeId("");
                   setActiveModelId("");
+                  setPage(1);
                   return;
                 }
                 setActiveMakeId(garageCar.makeId);
                 setActiveModelId(garageCar.modelId);
+                setPage(1);
               }}
               onMakeChange={(value) => {
                 setActiveGarageCarId("");
                 setActiveMakeId(value);
                 setActiveModelId("");
+                setPage(1);
               }}
               onModelChange={(value) => {
                 setActiveGarageCarId("");
                 setActiveModelId(value);
+                setPage(1);
               }}
             />
           </article>
@@ -581,7 +616,7 @@ function CarSelector({
           <option value="">All Makes</option>
           {makeOptions.map((make) => (
             <option key={make.id} value={make.id}>
-              {make.name} ({make.count})
+              {make.name}
             </option>
           ))}
         </select>
@@ -596,7 +631,7 @@ function CarSelector({
           <option value="">All Models</option>
           {modelOptions.map((model) => (
             <option key={model.id} value={model.id}>
-              {model.name} ({model.count})
+              {model.name}
             </option>
           ))}
         </select>
@@ -609,26 +644,6 @@ function isCleanBrandLogo(logoUrl: string | null, logoBackground: string, logoNe
   if (!logoUrl || logoNeedsReview) return false;
   if (logoUrl.startsWith("/parts/placeholders/brand/")) return false;
   return logoBackground === "TRANSPARENT";
-}
-
-function partMatchesFitment(part: PartsStorePartRow, makeId: string, modelId: string) {
-  if (!makeId && !modelId) return true;
-  if (part.fitments.length === 0) return false;
-
-  return part.fitments.some((fitment) => {
-    if (modelId) {
-      if (fitment.modelId === modelId) return !makeId || !fitment.makeId || fitment.makeId === makeId;
-      if (fitment.modelId) return false;
-      return Boolean(makeId && fitment.makeId === makeId);
-    }
-
-    if (makeId) {
-      if (fitment.makeId === makeId) return true;
-      if (fitment.makeId || fitment.modelId) return false;
-    }
-
-    return false;
-  });
 }
 
 function getProductBadge(index: number) {

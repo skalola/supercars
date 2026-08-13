@@ -20,11 +20,11 @@ Run the check after a representative production traffic window and before downgr
 | Broad Vehicle row query | 100 rows/call | Wide VIN-decode records should be paginated or narrowly selected. |
 | Listing row query | 200 rows/call | Public inventory is paginated at 48 and admin tables are paginated at 50. |
 | Any application query | 1,000 rows/call | Catches previously unknown fanout patterns. |
-| Public parts catalog | Warning at 200, failure at 240 | Server filtering and pagination must replace the current cached catalog payload before this ceiling. |
+| Public parts result page | 24 products/call | Server filtering and pagination keep affiliate catalog growth from increasing per-request transfer. |
 
 The 688-row make/model selector is intentionally cached for 24 hours and does not violate these limits. Aggregate queries returning one row are also safe.
 
-The public parts catalog is likewise cached for 24 hours and invalidated immediately by admin part mutations. Keep the 240-product ceiling until server-side filtering and pagination replace the single catalog payload; do not increase the ceiling to accommodate affiliate imports.
+The compact public parts shell is cached for 24 hours and invalidated immediately by admin part mutations. Product results and compatibility details are fetched in server-filtered pages of 24, so affiliate imports can grow without increasing each storefront response.
 
 ## Measurement Procedure
 

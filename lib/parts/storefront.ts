@@ -1,0 +1,292 @@
+import type { Prisma } from "@prisma/client";
+import type {
+  PartsBrandRow,
+  PartsCategoryRow,
+  PartsStorePartRow,
+} from "@/components/parts/PartsStoreExplorer";
+import { getPartDetailPath } from "@/lib/parts/routes";
+import { getCatalogNodePlaceholderUrl } from "@/lib/parts/visual-placeholders";
+import { prisma } from "@/lib/prisma";
+
+export const PARTS_STORE_PAGE_SIZE = 24;
+
+export type PartsStoreFilters = {
+  categoryId?: string;
+  brandId?: string;
+  makeId?: string;
+  modelId?: string;
+  search?: string;
+  page?: number;
+};
+
+export type PartsStorePage = {
+  parts: PartsStorePartRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  categoryCounts: Record<string, number>;
+  brandCounts: Record<string, number>;
+};
+
+export const publicPartsWhere = {
+  status: "ACTIVE",
+  sourceUrl: { not: null },
+  sourceConfidence: "SOURCE_VERIFIED",
+  imageUrl: { not: null },
+  compatibility: {
+    some: {
+      OR: [{ makeId: { not: null } }, { modelId: { not: null } }],
+    },
+  },
+} satisfies Prisma.PerformancePartWhereInput;
+
+const storePartSelect = {
+  id: true,
+  name: true,
+  slug: true,
+  partNumber: true,
+  description: true,
+  imageUrl: true,
+  retailPriceCents: true,
+  estimatedHpGain: true,
+  estimatedTorqueGain: true,
+  categoryId: true,
+  brandId: true,
+  category: { select: { name: true } },
+  brand: {
+    select: {
+      name: true,
+      slug: true,
+      logoUrl: true,
+      logoBackground: true,
+      logoNeedsReview: true,
+    },
+  },
+} satisfies Prisma.PerformancePartSelect;
+
+type StorePart = Prisma.PerformancePartGetPayload<{ select: typeof storePartSelect }>;
+type StorePartCompatibility = {
+  makeId: string | null;
+  modelId: string | null;
+  yearStart: number | null;
+  yearEnd: number | null;
+  make: { name: string } | null;
+  model: { name: string } | null;
+};
+
+export async function getPublicPartsStoreShell() {
+  const [categories, brands, fitments, catalogNodeCount] = await Promise.all([
+    prisma.partCategory.findMany({
+      where: { active: true },
+      select: { id: true, name: true, slug: true },
+      orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
+    }),
+    prisma.partBrand.findMany({
+      where: { active: true },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        logoUrl: true,
+        logoBackground: true,
+        logoNeedsReview: true,
+      },
+      orderBy: { name: "asc" },
+    }),
+    prisma.partCompatibility.findMany({
+      where: { part: publicPartsWhere },
+      select: {
+        makeId: true,
+        modelId: true,
+        make: { select: { name: true } },
+        model: { select: { name: true, makeId: true } },
+      },
+      distinct: ["makeId", "modelId"],
+    }),
+    prisma.partCatalogNode.count({
+      where: { active: true, placeholderOnly: true, categoryId: { not: null } },
+    }),
+  ]);
+
+  const categoryRows: PartsCategoryRow[] = categories.map((category) => ({
+    ...category,
+    iconUrl: getCatalogNodePlaceholderUrl(category.slug, category.slug),
+    partCount: 0,
+  }));
+  const brandRows: PartsBrandRow[] = brands.map((brand) => ({ ...brand, partCount: 0 }));
+  const makeMap = new Map<string, { id: string; name: string }>();
+  const modelMap = new Map<string, { id: string; name: string; makeId: string }>();
+
+  for (const fitment of fitments) {
+    if (fitment.makeId && fitment.make?.name) {
+      makeMap.set(fitment.makeId, { id: fitment.makeId, name: fitment.make.name });
+    }
+    if (fitment.modelId && fitment.model?.name) {
+      modelMap.set(fitment.modelId, {
+        id: fitment.modelId,
+        name: fitment.model.name,
+        makeId: fitment.model.makeId,
+      });
+    }
+  }
+
+  return {
+    categoryRows,
+    brandRows,
+    fitmentMakes: [...makeMap.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    fitmentModels: [...modelMap.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    catalogNodeCount,
+  };
+}
+
+export async function queryPublicPartsStore(filters: PartsStoreFilters): Promise<PartsStorePage> {
+  const page = Math.max(1, Math.floor(filters.page || 1));
+  const facetWhere = buildPartsWhere({ ...filters, categoryId: undefined, brandId: undefined });
+  const categoryWhere = buildPartsWhere({ ...filters, brandId: undefined });
+  const resultWhere = buildPartsWhere(filters);
+
+  const [parts, total, categoryCounts, brandCounts] = await Promise.all([
+    prisma.performancePart.findMany({
+      where: resultWhere,
+      select: storePartSelect,
+      orderBy: [
+        { category: { displayOrder: "asc" } },
+        { brand: { name: "asc" } },
+        { name: "asc" },
+      ],
+      skip: (page - 1) * PARTS_STORE_PAGE_SIZE,
+      take: PARTS_STORE_PAGE_SIZE,
+    }),
+    prisma.performancePart.count({ where: resultWhere }),
+    prisma.performancePart.groupBy({
+      by: ["categoryId"],
+      where: facetWhere,
+      _count: { id: true },
+    }),
+    prisma.performancePart.groupBy({
+      by: ["brandId"],
+      where: categoryWhere,
+      _count: { id: true },
+    }),
+  ]);
+
+  const compatibility = await getCompatibility(parts.map((part) => part.id));
+  const compatibilityByPartId = new Map<string, StorePartCompatibility[]>();
+  for (const row of compatibility) {
+    const rows = compatibilityByPartId.get(row.partId) ?? [];
+    rows.push(row);
+    compatibilityByPartId.set(row.partId, rows);
+  }
+
+  const totalPages = Math.max(1, Math.ceil(total / PARTS_STORE_PAGE_SIZE));
+  return {
+    parts: parts.map((part) => mapStorePartRow(part, compatibilityByPartId.get(part.id) ?? [])),
+    total,
+    page: Math.min(page, totalPages),
+    pageSize: PARTS_STORE_PAGE_SIZE,
+    totalPages,
+    categoryCounts: Object.fromEntries(categoryCounts.map((row) => [row.categoryId, row._count.id])),
+    brandCounts: Object.fromEntries(brandCounts.map((row) => [row.brandId, row._count.id])),
+  };
+}
+
+function buildPartsWhere(filters: PartsStoreFilters): Prisma.PerformancePartWhereInput {
+  const search = filters.search?.trim().slice(0, 80);
+  const fitment = filters.modelId
+    ? {
+        some: {
+          OR: [
+            { modelId: filters.modelId },
+            ...(filters.makeId ? [{ modelId: null, makeId: filters.makeId }] : []),
+          ],
+        },
+      }
+    : filters.makeId
+      ? { some: { makeId: filters.makeId } }
+      : undefined;
+
+  return {
+    AND: [
+      publicPartsWhere,
+      filters.categoryId ? { categoryId: filters.categoryId } : {},
+      filters.brandId ? { brandId: filters.brandId } : {},
+      fitment ? { compatibility: fitment } : {},
+      search
+        ? {
+            OR: [
+              { name: { contains: search, mode: "insensitive" } },
+              { partNumber: { contains: search, mode: "insensitive" } },
+              { description: { contains: search, mode: "insensitive" } },
+              { brand: { name: { contains: search, mode: "insensitive" } } },
+              { category: { name: { contains: search, mode: "insensitive" } } },
+              { compatibility: { some: { make: { name: { contains: search, mode: "insensitive" } } } } },
+              { compatibility: { some: { model: { name: { contains: search, mode: "insensitive" } } } } },
+            ],
+          }
+        : {},
+    ],
+  };
+}
+
+async function getCompatibility(partIds: string[]) {
+  if (partIds.length === 0) return [];
+  return prisma.partCompatibility.findMany({
+    where: { partId: { in: partIds } },
+    select: {
+      partId: true,
+      makeId: true,
+      modelId: true,
+      yearStart: true,
+      yearEnd: true,
+      make: { select: { name: true } },
+      model: { select: { name: true } },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+}
+
+function mapStorePartRow(part: StorePart, compatibility: StorePartCompatibility[]): PartsStorePartRow {
+  return {
+    id: part.id,
+    name: part.name,
+    partNumber: part.partNumber,
+    detailPath: getPartDetailPath(part),
+    description: part.description,
+    imageUrl: part.imageUrl,
+    priceLabel: formatCents(part.retailPriceCents),
+    hpGainLabel: part.estimatedHpGain === null ? null : `+${part.estimatedHpGain.toLocaleString()} hp`,
+    torqueGainLabel: part.estimatedTorqueGain === null ? null : `+${part.estimatedTorqueGain.toLocaleString()} lb-ft`,
+    categoryId: part.categoryId,
+    categoryName: part.category.name,
+    brandId: part.brandId,
+    brandName: part.brand.name,
+    brandLogoUrl: part.brand.logoUrl,
+    brandLogoBackground: part.brand.logoBackground,
+    brandLogoNeedsReview: part.brand.logoNeedsReview,
+    compatibility: compatibility.map(formatCompatibility),
+    fitments: compatibility.map((fitment) => ({
+      makeId: fitment.makeId,
+      makeName: fitment.make?.name ?? null,
+      modelId: fitment.modelId,
+      modelName: fitment.model?.name ?? null,
+    })),
+  };
+}
+
+function formatCents(value: number | null) {
+  if (value === null) return "Price pending";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value / 100);
+}
+
+function formatCompatibility(fitment: StorePartCompatibility) {
+  const makeModel = [fitment.make?.name, fitment.model?.name].filter(Boolean).join(" ");
+  const years = fitment.yearStart && fitment.yearEnd
+    ? fitment.yearStart === fitment.yearEnd ? String(fitment.yearStart) : `${fitment.yearStart}-${fitment.yearEnd}`
+    : fitment.yearStart ? `${fitment.yearStart}+` : fitment.yearEnd ? `Through ${fitment.yearEnd}` : null;
+  return [makeModel || "Universal", years].filter(Boolean).join(" · ");
+}
