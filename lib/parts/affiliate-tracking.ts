@@ -1,3 +1,6 @@
+import { unstable_cache } from "next/cache";
+import { prisma } from "@/lib/prisma";
+
 type AffiliateReadyPart = {
   status: string;
   affiliateUrl: string | null;
@@ -9,6 +12,28 @@ type AffiliateReadyPart = {
 };
 
 const ACTIVE_PARTNER_STATUSES = new Set(["ACTIVE", "APPROVED"]);
+
+export const getPartOutboundRouting = unstable_cache(
+  async (partId: string) => prisma.performancePart.findUnique({
+    where: { id: partId },
+    select: {
+      id: true,
+      status: true,
+      affiliateUrl: true,
+      sourceUrl: true,
+      trackingStatus: true,
+      affiliatePartnerId: true,
+      affiliatePartner: {
+        select: {
+          active: true,
+          status: true,
+        },
+      },
+    },
+  }),
+  ["part-outbound-routing-v1"],
+  { revalidate: 300, tags: ["parts-catalog"] },
+);
 
 export function isAffiliateTrackingReady(part: AffiliateReadyPart) {
   return Boolean(

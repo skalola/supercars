@@ -1,7 +1,11 @@
 import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { isAffiliateTrackingReady, isSafeOutboundUrl } from "@/lib/parts/affiliate-tracking";
+import {
+  getPartOutboundRouting,
+  isAffiliateTrackingReady,
+  isSafeOutboundUrl,
+} from "@/lib/parts/affiliate-tracking";
 import { prisma } from "@/lib/prisma";
 
 interface RouteParams {
@@ -15,23 +19,7 @@ const CLICK_DEDUPE_WINDOW_MS = 10 * 60 * 1000;
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const { partId } = await params;
 
-  const part = await prisma.performancePart.findUnique({
-    where: { id: partId },
-    select: {
-      id: true,
-      status: true,
-      affiliateUrl: true,
-      sourceUrl: true,
-      trackingStatus: true,
-      affiliatePartnerId: true,
-      affiliatePartner: {
-        select: {
-          active: true,
-          status: true,
-        },
-      },
-    },
-  });
+  const part = await getPartOutboundRouting(partId);
 
   if (!part || part.status !== "ACTIVE") {
     return NextResponse.redirect(new URL("/parts?outbound=part-unavailable", request.url), { status: 303 });
