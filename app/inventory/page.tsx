@@ -44,15 +44,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
     maxPrice,
   });
 
-  const yearFilterWhere = buildInventoryWhere({
-    isAdmin,
-    makeId: selectedMakeId,
-    modelId: selectedModelId,
-    minPrice,
-    maxPrice,
-  });
-
-  const [listings, totalListings, askingPriceTotal, fallbackPriceTotal, yearRows] = await Promise.all([
+  const [listings, summary] = await Promise.all([
     prisma.listing.findMany({
       where,
       select: inventoryListingSelect,
@@ -60,33 +52,19 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
       skip: (requestedPage - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
-    prisma.listing.count({ where }),
-    prisma.listing.aggregate({
-      where,
-      _sum: {
-        askingPrice: true,
-      },
-    }),
-    prisma.listing.aggregate({
-      where: {
-        AND: [
-          where,
-          { askingPrice: null },
-        ],
-      },
-      _sum: {
-        price: true,
-      },
-    }),
-    prisma.listing.groupBy({
-      by: ["year"],
-      where: yearFilterWhere,
-      orderBy: { year: "desc" },
+    getInventorySummary({
+      isAdmin,
+      makeId: selectedMakeId,
+      modelId: selectedModelId,
+      year: selectedYear,
+      minPrice,
+      maxPrice,
     }),
   ]);
 
-  const totalValue = (askingPriceTotal._sum.askingPrice || 0) + (fallbackPriceTotal._sum.price || 0);
-  const availableYears = yearRows.map((row) => row.year).filter(Boolean);
+  const totalListings = summary.totalListings;
+  const totalValue = summary.totalValue;
+  const availableYears = summary.availableYears;
 
   const mappedListings = listings.filter(hasCleanDisplayImage).map((l) => ({
     id: l.id,
@@ -186,6 +164,83 @@ const inventoryListingSelect = {
     },
   },
 } satisfies Prisma.ListingSelect;
+
+async function getInventorySummary({
+  isAdmin,
+  makeId,
+  modelId,
+  year,
+  minPrice,
+  maxPrice,
+}: {
+  isAdmin: boolean;
+  makeId?: string;
+  modelId?: string;
+  year?: number;
+  minPrice?: number;
+  maxPrice?: number;
+}) {
+  type InventorySummaryRow = {
+    totalListings: number;
+    totalValue: number;
+    availableYears: number[];
+  };
+
+  const minimumPrice = minPrice || 10_000;
+  const maximumPriceClause = maxPrice
+    ? Prisma.sql`AND COALESCE(listing."askingPrice", listing."price") <= ${maxPrice}`
+    : Prisma.empty;
+  const makeClause = makeId ? Prisma.sql`AND make."id" = ${makeId}` : Prisma.empty;
+  const modelClause = modelId ? Prisma.sql`AND model."id" = ${modelId}` : Prisma.empty;
+  const visibilityClause = isAdmin
+    ? Prisma.sql`AND (
+        (listing."validationStatus" = 'VALID' AND vehicle."inventoryStatus" IN ('ACTIVE', 'VALID', 'WARNING'))
+        OR (listing."validationStatus" = 'ADMIN_TEST' AND vehicle."inventoryStatus" = 'ADMIN_TEST')
+      )`
+    : Prisma.sql`AND listing."validationStatus" = 'VALID'
+        AND vehicle."inventoryStatus" IN ('ACTIVE', 'VALID', 'WARNING')`;
+  const selectedYearClause = year ? Prisma.sql`WHERE year = ${year}` : Prisma.empty;
+
+  const [summary] = await prisma.$queryRaw<InventorySummaryRow[]>(Prisma.sql`
+    WITH eligible AS (
+      SELECT
+        listing."year" AS year,
+        COALESCE(listing."askingPrice", listing."price")::double precision AS value
+      FROM "Listing" listing
+      INNER JOIN "Vehicle" vehicle ON vehicle."id" = listing."vehicleId"
+      INNER JOIN "Model" model ON model."id" = vehicle."modelId"
+      INNER JOIN "Make" make ON make."id" = model."makeId"
+      LEFT JOIN "MarketSource" source ON source."id" = listing."sourceId"
+      WHERE listing."status" = 'ACTIVE'
+        AND listing."priceStatus" IS DISTINCT FROM 'PRICE_INVALID'
+        AND listing."imageUrl" IS NOT NULL
+        AND (source."type" IS NULL OR source."type" <> 'AUCTION')
+        AND (listing."url" IS NULL OR listing."url" NOT ILIKE '%bringatrailer.com%')
+        AND make."name" IN (${Prisma.join(SUPPORTED_INVENTORY_MAKES)})
+        AND COALESCE(listing."askingPrice", listing."price") >= ${minimumPrice}
+        ${maximumPriceClause}
+        ${makeClause}
+        ${modelClause}
+        ${visibilityClause}
+    ),
+    filtered AS (
+      SELECT * FROM eligible ${selectedYearClause}
+    )
+    SELECT
+      (SELECT COUNT(*)::int FROM filtered) AS "totalListings",
+      (SELECT COALESCE(SUM(value), 0)::double precision FROM filtered) AS "totalValue",
+      COALESCE(
+        (SELECT ARRAY_AGG(DISTINCT year ORDER BY year DESC) FROM eligible),
+        ARRAY[]::integer[]
+      ) AS "availableYears"
+  `);
+
+  return {
+    totalListings: summary?.totalListings ?? 0,
+    totalValue: summary?.totalValue ?? 0,
+    availableYears: summary?.availableYears ?? [],
+  };
+}
 
 function buildInventoryWhere({
   isAdmin,
