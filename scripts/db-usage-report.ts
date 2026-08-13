@@ -26,28 +26,16 @@ type PgStatInfoRow = {
 
 const RISK_AREAS = [
   {
-    area: "Authenticated Vehicle Passport",
-    files: ["app/vehicle/[vin]/page.tsx"],
-    risk: "The public-route sample does not cover owner-only service records, modifications, or fulfillment controls.",
-    next: "Capture an authenticated passport trace and split any expandable sections that exceed 50 rows per call.",
+    area: "Make / Model Catalog Growth",
+    files: ["lib/makes/catalog.ts"],
+    risk: "The shared selector intentionally hydrates the full make/model taxonomy once per cache window; its payload grows with catalog breadth.",
+    next: "Keep the 24-hour cache and split model options by selected make only if the catalog exceeds the 1,000-row guardrail.",
   },
   {
-    area: "Authenticated Garage",
-    files: ["app/garage/garage-data.ts"],
-    risk: "Owner collections are bounded, but accounts with many service records or saved cars need a signed-in traffic sample.",
-    next: "Measure a populated garage and paginate history only if real telemetry crosses the row threshold.",
-  },
-  {
-    area: "Admin Parts",
-    files: ["app/admin/parts/page.tsx"],
-    risk: "The admin editor still loads a bounded 300-part working set with compatibility details.",
-    next: "Add server pagination when the active catalog approaches the current cap.",
-  },
-  {
-    area: "Fulfillment Admin",
-    files: ["lib/admin/fulfillment-ops.ts"],
-    risk: "Fulfillment requests are capped at 250 but not cursor-paginated.",
-    next: "Measure after real transaction volume exists, then add server filters and cursor pagination before raising the cap.",
+    area: "Production Call Frequency",
+    files: ["scripts/check-db-usage.ts", "scripts/db-usage-snapshot.ts"],
+    risk: "Small bounded queries can still create material transfer when called repeatedly under real traffic.",
+    next: "Use a multi-hour production comparison to rank incremental calls and rows before changing cache boundaries.",
   },
   {
     area: "Production Measurement",
@@ -290,7 +278,7 @@ function reportRiskAreas() {
     console.log(`  Risk: ${risk.risk}`);
     console.log(`  Next: ${risk.next}`);
   }
-  console.log("\nRecommended next sprint: authenticated route trace, followed by a multi-hour production measurement window.\n");
+  console.log("\nRecommended next sprint: collect a multi-hour production window, then optimize only query shapes with material incremental calls or rows.\n");
 }
 
 function compactQuery(query: string) {

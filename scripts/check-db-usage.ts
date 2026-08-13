@@ -8,6 +8,7 @@ type QueryStat = {
   calls: number;
   totalRows: number;
   averageRows: number;
+  selectedColumnCount: number;
 };
 
 type RawQueryStat = {
@@ -30,6 +31,7 @@ const LIMITS = {
   broadVehicleAverageRows: 100,
   listingAverageRows: 200,
   publicPartsPageAverageRows: 24,
+  makeModelCatalogAverageRows: 1_000,
 } as const;
 
 async function main() {
@@ -104,6 +106,7 @@ async function getQueryStats(): Promise<QueryStat[]> {
       calls: Number(row.calls),
       totalRows: Number(row.total_rows),
       averageRows: Number(row.average_rows ?? 0),
+      selectedColumnCount: countSelectedColumns(row.query),
     }));
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -116,8 +119,16 @@ function evaluateQueryStats(stats: QueryStat[]): Finding[] {
 
   for (const stat of stats) {
     const normalized = stat.query.replace(/\s+/g, " ");
-    const selectedColumns = normalized.match(/^SELECT (.+?) FROM /i)?.[1] ?? "";
-    const selectedColumnCount = (selectedColumns.match(/"public"\./g) ?? []).length;
+    const selectedColumnCount = stat.selectedColumnCount;
+
+    if (isMakeModelCatalogQuery(normalized) && stat.averageRows > LIMITS.makeModelCatalogAverageRows) {
+      findings.push({
+        level: "FAIL",
+        message: `Shared make/model catalog returned more than ${LIMITS.makeModelCatalogAverageRows.toLocaleString()} rows per cache fill.`,
+        query: stat,
+      });
+      continue;
+    }
 
     if (isVehicleImageQuery(normalized) && stat.averageRows > LIMITS.vehicleImageAverageRows) {
       findings.push({
@@ -183,6 +194,18 @@ function isPublicPartsPageQuery(query: string) {
   return /^SELECT /i.test(query)
     && /FROM "public"\."PerformancePart"/i.test(query)
     && /"public"\."PerformancePart"\."description"/i.test(query);
+}
+
+function isMakeModelCatalogQuery(query: string) {
+  return /^SELECT /i.test(query)
+    && (/FROM "public"\."Make"/i.test(query) || /FROM "public"\."Model"/i.test(query))
+    && /ORDER BY /i.test(query);
+}
+
+function countSelectedColumns(query: string) {
+  const normalized = query.replace(/\s+/g, " ");
+  const selectedColumns = normalized.match(/^SELECT (.+?) FROM /i)?.[1] ?? "";
+  return (selectedColumns.match(/"public"\./g) ?? []).length;
 }
 
 function compactQuery(query: string) {
