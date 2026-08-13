@@ -4,6 +4,8 @@ import { shouldSendMarketingAutomation } from "@/lib/admin/marketing-automation"
 
 type AlertKind = "price" | "listing";
 
+const SAVED_CAR_SUBSCRIBER_BATCH_SIZE = 100;
+
 type AlertListing = {
   id: string;
   modelId: string;
@@ -180,9 +182,81 @@ async function notifySavedCarSubscribers({
   previousPrice?: number;
   currentPrice?: number;
 }) {
-  const subscribers = await prisma.garageItem.findMany({
-    where: {
+  let cursor: string | undefined;
+  let batches = 0;
+  let sent = 0;
+
+  while (true) {
+    const subscribers = await getSavedCarSubscriberBatch({
+      kind,
       modelId: listing.modelId,
+      cursor,
+    });
+    if (subscribers.length === 0) break;
+
+    batches++;
+
+    for (const subscriber of subscribers) {
+      if (!isValidEmail(subscriber.user.email)) continue;
+
+      const displayPrice = currentPrice ?? listing.askingPrice ?? listing.price ?? null;
+      if (
+        kind === "price" &&
+        displayPrice !== null &&
+        subscriber.priceTrackerBaseline !== null &&
+        displayPrice >= subscriber.priceTrackerBaseline
+      ) {
+        continue;
+      }
+
+      const email = buildSavedCarAlertEmail({
+        kind,
+        listing,
+        recipientName: subscriber.user.name || subscriber.user.username || "there",
+        previousPrice,
+        currentPrice: displayPrice,
+      });
+
+      await sendSavedCarAlertEmail({
+        to: subscriber.user.email!,
+        ...email,
+      });
+
+      await prisma.garageItem.update({
+        where: { id: subscriber.id },
+        data:
+          kind === "price"
+            ? {
+                lastPriceAlertAt: new Date(),
+                priceTrackerBaseline: displayPrice,
+              }
+            : {
+                lastListingAlertAt: new Date(),
+              },
+      });
+
+      sent++;
+    }
+
+    if (subscribers.length < SAVED_CAR_SUBSCRIBER_BATCH_SIZE) break;
+    cursor = subscribers[subscribers.length - 1]?.id;
+  }
+
+  return { sent, batches, batchSize: SAVED_CAR_SUBSCRIBER_BATCH_SIZE };
+}
+
+function getSavedCarSubscriberBatch({
+  kind,
+  modelId,
+  cursor,
+}: {
+  kind: AlertKind;
+  modelId: string;
+  cursor?: string;
+}) {
+  return prisma.garageItem.findMany({
+    where: {
+      modelId,
       ...(kind === "price"
         ? { priceTrackerAlertsEnabled: true }
         : { listingTrackerAlertsEnabled: true }),
@@ -202,53 +276,10 @@ async function notifySavedCarSubscribers({
         },
       },
     },
+    orderBy: { id: "asc" },
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    take: SAVED_CAR_SUBSCRIBER_BATCH_SIZE,
   });
-
-  let sent = 0;
-
-  for (const subscriber of subscribers) {
-    if (!isValidEmail(subscriber.user.email)) continue;
-
-    const displayPrice = currentPrice ?? listing.askingPrice ?? listing.price ?? null;
-    if (
-      kind === "price" &&
-      displayPrice !== null &&
-      subscriber.priceTrackerBaseline !== null &&
-      displayPrice >= subscriber.priceTrackerBaseline
-    ) {
-      continue;
-    }
-
-    const email = buildSavedCarAlertEmail({
-      kind,
-      listing,
-      recipientName: subscriber.user.name || subscriber.user.username || "there",
-      previousPrice,
-      currentPrice: displayPrice,
-    });
-
-    await sendSavedCarAlertEmail({
-      to: subscriber.user.email!,
-      ...email,
-    });
-
-    await prisma.garageItem.update({
-      where: { id: subscriber.id },
-      data:
-        kind === "price"
-          ? {
-              lastPriceAlertAt: new Date(),
-              priceTrackerBaseline: displayPrice,
-            }
-          : {
-              lastListingAlertAt: new Date(),
-            },
-    });
-
-    sent++;
-  }
-
-  return { sent };
 }
 
 function buildSavedCarAlertEmail({
