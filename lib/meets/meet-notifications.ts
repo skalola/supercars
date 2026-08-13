@@ -37,6 +37,8 @@ export type MeetReminderRecipient = {
   user: MeetEmailUser;
 };
 
+const MEET_BROADCAST_BATCH_SIZE = 100;
+
 export async function notifyMeetCreated(meetId: string) {
   const meet = await getMeetEmailContext(meetId);
   if (!meet) return;
@@ -94,67 +96,90 @@ export async function notifyMeetCancelled(meetId: string, actorUserId?: string |
     bypassUserPreference: actorUserId === meet.host.id,
   });
 
-  const attendees = await prisma.meetRsvp.findMany({
-    where: { meetId, status: { in: ["GOING", "MAYBE", "WAITLISTED"] } },
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          username: true,
-          email: true,
-          trackerPreference: { select: { eventsTrackerEnabled: true } },
-        },
-      },
-    },
-    take: 500,
+  await broadcastMeetNotification({
+    meet,
+    excludeUserId: meet.host.id,
+    type: "MEET_CANCELLED_ATTENDEE",
+    subject: `[SUPERCAR DASH] Meet Cancelled - ${meet.title}`,
+    headline: "Meet cancelled",
+    body: `${meet.title} in ${meet.city}, ${meet.state} has been cancelled by the host or admin.`,
+    ctaLabel: "View Meet",
   });
-
-  for (const attendee of attendees) {
-    if (attendee.user.id === meet.host.id) continue;
-    await sendMeetNotification({
-      meet,
-      user: attendee.user,
-      type: "MEET_CANCELLED_ATTENDEE",
-      subject: `[SUPERCAR DASH] Meet Cancelled - ${meet.title}`,
-      headline: "Meet cancelled",
-      body: `${meet.title} in ${meet.city}, ${meet.state} has been cancelled by the host or admin.`,
-      ctaLabel: "View Meet",
-    });
-  }
 }
 
 export async function notifyMeetUpdated(meetId: string, actorUserId?: string | null) {
   const meet = await getMeetEmailContext(meetId);
   if (!meet) return;
 
-  const attendees = await prisma.meetRsvp.findMany({
-    where: { meetId, status: { in: ["GOING", "MAYBE", "WAITLISTED"] } },
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          username: true,
-          email: true,
-          trackerPreference: { select: { eventsTrackerEnabled: true } },
+  await broadcastMeetNotification({
+    meet,
+    excludeUserId: actorUserId,
+    type: "MEET_UPDATED_ATTENDEE",
+    subject: `[SUPERCAR DASH] Meet Updated - ${meet.title}`,
+    headline: "Meet details updated",
+    body: `${meet.title} has updated event details. Review the meet page before you arrive.`,
+    ctaLabel: "View Meet",
+  });
+}
+
+async function broadcastMeetNotification({
+  meet,
+  excludeUserId,
+  type,
+  subject,
+  headline,
+  body,
+  ctaLabel,
+}: {
+  meet: MeetEmailContext;
+  excludeUserId?: string | null;
+  type: "MEET_UPDATED_ATTENDEE" | "MEET_CANCELLED_ATTENDEE";
+  subject: string;
+  headline: string;
+  body: string;
+  ctaLabel: string;
+}) {
+  let cursor: string | undefined;
+
+  while (true) {
+    const attendees = await prisma.meetRsvp.findMany({
+      where: {
+        meetId: meet.id,
+        status: { in: ["GOING", "MAYBE", "WAITLISTED"] },
+      },
+      select: {
+        id: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            email: true,
+            trackerPreference: { select: { eventsTrackerEnabled: true } },
+          },
         },
       },
-    },
-    take: 500,
-  });
-
-  for (const attendee of attendees) {
-    if (attendee.user.id === actorUserId) continue;
-    await sendMeetNotification({
-      meet,
-      user: attendee.user,
-      type: "MEET_UPDATED_ATTENDEE",
-      subject: `[SUPERCAR DASH] Meet Updated - ${meet.title}`,
-      headline: "Meet details updated",
-      body: `${meet.title} has updated event details. Review the meet page before you arrive.`,
-      ctaLabel: "View Meet",
+      orderBy: { id: "asc" },
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      take: MEET_BROADCAST_BATCH_SIZE,
     });
+    if (attendees.length === 0) break;
+
+    for (const attendee of attendees) {
+      if (attendee.user.id === excludeUserId) continue;
+      await sendMeetNotification({
+        meet,
+        user: attendee.user,
+        type,
+        subject,
+        headline,
+        body,
+        ctaLabel,
+      });
+    }
+
+    if (attendees.length < MEET_BROADCAST_BATCH_SIZE) break;
+    cursor = attendees[attendees.length - 1]?.id;
   }
 }
 
