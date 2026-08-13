@@ -7,6 +7,8 @@ SUPERCAR DASH treats database network transfer as a limited production resource.
 - `npm run db:usage-report` prints query, table-size, and row-count diagnostics.
 - `npm run db:usage-reset` resets PostgreSQL query statistics before a controlled measurement window.
 - `npm run db:usage-check` fails when a known expensive query shape exceeds its production limit.
+- `npm run db:usage-snapshot` stores the current production counters as a local baseline.
+- `npm run db:usage-compare` ranks traffic since that baseline by incremental rows, calls, and execution time.
 
 Run the check after a representative production traffic window and before downgrading the Neon plan.
 
@@ -28,7 +30,11 @@ The 688-row make/model selector is intentionally cached for 24 hours and does no
 2. Run `npm run db:usage-reset`.
 3. Exercise homepage, inventory, parts, makes, clubs, garage, passport, transactions, and admin pages.
 4. Allow normal production traffic to run for several hours.
-5. Run `npm run db:usage-report` and `npm run db:usage-check`.
-6. Investigate every failure before increasing a threshold.
+5. Run `npm run db:usage-snapshot` after the controlled route trace establishes a clean baseline.
+6. After the normal traffic window, run `npm run db:usage-compare`.
+7. Run `npm run db:usage-report` and `npm run db:usage-check` for the full diagnostic and guardrails.
+8. Investigate every failure before increasing a threshold.
+
+Snapshots are written under `.neon-usage/` and remain local because they contain production SQL shapes. If Neon suspends or restarts the compute, PostgreSQL may reset its counters; the comparison command detects this and asks for a fresh baseline instead of reporting misleading negative deltas.
 
 Thresholds are architecture limits, not alerts to dismiss. Raise one only when the associated UX intentionally requires a larger bounded result and the projected Neon transfer remains acceptable.

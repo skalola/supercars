@@ -12,6 +12,8 @@
     "db:usage-report": "tsx --env-file .env scripts/db-usage-report.ts",
     "db:usage-reset": "tsx --env-file .env scripts/db-usage-report.ts --reset",
     "db:usage-check": "tsx --env-file .env scripts/check-db-usage.ts",
+    "db:usage-snapshot": "tsx --env-file .env scripts/db-usage-snapshot.ts --write=.neon-usage/baseline.json",
+    "db:usage-compare": "tsx --env-file .env scripts/db-usage-snapshot.ts --compare=.neon-usage/baseline.json",
     "refresh-market-summaries": "tsx --env-file .env scripts/refresh-market-model-summaries.ts",
     "crawl-inventory": "tsx --env-file .env scripts/crawl-inventory.ts",
     "refresh-inventory-weekly": "npm run refresh-official-dealers && tsx --env-file .env scripts/weekly-inventory-refresh.ts",
