@@ -39,6 +39,8 @@ The compact public parts shell is cached for 24 hours and invalidated immediatel
 
 Snapshots are written under `.neon-usage/` and remain local because they contain production SQL shapes. If Neon suspends or restarts the compute, PostgreSQL may reset its counters; the comparison command detects this and asks for a fresh baseline instead of reporting misleading negative deltas.
 
+Usage-tool health queries are tagged with `supercar_dash_usage_diagnostic` and excluded from reports, snapshots, comparisons, and guardrails. Core row counts are collected in one tagged query, so running the diagnostics does not masquerade as application traffic or add a dozen independent count calls to the measured window.
+
 Thresholds are architecture limits, not alerts to dismiss. Raise one only when the associated UX intentionally requires a larger bounded result and the projected Neon transfer remains acceptable.
 
 The shared make/model selector is intentionally a full taxonomy read. It is cached for 24 hours and guarded at 1,000 rows per cache fill. A single narrow catalog hydration is expected; repeated catalog calls in the production comparison indicate cache invalidation or deployment churn and should be investigated before splitting the selector into additional requests.

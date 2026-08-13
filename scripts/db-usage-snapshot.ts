@@ -67,6 +67,7 @@ async function captureSnapshot(): Promise<UsageSnapshot> {
         OR query ILIKE '%from public.%'
         OR query ILIKE '%from "public".%'
       )
+      AND query NOT ILIKE ('%' || 'supercar_dash_usage_' || 'diagnostic' || '%')
   `;
 
   return {

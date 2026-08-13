@@ -39,19 +39,24 @@ async function main() {
   console.log("\nSUPERCAR DASH Neon Usage Guardrail\n");
 
   const stats = await getQueryStats();
-  const publicPartCount = await prisma.performancePart.count({
-    where: {
-      status: "ACTIVE",
-      sourceUrl: { not: null },
-      sourceConfidence: "SOURCE_VERIFIED",
-      imageUrl: { not: null },
-      compatibility: {
-        some: {
-          OR: [{ makeId: { not: null } }, { modelId: { not: null } }],
-        },
-      },
-    },
-  });
+  const [publicPartCountRow] = await prisma.$queryRaw<Array<{ count: bigint }>>`
+    WITH supercar_dash_usage_diagnostic AS (
+      SELECT count(*) AS count
+      FROM "public"."PerformancePart" part
+      WHERE part.status = 'ACTIVE'
+        AND part."sourceUrl" IS NOT NULL
+        AND part."sourceConfidence" = 'SOURCE_VERIFIED'
+        AND part."imageUrl" IS NOT NULL
+        AND EXISTS (
+          SELECT 1
+          FROM "public"."PartCompatibility" compatibility
+          WHERE compatibility."partId" = part.id
+            AND (compatibility."makeId" IS NOT NULL OR compatibility."modelId" IS NOT NULL)
+        )
+    )
+    SELECT count FROM supercar_dash_usage_diagnostic
+  `;
+  const publicPartCount = Number(publicPartCountRow?.count ?? 0);
 
   const findings = evaluateQueryStats(stats);
   console.log(`Observed query shapes: ${stats.length.toLocaleString()}`);
@@ -99,6 +104,7 @@ async function getQueryStats(): Promise<QueryStat[]> {
           OR query ILIKE '%from public.%'
           OR query ILIKE '%from "public".%'
         )
+        AND query NOT ILIKE ('%' || 'supercar_dash_usage_' || 'diagnostic' || '%')
     `;
 
     return rows.map((row) => ({

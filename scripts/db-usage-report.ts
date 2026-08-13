@@ -24,6 +24,11 @@ type PgStatInfoRow = {
   stats_reset: Date | string | null;
 };
 
+type CoreCountRow = {
+  label: string;
+  row_count: bigint | number;
+};
+
 const RISK_AREAS = [
   {
     area: "Make / Model Catalog Growth",
@@ -51,6 +56,7 @@ const APPLICATION_QUERY_FILTER = `
     OR query ILIKE '%from public.%'
     OR query ILIKE '%from "public".%'
   )
+  AND query NOT ILIKE ('%' || 'supercar_dash_usage_' || 'diagnostic' || '%')
 `;
 
 const shouldReset = process.argv.includes("--reset");
@@ -230,43 +236,27 @@ async function reportTableSizes() {
 
 async function reportCoreCounts() {
   console.log("3. Core Row Counts\n");
-  const counts = await Promise.allSettled([
-    prisma.user.count(),
-    prisma.vehicle.count(),
-    prisma.listing.count(),
-    prisma.partnerContact.count(),
-    prisma.model.count(),
-    prisma.modelImage.count(),
-    prisma.performancePart.count(),
-    prisma.partCompatibility.count(),
-    prisma.vehiclePhoto.count(),
-    prisma.serviceRecord.count(),
-    prisma.carClub.count(),
-    prisma.meet.count(),
-  ]);
+  const counts = await prisma.$queryRawUnsafe<CoreCountRow[]>(`
+    WITH supercar_dash_usage_diagnostic AS (
+      SELECT 'Users' AS label, count(*) AS row_count FROM "public"."User"
+      UNION ALL SELECT 'Vehicles', count(*) FROM "public"."Vehicle"
+      UNION ALL SELECT 'Listings', count(*) FROM "public"."Listing"
+      UNION ALL SELECT 'Partner contacts', count(*) FROM "public"."PartnerContact"
+      UNION ALL SELECT 'Models', count(*) FROM "public"."Model"
+      UNION ALL SELECT 'Model images', count(*) FROM "public"."ModelImage"
+      UNION ALL SELECT 'Performance parts', count(*) FROM "public"."PerformancePart"
+      UNION ALL SELECT 'Part compatibility rows', count(*) FROM "public"."PartCompatibility"
+      UNION ALL SELECT 'Owner vehicle photos', count(*) FROM "public"."VehiclePhoto"
+      UNION ALL SELECT 'Service records', count(*) FROM "public"."ServiceRecord"
+      UNION ALL SELECT 'Car clubs', count(*) FROM "public"."CarClub"
+      UNION ALL SELECT 'Meets', count(*) FROM "public"."Meet"
+    )
+    SELECT label, row_count FROM supercar_dash_usage_diagnostic
+  `);
 
-  const labels = [
-    "Users",
-    "Vehicles",
-    "Listings",
-    "Partner contacts",
-    "Models",
-    "Model images",
-    "Performance parts",
-    "Part compatibility rows",
-    "Owner vehicle photos",
-    "Service records",
-    "Car clubs",
-    "Meets",
-  ];
-
-  counts.forEach((result, index) => {
-    if (result.status === "fulfilled") {
-      console.log(`- ${labels[index]}: ${result.value.toLocaleString()}`);
-    } else {
-      console.log(`- ${labels[index]}: unavailable (${result.reason instanceof Error ? result.reason.message : result.reason})`);
-    }
-  });
+  for (const row of counts) {
+    console.log(`- ${row.label}: ${Number(row.row_count).toLocaleString()}`);
+  }
   console.log("");
 }
 
