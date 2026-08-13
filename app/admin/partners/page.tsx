@@ -4,7 +4,7 @@ import { AdminPagination, parseAdminPage } from "@/components/admin/AdminPaginat
 import { requireAdmin } from "@/lib/admin/auth";
 import { ADMIN_DIRECTORY_PAGE_SIZE, getAdminDirectoryPage } from "@/lib/admin/directory-ops";
 import { formatCityState, normalizePartnerLocation, normalizePhoneNumber } from "@/lib/directory/partner-contact-format";
-import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
+import { getCatalogMakeOptions } from "@/lib/makes/catalog";
 
 const allowedTypes = new Set<DirectoryVendorType>([
   "DEALER",
@@ -36,7 +36,7 @@ export default async function AdminPartnersPage({
   const latitude = parseCoordinate(params?.lat, -90, 90);
   const longitude = parseCoordinate(params?.lng, -180, 180);
 
-  const catalog = await getMakeModelCatalogOptions();
+  const makeOptions = await getCatalogMakeOptions();
   const firstResult = await getAdminDirectoryPage({ type, make, location, latitude, longitude }, requestedPage);
   const totalPages = Math.max(1, Math.ceil(firstResult.totalCount / ADMIN_DIRECTORY_PAGE_SIZE));
   const page = Math.min(requestedPage, totalPages);
@@ -78,12 +78,12 @@ export default async function AdminPartnersPage({
             Admin-only fulfillment contacts for dealers, service shops, transport providers, and insurance partners.
           </p>
         </div>
-        <AdminDirectoryActions makeOptions={catalog.makes} />
+        <AdminDirectoryActions makeOptions={makeOptions} />
       </section>
 
       <DirectoryTabs
         vendors={vendors}
-        makeOptions={catalog.makes}
+        makeOptions={makeOptions}
         activeTab={type}
         makeFilter={make}
         locationFilter={location}

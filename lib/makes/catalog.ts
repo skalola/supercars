@@ -84,3 +84,28 @@ export const getCatalogMakeNames = unstable_cache(
   ["catalog-make-names-v1"],
   { revalidate: 86_400, tags: ["make-model-catalog"] }
 );
+
+export const getCatalogMakeOptions = unstable_cache(
+  async () => {
+    const makes = await prisma.make.findMany({
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        region: true,
+        logoUrl: true,
+      },
+      orderBy: [
+        { region: "asc" },
+        { name: "asc" },
+      ],
+    });
+
+    return makes.map((make): MakeOption => ({
+      ...make,
+      name: make.name.trim(),
+    }));
+  },
+  ["catalog-make-options-v1"],
+  { revalidate: 86_400, tags: ["make-model-catalog"] }
+);
