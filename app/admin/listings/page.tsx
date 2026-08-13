@@ -2,7 +2,6 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { ADMIN_LISTINGS_PAGE_SIZE, getAdminInventoryListingCount, getAdminInventoryListings } from "@/lib/admin/listing-filters";
 import { AdminListingsTable, AdminListingRow } from "@/components/admin/AdminListingsTable";
 import { AdminPagination, parseAdminPage } from "@/components/admin/AdminPagination";
-import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
 
 function formatDate(value: Date) {
   return new Intl.DateTimeFormat("en-US", {
@@ -34,10 +33,7 @@ export default async function AdminListingsPage({
   await requireAdmin();
   const requestedPage = parseAdminPage((await searchParams)?.page);
 
-  const [totalListings, catalog] = await Promise.all([
-    getAdminInventoryListingCount(),
-    getMakeModelCatalogOptions(),
-  ]);
+  const totalListings = await getAdminInventoryListingCount();
   const totalPages = Math.max(1, Math.ceil(totalListings / ADMIN_LISTINGS_PAGE_SIZE));
   const page = Math.min(requestedPage, totalPages);
   const listings = await getAdminInventoryListings(page);
@@ -80,7 +76,7 @@ export default async function AdminListingsPage({
 
   return (
     <main className="page-shell wide">
-      <AdminListingsTable listings={rows} totalCount={totalListings} referenceTimeIso={referenceTimeIso} makes={catalog.makes} models={catalog.models} />
+      <AdminListingsTable listings={rows} totalCount={totalListings} referenceTimeIso={referenceTimeIso} />
       <AdminPagination pathname="/admin/listings" page={page} totalPages={totalPages} />
     </main>
   );

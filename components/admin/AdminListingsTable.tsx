@@ -2,7 +2,6 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { removeListingAction, unpublishListingAction } from "@/app/actions/admin-management";
-import type { MakeOption, ModelOption } from "@/lib/makes/catalog";
 
 export type AdminListingRow = {
   id: string;
@@ -33,14 +32,10 @@ export function AdminListingsTable({
   listings,
   totalCount,
   referenceTimeIso,
-  makes,
-  models,
 }: {
   listings: AdminListingRow[];
   totalCount: number;
   referenceTimeIso: string;
-  makes: MakeOption[];
-  models: ModelOption[];
 }) {
   const [isPending, startTransition] = useTransition();
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -55,17 +50,17 @@ export function AdminListingsTable({
   const [dateFilter, setDateFilter] = useState("");
 
   const makeOptions = useMemo(
-    () => makes.map((make) => make.name).sort((a, b) => a.localeCompare(b)),
-    [makes]
+    () => Array.from(new Set(listings.map((listing) => listing.make))).sort((a, b) => a.localeCompare(b)),
+    [listings]
   );
   const modelOptions = useMemo(
     () =>
-      models
-        .filter((model) => !makeFilter || model.make.name === makeFilter)
-        .map((model) => model.name)
+      listings
+        .filter((listing) => !makeFilter || listing.make === makeFilter)
+        .map((listing) => listing.model)
         .filter((model, index, allModels) => allModels.indexOf(model) === index)
         .sort((a, b) => a.localeCompare(b)),
-    [makeFilter, models]
+    [listings, makeFilter]
   );
   const yearOptions = useMemo(
     () => Array.from(new Set(listings.map((listing) => listing.year))).sort((a, b) => b - a),
