@@ -100,6 +100,25 @@ type OpenverseImageResponse = {
   }>;
 };
 
+type CandidateInput = {
+  makeName: string;
+  url: string;
+  source: string;
+  sourceName: string | null;
+  sourceUrl: string | null;
+  license: string | null;
+  attribution: string | null;
+  attributionUrl: string | null;
+  title: string | null;
+  category: string | null;
+  context: string | null;
+  baseModelName: string | null;
+};
+
+type ExistingCandidate = CandidateInput & {
+  id: string;
+};
+
 const OPENVERSE_LICENSES = ["cc0", "by", "by-sa", "by-nc", "by-nc-sa", "pdm"];
 
 async function main() {
@@ -130,7 +149,14 @@ async function main() {
 
   let candidatesCreated = 0;
   let candidatesUpdated = 0;
+  let candidatesUnchanged = 0;
   let categoriesScanned = 0;
+
+  const countCandidateResult = (result: { created: boolean; updated: boolean }) => {
+    candidatesCreated += result.created ? 1 : 0;
+    candidatesUpdated += result.updated ? 1 : 0;
+    candidatesUnchanged += !result.created && !result.updated ? 1 : 0;
+  };
 
   for (const make of makes) {
     const missingModels = make.models.filter((model) => !model.images.some((image) => image.type?.toLowerCase() !== "candidate" && image.reviewStatus !== "NEEDS_REVIEW"));
@@ -165,8 +191,7 @@ async function main() {
             context: `${category.title} ${title}`,
             baseModelName: inferBestBaseFamily(`${category.title} ${title}`, baseFamilies),
           });
-          candidatesCreated += result.created ? 1 : 0;
-          candidatesUpdated += result.created ? 0 : 1;
+          countCandidateResult(result);
         }
         await sleep(options.delayMs);
       }
@@ -200,8 +225,7 @@ async function main() {
           context: `${query} ${title} ${file.snippet || ""}`,
           baseModelName: inferBestBaseFamily(`${query} ${title} ${file.snippet || ""}`, baseFamilies),
         });
-        candidatesCreated += result.created ? 1 : 0;
-        candidatesUpdated += result.created ? 0 : 1;
+        countCandidateResult(result);
       }
       await sleep(options.delayMs);
     }
@@ -241,8 +265,7 @@ async function main() {
               context: entityContext,
               baseModelName,
             });
-            candidatesCreated += result.created ? 1 : 0;
-            candidatesUpdated += result.created ? 0 : 1;
+            countCandidateResult(result);
           }
         }
 
@@ -267,8 +290,7 @@ async function main() {
               context: `${entityContext} ${title}`,
               baseModelName,
             });
-            candidatesCreated += result.created ? 1 : 0;
-            candidatesUpdated += result.created ? 0 : 1;
+            countCandidateResult(result);
           }
         }
         await sleep(options.delayMs);
@@ -293,8 +315,7 @@ async function main() {
           context: `${item.title || ""} ${(item.tags || []).map((tag) => tag.name).filter(Boolean).join(" ")} ${item.foreign_landing_url || ""}`,
           baseModelName: family,
         });
-        candidatesCreated += result.created ? 1 : 0;
-        candidatesUpdated += result.created ? 0 : 1;
+        countCandidateResult(result);
       }
       await sleep(options.delayMs);
     }
@@ -303,6 +324,7 @@ async function main() {
   console.log(`[model-image-pool] Categories scanned: ${categoriesScanned}`);
   console.log(`[model-image-pool] Candidates created: ${candidatesCreated}`);
   console.log(`[model-image-pool] Candidates updated: ${candidatesUpdated}`);
+  console.log(`[model-image-pool] Candidates unchanged: ${candidatesUnchanged}`);
 }
 
 async function searchWikidataEntities(query: string) {
@@ -364,53 +386,79 @@ async function searchCommonsFiles(query: string) {
     .sort((a, b) => scoreContext(`${b.title} ${b.snippet || ""}`, query) - scoreContext(`${a.title} ${a.snippet || ""}`, query));
 }
 
-async function upsertCandidate(execute: boolean, input: {
-  makeName: string;
-  url: string;
-  source: string;
-  sourceName: string;
-  sourceUrl: string | null;
-  license: string | null;
-  attribution: string | null;
-  attributionUrl: string | null;
-  title: string | null;
-  category: string | null;
-  context: string | null;
-  baseModelName: string | null;
-}) {
-  if (!execute) return { created: false };
+const existingCandidateCaches = new Map<string, Promise<Map<string, ExistingCandidate>>>();
 
-  const existing = await prisma.modelImageCandidate.findUnique({
-    where: {
-      source_url_makeName: {
-        source: input.source,
-        url: input.url,
-        makeName: input.makeName,
-      },
-    },
-  });
-  const data = {
-    makeName: input.makeName,
-    url: input.url,
-    source: input.source,
-    sourceName: input.sourceName,
-    sourceUrl: input.sourceUrl,
-    license: input.license,
-    attribution: input.attribution,
-    attributionUrl: input.attributionUrl,
-    title: input.title,
-    category: input.category,
-    context: input.context,
-    baseModelName: input.baseModelName,
-  };
+async function upsertCandidate(execute: boolean, input: CandidateInput) {
+  if (!execute) return { created: false, updated: false };
 
-  if (existing) {
-    await prisma.modelImageCandidate.update({ where: { id: existing.id }, data });
-    return { created: false };
+  const cache = await getExistingCandidateCache(input.makeName);
+  const key = candidateKey(input);
+  const existing = cache.get(key);
+
+  if (existing && candidateMetadataMatches(existing, input)) {
+    return { created: false, updated: false };
   }
 
-  await prisma.modelImageCandidate.create({ data });
-  return { created: true };
+  if (existing) {
+    await prisma.modelImageCandidate.update({
+      where: { id: existing.id },
+      data: input,
+    });
+    cache.set(key, { id: existing.id, ...input });
+    return { created: false, updated: true };
+  }
+
+  const created = await prisma.modelImageCandidate.create({
+    data: input,
+    select: { id: true },
+  });
+  cache.set(key, { id: created.id, ...input });
+  return { created: true, updated: false };
+}
+
+function getExistingCandidateCache(makeName: string) {
+  const cached = existingCandidateCaches.get(makeName);
+  if (cached) return cached;
+
+  const pending = prisma.modelImageCandidate.findMany({
+    where: { makeName },
+    select: {
+      id: true,
+      makeName: true,
+      url: true,
+      source: true,
+      sourceName: true,
+      sourceUrl: true,
+      license: true,
+      attribution: true,
+      attributionUrl: true,
+      title: true,
+      category: true,
+      context: true,
+      baseModelName: true,
+    },
+  }).then((rows) => new Map(rows.map((row) => [candidateKey(row), row])));
+
+  existingCandidateCaches.set(makeName, pending);
+  return pending;
+}
+
+function candidateKey(candidate: Pick<CandidateInput, "source" | "url" | "makeName">) {
+  return `${candidate.source}\u0000${candidate.url}\u0000${candidate.makeName}`;
+}
+
+function candidateMetadataMatches(existing: ExistingCandidate, input: CandidateInput) {
+  return (
+    existing.sourceName === input.sourceName &&
+    existing.sourceUrl === input.sourceUrl &&
+    existing.license === input.license &&
+    existing.attribution === input.attribution &&
+    existing.attributionUrl === input.attributionUrl &&
+    existing.title === input.title &&
+    existing.category === input.category &&
+    existing.context === input.context &&
+    existing.baseModelName === input.baseModelName
+  );
 }
 
 async function searchCommonsCategories(query: string) {
