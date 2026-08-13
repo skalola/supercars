@@ -65,13 +65,9 @@ export default async function AdminOverviewPage({
     activeSessionRows,
     liveInventoryStats,
     partnerCoverage,
-    recentTransactions,
-    recentVolume,
+    recentStats,
     previousVolume,
-    pendingFulfillmentCount,
-    acceptedOpenCount,
     fulfillmentByStatus,
-    fulfillmentByType,
     fulfillmentVolumeByType,
     salesRequestStats,
     completedSalesStats,
@@ -83,11 +79,9 @@ export default async function AdminOverviewPage({
       `,
       getLiveInventoryListingStats(),
       getAdminPartnerCoverageStats(),
-      prisma.fulfillmentRequest.count({
-        where: withRealFulfillmentWhere({ createdAt: { gte: recentWindowStart } }),
-      }),
       prisma.fulfillmentRequest.aggregate({
         where: withRealFulfillmentWhere({ createdAt: { gte: recentWindowStart } }),
+        _count: { id: true },
         _sum: { collectedAmount: true },
       }),
       prisma.fulfillmentRequest.aggregate({
@@ -96,19 +90,8 @@ export default async function AdminOverviewPage({
         }),
         _sum: { collectedAmount: true },
       }),
-      prisma.fulfillmentRequest.count({
-        where: withRealFulfillmentWhere({ status: { in: ["READY_TO_SEND", "SENT", "VIEWED"] } }),
-      }),
-      prisma.fulfillmentRequest.count({
-        where: withRealFulfillmentWhere({ status: "ACCEPTED" }),
-      }),
       prisma.fulfillmentRequest.groupBy({
         by: ["status"],
-        where: realFulfillmentWhere,
-        _count: { id: true },
-      }),
-      prisma.fulfillmentRequest.groupBy({
-        by: ["requestType"],
         where: realFulfillmentWhere,
         _count: { id: true },
       }),
@@ -159,7 +142,8 @@ export default async function AdminOverviewPage({
 
   const activeSessionCount = activeSessionRows[0]?.count ?? 0;
   const activeListingCount = liveInventoryStats.liveListingCount;
-  const recentTransactionAmount = recentVolume._sum.collectedAmount || 0;
+  const recentTransactions = recentStats._count.id;
+  const recentTransactionAmount = recentStats._sum.collectedAmount || 0;
   const previousTransactionAmount = previousVolume._sum.collectedAmount || 0;
   const volumeDelta = recentTransactionAmount - previousTransactionAmount;
   const totalInventoryValue = liveInventoryStats.totalLiveListingValue;
@@ -176,8 +160,12 @@ export default async function AdminOverviewPage({
     .map((row) => ({ label: row.status, value: row._count.id }))
     .sort((a, b) => b.value - a.value);
   const pipelineTotal = pipelineRows.reduce((sum, row) => sum + row.value, 0);
+  const pendingFulfillmentCount = fulfillmentByStatus
+    .filter((row) => ["READY_TO_SEND", "SENT", "VIEWED"].includes(row.status))
+    .reduce((sum, row) => sum + row._count.id, 0);
+  const acceptedOpenCount = fulfillmentByStatus.find((row) => row.status === "ACCEPTED")?._count.id ?? 0;
 
-  const requestTypeRows = fulfillmentByType
+  const requestTypeRows = fulfillmentVolumeByType
     .map((row) => ({ label: row.requestType.replace("_", " "), value: row._count.id }))
     .sort((a, b) => b.value - a.value);
   const requestTypeTotal = requestTypeRows.reduce((sum, row) => sum + row.value, 0);
