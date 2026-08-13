@@ -31,6 +31,7 @@ const LIMITS = {
   broadVehicleAverageRows: 100,
   listingAverageRows: 200,
   publicPartsPageAverageRows: 24,
+  publicPartsCompatibilityAverageRows: 288,
   makeModelCatalogAverageRows: 1_000,
 } as const;
 
@@ -166,6 +167,15 @@ function evaluateQueryStats(stats: QueryStat[]): Finding[] {
       continue;
     }
 
+    if (isPublicPartsCompatibilityQuery(normalized) && stat.averageRows > LIMITS.publicPartsCompatibilityAverageRows) {
+      findings.push({
+        level: "FAIL",
+        message: `Public parts compatibility fanout returned more than ${LIMITS.publicPartsCompatibilityAverageRows} rows per 24-product page.`,
+        query: stat,
+      });
+      continue;
+    }
+
     if (stat.averageRows > LIMITS.anyQueryAverageRows) {
       findings.push({
         level: "FAIL",
@@ -200,6 +210,12 @@ function isMakeModelCatalogQuery(query: string) {
   return /^SELECT /i.test(query)
     && (/FROM "public"\."Make"/i.test(query) || /FROM "public"\."Model"/i.test(query))
     && /ORDER BY /i.test(query);
+}
+
+function isPublicPartsCompatibilityQuery(query: string) {
+  return /^SELECT /i.test(query)
+    && /FROM "public"\."PartCompatibility"/i.test(query)
+    && /"partId" IN/i.test(query);
 }
 
 function countSelectedColumns(query: string) {

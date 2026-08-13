@@ -42,3 +42,5 @@ Snapshots are written under `.neon-usage/` and remain local because they contain
 Thresholds are architecture limits, not alerts to dismiss. Raise one only when the associated UX intentionally requires a larger bounded result and the projected Neon transfer remains acceptable.
 
 The shared make/model selector is intentionally a full taxonomy read. It is cached for 24 hours and guarded at 1,000 rows per cache fill. A single narrow catalog hydration is expected; repeated catalog calls in the production comparison indicate cache invalidation or deployment churn and should be investigated before splitting the selector into additional requests.
+
+The public parts storefront reads fitment labels with narrow SQL joins rather than Prisma relation hydration. This avoids separate Make and Model fanout queries while preserving the same API shape. A 24-product page may return at most 288 compatibility rows before the usage guardrail fails.

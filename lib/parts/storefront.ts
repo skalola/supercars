@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import type {
   PartsBrandRow,
   PartsCategoryRow,
@@ -75,6 +75,24 @@ type StorePartCompatibility = {
   model: { name: string } | null;
 };
 
+type StoreFitmentOption = {
+  makeId: string | null;
+  makeName: string | null;
+  modelId: string | null;
+  modelName: string | null;
+  modelMakeId: string | null;
+};
+
+type StoreCompatibilityRow = {
+  partId: string;
+  makeId: string | null;
+  modelId: string | null;
+  yearStart: number | null;
+  yearEnd: number | null;
+  makeName: string | null;
+  modelName: string | null;
+};
+
 export async function getPublicPartsStoreShell() {
   const [categories, brands, fitments, catalogNodeCount] = await Promise.all([
     prisma.partCategory.findMany({
@@ -94,16 +112,7 @@ export async function getPublicPartsStoreShell() {
       },
       orderBy: { name: "asc" },
     }),
-    prisma.partCompatibility.findMany({
-      where: { part: publicPartsWhere },
-      select: {
-        makeId: true,
-        modelId: true,
-        make: { select: { name: true } },
-        model: { select: { name: true, makeId: true } },
-      },
-      distinct: ["makeId", "modelId"],
-    }),
+    getPublicFitmentOptions(),
     prisma.partCatalogNode.count({
       where: { active: true, placeholderOnly: true, categoryId: { not: null } },
     }),
@@ -119,14 +128,15 @@ export async function getPublicPartsStoreShell() {
   const modelMap = new Map<string, { id: string; name: string; makeId: string }>();
 
   for (const fitment of fitments) {
-    if (fitment.makeId && fitment.make?.name) {
-      makeMap.set(fitment.makeId, { id: fitment.makeId, name: fitment.make.name });
+    const effectiveMakeId = fitment.makeId ?? fitment.modelMakeId;
+    if (effectiveMakeId && fitment.makeName) {
+      makeMap.set(effectiveMakeId, { id: effectiveMakeId, name: fitment.makeName });
     }
-    if (fitment.modelId && fitment.model?.name) {
+    if (fitment.modelId && fitment.modelName && fitment.modelMakeId) {
       modelMap.set(fitment.modelId, {
         id: fitment.modelId,
-        name: fitment.model.name,
-        makeId: fitment.model.makeId,
+        name: fitment.modelName,
+        makeId: fitment.modelMakeId,
       });
     }
   }
@@ -231,19 +241,52 @@ function buildPartsWhere(filters: PartsStoreFilters): Prisma.PerformancePartWher
 
 async function getCompatibility(partIds: string[]) {
   if (partIds.length === 0) return [];
-  return prisma.partCompatibility.findMany({
-    where: { partId: { in: partIds } },
-    select: {
-      partId: true,
-      makeId: true,
-      modelId: true,
-      yearStart: true,
-      yearEnd: true,
-      make: { select: { name: true } },
-      model: { select: { name: true } },
-    },
-    orderBy: { createdAt: "asc" },
-  });
+  const rows = await prisma.$queryRaw<StoreCompatibilityRow[]>(Prisma.sql`
+    SELECT
+      compatibility."partId" AS "partId",
+      compatibility."makeId" AS "makeId",
+      compatibility."modelId" AS "modelId",
+      compatibility."yearStart" AS "yearStart",
+      compatibility."yearEnd" AS "yearEnd",
+      make.name AS "makeName",
+      model.name AS "modelName"
+    FROM "public"."PartCompatibility" compatibility
+    LEFT JOIN "public"."Make" make ON make.id = compatibility."makeId"
+    LEFT JOIN "public"."Model" model ON model.id = compatibility."modelId"
+    WHERE compatibility."partId" IN (${Prisma.join(partIds)})
+    ORDER BY compatibility."createdAt" ASC
+  `);
+
+  return rows.map((row) => ({
+    partId: row.partId,
+    makeId: row.makeId,
+    modelId: row.modelId,
+    yearStart: row.yearStart,
+    yearEnd: row.yearEnd,
+    make: row.makeName ? { name: row.makeName } : null,
+    model: row.modelName ? { name: row.modelName } : null,
+  }));
+}
+
+async function getPublicFitmentOptions() {
+  return prisma.$queryRaw<StoreFitmentOption[]>(Prisma.sql`
+    SELECT DISTINCT
+      compatibility."makeId" AS "makeId",
+      make.name AS "makeName",
+      compatibility."modelId" AS "modelId",
+      model.name AS "modelName",
+      model."makeId" AS "modelMakeId"
+    FROM "public"."PartCompatibility" compatibility
+    INNER JOIN "public"."PerformancePart" part ON part.id = compatibility."partId"
+    LEFT JOIN "public"."Model" model ON model.id = compatibility."modelId"
+    LEFT JOIN "public"."Make" make ON make.id = COALESCE(compatibility."makeId", model."makeId")
+    WHERE part.status = 'ACTIVE'
+      AND part."sourceUrl" IS NOT NULL
+      AND part."sourceConfidence" = 'SOURCE_VERIFIED'
+      AND part."imageUrl" IS NOT NULL
+      AND (compatibility."makeId" IS NOT NULL OR compatibility."modelId" IS NOT NULL)
+    ORDER BY "makeName" ASC NULLS LAST, "modelName" ASC NULLS LAST
+  `);
 }
 
 function mapStorePartRow(part: StorePart, compatibility: StorePartCompatibility[]): PartsStorePartRow {
