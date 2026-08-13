@@ -2,7 +2,6 @@ import { Analytics } from "@vercel/analytics/next";
 import { auth } from "@/auth";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
-import { ensureDefaultClubMembership } from "@/lib/clubs/default-club";
 import { prisma } from "@/lib/prisma";
 import "./globals.css";
 
@@ -24,10 +23,6 @@ export default async function RootLayout({
   const garageHref = navUser?.username ? `/garage/${navUser.username}` : "/garage";
   const trackersHref = !isAdmin && navUser?.username ? `/garage/${navUser.username}/trackers` : null;
   const profileImageUrl = isAdmin ? null : navUser?.image || session?.user?.image || null;
-  if (session?.user?.id) {
-    await ensureDefaultClubMembership(session.user.id as string).catch(() => null);
-  }
-
   return (
     <html lang="en">
       <body>

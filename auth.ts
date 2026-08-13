@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import { ensureDefaultClubMembership } from "@/lib/clubs/default-club";
 import { prisma } from "@/lib/prisma";
 
 export const { handlers: { GET, POST }, auth, signIn, signOut } = NextAuth({
@@ -104,6 +105,15 @@ export const { handlers: { GET, POST }, auth, signIn, signOut } = NextAuth({
         session.user.role = (token.role as string) || "USER";
       }
       return session;
+    },
+  },
+  events: {
+    async signIn({ user }) {
+      if (!user.id) return;
+
+      await ensureDefaultClubMembership(user.id).catch((error) => {
+        console.error("Failed to ensure default club membership after sign-in", error);
+      });
     },
   },
 });
