@@ -5,6 +5,14 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import { ensureDefaultClubMembership } from "@/lib/clubs/default-club";
 import { prisma } from "@/lib/prisma";
 
+const credentialUserSelect = {
+  id: true,
+  email: true,
+  name: true,
+  image: true,
+  role: true,
+};
+
 export const { handlers: { GET, POST }, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: {
@@ -29,17 +37,10 @@ export const { handlers: { GET, POST }, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
-        const user = await prisma.user.upsert({
-          where: { email },
-          update: {
-            name: "SUPERCARS Admin",
-            role: "ADMIN",
-          },
-          create: {
-            email,
-            name: "SUPERCARS Admin",
-            role: "ADMIN",
-          },
+        const user = await getOrCreateCredentialUser({
+          email,
+          name: "SUPERCARS Admin",
+          role: "ADMIN",
         });
 
         return {
@@ -68,17 +69,10 @@ export const { handlers: { GET, POST }, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
-        const user = await prisma.user.upsert({
-          where: { email },
-          update: {
-            name: "SUPERCARS Test User",
-            role: "USER",
-          },
-          create: {
-            email,
-            name: "SUPERCARS Test User",
-            role: "USER",
-          },
+        const user = await getOrCreateCredentialUser({
+          email,
+          name: "SUPERCARS Test User",
+          role: "USER",
         });
 
         return {
@@ -117,5 +111,37 @@ export const { handlers: { GET, POST }, auth, signIn, signOut } = NextAuth({
     },
   },
 });
+
+async function getOrCreateCredentialUser({
+  email,
+  name,
+  role,
+}: {
+  email: string;
+  name: string;
+  role: "ADMIN" | "USER";
+}) {
+  const existing = await prisma.user.findUnique({
+    where: { email },
+    select: credentialUserSelect,
+  });
+
+  if (!existing) {
+    return prisma.user.create({
+      data: { email, name, role },
+      select: credentialUserSelect,
+    });
+  }
+
+  if (existing.name !== name || existing.role !== role) {
+    return prisma.user.update({
+      where: { id: existing.id },
+      data: { name, role },
+      select: credentialUserSelect,
+    });
+  }
+
+  return existing;
+}
 
 export type Session = ReturnType<typeof auth>;

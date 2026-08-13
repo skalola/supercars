@@ -58,3 +58,5 @@ Meet update and cancellation broadcasts fetch only RSVP IDs and recipient fields
 The admin marketing page reads all six automation settings in one query. It creates only missing defaults instead of running six upserts on every page view, and no-op toggle submissions do not write duplicate audit records.
 
 Default-club enrollment runs only after sign-in. The common already-enrolled path resolves the active membership and club identity in one relation query; additional reads and writes occur only when the default club or membership genuinely needs repair.
+
+Credential-based admin and regular test logins read the existing user once and update it only when the required role or display name differs. Routine successful logins no longer execute a no-op user upsert or advance the user row's `updatedAt` timestamp.
