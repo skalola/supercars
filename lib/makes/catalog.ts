@@ -109,3 +109,40 @@ export const getCatalogMakeOptions = unstable_cache(
   ["catalog-make-options-v1"],
   { revalidate: 86_400, tags: ["make-model-catalog"] }
 );
+
+export const getCatalogMakeWithModels = unstable_cache(
+  async (slug: string) => {
+    const make = await prisma.make.findUnique({
+      where: { slug },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        region: true,
+        logoUrl: true,
+        models: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            makeId: true,
+          },
+          orderBy: { name: "asc" },
+        },
+      },
+    });
+
+    if (!make) return null;
+
+    return {
+      ...make,
+      name: make.name.trim(),
+      models: make.models.map((model) => ({
+        ...model,
+        name: model.name.trim(),
+      })),
+    };
+  },
+  ["catalog-make-with-models-v1"],
+  { revalidate: 86_400, tags: ["make-model-catalog"] }
+);
