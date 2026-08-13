@@ -27,6 +27,8 @@ export type PartnerConfidence = "VERIFIED" | "PUBLIC_SOURCE" | "MANUAL_REVIEW" |
 export type ContactSource = "IMPORTED_LISTING" | "PUBLIC_WEBSITE" | "MANUALLY_VERIFIED";
 export type ContactStatus = "RESOLVED" | "UNRESOLVED_EMAIL";
 
+const PARTNER_VERIFICATION_HEARTBEAT_MS = 24 * 60 * 60 * 1000;
+
 export interface UpsertPartnerContactInput {
   name: string;
   type: PartnerType;
@@ -142,32 +144,43 @@ export async function upsertPartnerContact(input: UpsertPartnerContactInput) {
       existing.makeSpecialization && existing.makeSpecialization !== "ALL" && input.makeSpecialization && existing.makeSpecialization !== input.makeSpecialization
         ? existing.makeSpecialization
         : input.makeSpecialization || existing.makeSpecialization;
+    const nextContact = {
+      name: input.name,
+      type: input.type,
+      email: finalEmail,
+      phone: cleanPhone || existing.phone,
+      website: input.website || existing.website,
+      sourceDomain: sourceDomain || existing.sourceDomain,
+      makeSpecialization: finalMakeSpecialization,
+      location: location.location || existing.location,
+      streetAddress: location.streetAddress || existing.streetAddress,
+      city: location.city || existing.city,
+      state: location.state || existing.state,
+      postalCode: location.postalCode || existing.postalCode,
+      country: input.country || existing.country || "US",
+      latitude: input.latitude ?? existing.latitude,
+      longitude: input.longitude ?? existing.longitude,
+      active: input.active !== undefined ? input.active : existing.active,
+      contactSource,
+      confidence: finalConfidence,
+      contactStatus: finalStatus,
+      coverage: input.coverage || existing.coverage,
+      marketSourceId: finalMarketSourceId,
+    };
+    const verificationIsFresh = Boolean(
+      existing.lastVerifiedAt &&
+      Date.now() - existing.lastVerifiedAt.getTime() < PARTNER_VERIFICATION_HEARTBEAT_MS
+    );
+
+    if (verificationIsFresh && partnerContactMatches(existing, nextContact)) {
+      return existing;
+    }
 
     return prisma.partnerContact.update({
       where: { id: existing.id },
       data: {
-        name: input.name,
-        type: input.type,
-        email: finalEmail,
-        phone: cleanPhone || existing.phone,
-        website: input.website || existing.website,
-        sourceDomain: sourceDomain || existing.sourceDomain,
-        makeSpecialization: finalMakeSpecialization,
-        location: location.location || existing.location,
-        streetAddress: location.streetAddress || existing.streetAddress,
-        city: location.city || existing.city,
-        state: location.state || existing.state,
-        postalCode: location.postalCode || existing.postalCode,
-        country: input.country || existing.country || "US",
-        latitude: input.latitude ?? existing.latitude,
-        longitude: input.longitude ?? existing.longitude,
-        active: input.active !== undefined ? input.active : existing.active,
-        contactSource,
-        confidence: finalConfidence,
-        contactStatus: finalStatus,
-        coverage: input.coverage || existing.coverage,
+        ...nextContact,
         lastVerifiedAt: new Date(),
-        marketSourceId: finalMarketSourceId,
       },
     });
   }
@@ -200,6 +213,79 @@ export async function upsertPartnerContact(input: UpsertPartnerContactInput) {
       marketSourceId,
     },
   });
+}
+
+function partnerContactMatches(
+  existing: {
+    name: string;
+    type: string;
+    email: string | null;
+    phone: string | null;
+    website: string | null;
+    sourceDomain: string | null;
+    makeSpecialization: string | null;
+    location: string | null;
+    streetAddress: string | null;
+    city: string | null;
+    state: string | null;
+    postalCode: string | null;
+    country: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    active: boolean;
+    contactSource: string;
+    confidence: string;
+    contactStatus: string;
+    coverage: string;
+    marketSourceId: string | null;
+  },
+  next: {
+    name: string;
+    type: string;
+    email: string | null;
+    phone: string | null;
+    website: string | null;
+    sourceDomain: string | null;
+    makeSpecialization: string | null;
+    location: string | null;
+    streetAddress: string | null;
+    city: string | null;
+    state: string | null;
+    postalCode: string | null;
+    country: string;
+    latitude: number | null;
+    longitude: number | null;
+    active: boolean;
+    contactSource: string;
+    confidence: string;
+    contactStatus: string;
+    coverage: string;
+    marketSourceId: string | null;
+  }
+) {
+  return (
+    existing.name === next.name &&
+    existing.type === next.type &&
+    existing.email === next.email &&
+    existing.phone === next.phone &&
+    existing.website === next.website &&
+    existing.sourceDomain === next.sourceDomain &&
+    existing.makeSpecialization === next.makeSpecialization &&
+    existing.location === next.location &&
+    existing.streetAddress === next.streetAddress &&
+    existing.city === next.city &&
+    existing.state === next.state &&
+    existing.postalCode === next.postalCode &&
+    existing.country === next.country &&
+    existing.latitude === next.latitude &&
+    existing.longitude === next.longitude &&
+    existing.active === next.active &&
+    existing.contactSource === next.contactSource &&
+    existing.confidence === next.confidence &&
+    existing.contactStatus === next.contactStatus &&
+    existing.coverage === next.coverage &&
+    existing.marketSourceId === next.marketSourceId
+  );
 }
 
 async function resolveContactMarketSourceId(
