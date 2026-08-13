@@ -48,3 +48,5 @@ The shared make/model selector is intentionally a full taxonomy read. It is cach
 The public parts storefront reads fitment labels with narrow SQL joins rather than Prisma relation hydration. This avoids separate Make and Model fanout queries while preserving the same API shape. A 24-product page may return at most 288 compatibility rows before the usage guardrail fails.
 
 Maintenance tracker processing uses deterministic keyset batches of 100 claimed vehicles, with a hard maximum of 250. The processor continues through every eligible vehicle instead of rereading an arbitrary first 500, and caches maintenance rules across batches for the duration of the run. This keeps each Neon response bounded without allowing later users to be skipped as ownership grows.
+
+Meet reminder processing uses deterministic RSVP keyset batches of 100, with a hard maximum of 250. Existing reminder records are checked per batch, so event growth cannot create a single 500-row relation payload or permanently exclude attendees beyond an arbitrary first page. Past-meet completion remains one set-based update.
