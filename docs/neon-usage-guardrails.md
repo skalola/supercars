@@ -46,3 +46,5 @@ Thresholds are architecture limits, not alerts to dismiss. Raise one only when t
 The shared make/model selector is intentionally a full taxonomy read. It is cached for 24 hours and guarded at 1,000 rows per cache fill. A single narrow catalog hydration is expected; repeated catalog calls in the production comparison indicate cache invalidation or deployment churn and should be investigated before splitting the selector into additional requests.
 
 The public parts storefront reads fitment labels with narrow SQL joins rather than Prisma relation hydration. This avoids separate Make and Model fanout queries while preserving the same API shape. A 24-product page may return at most 288 compatibility rows before the usage guardrail fails.
+
+Maintenance tracker processing uses deterministic keyset batches of 100 claimed vehicles, with a hard maximum of 250. The processor continues through every eligible vehicle instead of rereading an arbitrary first 500, and caches maintenance rules across batches for the duration of the run. This keeps each Neon response bounded without allowing later users to be skipped as ownership grows.
