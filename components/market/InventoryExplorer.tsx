@@ -198,12 +198,13 @@ export default function InventoryExplorer({
           <label>Model</label>
           <select
             value={selectedModelId}
+            disabled={!selectedMakeId}
             onChange={(e) => {
               const model = models.find((m) => m.id === e.target.value);
               updateFilters({ model: model?.slug || null });
             }}
           >
-            <option value="">All Models</option>
+            <option value="">{selectedMakeId ? "All Models" : "Choose Make First"}</option>
             {filteredModels.map((m) => (
               <option key={m.id} value={m.id}>{m.name}</option>
             ))}

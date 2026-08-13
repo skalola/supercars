@@ -3,7 +3,12 @@ import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import InventoryExplorer from "@/components/market/InventoryExplorer";
-import { getMakeModelCatalogOptions, type MakeOption, type ModelOption } from "@/lib/makes/catalog";
+import {
+  getCatalogMakeOptions,
+  getCatalogMakeWithModels,
+  type MakeOption,
+  type ModelOption,
+} from "@/lib/makes/catalog";
 import { isNonVehicleImageUrl } from "@/lib/vehicle-images";
 
 type InventoryPageProps = {
@@ -22,13 +27,21 @@ const SUPPORTED_INVENTORY_MAKES = ["Ferrari", "Lamborghini", "McLaren"];
 
 export default async function InventoryPage({ searchParams }: InventoryPageProps) {
   const resolvedSearchParams = (await searchParams) || {};
-  const [{ makes: mappedMakes, models: mappedModels }, session] = await Promise.all([
-    getMakeModelCatalogOptions(),
+  const [mappedMakes, session] = await Promise.all([
+    getCatalogMakeOptions(),
     auth(),
   ]);
 
   const isAdmin = session?.user?.role === "ADMIN";
   const selectedMakeId = resolveMakeId(mappedMakes, resolvedSearchParams.make);
+  const selectedMake = mappedMakes.find((make) => make.id === selectedMakeId);
+  const selectedMakeCatalog = selectedMake
+    ? await getCatalogMakeWithModels(selectedMake.slug)
+    : null;
+  const mappedModels: ModelOption[] = selectedMakeCatalog?.models.map((model) => ({
+    ...model,
+    make: selectedMake!,
+  })) ?? [];
   const selectedModelId = resolveModelId(mappedModels, resolvedSearchParams.model, selectedMakeId);
   const selectedYear = parseYear(resolvedSearchParams.year);
   const minPrice = parsePrice(resolvedSearchParams.minPrice);
