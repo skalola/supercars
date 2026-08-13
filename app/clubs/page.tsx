@@ -27,11 +27,8 @@ export default async function ClubsPage({
   const resolvedSearchParams = await searchParams;
   const activeSort = resolveSortKey(resolvedSearchParams?.sort);
   const activeDirection = resolveSortDirection(resolvedSearchParams?.dir);
-  const [session, catalog] = await Promise.all([
-    auth(),
-    getMakeModelCatalogOptions(),
-  ]);
-  const clubs = await prisma.carClub.findMany({
+  const sessionPromise = auth();
+  const clubsPromise = prisma.carClub.findMany({
     where: {
       status: "ACTIVE",
       visibility: "PUBLIC",
@@ -65,6 +62,11 @@ export default async function ClubsPage({
       orderBy: { createdAt: "asc" },
       take: 80,
     }).catch(() => []);
+  const session = await sessionPromise;
+  const [clubs, catalog] = await Promise.all([
+    clubsPromise,
+    session?.user?.id ? getMakeModelCatalogOptions() : Promise.resolve(null),
+  ]);
 
   const sortedClubs = [...clubs]
     .sort((a, b) => compareClubs(a, b, activeSort, activeDirection))
@@ -143,7 +145,7 @@ export default async function ClubsPage({
             <span>Creator Tools</span>
             <strong>Start a Club</strong>
           </div>
-          {session?.user?.id ? (
+          {session?.user?.id && catalog ? (
             <form action={createCarClubAction} className="club-form">
               <label>
                 <span>Club Name</span>
