@@ -178,6 +178,7 @@ export async function ingestListings(
             status: "ACTIVE",
             lastSeen: new Date(),
           },
+          select: { id: true },
         })
         : await prisma.listing.create({
           data: {
@@ -195,6 +196,7 @@ export async function ingestListings(
             firstSeen: input.listingDate,
             lastSeen: new Date(),
           },
+          select: { id: true },
         });
 
       if (existingListing) {
