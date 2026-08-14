@@ -11,6 +11,7 @@ import { isNonVehicleImageUrl } from "@/lib/vehicle-images";
 import MarketPriceHistory from "@/components/market/MarketPriceHistory";
 import { isListingMatchForModel } from "@/lib/inventory/validate-listing-identity";
 import { getPartDetailPath } from "@/lib/parts/routes";
+import { getModelPageCatalogData } from "@/lib/model-catalog/model-page-data";
 
 
 
@@ -21,10 +22,8 @@ type ModelImageRecord = {
   source: string | null;
   sourceUrl?: string | null;
   sourceName?: string | null;
-  license?: string | null;
   attribution?: string | null;
   attributionUrl?: string | null;
-  confidence?: number | null;
   reviewStatus?: string | null;
 };
 
@@ -107,74 +106,6 @@ function ModelEmptyState({
   );
 }
 
-const modelPageSelect = {
-  id: true,
-  makeId: true,
-  name: true,
-  slug: true,
-  years: true,
-  productionStartYear: true,
-  productionEndYear: true,
-  category: true,
-  bodyStyle: true,
-  productionCount: true,
-  description: true,
-  metadataStatus: true,
-  metadataSource: true,
-  metadataSourceUrl: true,
-  make: {
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      logoUrl: true,
-    },
-  },
-  spec: {
-    select: {
-      engine: true,
-      displacement: true,
-      cylinders: true,
-      horsepower: true,
-      torque: true,
-      transmission: true,
-      drivetrain: true,
-      topSpeed: true,
-      zeroToSixty: true,
-      weight: true,
-    },
-  },
-  variants: {
-    select: {
-      id: true,
-      name: true,
-      productionStartYear: true,
-      productionEndYear: true,
-      productionCount: true,
-      description: true,
-    },
-    orderBy: [{ productionStartYear: "asc" }, { name: "asc" }],
-    take: 24,
-  },
-  images: {
-    select: {
-      id: true,
-      url: true,
-      type: true,
-      source: true,
-      sourceUrl: true,
-      sourceName: true,
-      license: true,
-      attribution: true,
-      attributionUrl: true,
-      confidence: true,
-      reviewStatus: true,
-    },
-    orderBy: [{ type: "asc" }, { createdAt: "asc" }],
-    take: 12,
-  },
-} satisfies Prisma.ModelSelect;
-
 type ModelListingPreview = Prisma.ListingGetPayload<{
   select: typeof modelListingPreviewSelect;
 }>;
@@ -218,18 +149,12 @@ type ModelPageSession = Session | null;
 export default async function ModelPage({ params }: ModelPageProps) {
   const { slug, modelSlug } = await params;
   const mockSession = (globalThis as typeof globalThis & { mockSession?: ModelPageSession }).mockSession;
-  const [session, model] = await Promise.all([
+  const [session, catalogData] = await Promise.all([
     mockSession !== undefined ? Promise.resolve(mockSession) : auth(),
-    prisma.model.findFirst({
-      where: {
-        slug: modelSlug,
-        make: { slug },
-      },
-      select: modelPageSelect,
-    }),
+    getModelPageCatalogData(slug, modelSlug),
   ]);
 
-  if (!model) {
+  if (!catalogData) {
     const makeExists = await prisma.make.findUnique({
       where: { slug },
       select: { id: true },
@@ -250,7 +175,8 @@ export default async function ModelPage({ params }: ModelPageProps) {
     );
   }
 
-  const [market, rawListings, maintenanceRules, recommendedParts, garageItem, claimedVehicle] = await Promise.all([
+  const { model, maintenanceRules } = catalogData;
+  const [market, rawListings, recommendedParts, garageItem, claimedVehicle] = await Promise.all([
     getMarketSummary(model.id),
     // Public model inventory preview follows the same source-backed trust rules as market pages.
     prisma.listing.findMany({
@@ -289,19 +215,6 @@ export default async function ModelPage({ params }: ModelPageProps) {
       select: modelListingPreviewSelect,
       orderBy: { createdAt: "desc" },
       take: 12,
-    }),
-    prisma.maintenanceRule.findMany({
-      where: {
-        OR: [
-          { modelId: null },
-          { modelId: model.id },
-        ],
-      },
-      orderBy: [
-        { priority: "asc" },
-        { intervalMiles: "asc" },
-      ],
-      take: 6,
     }),
     prisma.performancePart.findMany({
       where: {
