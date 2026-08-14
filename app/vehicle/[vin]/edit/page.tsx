@@ -16,6 +16,7 @@ const vehicleEditSelect = {
   year: true,
   ownerId: true,
   status: true,
+  mileage: true,
   engineHP: true,
   model: {
     select: {

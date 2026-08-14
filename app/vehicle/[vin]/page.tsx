@@ -345,8 +345,8 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
     return (a.intervalMiles || 0) - (b.intervalMiles || 0);
   });
 
-  // Check mileage in priority: 1. Vehicle.currentMileage, 2. Vehicle mileage decoded/imported data, 3. User-entered mileage
-  const currentMileage = vehicle.mileage ?? vehicle.profile?.currentMileage ?? null;
+  // Owner-entered passport mileage is the freshest value; imported vehicle mileage is the fallback.
+  const currentMileage = vehicle.profile?.currentMileage ?? vehicle.mileage ?? null;
 
   const { success: successParam } = (await searchParams) || {};
   let resolvedHeroImage = getVehicleHeroImage(vehicle);
@@ -428,7 +428,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
             defaultRule={firstMaintenanceRule}
           />
         ) : null}
-        <section className="vehicle-intelligence-hero" style={heroStyle}>
+        <section className={`vehicle-intelligence-hero${hasOwnerPhotos ? " has-owner-photo" : ""}`} style={heroStyle}>
           <div className="vehicle-intelligence-hero-shade" aria-hidden="true" />
           <div className="vehicle-intelligence-hero-copy">
             <span className="vehicle-intelligence-kicker">{isOwner ? "Claimed Garage" : isForSale ? "Market Listing" : "Vehicle Passport"}</span>

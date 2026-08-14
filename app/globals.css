@@ -3663,6 +3663,13 @@ canvas {
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.34);
 }
 
+.vehicle-intelligence-hero.has-owner-photo {
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.22) 38%, rgba(0, 0, 0, 0.08) 64%, rgba(0, 0, 0, 0.7)),
+    var(--vehicle-passport-hero-image) center 52% / cover no-repeat,
+    linear-gradient(180deg, #070707, #0b0b0c);
+}
+
 .vehicle-intelligence-hero::after {
   position: absolute;
   right: 0;
@@ -5195,6 +5202,13 @@ canvas {
       linear-gradient(180deg, #070707, #0b0b0c);
   }
 
+  .vehicle-intelligence-hero.has-owner-photo {
+    background:
+      linear-gradient(180deg, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0.14) 44%, rgba(0, 0, 0, 0.88)),
+      var(--vehicle-passport-hero-image) center 42% / cover no-repeat,
+      linear-gradient(180deg, #070707, #0b0b0c);
+  }
+
   .vehicle-intelligence-actions {
     align-content: start;
     max-width: 420px;
@@ -5264,6 +5278,13 @@ canvas {
     background:
       linear-gradient(180deg, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.2) 36%, rgba(0, 0, 0, 0.9)),
       var(--vehicle-passport-hero-image, url("/images/garage-home-hero.png?v=garage-2")) center 28% / auto 45% no-repeat,
+      linear-gradient(180deg, #070707, #0b0b0c);
+  }
+
+  .vehicle-intelligence-hero.has-owner-photo {
+    background:
+      linear-gradient(180deg, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.16) 38%, rgba(0, 0, 0, 0.92)),
+      var(--vehicle-passport-hero-image) center 38% / cover no-repeat,
       linear-gradient(180deg, #070707, #0b0b0c);
   }
 
@@ -9992,6 +10013,108 @@ canvas {
 .profile-edit-form small {
   color: rgba(255, 255, 255, 0.52);
   font-size: 12px;
+}
+
+.profile-edit-photo-field {
+  display: grid;
+  gap: 8px;
+}
+
+.profile-edit-photo-field > span {
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.profile-edit-photo-control {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.profile-edit-photo-control > img,
+.profile-edit-photo-control > span {
+  flex: 0 0 64px;
+  width: 64px;
+  height: 64px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  object-fit: cover;
+}
+
+.profile-edit-photo-control label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.profile-edit-photo-control label strong {
+  color: #ffffff;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.profile-edit-photo-control input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.passport-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.passport-photo-card {
+  cursor: grab;
+  transition: border-color 160ms ease, opacity 160ms ease, transform 160ms ease;
+}
+
+.passport-photo-card:active {
+  cursor: grabbing;
+}
+
+.passport-photo-card.is-dragging {
+  opacity: 0.55;
+  border-color: #dc2626 !important;
+  transform: scale(0.98);
+}
+
+.passport-photo-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #4b5563;
+  font-size: 11px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+@media (max-width: 560px) {
+  .passport-photo-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .profile-edit-message {
@@ -16610,6 +16733,12 @@ canvas {
   gap: 10px;
 }
 
+.club-location-city {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
 .club-checkbox-row {
   display: flex !important;
   min-height: 44px;
@@ -16631,6 +16760,31 @@ canvas {
 
 .club-checkbox-row span {
   color: #ffffff;
+}
+
+.club-form .club-checkbox-row-compact {
+  width: fit-content;
+  min-height: 24px;
+  gap: 7px !important;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.club-form .club-checkbox-row-compact input[type="checkbox"] {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  min-height: 14px;
+  margin: 0;
+  padding: 0;
+}
+
+.club-form .club-checkbox-row-compact span {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .club-form-grid {

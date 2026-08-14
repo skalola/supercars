@@ -20,6 +20,9 @@ const garageClaimedVehicleSelect = {
   mileage: true,
   trim: true,
   createdAt: true,
+  profile: {
+    select: { currentMileage: true },
+  },
   model: {
     select: {
       name: true,
@@ -83,6 +86,9 @@ const garagePreviousVehicleSelect = {
   status: true,
   mileage: true,
   trim: true,
+  profile: {
+    select: { currentMileage: true },
+  },
   model: {
     select: {
       name: true,
@@ -208,7 +214,7 @@ function toClaimedVehicle(vehicle: GarageClaimedVehicleRow): GarageClaimedVehicl
     vin: vehicle.vin,
     year: vehicle.year,
     status: vehicle.status,
-    mileage: vehicle.mileage,
+    mileage: vehicle.profile?.currentMileage ?? vehicle.mileage,
     image: vehicle.photos[0]?.filePath || vehicle.images[0]?.url || vehicle.model.images[0]?.url || null,
     makeLogoUrl: vehicle.model.make.logoUrl,
     makeName: vehicle.model.make.name,
@@ -226,7 +232,7 @@ function toPreviousVehicle(vehicle: GaragePreviousVehicleRow): GaragePreviousVeh
     vin: vehicle.vin,
     year: vehicle.year,
     status: vehicle.status,
-    mileage: vehicle.mileage,
+    mileage: vehicle.profile?.currentMileage ?? vehicle.mileage,
     image: vehicle.photos[0]?.filePath || vehicle.images[0]?.url || vehicle.model.images[0]?.url || null,
     makeLogoUrl: vehicle.model.make.logoUrl,
     makeName: vehicle.model.make.name,
@@ -260,7 +266,7 @@ function getGarageServiceWatch(
   return vehicles
     .map((vehicle) => {
       const recommendation = getNextMaintenanceRecommendation({
-        currentMileage: vehicle.mileage,
+        currentMileage: vehicle.profile?.currentMileage ?? vehicle.mileage,
         rules: vehicle.model.maintenanceRules,
         serviceRecords: serviceRecordsByVehicle.get(vehicle.id) ?? [],
       });

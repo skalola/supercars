@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import Image from "next/image";
 import { updateProfileAction, type UpdateProfileState } from "@/app/actions/profile";
 
 type ProfileEditFormProps = {
@@ -16,6 +17,22 @@ const initialState: UpdateProfileState = {};
 
 export function ProfileEditForm({ user }: ProfileEditFormProps) {
   const [state, action, pending] = useActionState(updateProfileAction, initialState);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(user.image);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl?.startsWith("blob:")) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  function handleProfileImageChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setPreviewUrl((current) => {
+      if (current?.startsWith("blob:")) URL.revokeObjectURL(current);
+      return URL.createObjectURL(file);
+    });
+  }
 
   return (
     <form action={action} className="profile-edit-form">
@@ -47,21 +64,34 @@ export function ProfileEditForm({ user }: ProfileEditFormProps) {
         <small>Used for your public garage URL.</small>
       </label>
 
-      <label>
-        <span>Profile image URL</span>
-        <input
-          name="image"
-          type="url"
-          defaultValue={user.image || ""}
-          placeholder="https://..."
-          autoComplete="photo"
-        />
-        <small>Leave blank to use the default profile icon.</small>
-      </label>
+      <div className="profile-edit-photo-field">
+        <span>Profile photo</span>
+        <div className="profile-edit-photo-control">
+          {previewUrl ? (
+            <Image src={previewUrl} alt="Profile photo preview" width={64} height={64} unoptimized />
+          ) : (
+            <span aria-hidden="true" />
+          )}
+          <label>
+            <strong>Choose Photo</strong>
+            <input
+              name="profileImage"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleProfileImageChange}
+            />
+          </label>
+        </div>
+        <small>JPG, PNG, or WebP. Maximum 8 MB.</small>
+      </div>
 
       <label>
         <span>Email</span>
-        <input type="email" value={user.email || ""} disabled />
+        <input
+          type="email"
+          value={user.email || ""}
+          disabled
+        />
         <small>Email comes from your login provider.</small>
       </label>
 

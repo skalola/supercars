@@ -17,6 +17,7 @@ function safeRevalidatePath(vin: string) {
   try {
     revalidatePath(`/vehicle/${vin}`);
     revalidatePath(`/vehicle/${vin}/edit`);
+    revalidatePath("/garage");
   } catch {
     // Ignore in non-HTTP-request scope
   }
@@ -65,23 +66,30 @@ export async function updateVehicleProfile(
   }
 ) {
   const { vehicleId } = await verifyOwnership(vin);
+  const currentMileage = cleanNumber(data.currentMileage);
 
-  await prisma.vehicleProfile.upsert({
-    where: { vehicleId },
-    update: {
-      exteriorColor: data.exteriorColor || null,
-      interiorColor: data.interiorColor || null,
-      currentMileage: data.currentMileage || null,
-      ownerNotes: data.ownerNotes || null,
-    },
-    create: {
-      vehicleId,
-      exteriorColor: data.exteriorColor || null,
-      interiorColor: data.interiorColor || null,
-      currentMileage: data.currentMileage || null,
-      ownerNotes: data.ownerNotes || null,
-    },
-  });
+  await prisma.$transaction([
+    prisma.vehicleProfile.upsert({
+      where: { vehicleId },
+      update: {
+        exteriorColor: data.exteriorColor || null,
+        interiorColor: data.interiorColor || null,
+        currentMileage,
+        ownerNotes: data.ownerNotes || null,
+      },
+      create: {
+        vehicleId,
+        exteriorColor: data.exteriorColor || null,
+        interiorColor: data.interiorColor || null,
+        currentMileage,
+        ownerNotes: data.ownerNotes || null,
+      },
+    }),
+    prisma.vehicle.update({
+      where: { id: vehicleId },
+      data: { mileage: currentMileage },
+    }),
+  ]);
 
   safeRevalidatePath(vin);
 }

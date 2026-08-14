@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @next/next/no-img-element */
 
-import { useState } from "react";
+import { useState, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   updateVehicleProfile,
@@ -16,7 +16,6 @@ import { calculateModifiedPerformance } from "@/lib/parts/performance";
 import {
   uploadVehiclePhoto,
   deleteVehiclePhoto,
-  setHeroPhoto,
   reorderVehiclePhotos,
   uploadVehicleDocument,
   deleteVehicleDocument
@@ -47,7 +46,7 @@ export default function VehicleEditorForm({
   // 1. Vehicle Info Form State
   const [extColor, setExtColor] = useState(vehicle.profile?.exteriorColor || "");
   const [intColor, setIntColor] = useState(vehicle.profile?.interiorColor || "");
-  const [mileage, setMileage] = useState<number | "">(vehicle.profile?.currentMileage ?? "");
+  const [mileage, setMileage] = useState<number | "">(vehicle.profile?.currentMileage ?? vehicle.mileage ?? "");
   const [notes, setNotes] = useState(vehicle.profile?.ownerNotes || "");
 
   // 2. Add Modification State
@@ -75,8 +74,9 @@ export default function VehicleEditorForm({
   const [awdDesc, setAwdDesc] = useState("");
 
   // 5. Photos State
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [photoCaption, setPhotoCaption] = useState("");
+  const [draggedPhotoId, setDraggedPhotoId] = useState<string | null>(null);
 
   // 6. Documents State
   const [docFile, setDocFile] = useState<File | null>(null);
@@ -106,18 +106,20 @@ export default function VehicleEditorForm({
   // Actions
   async function handleUploadPhoto(e: React.FormEvent) {
     e.preventDefault();
-    if (!photoFile) {
-      showError("Please select an image file to upload.");
+    if (photoFiles.length === 0) {
+      showError("Please select one or more image files to upload.");
       return;
     }
     setLoading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", photoFile);
-      formData.append("caption", photoCaption);
-      await uploadVehiclePhoto(vehicle.vin, formData);
-      showSuccess("Photo uploaded successfully!");
-      setPhotoFile(null);
+      for (const photoFile of photoFiles) {
+        const formData = new FormData();
+        formData.append("file", photoFile);
+        formData.append("caption", photoCaption);
+        await uploadVehiclePhoto(vehicle.vin, formData);
+      }
+      showSuccess(`${photoFiles.length} ${photoFiles.length === 1 ? "photo" : "photos"} uploaded successfully.`);
+      setPhotoFiles([]);
       setPhotoCaption("");
       const fileInput = document.getElementById("photo-file-input") as HTMLInputElement;
       if (fileInput) fileInput.value = "";
@@ -144,9 +146,12 @@ export default function VehicleEditorForm({
   }
 
   async function handleMakeHero(photoId: string) {
+    const selected = vehicle.photos.find((photo: any) => photo.id === photoId);
+    if (!selected) return;
+    const orderedPhotos = [selected, ...vehicle.photos.filter((photo: any) => photo.id !== photoId)];
     setLoading(true);
     try {
-      await setHeroPhoto(vehicle.vin, photoId);
+      await reorderVehiclePhotos(vehicle.vin, orderedPhotos.map((photo: any) => photo.id));
       showSuccess("Hero photo updated successfully!");
       router.refresh();
     } catch (err: any) {
@@ -171,6 +176,30 @@ export default function VehicleEditorForm({
     try {
       await reorderVehiclePhotos(vehicle.vin, list.map((p: any) => p.id));
       showSuccess("Photo order updated!");
+      router.refresh();
+    } catch (err: any) {
+      showError(err.message || "Could not reorder photos.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDropPhoto(event: DragEvent<HTMLDivElement>, targetPhotoId: string) {
+    event.preventDefault();
+    if (!draggedPhotoId || draggedPhotoId === targetPhotoId || loading) return;
+
+    const list = [...vehicle.photos];
+    const sourceIndex = list.findIndex((photo: any) => photo.id === draggedPhotoId);
+    const targetIndex = list.findIndex((photo: any) => photo.id === targetPhotoId);
+    if (sourceIndex === -1 || targetIndex === -1) return;
+
+    const [movedPhoto] = list.splice(sourceIndex, 1);
+    list.splice(targetIndex, 0, movedPhoto);
+    setDraggedPhotoId(null);
+    setLoading(true);
+    try {
+      await reorderVehiclePhotos(vehicle.vin, list.map((photo: any) => photo.id));
+      showSuccess("Photo order updated. The first photo is now the hero image.");
       router.refresh();
     } catch (err: any) {
       showError(err.message || "Could not reorder photos.");
@@ -805,9 +834,21 @@ export default function VehicleEditorForm({
             {vehicle.photos?.length === 0 ? (
               <p style={{ color: "#6b7280", fontStyle: "italic" }}>No photos uploaded yet.</p>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "16px" }}>
+              <>
+                <p style={{ margin: "0 0 12px", color: "#6b7280", fontSize: "13px" }}>
+                  Drag photos into order. The first photo is used as the vehicle hero image.
+                </p>
+                <div className="passport-photo-grid">
                 {vehicle.photos.map((photo: any, idx: number) => (
-                  <div key={photo.id} style={{
+                  <div
+                    key={photo.id}
+                    className={`passport-photo-card${draggedPhotoId === photo.id ? " is-dragging" : ""}`}
+                    draggable={!loading}
+                    onDragStart={() => setDraggedPhotoId(photo.id)}
+                    onDragEnd={() => setDraggedPhotoId(null)}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => handleDropPhoto(event, photo.id)}
+                    style={{
                     border: "1px solid #e5e7eb",
                     borderRadius: "12px",
                     padding: "12px",
@@ -817,6 +858,10 @@ export default function VehicleEditorForm({
                     flexDirection: "column",
                     gap: "8px"
                   }}>
+                    <div className="passport-photo-card-header">
+                      <span>{idx === 0 ? "Hero image" : `Photo ${idx + 1}`}</span>
+                      <span aria-hidden="true">Drag</span>
+                    </div>
                     <div style={{
                       position: "relative",
                       width: "100%",
@@ -848,7 +893,7 @@ export default function VehicleEditorForm({
                           textAlign: "center",
                           flex: "1 1 100%"
                         }}>
-                          ★ Hero Image
+                          Hero Image
                         </span>
                       ) : (
                         <button type="button" onClick={() => handleMakeHero(photo.id)} style={{
@@ -861,7 +906,7 @@ export default function VehicleEditorForm({
                           cursor: "pointer",
                           width: "100%"
                         }}>
-                          Make Hero
+                          Move to First
                         </button>
                       )}
                       
@@ -876,7 +921,7 @@ export default function VehicleEditorForm({
                           cursor: idx === 0 ? "not-allowed" : "pointer",
                           flex: 1
                         }}>
-                          ▲
+                          Earlier
                         </button>
                         <button type="button" disabled={idx === vehicle.photos.length - 1} onClick={() => handleMovePhoto(photo.id, "down")} style={{
                           backgroundColor: "#f3f4f6",
@@ -888,7 +933,7 @@ export default function VehicleEditorForm({
                           cursor: idx === vehicle.photos.length - 1 ? "not-allowed" : "pointer",
                           flex: 1
                         }}>
-                          ▼
+                          Later
                         </button>
                         <button type="button" onClick={() => handleDeletePhoto(photo.id)} style={{
                           backgroundColor: "#fef2f2",
@@ -900,29 +945,41 @@ export default function VehicleEditorForm({
                           cursor: "pointer",
                           flex: 1
                         }}>
-                          🗑️
+                          Delete
                         </button>
                       </div>
                     </div>
                   </div>
                 ))}
-              </div>
+                </div>
+              </>
             )}
           </div>
 
           {/* Add Photo Form */}
           <form onSubmit={handleUploadPhoto} style={{ borderTop: "1px solid #e5e7eb", paddingTop: "24px", display: "grid", gap: "16px" }}>
-            <h3 style={{ fontSize: "18px", fontWeight: 600 }}>Upload New Photo</h3>
+            <h3 style={{ fontSize: "18px", fontWeight: 600 }}>Upload Vehicle Photos</h3>
             <div>
-              <label style={labelStyle}>Select Image File *</label>
-              <input required id="photo-file-input" type="file" accept="image/*" onChange={(e) => setPhotoFile(e.target.files?.[0] || null)} style={inputStyle} />
+              <label style={labelStyle}>Select Image Files *</label>
+              <input
+                required
+                multiple
+                id="photo-file-input"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(e) => setPhotoFiles(Array.from(e.target.files || []).slice(0, 8))}
+                style={inputStyle}
+              />
+              <small style={{ display: "block", marginTop: "6px", color: "#6b7280" }}>
+                Select up to 8 JPG, PNG, or WebP images. Each image can be up to 8 MB.
+              </small>
             </div>
             <div>
               <label style={labelStyle}>Caption / Description</label>
               <input value={photoCaption} onChange={(e) => setPhotoCaption(e.target.value)} placeholder="e.g. Cleaned and detailed at the shop" style={inputStyle} />
             </div>
             <button type="submit" disabled={loading} style={{ ...btnStyle, justifySelf: "start" }}>
-              {loading ? "Uploading..." : "Upload Photo"}
+              {loading ? "Uploading..." : `Upload ${photoFiles.length > 1 ? `${photoFiles.length} Photos` : "Photo"}`}
             </button>
           </form>
         </div>

@@ -11,6 +11,7 @@ function safeRevalidatePath(vin: string) {
   try {
     revalidatePath(`/vehicle/${vin}`);
     revalidatePath(`/vehicle/${vin}/edit`);
+    revalidatePath("/garage");
   } catch {
     // Ignore in non-HTTP-request scope
   }
@@ -126,29 +127,19 @@ export async function deleteVehiclePhoto(vin: string, photoId: string) {
 export async function setHeroPhoto(vin: string, photoId: string) {
   const { vehicleId } = await verifyOwnership(vin);
 
-  const photo = await prisma.vehiclePhoto.findUnique({
-    where: { id: photoId },
-    select: {
-      id: true,
-      vehicleId: true,
-    },
+  const photos = await prisma.vehiclePhoto.findMany({
+    where: { vehicleId },
+    select: { id: true },
+    orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
   });
+  const photo = photos.find((item) => item.id === photoId);
 
-  if (!photo || photo.vehicleId !== vehicleId) {
+  if (!photo) {
     throw new Error("Photo not found.");
   }
 
-  // Clear hero on all photos and set this one as hero
-  await prisma.$transaction([
-    prisma.vehiclePhoto.updateMany({
-      where: { vehicleId },
-      data: { isHero: false },
-    }),
-    prisma.vehiclePhoto.update({
-      where: { id: photoId },
-      data: { isHero: true },
-    }),
-  ]);
+  const orderedIds = [photoId, ...photos.filter((item) => item.id !== photoId).map((item) => item.id)];
+  await persistVehiclePhotoOrder(vehicleId, orderedIds);
 
   safeRevalidatePath(vin);
 }
@@ -156,16 +147,38 @@ export async function setHeroPhoto(vin: string, photoId: string) {
 export async function reorderVehiclePhotos(vin: string, photoIds: string[]) {
   const { vehicleId } = await verifyOwnership(vin);
 
-  await prisma.$transaction(
-    photoIds.map((id, index) =>
-      prisma.vehiclePhoto.updateMany({
-        where: { id, vehicleId },
-        data: { displayOrder: index },
-      })
-    )
-  );
+  const existingPhotos = await prisma.vehiclePhoto.findMany({
+    where: { vehicleId },
+    select: { id: true },
+  });
+  const existingIds = new Set(existingPhotos.map((photo) => photo.id));
+  const submittedIds = new Set(photoIds);
+  if (
+    photoIds.length !== existingPhotos.length ||
+    submittedIds.size !== photoIds.length ||
+    photoIds.some((id) => !existingIds.has(id))
+  ) {
+    throw new Error("Photo order is out of date. Refresh and try again.");
+  }
+
+  await persistVehiclePhotoOrder(vehicleId, photoIds);
 
   safeRevalidatePath(vin);
+}
+
+async function persistVehiclePhotoOrder(vehicleId: string, photoIds: string[]) {
+  await prisma.$transaction([
+    prisma.vehiclePhoto.updateMany({
+      where: { vehicleId },
+      data: { isHero: false },
+    }),
+    ...photoIds.map((id, index) =>
+      prisma.vehiclePhoto.updateMany({
+        where: { id, vehicleId },
+        data: { displayOrder: index, isHero: index === 0 },
+      })
+    ),
+  ]);
 }
 
 // ----------------------------------------------------
