@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { createCarClubAction } from "@/app/actions/clubs";
-import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
+import { getCatalogMakeOptions } from "@/lib/makes/catalog";
 import { prisma } from "@/lib/prisma";
 import ClubLocationFields from "./ClubLocationFields";
 import ClubModelSelector from "./ClubModelSelector";
@@ -63,9 +63,9 @@ export default async function ClubsPage({
       take: 80,
     }).catch(() => []);
   const session = await sessionPromise;
-  const [clubs, catalog] = await Promise.all([
+  const [clubs, makeOptions] = await Promise.all([
     clubsPromise,
-    session?.user?.id ? getMakeModelCatalogOptions() : Promise.resolve(null),
+    session?.user?.id ? getCatalogMakeOptions() : Promise.resolve(null),
   ]);
 
   const sortedClubs = [...clubs]
@@ -145,7 +145,7 @@ export default async function ClubsPage({
             <span>Creator Tools</span>
             <strong>Start a Club</strong>
           </div>
-          {session?.user?.id && catalog ? (
+          {session?.user?.id && makeOptions ? (
             <form action={createCarClubAction} className="club-form">
               <label>
                 <span>Club Name</span>
@@ -168,7 +168,7 @@ export default async function ClubsPage({
                 <span>Description</span>
                 <textarea name="description" rows={4} placeholder="Model focus, meet style, and membership expectations." />
               </label>
-              <ClubModelSelector makes={catalog.makes} models={catalog.models} />
+              <ClubModelSelector makes={makeOptions} />
               <button type="submit">Create Club</button>
             </form>
           ) : (

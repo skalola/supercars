@@ -39,55 +39,6 @@ type CatalogMakeSummaryRow = {
   modelPreviewNames: string[];
 };
 
-export const getMakeModelCatalogOptions = unstable_cache(
-  async () => {
-  const makes = await prisma.make.findMany({
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      region: true,
-      logoUrl: true,
-      models: {
-        select: {
-          id: true,
-          name: true,
-          makeId: true,
-        },
-        orderBy: { name: "asc" },
-      },
-    },
-    orderBy: [
-      { region: "asc" },
-      { name: "asc" },
-    ],
-  });
-
-  const makeOptions: MakeOption[] = makes.map((make) => ({
-    id: make.id,
-    name: make.name.trim(),
-    slug: make.slug,
-    region: make.region,
-    logoUrl: make.logoUrl,
-  }));
-
-  const modelOptions: ModelEditorOption[] = makes.flatMap((make) =>
-    make.models.map((model) => ({
-      id: model.id,
-      name: model.name.trim(),
-      makeId: model.makeId,
-    })),
-  );
-
-  return {
-    makes: makeOptions,
-    models: modelOptions,
-  };
-  },
-  ["make-model-catalog-options-v2"],
-  { revalidate: 86_400, tags: ["make-model-catalog"] }
-);
-
 export const getCatalogMakeNames = unstable_cache(
   async () => {
   const makes = await prisma.make.findMany({
@@ -124,6 +75,32 @@ export const getCatalogMakeOptions = unstable_cache(
   },
   ["catalog-make-options-v1"],
   { revalidate: 86_400, tags: ["make-model-catalog"] }
+);
+
+export const getCatalogModelsByMakeIds = unstable_cache(
+  async (makeIds: string[]): Promise<ModelEditorOption[]> => {
+    if (makeIds.length === 0) return [];
+
+    const models = await prisma.model.findMany({
+      where: { makeId: { in: makeIds } },
+      select: {
+        id: true,
+        name: true,
+        makeId: true,
+      },
+      orderBy: [
+        { make: { name: "asc" } },
+        { name: "asc" },
+      ],
+    });
+
+    return models.map((model) => ({
+      ...model,
+      name: model.name.trim(),
+    }));
+  },
+  ["catalog-models-by-make-v1"],
+  { revalidate: 86_400, tags: ["make-model-catalog"] },
 );
 
 export const getCatalogMakeSummaries = unstable_cache(

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import type { ReactNode } from "react";
 import {
   addPartBrandAction,
@@ -10,6 +10,7 @@ import {
   updatePerformancePartAffiliateAction,
 } from "@/app/actions/admin-parts";
 import type { MakeOption, ModelEditorOption } from "@/lib/makes/catalog";
+import { fetchCatalogModels } from "@/lib/makes/client";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export type AdminPartCategoryRow = {
@@ -121,7 +122,6 @@ type AdminPartsClientProps = {
   };
   affiliateAnalytics: AdminAffiliateAnalytics;
   makes: MakeOption[];
-  models: ModelEditorOption[];
 };
 
 type PartFormState = {
@@ -205,7 +205,6 @@ export function AdminPartsClient({
   activeFilters,
   affiliateAnalytics,
   makes,
-  models,
 }: AdminPartsClientProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -230,11 +229,26 @@ export function AdminPartsClient({
     toAffiliatePartnerForm(affiliatePartners[0] ?? null)
   );
   const [searchQuery, setSearchQuery] = useState(activeFilters.search);
+  const [filteredModels, setFilteredModels] = useState<ModelEditorOption[]>([]);
+  const [modelLoadState, setModelLoadState] = useState<"idle" | "loading" | "error">("idle");
 
-  const filteredModels = useMemo(
-    () => models.filter((model) => !partForm.makeId || model.makeId === partForm.makeId),
-    [models, partForm.makeId]
-  );
+  useEffect(() => {
+    if (!partForm.makeId) return;
+
+    const controller = new AbortController();
+    fetchCatalogModels([partForm.makeId], controller.signal)
+      .then((rows) => {
+        setFilteredModels(rows);
+        setModelLoadState("idle");
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setFilteredModels([]);
+        setModelLoadState("error");
+      });
+
+    return () => controller.abort();
+  }, [partForm.makeId]);
 
   const updateFilters = (updates: Record<string, string>) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -248,6 +262,10 @@ export function AdminPartsClient({
   };
 
   const updatePartForm = (field: keyof PartFormState, value: string) => {
+    if (field === "makeId") {
+      setFilteredModels([]);
+      setModelLoadState(value ? "loading" : "idle");
+    }
     setPartForm((prev) => ({
       ...prev,
       [field]: value,
@@ -749,9 +767,17 @@ export function AdminPartsClient({
               <select
                 value={partForm.modelId}
                 onChange={(event) => updatePartForm("modelId", event.target.value)}
-                disabled={!partForm.makeId}
+                disabled={!partForm.makeId || modelLoadState === "loading"}
               >
-                <option value="">{partForm.makeId ? "All Models" : "Choose make first"}</option>
+                <option value="">
+                  {!partForm.makeId
+                    ? "Choose make first"
+                    : modelLoadState === "loading"
+                      ? "Loading models..."
+                      : modelLoadState === "error"
+                        ? "Unable to load models"
+                        : "All Models"}
+                </option>
                 {filteredModels.map((model) => (
                   <option key={model.id} value={model.id}>
                     {model.name}

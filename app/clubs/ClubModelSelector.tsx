@@ -3,19 +3,24 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { MakeOption, ModelEditorOption } from "@/lib/makes/catalog";
+import { fetchCatalogModels } from "@/lib/makes/client";
 
 export default function ClubModelSelector({
   makes,
-  models,
+  initialModels = [],
   initialModelIds = [],
 }: {
   makes: MakeOption[];
-  models: ModelEditorOption[];
+  initialModels?: ModelEditorOption[];
   initialModelIds?: string[];
 }) {
   const [openMenu, setOpenMenu] = useState<"make" | "model" | null>(null);
+  const [models, setModels] = useState<ModelEditorOption[]>(initialModels);
+  const [loadedMakeIds, setLoadedMakeIds] = useState<Set<string>>(() => new Set());
+  const [modelLoadState, setModelLoadState] = useState<"idle" | "loading" | "error">("idle");
+  const modelRequestRef = useRef(0);
   const [selectedMakeIds, setSelectedMakeIds] = useState<Set<string>>(
-    () => new Set(models.filter((model) => initialModelIds.includes(model.id)).map((model) => model.makeId)),
+    () => new Set(initialModels.filter((model) => initialModelIds.includes(model.id)).map((model) => model.makeId)),
   );
   const [selectedModelIds, setSelectedModelIds] = useState<Set<string>>(() => new Set(initialModelIds));
   const makeNamesById = new Map(makes.map((make) => [make.id, make.name]));
@@ -40,11 +45,32 @@ export default function ClubModelSelector({
       : "All or selected makes";
   const modelSummary = selectedMakeIds.size === 0
     ? "Choose make first"
+    : modelLoadState === "loading"
+      ? "Loading models..."
     : allModelsSelected
     ? "All models selected"
     : selectedVisibleModelCount > 0
       ? `${selectedVisibleModelCount} ${selectedVisibleModelCount === 1 ? "model" : "models"} selected`
       : "All or selected models";
+
+  async function loadModels(makeIds: string[]) {
+    const missingMakeIds = makeIds.filter((makeId) => !loadedMakeIds.has(makeId));
+    if (missingMakeIds.length === 0) return;
+    const requestId = ++modelRequestRef.current;
+    setModelLoadState("loading");
+    try {
+      const rows = await fetchCatalogModels(missingMakeIds);
+      setModels((current) => {
+        const byId = new Map(current.map((model) => [model.id, model]));
+        for (const model of rows) byId.set(model.id, model);
+        return [...byId.values()];
+      });
+      setLoadedMakeIds((current) => new Set([...current, ...missingMakeIds]));
+      if (modelRequestRef.current === requestId) setModelLoadState("idle");
+    } catch {
+      if (modelRequestRef.current === requestId) setModelLoadState("error");
+    }
+  }
 
   function toggleMake(makeId: string) {
     const isRemovingMake = selectedMakeIds.has(makeId);
@@ -133,7 +159,13 @@ export default function ClubModelSelector({
         summary={modelSummary}
         isOpen={openMenu === "model"}
         onToggle={() => {
-          if (selectedMakeIds.size > 0) setOpenMenu((menu) => (menu === "model" ? null : "model"));
+          if (selectedMakeIds.size === 0) return;
+          if (openMenu === "model") {
+            setOpenMenu(null);
+            return;
+          }
+          setOpenMenu("model");
+          void loadModels([...selectedMakeIds]);
         }}
         disabled={selectedMakeIds.size === 0}
       >
@@ -141,6 +173,8 @@ export default function ClubModelSelector({
           <input type="checkbox" checked={allModelsSelected} onChange={toggleAllModels} />
           <span>Select all models</span>
         </label>
+        {modelLoadState === "loading" ? <p className="club-widget-note">Loading selected models...</p> : null}
+        {modelLoadState === "error" ? <p className="club-widget-note">Models could not be loaded. Close and try again.</p> : null}
         {availableModels.map((model) => (
           <label key={model.id} className="club-multi-option">
             <input type="checkbox" checked={selectedModelIds.has(model.id)} onChange={() => toggleModel(model.id)} />

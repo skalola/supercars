@@ -1,5 +1,5 @@
 import { AdminPartsClient, type AdminAffiliateAnalyticsRow, type AdminAffiliatePartnerRow, type AdminPartBrandRow, type AdminPartCategoryRow, type AdminPerformancePartRow, type AdminRecentAffiliateClickRow } from "@/components/admin/AdminPartsClient";
-import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
+import { getCatalogMakeOptions } from "@/lib/makes/catalog";
 import { isAffiliateTrackingReady } from "@/lib/parts/affiliate-tracking";
 import { auditPerformancePartTrust } from "@/lib/parts/trust";
 import { prisma } from "@/lib/prisma";
@@ -114,7 +114,7 @@ export default async function AdminPartsPage({
     totalClicks,
     recentClickCount,
     configuredParts,
-    catalog,
+    makeOptions,
   ] = await Promise.all([
     prisma.partCategory.findMany({
       select: {
@@ -208,7 +208,7 @@ export default async function AdminPartsPage({
         },
       },
     }),
-    getMakeModelCatalogOptions(),
+    getCatalogMakeOptions(),
   ]);
   const totalPages = Math.max(1, Math.ceil(filteredPartCount / ADMIN_PARTS_PAGE_LIMIT));
   const page = Math.min(requestedPage, totalPages);
@@ -345,8 +345,7 @@ export default async function AdminPartsPage({
           topBrands: analyticsRows.topBrands,
           recentClicks: recentClickRows,
         }}
-        makes={catalog.makes}
-        models={catalog.models}
+        makes={makeOptions}
       />
       <AdminPagination
         pathname="/admin/parts"

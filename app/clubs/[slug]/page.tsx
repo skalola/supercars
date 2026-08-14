@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { leaveClubAction, manageClubMemberAction, requestJoinClubAction, updateClubModelsAction, updateClubProfileAction } from "@/app/actions/clubs";
-import { getMakeModelCatalogOptions } from "@/lib/makes/catalog";
+import { getCatalogMakeOptions } from "@/lib/makes/catalog";
 import { getMeetTypeBadgeClass, normalizeMeetType } from "@/lib/meets/meet-types";
 import { prisma } from "@/lib/prisma";
 import ClubConfirmButton from "../ClubConfirmButton";
@@ -43,7 +43,9 @@ function getClubDetailSelect(now = new Date()) {
       modelId: true,
       model: {
         select: {
+          id: true,
           name: true,
+          makeId: true,
           make: { select: { logoUrl: true } },
           images: {
             select: { url: true },
@@ -97,10 +99,10 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
   const activeMembers = club.members.filter((member) => member.status === "ACTIVE");
   const pendingMembers = club.members.filter((member) => member.status === "PENDING");
   const memberUserIds = activeMembers.map((member) => member.userId);
-  const [fastest, mostModified, catalog] = await Promise.all([
+  const [fastest, mostModified, makeOptions] = await Promise.all([
     getFastestClubCar(memberUserIds),
     getMostModifiedClubCar(memberUserIds),
-    canModerate ? getMakeModelCatalogOptions() : Promise.resolve(null),
+    canModerate ? getCatalogMakeOptions() : Promise.resolve(null),
   ]);
   const nextMeet = club.meets[0] ?? null;
   const creatorName = club.creator.name || club.creator.username || "SUPERCAR DASH Member";
@@ -249,7 +251,7 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
           {pendingMembers.length > 0 && canModerate ? (
             <p className="club-widget-note">{pendingMembers.length} pending {pendingMembers.length === 1 ? "request" : "requests"}</p>
           ) : null}
-          {canModerate && catalog ? (
+          {canModerate && makeOptions ? (
             <ClubEditModal>
               <form action={updateClubProfileAction} className="club-form">
                 <input type="hidden" name="clubId" value={club.id} />
@@ -296,8 +298,12 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
                   <strong>Edit Makes & Models</strong>
                 </div>
                 <ClubModelSelector
-                  makes={catalog.makes}
-                  models={catalog.models}
+                  makes={makeOptions}
+                  initialModels={club.models.map(({ model }) => ({
+                    id: model.id,
+                    name: model.name,
+                    makeId: model.makeId,
+                  }))}
                   initialModelIds={club.models.map(({ modelId }) => modelId)}
                 />
                 <button type="submit">Save Models</button>
