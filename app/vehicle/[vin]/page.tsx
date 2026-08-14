@@ -45,13 +45,11 @@ const vehiclePageSelect = {
   inventoryStatus: true,
   model: {
     select: {
-      id: true,
       name: true,
       slug: true,
       makeId: true,
       make: {
         select: {
-          id: true,
           name: true,
           slug: true,
           logoUrl: true,
@@ -59,7 +57,6 @@ const vehiclePageSelect = {
       },
       images: {
         select: {
-          id: true,
           url: true,
           type: true,
           sourceName: true,
@@ -118,21 +115,20 @@ const vehiclePageSelect = {
       torqueGainOverride: true,
       part: {
         select: {
-          id: true,
           name: true,
           retailPriceCents: true,
           estimatedHpGain: true,
           estimatedTorqueGain: true,
           category: {
-            select: { id: true, name: true },
+            select: { name: true },
           },
           brand: {
-            select: { id: true, name: true },
+            select: { name: true },
           },
         },
       },
       category: {
-        select: { id: true, name: true },
+        select: { name: true },
       },
     },
     orderBy: { createdAt: "desc" },
@@ -166,9 +162,6 @@ const vehiclePageListingSelect = {
   id: true,
   askingPrice: true,
   price: true,
-  priceStatus: true,
-  validationStatus: true,
-  status: true,
   url: true,
   imageUrl: true,
   sellerId: true,
@@ -201,12 +194,13 @@ type VehiclePageSession = Session | null;
 export default async function VehiclePage({ params, searchParams }: VehiclePageProps) {
   const { vin } = await params;
   const mockSession = (globalThis as typeof globalThis & { mockSession?: VehiclePageSession }).mockSession;
-  const session: VehiclePageSession = mockSession !== undefined ? mockSession : await auth();
-
-  const vehicle = await prisma.vehicle.findUnique({
-    where: { vin },
-    select: vehiclePageSelect,
-  });
+  const [session, vehicle] = await Promise.all([
+    mockSession !== undefined ? Promise.resolve(mockSession) : auth(),
+    prisma.vehicle.findUnique({
+      where: { vin },
+      select: vehiclePageSelect,
+    }),
+  ]);
 
   if (!vehicle || vehicle.inventoryStatus === "REMOVED" || vehicle.inventoryStatus === "NEEDS_REVIEW") {
     return (
@@ -273,12 +267,8 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
         name: true,
         slug: true,
         imageUrl: true,
-        sourceUrl: true,
-        sourceConfidence: true,
         retailPriceCents: true,
         estimatedHpGain: true,
-        estimatedTorqueGain: true,
-        status: true,
         category: {
           select: {
             name: true,
@@ -293,8 +283,6 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
         compatibility: {
           where: getExplicitCompatibilityScopeForVehicle(vehicle),
           select: {
-            makeId: true,
-            modelId: true,
             yearStart: true,
             yearEnd: true,
             make: {
