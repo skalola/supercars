@@ -192,7 +192,6 @@ const modelListingPreviewSelect = {
   source: {
     select: {
       name: true,
-      type: true,
     },
   },
   vehicle: {
@@ -203,7 +202,6 @@ const modelListingPreviewSelect = {
       model: {
         select: {
           name: true,
-          slug: true,
           make: {
             select: {
               name: true,
@@ -220,41 +218,33 @@ type ModelPageSession = Session | null;
 export default async function ModelPage({ params }: ModelPageProps) {
   const { slug, modelSlug } = await params;
   const mockSession = (globalThis as typeof globalThis & { mockSession?: ModelPageSession }).mockSession;
-  const session: ModelPageSession = mockSession !== undefined ? mockSession : await auth();
-
-  const make = await prisma.make.findUnique({
-    where: { slug },
-    select: { id: true, name: true },
-  });
-  if (!make) {
-    return (
-      <main className="garage-page-shell auth-page-shell">
-        <section className="auth-panel">
-          <div className="garage-page-eyebrow">Explore</div>
-          <h1>Make not found</h1>
-          <p>This manufacturer is not available in SUPERCAR DASH yet.</p>
-        </section>
-      </main>
-    );
-  }
-
-  const model = await prisma.model.findUnique({
-    where: {
-      makeId_slug: {
-        makeId: make.id,
+  const [session, model] = await Promise.all([
+    mockSession !== undefined ? Promise.resolve(mockSession) : auth(),
+    prisma.model.findFirst({
+      where: {
         slug: modelSlug,
+        make: { slug },
       },
-    },
-    select: modelPageSelect,
-  });
+      select: modelPageSelect,
+    }),
+  ]);
 
   if (!model) {
+    const makeExists = await prisma.make.findUnique({
+      where: { slug },
+      select: { id: true },
+    });
+
     return (
       <main className="garage-page-shell auth-page-shell">
         <section className="auth-panel">
           <div className="garage-page-eyebrow">Explore</div>
-          <h1>Model not found</h1>
-          <p>This model is not available in SUPERCAR DASH yet.</p>
+          <h1>{makeExists ? "Model not found" : "Make not found"}</h1>
+          <p>
+            {makeExists
+              ? "This model is not available in SUPERCAR DASH yet."
+              : "This manufacturer is not available in SUPERCAR DASH yet."}
+          </p>
         </section>
       </main>
     );
@@ -368,19 +358,6 @@ export default async function ModelPage({ params }: ModelPageProps) {
             name: true,
             slug: true,
           },
-        },
-        compatibility: {
-          select: {
-            makeId: true,
-            modelId: true,
-            make: {
-              select: { name: true },
-            },
-            model: {
-              select: { name: true },
-            },
-          },
-          orderBy: { createdAt: "asc" },
         },
       },
       orderBy: [
