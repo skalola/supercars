@@ -2,7 +2,12 @@ import { Prisma } from "@prisma/client";
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { SUPPORTED_MAKES } from "@/lib/supported-makes";
-import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
+import {
+  getVehicleHeroImage,
+  isNonVehicleImageUrl,
+  NON_VEHICLE_IMAGE_URL_PATTERN,
+  NON_VEHICLE_IMAGE_URL_TERMS,
+} from "@/lib/vehicle-images";
 
 export type HomepageGarageVehicle = {
   id: string;
@@ -395,6 +400,8 @@ const getLiveInventoryValueStats = unstable_cache(
       WHERE listing."status" = 'ACTIVE'
         AND listing."validationStatus" = 'VALID'
         AND listing."priceStatus" IS DISTINCT FROM 'PRICE_INVALID'
+        AND listing."imageUrl" IS NOT NULL
+        AND listing."imageUrl" !~* ${NON_VEHICLE_IMAGE_URL_PATTERN}
         AND vehicle."inventoryStatus" IN ('ACTIVE', 'VALID', 'WARNING')
         AND make."name" IN (${Prisma.join(SUPPORTED_MAKES)})
         AND (listing."askingPrice" >= 10000 OR listing."price" >= 10000)
@@ -447,7 +454,7 @@ const getLiveInventoryValueStats = unstable_cache(
     mostExpensive: pricedListings.sort((a, b) => b.value - a.value)[0] ?? null,
   };
   },
-  ["homepage-live-inventory-value-stats-v3"],
+  ["homepage-live-inventory-value-stats-v4"],
   { revalidate: 900, tags: ["inventory-summary"] }
 );
 
@@ -489,6 +496,7 @@ const liveInventoryWhere = {
   status: "ACTIVE",
   validationStatus: "VALID",
   priceStatus: { not: "PRICE_INVALID" },
+  imageUrl: { not: null },
   vehicle: {
     is: {
       inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
@@ -499,6 +507,9 @@ const liveInventoryWhere = {
   NOT: [
     { source: { is: { type: "AUCTION" } } },
     { url: { contains: "bringatrailer.com", mode: "insensitive" } },
+    ...NON_VEHICLE_IMAGE_URL_TERMS.map((term) => ({
+      imageUrl: { contains: term, mode: "insensitive" as const },
+    })),
   ],
 } satisfies Prisma.ListingWhereInput;
 
@@ -558,7 +569,7 @@ const getVisibleInventoryCardListings = unstable_cache(
     take,
   });
   },
-  ["homepage-visible-inventory-cards-v1"],
+  ["homepage-visible-inventory-cards-v2"],
   { revalidate: 600, tags: ["inventory-summary"] }
 );
 

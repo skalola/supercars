@@ -6,6 +6,29 @@ export interface VehicleImageInput {
   } | null;
 }
 
+export const NON_VEHICLE_IMAGE_URL_TERMS = [
+  "placeholder",
+  "logo",
+  "icon",
+  "favicon",
+  "spinner",
+  "loading",
+  "avatar",
+  "profile",
+  "badge",
+  "sprite",
+  "transparent",
+  "blank",
+  "noimage",
+  "comingsoon",
+  "autocheck",
+  "carfax",
+  "e6-static-thumber",
+] as const;
+
+export const NON_VEHICLE_IMAGE_URL_PATTERN = NON_VEHICLE_IMAGE_URL_TERMS.join("|");
+const nonVehicleImageUrlPattern = new RegExp(NON_VEHICLE_IMAGE_URL_PATTERN, "i");
+
 /**
  * Resolves the best available hero image for a vehicle based on the priority chain:
  * 1. Owner-uploaded primary vehicle image (isHero === true, or first available photo)
@@ -63,5 +86,5 @@ export function getVehicleHeroImage(vehicle: VehicleImageInput | null | undefine
 
 export function isNonVehicleImageUrl(value: string | null | undefined) {
   if (!value) return true;
-  return /placeholder|logo|icon|favicon|spinner|loading|avatar|profile|badge|sprite|transparent|blank|noimage|comingsoon|autocheck|carfax|e6-static-thumber/i.test(value);
+  return nonVehicleImageUrlPattern.test(value);
 }

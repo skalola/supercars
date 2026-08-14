@@ -1,6 +1,9 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { isNonVehicleImageUrl } from "@/lib/vehicle-images";
+import {
+  NON_VEHICLE_IMAGE_URL_PATTERN,
+  NON_VEHICLE_IMAGE_URL_TERMS,
+} from "@/lib/vehicle-images";
 
 const SUPPORTED_INVENTORY_MAKES = ["Ferrari", "Lamborghini", "McLaren"];
 const ADMIN_LISTING_LIMIT = 1000;
@@ -26,6 +29,9 @@ export const inventoryDashboardListingWhere: Prisma.ListingWhereInput = {
 const liveInventoryWhere: Prisma.ListingWhereInput = {
   ...inventoryDashboardListingWhere,
   imageUrl: { not: null },
+  AND: NON_VEHICLE_IMAGE_URL_TERMS.map((term) => ({
+    NOT: { imageUrl: { contains: term, mode: "insensitive" } },
+  })),
   vehicle: {
     is: {
       inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
@@ -78,7 +84,7 @@ const adminInventoryListingSelect = {
 } satisfies Prisma.ListingSelect;
 
 export async function getInventoryDashboardListings() {
-  const rawListings = await prisma.listing.findMany({
+  return prisma.listing.findMany({
     where: liveInventoryWhere,
     select: {
       id: true,
@@ -118,7 +124,6 @@ export async function getInventoryDashboardListings() {
     orderBy: { createdAt: "desc" },
     take: ADMIN_LISTING_LIMIT,
   });
-  return rawListings.filter(hasCleanInventoryDisplayImage);
 }
 
 export async function getAdminInventoryListings(page = 1) {
@@ -149,18 +154,10 @@ export async function getAdminInventoryListingCount() {
   });
 }
 
-function hasCleanInventoryDisplayImage(listing: {
-  imageUrl?: string | null;
-}) {
-  return Boolean(listing.imageUrl && !isNonVehicleImageUrl(listing.imageUrl));
-}
-
 export async function getInventoryDashboardListingCount() {
-  const listings = await prisma.listing.findMany({
+  return prisma.listing.count({
     where: liveInventoryWhere,
-    select: { imageUrl: true },
   });
-  return listings.filter(hasCleanInventoryDisplayImage).length;
 }
 
 export async function getLiveInventoryListingStats() {
@@ -190,7 +187,7 @@ export async function getLiveInventoryListingStats() {
         AND listing."priceStatus" IS DISTINCT FROM 'PRICE_INVALID'
         AND (listing."askingPrice" >= 10000 OR listing."price" >= 10000)
         AND listing."imageUrl" IS NOT NULL
-        AND listing."imageUrl" !~* 'placeholder|logo|icon|favicon|spinner|loading|avatar|profile|badge|sprite|transparent|blank|noimage|comingsoon|autocheck|carfax|e6-static-thumber'
+        AND listing."imageUrl" !~* ${NON_VEHICLE_IMAGE_URL_PATTERN}
         AND make."name" IN ('Ferrari', 'Lamborghini', 'McLaren')
         AND (source."type" IS NULL OR source."type" <> 'AUCTION')
         AND (listing."url" IS NULL OR listing."url" NOT ILIKE '%bringatrailer.com%')

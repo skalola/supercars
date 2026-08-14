@@ -9,7 +9,10 @@ import {
   type MakeOption,
   type ModelOption,
 } from "@/lib/makes/catalog";
-import { isNonVehicleImageUrl } from "@/lib/vehicle-images";
+import {
+  NON_VEHICLE_IMAGE_URL_PATTERN,
+  NON_VEHICLE_IMAGE_URL_TERMS,
+} from "@/lib/vehicle-images";
 
 type InventoryPageProps = {
   searchParams?: Promise<{
@@ -79,7 +82,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
   const totalValue = summary.totalValue;
   const availableYears = summary.availableYears;
 
-  const mappedListings = listings.filter(hasCleanDisplayImage).map((l) => ({
+  const mappedListings = listings.map((l) => ({
     id: l.id,
     modelId: l.vehicle?.modelId || l.modelId,
     imageUrl: l.imageUrl,
@@ -227,6 +230,7 @@ async function getInventorySummary({
       WHERE listing."status" = 'ACTIVE'
         AND listing."priceStatus" IS DISTINCT FROM 'PRICE_INVALID'
         AND listing."imageUrl" IS NOT NULL
+        AND listing."imageUrl" !~* ${NON_VEHICLE_IMAGE_URL_PATTERN}
         AND (source."type" IS NULL OR source."type" <> 'AUCTION')
         AND (listing."url" IS NULL OR listing."url" NOT ILIKE '%bringatrailer.com%')
         AND make."name" IN (${Prisma.join(SUPPORTED_INVENTORY_MAKES)})
@@ -288,6 +292,9 @@ function buildInventoryWhere({
     NOT: [
       { source: { is: { type: "AUCTION" } } },
       { url: { contains: "bringatrailer.com", mode: "insensitive" } },
+      ...NON_VEHICLE_IMAGE_URL_TERMS.map((term) => ({
+        imageUrl: { contains: term, mode: "insensitive" as const },
+      })),
     ],
     AND: [
       {
@@ -331,10 +338,6 @@ function buildInventoryWhere({
       { imageUrl: { not: null } },
     ],
   };
-}
-
-function hasCleanDisplayImage(listing: { imageUrl: string | null }) {
-  return Boolean(listing.imageUrl && !isNonVehicleImageUrl(listing.imageUrl));
 }
 
 function resolveMakeId(makes: MakeOption[], value?: string) {
