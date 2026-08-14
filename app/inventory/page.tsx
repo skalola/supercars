@@ -84,30 +84,28 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
 
   const mappedListings = listings.map((l) => ({
     id: l.id,
-    modelId: l.vehicle?.modelId || l.modelId,
+    modelId: l.vehicle!.modelId,
     imageUrl: l.imageUrl,
-    year: l.vehicle?.year || l.year,
+    year: l.vehicle!.year,
     price: l.price,
     mileage: l.mileage,
     color: l.color,
     askingPrice: l.askingPrice,
     url: l.url,
     vehicleId: l.vehicleId,
-    vehicle: l.vehicle
-      ? {
-          vin: l.vehicle.vin,
-          heroImageUrl: l.imageUrl,
-        }
-      : null,
+    vehicle: {
+      vin: l.vehicle!.vin,
+      heroImageUrl: l.imageUrl,
+    },
     model: {
-      id: l.vehicle?.model.id || l.model.id,
-      name: l.vehicle?.model.name || l.model.name,
-      slug: l.vehicle?.model.slug || l.model.slug,
-      makeId: l.vehicle?.model.makeId || l.model.makeId,
+      id: l.vehicle!.model.id,
+      name: l.vehicle!.model.name,
+      slug: l.vehicle!.model.slug,
+      makeId: l.vehicle!.model.makeId,
       make: {
-        id: l.vehicle?.model.make.id || l.model.make.id,
-        name: l.vehicle?.model.make.name || l.model.make.name,
-        slug: l.vehicle?.model.make.slug || l.model.make.slug,
+        id: l.vehicle!.model.make.id,
+        name: l.vehicle!.model.make.name,
+        slug: l.vehicle!.model.make.slug,
       },
     },
   }));
@@ -133,9 +131,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
 
 const inventoryListingSelect = {
   id: true,
-  modelId: true,
   imageUrl: true,
-  year: true,
   price: true,
   mileage: true,
   color: true,
@@ -160,21 +156,6 @@ const inventoryListingSelect = {
               slug: true,
             },
           },
-        },
-      },
-    },
-  },
-  model: {
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      makeId: true,
-      make: {
-        select: {
-          id: true,
-          name: true,
-          slug: true,
         },
       },
     },
