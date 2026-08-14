@@ -372,51 +372,101 @@ const getPublicFeaturedGarages = unstable_cache(
 
 const getLiveInventoryValueStats = unstable_cache(
   async () => {
-  const [totalCars, askingPriceTotal, fallbackPriceTotal, topAskingListings, topFallbackListings] = await Promise.all([
-    prisma.listing.count({ where: liveInventoryWhere }),
-    prisma.listing.aggregate({
-      where: liveInventoryWhere,
-      _sum: { askingPrice: true },
-    }),
-    prisma.listing.aggregate({
-      where: {
-        AND: [
-          liveInventoryWhere,
-          { askingPrice: null },
-        ],
-      },
-      _sum: { price: true },
-    }),
-    getTopPricedInventoryCandidates("askingPrice"),
-    getTopPricedInventoryCandidates("price"),
-  ]);
+  const rows = await prisma.$queryRaw<Array<{
+    totalCars: number;
+    totalValue: number;
+    candidates: HeadlinePriceCandidate[];
+  }>>(Prisma.sql`
+    WITH live_inventory AS MATERIALIZED (
+      SELECT
+        listing."id",
+        listing."url",
+        listing."askingPrice",
+        listing."price",
+        vehicle."vin",
+        vehicle."year",
+        model."name" AS "modelName",
+        make."name" AS "makeName"
+      FROM "Listing" listing
+      LEFT JOIN "MarketSource" source ON source."id" = listing."sourceId"
+      INNER JOIN "Vehicle" vehicle ON vehicle."id" = listing."vehicleId"
+      INNER JOIN "Model" model ON model."id" = vehicle."modelId"
+      INNER JOIN "Make" make ON make."id" = model."makeId"
+      WHERE listing."status" = 'ACTIVE'
+        AND listing."validationStatus" = 'VALID'
+        AND listing."priceStatus" IS DISTINCT FROM 'PRICE_INVALID'
+        AND vehicle."inventoryStatus" IN ('ACTIVE', 'VALID', 'WARNING')
+        AND make."name" IN (${Prisma.join(SUPPORTED_MAKES)})
+        AND (listing."askingPrice" >= 10000 OR listing."price" >= 10000)
+        AND (source."type" IS NULL OR source."type" <> 'AUCTION')
+        AND (listing."url" IS NULL OR listing."url" NOT ILIKE '%bringatrailer.com%')
+    ),
+    candidate_rows AS (
+      (SELECT * FROM live_inventory
+       WHERE "askingPrice" IS NOT NULL
+       ORDER BY "askingPrice" DESC
+       LIMIT 40)
+      UNION ALL
+      (SELECT * FROM live_inventory
+       WHERE "askingPrice" IS NULL
+       ORDER BY "price" DESC
+       LIMIT 40)
+    )
+    SELECT
+      COUNT(*)::int AS "totalCars",
+      COALESCE(SUM(COALESCE("askingPrice", "price", 0)), 0)::double precision AS "totalValue",
+      COALESCE(
+        (SELECT jsonb_agg(jsonb_build_object(
+          'id', candidate."id",
+          'url', candidate."url",
+          'askingPrice', candidate."askingPrice",
+          'price', candidate."price",
+          'vin', candidate."vin",
+          'year', candidate."year",
+          'modelName', candidate."modelName",
+          'makeName', candidate."makeName"
+        )) FROM candidate_rows candidate),
+        '[]'::jsonb
+      ) AS candidates
+    FROM live_inventory
+  `);
+  const stats = rows[0];
 
-  const pricedListings = [...topAskingListings, ...topFallbackListings]
+  const pricedListings = (stats?.candidates ?? [])
     .map((listing) => ({
-      label: listing.vehicle
-        ? `${listing.vehicle.year} ${listing.vehicle.model.make.name} ${listing.vehicle.model.name}`
-        : "Most expensive",
-      href: listing.vehicle ? `/vehicle/${listing.vehicle.vin}` : null,
+      label: `${listing.year} ${listing.makeName} ${listing.modelName}`,
+      href: `/vehicle/${listing.vin}`,
       value: listing.askingPrice ?? listing.price ?? 0,
       listing,
     }))
     .filter((listing) => listing.value >= 10000)
     .filter((listing) => isPlausibleHeadlinePrice(listing.listing, listing.value));
   return {
-    totalCars,
-    totalValue: (askingPriceTotal._sum.askingPrice || 0) + (fallbackPriceTotal._sum.price || 0),
+    totalCars: stats?.totalCars ?? 0,
+    totalValue: stats?.totalValue ?? 0,
     mostExpensive: pricedListings.sort((a, b) => b.value - a.value)[0] ?? null,
   };
   },
-  ["homepage-live-inventory-value-stats-v2"],
+  ["homepage-live-inventory-value-stats-v3"],
   { revalidate: 900, tags: ["inventory-summary"] }
 );
 
+type HeadlinePriceCandidate = {
+  id: string;
+  url: string | null;
+  askingPrice: number | null;
+  price: number | null;
+  vin: string;
+  year: number;
+  modelName: string;
+  makeName: string;
+};
+
 function isPlausibleHeadlinePrice(
-  listing: Awaited<ReturnType<typeof getTopPricedInventoryCandidates>>[number],
+  listing: HeadlinePriceCandidate,
   value: number,
 ) {
-  const modelName = listing.vehicle?.model.name ?? "";
+  const modelName = listing.modelName;
   const url = listing.url ?? "";
   const context = `${modelName} ${url}`;
   if (/laferrari|enzo|f40|f50|monza|daytona|sp[0-9]|p1|senna|speedtail|mclaren f1|countach|miura|reventon|sian|centenario/i.test(context)) {
@@ -511,37 +561,6 @@ const getVisibleInventoryCardListings = unstable_cache(
   ["homepage-visible-inventory-cards-v1"],
   { revalidate: 600, tags: ["inventory-summary"] }
 );
-
-async function getTopPricedInventoryCandidates(priceField: "askingPrice" | "price") {
-  return prisma.listing.findMany({
-    where: {
-      AND: [
-        liveInventoryWhere,
-        priceField === "price" ? { askingPrice: null } : {},
-      ],
-    },
-    select: {
-      id: true,
-      url: true,
-      askingPrice: true,
-      price: true,
-      vehicle: {
-        select: {
-          vin: true,
-          year: true,
-          model: {
-            select: {
-              name: true,
-              make: { select: { name: true } },
-            },
-          },
-        },
-      },
-    },
-    orderBy: { [priceField]: "desc" },
-    take: 40,
-  });
-}
 
 const getHighestHorsepowerInventoryCar = unstable_cache(
   async () => {
