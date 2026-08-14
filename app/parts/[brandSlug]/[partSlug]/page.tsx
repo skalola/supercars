@@ -118,10 +118,6 @@ const relatedPartSelect = {
       yearStart: true,
       yearEnd: true,
     },
-    orderBy: [
-      { make: { name: "asc" } },
-      { model: { name: "asc" } },
-    ],
     take: 24,
   },
 } satisfies Prisma.PerformancePartSelect;
@@ -504,44 +500,64 @@ const getPublicPartDetail = unstable_cache(
   { revalidate: 60 * 60, tags: ["parts-catalog"] },
 );
 
-async function getRelatedParts(
-  partId: string,
-  categoryId: string,
-  brandId: string,
-  makeIds: string[],
-  modelIds: string[],
+const getRelatedParts = unstable_cache(
+  async (
+    partId: string,
+    categoryId: string,
+    brandId: string,
+    makeIds: string[],
+    modelIds: string[],
+  ) => {
+    const relatedConditions = [
+      { categoryId },
+      { brandId },
+      ...(makeIds.length > 0 ? [{ compatibility: { some: { makeId: { in: makeIds } } } }] : []),
+      ...(modelIds.length > 0 ? [{ compatibility: { some: { modelId: { in: modelIds } } } }] : []),
+    ];
+
+    const parts = await prisma.performancePart.findMany({
+      where: {
+        id: { not: partId },
+        status: "ACTIVE",
+        OR: relatedConditions,
+      },
+      select: relatedPartSelect,
+      orderBy: [
+        { category: { displayOrder: "asc" } },
+        { brand: { name: "asc" } },
+        { name: "asc" },
+      ],
+      take: 20,
+    });
+
+    return parts
+      .map((part) => ({
+        ...part,
+        compatibility: [...part.compatibility].sort(compareRelatedFitments),
+      }))
+      .filter((part) => auditPerformancePartTrust(part).publicEligible)
+      .map((part) => ({
+        part,
+        score: scoreRelatedPart(part, { categoryId, brandId, makeIds, modelIds }),
+      }))
+      .sort((a, b) => b.score - a.score || a.part.name.localeCompare(b.part.name))
+      .map(({ part }) => part)
+      .slice(0, 5);
+  },
+  ["public-related-parts-v1"],
+  { revalidate: 60 * 60, tags: ["parts-catalog"] },
+);
+
+function compareRelatedFitments(
+  left: RelatedPart["compatibility"][number],
+  right: RelatedPart["compatibility"][number],
 ) {
-  const relatedConditions = [
-    { categoryId },
-    { brandId },
-    ...(makeIds.length > 0 ? [{ compatibility: { some: { makeId: { in: makeIds } } } }] : []),
-    ...(modelIds.length > 0 ? [{ compatibility: { some: { modelId: { in: modelIds } } } }] : []),
-  ];
-
-  const parts = await prisma.performancePart.findMany({
-    where: {
-      id: { not: partId },
-      status: "ACTIVE",
-      OR: relatedConditions,
-    },
-    select: relatedPartSelect,
-    orderBy: [
-      { category: { displayOrder: "asc" } },
-      { brand: { name: "asc" } },
-      { name: "asc" },
-    ],
-    take: 20,
-  });
-
-  return parts
-    .filter((part) => auditPerformancePartTrust(part).publicEligible)
-    .map((part) => ({
-      part,
-      score: scoreRelatedPart(part, { categoryId, brandId, makeIds, modelIds }),
-    }))
-    .sort((a, b) => b.score - a.score || a.part.name.localeCompare(b.part.name))
-    .map(({ part }) => part)
-    .slice(0, 5);
+  return (
+    (left.makeId || "").localeCompare(right.makeId || "") ||
+    (left.modelId || "").localeCompare(right.modelId || "") ||
+    (left.yearStart ?? 0) - (right.yearStart ?? 0) ||
+    (left.yearEnd ?? 0) - (right.yearEnd ?? 0)
+  );
 }
 
 function scoreRelatedPart(
