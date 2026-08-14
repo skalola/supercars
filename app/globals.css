@@ -16733,12 +16733,6 @@ canvas {
   gap: 10px;
 }
 
-.club-location-city {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-}
-
 .club-checkbox-row {
   display: flex !important;
   min-height: 44px;
@@ -16763,12 +16757,12 @@ canvas {
 }
 
 .club-form .club-checkbox-row-compact {
-  width: fit-content;
-  min-height: 24px;
+  width: 100%;
+  min-height: 36px;
   gap: 7px !important;
-  padding: 0;
-  border: 0;
-  background: transparent;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.035);
 }
 
 .club-form .club-checkbox-row-compact input[type="checkbox"] {
