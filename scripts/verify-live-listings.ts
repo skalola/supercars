@@ -5,7 +5,6 @@ import { getBatchLimit, isExecuteMode, logScriptMode } from "./lib/script-guards
 type ListingCandidate = {
   id: string;
   url: string | null;
-  externalListingId: string | null;
   dealerName: string | null;
   source: { name: string; type: string } | null;
   vehicle: {
@@ -14,10 +13,6 @@ type ListingCandidate = {
       make: { name: string };
     };
   } | null;
-  _count: {
-    purchases: number;
-    fulfillmentRequests: number;
-  };
 };
 
 type VerificationResult = {
@@ -176,25 +171,40 @@ async function verifyListing(
   }
 }
 
-async function removeBadListing(candidate: ListingCandidate) {
-  const hasAuditHistory = candidate._count.purchases > 0 || candidate._count.fulfillmentRequests > 0;
+async function applyBadListingActions(listingIds: string[]) {
+  const actions = new Map<string, "marked_removed" | "deleted">();
+  if (listingIds.length === 0) return actions;
 
-  if (hasAuditHistory) {
-    await prisma.listing.update({
-      where: { id: candidate.id },
+  const protectedListings = await prisma.listing.findMany({
+    where: {
+      id: { in: listingIds },
+      OR: [
+        { purchases: { some: {} } },
+        { fulfillmentRequests: { some: {} } },
+      ],
+    },
+    select: { id: true },
+  });
+  const protectedIds = new Set(protectedListings.map((listing) => listing.id));
+  const removableIds = listingIds.filter((id) => !protectedIds.has(id));
+
+  await prisma.$transaction([
+    prisma.listing.updateMany({
+      where: { id: { in: Array.from(protectedIds) } },
       data: {
         status: "REMOVED",
         freshnessStatus: "REMOVED",
         validationStatus: "SOURCE_UNAVAILABLE",
       },
-    });
-    return "marked_removed";
-  }
+    }),
+    prisma.listing.deleteMany({
+      where: { id: { in: removableIds } },
+    }),
+  ]);
 
-  await prisma.listing.delete({
-    where: { id: candidate.id },
-  });
-  return "deleted";
+  for (const id of protectedIds) actions.set(id, "marked_removed");
+  for (const id of removableIds) actions.set(id, "deleted");
+  return actions;
 }
 
 async function main() {
@@ -218,7 +228,6 @@ async function main() {
     select: {
       id: true,
       url: true,
-      externalListingId: true,
       dealerName: true,
       source: { select: { name: true, type: true } },
       vehicle: {
@@ -229,12 +238,6 @@ async function main() {
               make: { select: { name: true } },
             },
           },
-        },
-      },
-      _count: {
-        select: {
-          purchases: true,
-          fulfillmentRequests: true,
         },
       },
     },
@@ -254,11 +257,6 @@ async function main() {
 
   for (const candidate of candidates) {
     const result = await verifyListing(candidate, { nonTargetMakeNames });
-    let action = "kept";
-
-    if (!result.live) {
-      action = execute ? await removeBadListing(candidate) : "would_remove";
-    }
 
     results.push({
       id: candidate.id,
@@ -267,10 +265,21 @@ async function main() {
       source: candidate.source?.name || candidate.dealerName,
       live: result.live,
       reason: result.reason,
-      action,
+      action: result.live ? "kept" : "would_remove",
     });
+  }
 
-    console.log(`${action.toUpperCase()} ${candidate.vehicle?.vin || "NO_VIN"} ${result.reason} ${candidate.url || ""}`);
+  if (execute) {
+    const actions = await applyBadListingActions(
+      results.filter((row) => !row.live).map((row) => row.id),
+    );
+    for (const row of results) {
+      if (!row.live) row.action = actions.get(row.id) ?? "would_remove";
+    }
+  }
+
+  for (const row of results) {
+    console.log(`${row.action.toUpperCase()} ${row.vin || "NO_VIN"} ${row.reason} ${row.url || ""}`);
   }
 
   const summary = results.reduce(
