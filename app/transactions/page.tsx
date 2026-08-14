@@ -34,10 +34,12 @@ export default async function TransactionsPage({
   const search = params?.q?.trim() || undefined;
   const filters = { category, search };
 
-  const [summary, totalTransactions] = userId
+  const [summary, searchedTransactionCount] = userId
     ? await Promise.all([
         getUserFulfillmentSummary(userId),
-        getUserFulfillmentTransactionCount(userId, filters),
+        search
+          ? getUserFulfillmentTransactionCount(userId, filters)
+          : Promise.resolve(null),
       ])
     : [
         {
@@ -47,8 +49,9 @@ export default async function TransactionsPage({
           captured: 0,
           tabCounts: Object.fromEntries([...transactionCategories].map((key) => [key, 0])) as Record<UserFulfillmentCategory, number>,
         },
-        0,
+        null,
       ];
+  const totalTransactions = searchedTransactionCount ?? summary.tabCounts[category];
   const totalPages = Math.max(1, Math.ceil(totalTransactions / USER_FULFILLMENT_PAGE_SIZE));
   const page = Math.min(requestedPage, totalPages);
   const rawTransactions = userId ? await getUserFulfillmentTransactions(userId, filters, page) : [];
