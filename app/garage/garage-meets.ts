@@ -22,6 +22,42 @@ export type GarageMeetSummary = {
   upcoming: GarageMeetActivityItem[];
 };
 
+export async function getGarageMeetActivity(userId: string): Promise<GarageMeetActivityItem[]> {
+  try {
+    const [hostedMeets, attendedRsvps] = await Promise.all([
+      prisma.meet.findMany({
+        where: { hostId: userId, status: { not: "HIDDEN" } },
+        select: meetActivitySelect,
+        orderBy: { startsAt: "desc" },
+        take: 4,
+      }),
+      prisma.meetRsvp.findMany({
+        where: { userId, status: { not: "CANCELLED" }, meet: { status: { not: "HIDDEN" } } },
+        select: { status: true, meet: { select: meetActivitySelect } },
+        orderBy: { meet: { startsAt: "desc" } },
+        take: 4,
+      }),
+    ]);
+
+    const rows = [
+      ...hostedMeets.map((meet) => ({ meet, badge: meet.status })),
+      ...attendedRsvps.map((rsvp) => ({ meet: rsvp.meet, badge: formatRsvpBadge(rsvp.status) })),
+    ].sort((a, b) => b.meet.startsAt.getTime() - a.meet.startsAt.getTime());
+    const seen = new Set<string>();
+
+    return rows
+      .filter(({ meet }) => {
+        if (seen.has(meet.id)) return false;
+        seen.add(meet.id);
+        return true;
+      })
+      .slice(0, 4)
+      .map(({ meet, badge }) => toMeetActivityItem(meet, badge));
+  } catch {
+    return [];
+  }
+}
+
 export async function getGarageMeetSummary(userId: string): Promise<GarageMeetSummary> {
   try {
     const now = new Date();

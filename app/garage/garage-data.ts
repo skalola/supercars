@@ -4,7 +4,7 @@ import { getNextMaintenanceRecommendation } from "@/lib/maintenance/recommendati
 import type { GarageClaimedVehicle, GaragePreviousVehicle, GarageSavedVehicle } from "./GarageTabs";
 import type { GarageRecentActivityItem, GarageServiceWatchItem } from "./GarageSupportRail";
 import { getGarageClubSummary } from "./garage-clubs";
-import { getGarageMeetSummary } from "./garage-meets";
+import { getGarageMeetActivity } from "./garage-meets";
 import { getGarageStats } from "./garage-stats";
 
 const garageClaimedVehicleSelect = {
@@ -157,7 +157,7 @@ export type GaragePreviousVehicleRow = Prisma.VehicleGetPayload<{ select: typeof
 export type GarageItemRow = Prisma.GarageItemGetPayload<{ select: typeof garageItemSelect }>;
 
 export async function getGarageDashboardData(userId: string, includePendingClubs: boolean) {
-  const [claimedVehicleRows, previousVehicleRows, garageItems, meetSummary, clubSummary] = await Promise.all([
+  const [claimedVehicleRows, previousVehicleRows, garageItems, meetActivity, clubSummary] = await Promise.all([
     prisma.vehicle.findMany({
       where: {
         ownerId: userId,
@@ -182,7 +182,7 @@ export async function getGarageDashboardData(userId: string, includePendingClubs
       orderBy: { createdAt: "desc" },
       take: 96,
     }),
-    getGarageMeetSummary(userId),
+    getGarageMeetActivity(userId),
     getGarageClubSummary(userId, includePendingClubs),
   ]);
 
@@ -195,14 +195,13 @@ export async function getGarageDashboardData(userId: string, includePendingClubs
   const totalVehicles = claimedVehicles.length + savedVehicles.length;
 
   return {
-    meetSummary,
     clubSummary,
     claimedVehicles,
     savedVehicles,
     previousVehicles,
     garageStats: getGarageStats(claimedVehicleRows, totalVehicles),
     serviceWatch: getGarageServiceWatch(claimedVehicleRows),
-    recentActivity: getRecentGarageActivity(claimedVehicleRows, garageItems, meetSummary),
+    recentActivity: getRecentGarageActivity(claimedVehicleRows, garageItems, meetActivity),
   };
 }
 
@@ -285,7 +284,7 @@ function getGarageServiceWatch(vehicles: GarageClaimedVehicleRow[]): GarageServi
 function getRecentGarageActivity(
   vehicles: GarageClaimedVehicleRow[],
   garageItems: GarageItemRow[],
-  meetSummary: Awaited<ReturnType<typeof getGarageMeetSummary>>,
+  meetActivity: Awaited<ReturnType<typeof getGarageMeetActivity>>,
 ): GarageRecentActivityItem[] {
   const vehicleActivity = vehicles.map((vehicle) => ({
     id: `claimed:${vehicle.id}`,
@@ -305,7 +304,7 @@ function getRecentGarageActivity(
     timestamp: formatRelativeDate(item.createdAt),
     sortDate: item.createdAt,
   }));
-  const meetActivity = [...meetSummary.upcoming, ...meetSummary.hosted, ...meetSummary.attended].slice(0, 4).map((meet, index) => ({
+  const meetItems = meetActivity.map((meet, index) => ({
     id: `meet:${meet.id}:${index}`,
     href: meet.href,
     tone: "meet" as const,
@@ -315,7 +314,7 @@ function getRecentGarageActivity(
     sortDate: new Date(0),
   }));
 
-  return [...vehicleActivity, ...dreamActivity, ...meetActivity]
+  return [...vehicleActivity, ...dreamActivity, ...meetItems]
     .sort((a, b) => b.sortDate.getTime() - a.sortDate.getTime())
     .slice(0, 6)
     .map((item) => ({
