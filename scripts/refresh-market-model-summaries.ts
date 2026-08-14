@@ -1,5 +1,10 @@
 import { Prisma, PrismaClient } from "@prisma/client";
-import { getArgValue, getBatchLimit } from "./lib/script-guards";
+import {
+  getArgValue,
+  getBatchLimit,
+  getBatchOffset,
+  getRotatingBatchOffset,
+} from "./lib/script-guards";
 
 const prisma = new PrismaClient();
 
@@ -7,26 +12,43 @@ async function main() {
   const make = getArgValue("--make");
   const modelId = getArgValue("--model-id");
   const limit = getBatchLimit({ defaultLimit: 1000, maxLimit: 2000 });
+  const requestedOffset = getBatchOffset();
+  const where: Prisma.ModelWhereInput = {
+    ...(modelId ? { id: modelId } : {}),
+    ...(make ? { make: { name: { equals: make, mode: "insensitive" } } } : {}),
+  };
+  const eligibleModels = await prisma.model.count({ where });
+  const offset = modelId ? 0 : getRotatingBatchOffset(eligibleModels, limit, requestedOffset);
 
   const models = await prisma.model.findMany({
-    where: {
-      ...(modelId ? { id: modelId } : {}),
-      ...(make ? { make: { name: { equals: make, mode: "insensitive" } } } : {}),
-    },
+    where,
     select: { id: true },
-    orderBy: [{ make: { name: "asc" } }, { name: "asc" }],
+    orderBy: [{ make: { name: "asc" } }, { name: "asc" }, { id: "asc" }],
+    skip: offset,
     take: limit,
   });
 
   if (models.length === 0) {
-    console.log(JSON.stringify({ refreshed: 0, limit, make: make || null, modelId: modelId || null }, null, 2));
+    console.log(
+      JSON.stringify(
+        { refreshed: 0, eligibleModels, offset, limit, make: make || null, modelId: modelId || null },
+        null,
+        2,
+      ),
+    );
     return;
   }
 
   const modelIds = models.map((model) => model.id);
   const refreshed = await refreshSummaries(modelIds);
 
-  console.log(JSON.stringify({ refreshed, limit, make: make || null, modelId: modelId || null }, null, 2));
+  console.log(
+    JSON.stringify(
+      { refreshed, eligibleModels, offset, limit, make: make || null, modelId: modelId || null },
+      null,
+      2,
+    ),
+  );
 }
 
 async function refreshSummaries(modelIds: string[]) {

@@ -1,25 +1,46 @@
 import { prisma } from "@/lib/prisma";
 import { SUPPORTED_MAKES } from "@/lib/supported-makes";
-import { getBatchLimit } from "./lib/script-guards";
+import type { Prisma } from "@prisma/client";
+import { getBatchLimit, getBatchOffset, getRotatingBatchOffset } from "./lib/script-guards";
 
 const VIN_RE = /\b[A-HJ-NPR-Z0-9]{17}\b/g;
 const execute = process.argv.includes("--execute");
 const limit = getBatchLimit({ defaultLimit: 500, maxLimit: 1000 });
+const requestedOffset = getBatchOffset();
+
+const LISTING_WHERE: Prisma.ListingWhereInput = {
+  status: "ACTIVE",
+  vehicleId: { not: null },
+  vehicle: {
+    is: {
+      model: {
+        make: {
+          name: { in: [...SUPPORTED_MAKES] },
+        },
+      },
+    },
+  },
+};
 
 type ListingRow = Awaited<ReturnType<typeof getListings>>[number];
 
 async function main() {
-  const [listings, modelNames] = await Promise.all([
-    getListings(),
+  const [eligibleListings, modelNames] = await Promise.all([
+    prisma.listing.count({ where: LISTING_WHERE }),
     prisma.model.findMany({
       where: { make: { name: { in: [...SUPPORTED_MAKES] } } },
       select: { name: true },
     }),
   ]);
+  const offset = getRotatingBatchOffset(eligibleListings, limit, requestedOffset);
+  const listings = await getListings(offset);
   const knownModelFamilies = Array.from(new Set(modelNames.map((model) => toModelFamily(model.name)).filter(Boolean)));
 
   const summary = {
     execute,
+    eligibleListings,
+    offset,
+    limit,
     inspected: listings.length,
     kept: 0,
     imageRestored: 0,
@@ -77,21 +98,9 @@ async function main() {
   console.log(JSON.stringify(summary, null, 2));
 }
 
-async function getListings() {
+async function getListings(offset: number) {
   return prisma.listing.findMany({
-    where: {
-      status: "ACTIVE",
-      vehicleId: { not: null },
-      vehicle: {
-        is: {
-          model: {
-            make: {
-              name: { in: [...SUPPORTED_MAKES] },
-            },
-          },
-        },
-      },
-    },
+    where: LISTING_WHERE,
     select: {
       id: true,
       url: true,
@@ -119,14 +128,9 @@ async function getListings() {
           },
         },
       },
-      _count: {
-        select: {
-          purchases: true,
-          fulfillmentRequests: true,
-        },
-      },
     },
-    orderBy: { updatedAt: "desc" },
+    orderBy: { id: "asc" },
+    skip: offset,
     take: limit,
   });
 }

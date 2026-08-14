@@ -3,24 +3,30 @@ import type { Prisma } from "@prisma/client";
 import { emailMatchesWebsiteDomain } from "@/lib/directory/contact-domain-policy";
 import { isValidEmail } from "@/lib/fulfillment/partner-registry";
 import { SUPPORTED_MAKES } from "@/lib/supported-makes";
+import { getBatchLimit, getBatchOffset, getRotatingBatchOffset } from "./lib/script-guards";
 
 const TARGET_MAKES = [...SUPPORTED_MAKES];
 const AUCTION_DOMAINS = ["bringatrailer.com"];
 
 async function main() {
+  const partnerLimit = getBatchLimit({ defaultLimit: 500, maxLimit: 1000 });
+  const requestedPartnerOffset = getBatchOffset();
+  const eligiblePartnerContacts = await prisma.partnerContact.count({ where: { active: true } });
+  const partnerOffset = getRotatingBatchOffset(
+    eligiblePartnerContacts,
+    partnerLimit,
+    requestedPartnerOffset,
+  );
   const partnerContacts = await prisma.partnerContact.findMany({
     where: { active: true },
     select: {
       id: true,
       email: true,
       website: true,
-      _count: {
-        select: {
-          fulfillmentParties: true,
-        },
-      },
     },
-    take: 1000,
+    orderBy: { id: "asc" },
+    skip: partnerOffset,
+    take: partnerLimit,
   });
   const contactsWithoutValidEmail = partnerContacts.filter((contact) => !isValidEmail(contact.email));
   const contactsWithMismatchedDomains = partnerContacts.filter(
@@ -33,6 +39,10 @@ async function main() {
   const vendorUpdate = await prisma.partnerContact.updateMany({
     where: {
       id: { in: contactsWithoutValidEmail.map((contact) => contact.id) },
+      OR: [
+        { contactStatus: { not: "UNRESOLVED_EMAIL" } },
+        { confidence: { not: "UNRESOLVED_EMAIL" } },
+      ],
     },
     data: {
       contactStatus: "UNRESOLVED_EMAIL",
@@ -45,6 +55,10 @@ async function main() {
       id: {
         in: contactsWithMismatchedDomains.map((contact) => contact.id),
       },
+      OR: [
+        { contactStatus: { not: "RESOLVED" } },
+        { confidence: { not: "MANUAL_REVIEW" } },
+      ],
     },
     data: {
       contactStatus: "RESOLVED",
@@ -201,6 +215,10 @@ async function main() {
   console.log(
     JSON.stringify(
       {
+        eligiblePartnerContacts,
+        partnerContactsInspected: partnerContacts.length,
+        partnerBatchLimit: partnerLimit,
+        partnerBatchOffset: partnerOffset,
         vendorsMarkedUnverifiedForMissingEmail: vendorUpdate.count,
         vendorsMarkedManualReviewForEmailWebsiteDomainMismatch: mismatchedVendorHeld.count,
         listingsRemovedNoVinNoPrice: removedNoVinNoPrice.count,
