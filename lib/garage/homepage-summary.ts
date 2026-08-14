@@ -63,7 +63,7 @@ async function getSignedInHomepageSummary(userId: string): Promise<HomepageSumma
   const [user, ownedRows, dreamRows, inventoryVehicles, inventoryStats, highestHorsepowerCar, featuredGarages] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
-      select: { username: true, name: true },
+      select: { username: true },
     }),
     prisma.vehicle.findMany({
       where: {
@@ -105,14 +105,6 @@ async function getSignedInHomepageSummary(userId: string): Promise<HomepageSumma
             awards: true,
           },
         },
-        listings: {
-          where: {
-            status: "ACTIVE",
-            OR: [{ askingPrice: { gte: 10000 } }, { price: { gte: 10000 } }],
-          },
-          select: { askingPrice: true, price: true },
-          take: 1,
-        },
       },
       orderBy: { updatedAt: "desc" },
       take: 8,
@@ -132,16 +124,6 @@ async function getSignedInHomepageSummary(userId: string): Promise<HomepageSumma
               select: { url: true, type: true },
               orderBy: [{ type: "asc" }, { createdAt: "asc" }],
               take: 1,
-            },
-            listings: {
-              where: {
-                status: "ACTIVE",
-                validationStatus: "VALID",
-                priceStatus: { not: "PRICE_INVALID" },
-                OR: [{ askingPrice: { gte: 10000 } }, { price: { gte: 10000 } }],
-              },
-              select: { askingPrice: true, price: true },
-              take: 8,
             },
           },
         },
