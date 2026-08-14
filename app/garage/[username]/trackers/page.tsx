@@ -3,6 +3,10 @@ import type { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getNextMaintenanceRecommendation } from "@/lib/maintenance/recommendations";
+import {
+  getClaimedVehicleServiceRecordSummaries,
+  groupServiceRecordsByVehicle,
+} from "@/lib/maintenance/service-record-summaries";
 import TrackersClient, { type TrackerCard } from "./TrackersClient";
 
 const trackerUserSelect = {
@@ -39,15 +43,6 @@ const trackerUserSelect = {
           currentMileage: true,
         },
       },
-      serviceRecords: {
-        select: {
-          mileage: true,
-          serviceDate: true,
-          description: true,
-        },
-        orderBy: { serviceDate: "desc" },
-        take: 24,
-      },
       model: {
         select: {
           name: true,
@@ -74,17 +69,39 @@ export default async function ProfileTrackersPage({ params }: { params: Promise<
   const { username } = await params;
   const session = await auth();
 
-  const user = await prisma.user.findUnique({
-    where: { username },
+  if (!session?.user?.id) {
+    const profileExists = await prisma.user.findUnique({
+      where: { username },
+      select: { id: true },
+    });
+    return (
+      <main className="garage-page-shell">
+        <section className="garage-empty-panel">
+          <h1>{profileExists ? "Private Trackers" : "Profile not found"}</h1>
+          <p>{profileExists ? "Only the profile owner can manage tracker settings." : "This profile does not exist."}</p>
+          <Link href="/">
+            Return home
+          </Link>
+        </section>
+      </main>
+    );
+  }
+
+  const user = await prisma.user.findFirst({
+    where: { username, id: session.user.id },
     select: trackerUserSelect,
   });
 
   if (!user) {
+    const profileExists = await prisma.user.findUnique({
+      where: { username },
+      select: { id: true },
+    });
     return (
       <main className="garage-page-shell">
         <section className="garage-empty-panel">
-          <h1>Profile not found</h1>
-          <p>This profile does not exist.</p>
+          <h1>{profileExists ? "Private Trackers" : "Profile not found"}</h1>
+          <p>{profileExists ? "Only the profile owner can manage tracker settings." : "This profile does not exist."}</p>
           <Link href="/">
             Return home
           </Link>
@@ -93,19 +110,9 @@ export default async function ProfileTrackersPage({ params }: { params: Promise<
     );
   }
 
-  if (!session?.user || session.user.id !== user.id) {
-    return (
-      <main className="garage-page-shell">
-        <section className="garage-empty-panel">
-          <h1>Private Trackers</h1>
-          <p>Only the profile owner can manage tracker settings.</p>
-          <Link href="/">
-            Return home
-          </Link>
-        </section>
-      </main>
-    );
-  }
+  const serviceRecordsByVehicle = groupServiceRecordsByVehicle(
+    await getClaimedVehicleServiceRecordSummaries(user.id),
+  );
 
   const savedModelNames = user.garageItems
     .slice(0, 3)
@@ -116,7 +123,7 @@ export default async function ProfileTrackersPage({ params }: { params: Promise<
       const recommendation = getNextMaintenanceRecommendation({
         currentMileage,
         rules: vehicle.model.maintenanceRules,
-        serviceRecords: vehicle.serviceRecords,
+        serviceRecords: serviceRecordsByVehicle.get(vehicle.id) ?? [],
       });
       return recommendation
         ? `${vehicle.year} ${vehicle.model.make.name} ${vehicle.model.name}: ${recommendation.serviceName} (${recommendation.dueText})`

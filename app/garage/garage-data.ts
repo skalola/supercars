@@ -1,6 +1,10 @@
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getNextMaintenanceRecommendation } from "@/lib/maintenance/recommendations";
+import {
+  getClaimedVehicleServiceRecordSummaries,
+  groupServiceRecordsByVehicle,
+} from "@/lib/maintenance/service-record-summaries";
 import type { GarageClaimedVehicle, GaragePreviousVehicle, GarageSavedVehicle } from "./GarageTabs";
 import type { GarageRecentActivityItem, GarageServiceWatchItem } from "./GarageSupportRail";
 import { getGarageClubSummary } from "./garage-clubs";
@@ -148,12 +152,6 @@ export type GarageClaimedVehicleRow = Prisma.VehicleGetPayload<{ select: typeof 
 export type GaragePreviousVehicleRow = Prisma.VehicleGetPayload<{ select: typeof garagePreviousVehicleSelect }>;
 export type GarageItemRow = Prisma.GarageItemGetPayload<{ select: typeof garageItemSelect }>;
 
-type GarageServiceRecordSummaryRow = {
-  vehicleId: string;
-  serviceKey: string;
-  lastMileage: number;
-};
-
 export async function getGarageDashboardData(userId: string, includePendingClubs: boolean) {
   const [claimedVehicleRows, previousVehicleRows, garageItems, meetActivity, clubSummary, serviceRecordSummaries] = await Promise.all([
     prisma.vehicle.findMany({
@@ -182,7 +180,7 @@ export async function getGarageDashboardData(userId: string, includePendingClubs
     }),
     getGarageMeetActivity(userId),
     getGarageClubSummary(userId, includePendingClubs),
-    getGarageServiceRecordSummaries(userId),
+    getClaimedVehicleServiceRecordSummaries(userId),
   ]);
 
   const claimedModelIds = new Set(claimedVehicleRows.map((vehicle) => vehicle.modelId));
@@ -281,33 +279,6 @@ function getGarageServiceWatch(
     })
     .filter((item): item is GarageServiceWatchItem => Boolean(item))
     .sort((a, b) => serviceStatusRank(a.status) - serviceStatusRank(b.status));
-}
-
-async function getGarageServiceRecordSummaries(userId: string) {
-  return prisma.$queryRaw<GarageServiceRecordSummaryRow[]>(Prisma.sql`
-    SELECT
-      record."vehicleId" AS "vehicleId",
-      substring(record."description" FROM '^\\[[^]]+\\]') AS "serviceKey",
-      COALESCE(MAX(record."mileage"), 0)::int AS "lastMileage"
-    FROM "ServiceRecord" record
-    INNER JOIN "Vehicle" vehicle ON vehicle."id" = record."vehicleId"
-    WHERE vehicle."ownerId" = ${userId}
-      AND vehicle."status" = 'CLAIMED'
-      AND record."description" ~ '^\\[[^]]+\\]'
-    GROUP BY record."vehicleId", "serviceKey"
-  `);
-}
-
-function groupServiceRecordsByVehicle(rows: GarageServiceRecordSummaryRow[]) {
-  const grouped = new Map<string, Array<{ mileage: number; description: string }>>();
-
-  for (const row of rows) {
-    const records = grouped.get(row.vehicleId) ?? [];
-    records.push({ mileage: row.lastMileage, description: row.serviceKey });
-    grouped.set(row.vehicleId, records);
-  }
-
-  return grouped;
 }
 
 function getRecentGarageActivity(
