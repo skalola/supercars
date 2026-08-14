@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getNextMaintenanceRecommendation } from "@/lib/maintenance/recommendations";
 import type { GarageClaimedVehicle, GaragePreviousVehicle, GarageSavedVehicle } from "./GarageTabs";
@@ -61,14 +61,6 @@ const garageClaimedVehicleSelect = {
   },
   _count: {
     select: { modifications: true },
-  },
-  serviceRecords: {
-    select: {
-      mileage: true,
-      description: true,
-    },
-    orderBy: { serviceDate: "desc" },
-    take: 24,
   },
   listings: {
     where: {
@@ -156,8 +148,14 @@ export type GarageClaimedVehicleRow = Prisma.VehicleGetPayload<{ select: typeof 
 export type GaragePreviousVehicleRow = Prisma.VehicleGetPayload<{ select: typeof garagePreviousVehicleSelect }>;
 export type GarageItemRow = Prisma.GarageItemGetPayload<{ select: typeof garageItemSelect }>;
 
+type GarageServiceRecordSummaryRow = {
+  vehicleId: string;
+  serviceKey: string;
+  lastMileage: number;
+};
+
 export async function getGarageDashboardData(userId: string, includePendingClubs: boolean) {
-  const [claimedVehicleRows, previousVehicleRows, garageItems, meetActivity, clubSummary] = await Promise.all([
+  const [claimedVehicleRows, previousVehicleRows, garageItems, meetActivity, clubSummary, serviceRecordSummaries] = await Promise.all([
     prisma.vehicle.findMany({
       where: {
         ownerId: userId,
@@ -184,6 +182,7 @@ export async function getGarageDashboardData(userId: string, includePendingClubs
     }),
     getGarageMeetActivity(userId),
     getGarageClubSummary(userId, includePendingClubs),
+    getGarageServiceRecordSummaries(userId),
   ]);
 
   const claimedModelIds = new Set(claimedVehicleRows.map((vehicle) => vehicle.modelId));
@@ -200,7 +199,7 @@ export async function getGarageDashboardData(userId: string, includePendingClubs
     savedVehicles,
     previousVehicles,
     garageStats: getGarageStats(claimedVehicleRows, totalVehicles),
-    serviceWatch: getGarageServiceWatch(claimedVehicleRows),
+    serviceWatch: getGarageServiceWatch(claimedVehicleRows, groupServiceRecordsByVehicle(serviceRecordSummaries)),
     recentActivity: getRecentGarageActivity(claimedVehicleRows, garageItems, meetActivity),
   };
 }
@@ -256,13 +255,16 @@ function toSavedVehicle(item: GarageItemRow): GarageSavedVehicle {
   };
 }
 
-function getGarageServiceWatch(vehicles: GarageClaimedVehicleRow[]): GarageServiceWatchItem[] {
+function getGarageServiceWatch(
+  vehicles: GarageClaimedVehicleRow[],
+  serviceRecordsByVehicle: Map<string, Array<{ mileage: number; description: string }>>,
+): GarageServiceWatchItem[] {
   return vehicles
     .map((vehicle) => {
       const recommendation = getNextMaintenanceRecommendation({
         currentMileage: vehicle.mileage,
         rules: vehicle.model.maintenanceRules,
-        serviceRecords: vehicle.serviceRecords,
+        serviceRecords: serviceRecordsByVehicle.get(vehicle.id) ?? [],
       });
 
       if (!recommendation) return null;
@@ -279,6 +281,33 @@ function getGarageServiceWatch(vehicles: GarageClaimedVehicleRow[]): GarageServi
     })
     .filter((item): item is GarageServiceWatchItem => Boolean(item))
     .sort((a, b) => serviceStatusRank(a.status) - serviceStatusRank(b.status));
+}
+
+async function getGarageServiceRecordSummaries(userId: string) {
+  return prisma.$queryRaw<GarageServiceRecordSummaryRow[]>(Prisma.sql`
+    SELECT
+      record."vehicleId" AS "vehicleId",
+      substring(record."description" FROM '^\\[[^]]+\\]') AS "serviceKey",
+      COALESCE(MAX(record."mileage"), 0)::int AS "lastMileage"
+    FROM "ServiceRecord" record
+    INNER JOIN "Vehicle" vehicle ON vehicle."id" = record."vehicleId"
+    WHERE vehicle."ownerId" = ${userId}
+      AND vehicle."status" = 'CLAIMED'
+      AND record."description" ~ '^\\[[^]]+\\]'
+    GROUP BY record."vehicleId", "serviceKey"
+  `);
+}
+
+function groupServiceRecordsByVehicle(rows: GarageServiceRecordSummaryRow[]) {
+  const grouped = new Map<string, Array<{ mileage: number; description: string }>>();
+
+  for (const row of rows) {
+    const records = grouped.get(row.vehicleId) ?? [];
+    records.push({ mileage: row.lastMileage, description: row.serviceKey });
+    grouped.set(row.vehicleId, records);
+  }
+
+  return grouped;
 }
 
 function getRecentGarageActivity(
