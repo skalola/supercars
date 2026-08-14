@@ -7,6 +7,7 @@ import type {
 import { getPartDetailPath } from "@/lib/parts/routes";
 import { getCatalogNodePlaceholderUrl } from "@/lib/parts/visual-placeholders";
 import { prisma } from "@/lib/prisma";
+import { unstable_cache } from "next/cache";
 
 export const PARTS_STORE_PAGE_SIZE = 24;
 
@@ -151,6 +152,39 @@ export async function getPublicPartsStoreShell() {
 }
 
 export async function queryPublicPartsStore(filters: PartsStoreFilters): Promise<PartsStorePage> {
+  const normalized = normalizePartsStoreFilters(filters);
+  if (!normalized.search && isCacheablePartsFilter(normalized)) {
+    return queryPublicPartsStoreCached(
+      normalized.categoryId || "",
+      normalized.brandId || "",
+      normalized.makeId || "",
+      normalized.modelId || "",
+      normalized.page || 1,
+    );
+  }
+
+  return queryPublicPartsStoreUncached(normalized);
+}
+
+const queryPublicPartsStoreCached = unstable_cache(
+  (
+    categoryId: string,
+    brandId: string,
+    makeId: string,
+    modelId: string,
+    page: number,
+  ) => queryPublicPartsStoreUncached({
+    categoryId: categoryId || undefined,
+    brandId: brandId || undefined,
+    makeId: makeId || undefined,
+    modelId: modelId || undefined,
+    page,
+  }),
+  ["public-parts-store-page-v1"],
+  { revalidate: 60 * 60, tags: ["parts-catalog"] },
+);
+
+async function queryPublicPartsStoreUncached(filters: PartsStoreFilters): Promise<PartsStorePage> {
   const page = Math.max(1, Math.floor(filters.page || 1));
   const facetWhere = buildPartsWhere({ ...filters, categoryId: undefined, brandId: undefined });
   const categoryWhere = buildPartsWhere({ ...filters, brandId: undefined });
@@ -199,6 +233,23 @@ export async function queryPublicPartsStore(filters: PartsStoreFilters): Promise
     categoryCounts: Object.fromEntries(categoryCounts.map((row) => [row.categoryId, row._count.id])),
     brandCounts: Object.fromEntries(brandCounts.map((row) => [row.brandId, row._count.id])),
   };
+}
+
+function normalizePartsStoreFilters(filters: PartsStoreFilters): PartsStoreFilters {
+  return {
+    categoryId: filters.categoryId?.trim() || undefined,
+    brandId: filters.brandId?.trim() || undefined,
+    makeId: filters.makeId?.trim() || undefined,
+    modelId: filters.modelId?.trim() || undefined,
+    search: filters.search?.trim().slice(0, 80) || undefined,
+    page: Math.min(100, Math.max(1, Math.floor(filters.page || 1))),
+  };
+}
+
+function isCacheablePartsFilter(filters: PartsStoreFilters) {
+  return [filters.categoryId, filters.brandId, filters.makeId, filters.modelId]
+    .filter((value): value is string => Boolean(value))
+    .every((value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value));
 }
 
 function buildPartsWhere(filters: PartsStoreFilters): Prisma.PerformancePartWhereInput {
