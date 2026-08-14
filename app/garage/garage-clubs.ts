@@ -8,10 +8,6 @@ export type GarageClubSummaryItem = {
   role: string;
   status: string;
   location: string;
-  memberCount: number;
-  modelCount: number;
-  meetCount: number;
-  modelLabels: string[];
 };
 
 export async function getGarageClubSummary(userId: string, includePending = false): Promise<GarageClubSummaryItem[]> {
@@ -33,27 +29,6 @@ export async function getGarageClubSummary(userId: string, includePending = fals
           logoUrl: true,
           city: true,
           state: true,
-          _count: {
-            select: {
-              members: { where: { status: "ACTIVE" } },
-              meets: { where: { status: { in: ["PUBLISHED", "FULL", "COMPLETED"] } } },
-              models: true,
-            },
-          },
-          models: {
-            select: {
-              model: {
-                select: {
-                  name: true,
-                  make: {
-                    select: { name: true },
-                  },
-                },
-              },
-            },
-            orderBy: { createdAt: "asc" },
-            take: 4,
-          },
         },
       },
     },
@@ -68,9 +43,5 @@ export async function getGarageClubSummary(userId: string, includePending = fals
     role: membership.role,
     status: membership.status,
     location: [membership.club.city, membership.club.state].filter(Boolean).join(", ") || "Location pending",
-    memberCount: membership.club._count.members,
-    modelCount: membership.club._count.models,
-    meetCount: membership.club._count.meets,
-    modelLabels: membership.club.models.map(({ model }) => `${model.make.name} ${model.name}`),
   }));
 }

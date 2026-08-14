@@ -1,7 +1,14 @@
 import Link from "next/link";
 import type { GarageClubSummaryItem } from "./garage-clubs";
 
-export default function GarageClubHistory({ clubs, isOwner }: { clubs: GarageClubSummaryItem[]; isOwner: boolean }) {
+type GarageClubHistoryItem = GarageClubSummaryItem & {
+  memberCount: number;
+  modelCount: number;
+  meetCount: number;
+  modelLabels: string[];
+};
+
+export default function GarageClubHistory({ clubs, isOwner }: { clubs: GarageClubHistoryItem[]; isOwner: boolean }) {
   return (
     <section className="garage-club-history" aria-label="Garage club history">
       <div className="garage-meet-heading">
