@@ -40,7 +40,6 @@ const garageClaimedVehicleSelect = {
       spec: {
         select: {
           horsepower: true,
-          topSpeed: true,
         },
       },
       images: {
@@ -66,7 +65,6 @@ const garageClaimedVehicleSelect = {
   serviceRecords: {
     select: {
       mileage: true,
-      serviceDate: true,
       description: true,
     },
     orderBy: { serviceDate: "desc" },
@@ -85,12 +83,10 @@ const garageClaimedVehicleSelect = {
 const garagePreviousVehicleSelect = {
   id: true,
   vin: true,
-  modelId: true,
   year: true,
   status: true,
   mileage: true,
   trim: true,
-  createdAt: true,
   model: {
     select: {
       name: true,

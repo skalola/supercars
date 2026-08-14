@@ -1,6 +1,6 @@
 export type GarageStatsVehicle = {
   vin: string;
-  model: { name: string; make: { name: string }; spec: { horsepower: string | null; topSpeed: string | null } | null };
+  model: { name: string; make: { name: string }; spec: { horsepower: string | null } | null };
   _count: { modifications: number };
   listings: Array<{ askingPrice: number | null; price: number | null }>;
 };
