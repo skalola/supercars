@@ -67,13 +67,13 @@ const storePartSelect = {
 } satisfies Prisma.PerformancePartSelect;
 
 type StorePart = Prisma.PerformancePartGetPayload<{ select: typeof storePartSelect }>;
-type StorePartCompatibility = {
-  makeId: string | null;
-  modelId: string | null;
+type StoreCompatibilitySummary = {
+  partId: string;
   yearStart: number | null;
   yearEnd: number | null;
-  make: { name: string } | null;
-  model: { name: string } | null;
+  makeName: string | null;
+  modelName: string | null;
+  fitmentCount: number;
 };
 
 type StoreFitmentOption = {
@@ -82,16 +82,6 @@ type StoreFitmentOption = {
   modelId: string | null;
   modelName: string | null;
   modelMakeId: string | null;
-};
-
-type StoreCompatibilityRow = {
-  partId: string;
-  makeId: string | null;
-  modelId: string | null;
-  yearStart: number | null;
-  yearEnd: number | null;
-  makeName: string | null;
-  modelName: string | null;
 };
 
 export async function getPublicPartsStoreShell() {
@@ -180,7 +170,7 @@ const queryPublicPartsStoreCached = unstable_cache(
     modelId: modelId || undefined,
     page,
   }),
-  ["public-parts-store-page-v1"],
+  ["public-parts-store-page-v2"],
   { revalidate: 60 * 60, tags: ["parts-catalog"] },
 );
 
@@ -215,17 +205,12 @@ async function queryPublicPartsStoreUncached(filters: PartsStoreFilters): Promis
     }),
   ]);
 
-  const compatibility = await getCompatibility(parts.map((part) => part.id));
-  const compatibilityByPartId = new Map<string, StorePartCompatibility[]>();
-  for (const row of compatibility) {
-    const rows = compatibilityByPartId.get(row.partId) ?? [];
-    rows.push(row);
-    compatibilityByPartId.set(row.partId, rows);
-  }
+  const compatibility = await getCompatibilitySummaries(parts.map((part) => part.id), filters);
+  const compatibilityByPartId = new Map(compatibility.map((row) => [row.partId, row]));
 
   const totalPages = Math.max(1, Math.ceil(total / PARTS_STORE_PAGE_SIZE));
   return {
-    parts: parts.map((part) => mapStorePartRow(part, compatibilityByPartId.get(part.id) ?? [])),
+    parts: parts.map((part) => mapStorePartRow(part, compatibilityByPartId.get(part.id) ?? null)),
     total,
     page: Math.min(page, totalPages),
     pageSize: PARTS_STORE_PAGE_SIZE,
@@ -290,33 +275,36 @@ function buildPartsWhere(filters: PartsStoreFilters): Prisma.PerformancePartWher
   };
 }
 
-async function getCompatibility(partIds: string[]) {
+async function getCompatibilitySummaries(partIds: string[], filters: PartsStoreFilters) {
   if (partIds.length === 0) return [];
-  const rows = await prisma.$queryRaw<StoreCompatibilityRow[]>(Prisma.sql`
-    SELECT
-      compatibility."partId" AS "partId",
-      compatibility."makeId" AS "makeId",
-      compatibility."modelId" AS "modelId",
-      compatibility."yearStart" AS "yearStart",
-      compatibility."yearEnd" AS "yearEnd",
-      make.name AS "makeName",
-      model.name AS "modelName"
-    FROM "public"."PartCompatibility" compatibility
-    LEFT JOIN "public"."Make" make ON make.id = compatibility."makeId"
-    LEFT JOIN "public"."Model" model ON model.id = compatibility."modelId"
-    WHERE compatibility."partId" IN (${Prisma.join(partIds)})
-    ORDER BY compatibility."createdAt" ASC
-  `);
+  const preferredFitmentOrder = filters.modelId
+    ? Prisma.sql`CASE WHEN compatibility."modelId" = ${filters.modelId} THEN 0 ELSE 1 END,`
+    : filters.makeId
+      ? Prisma.sql`CASE WHEN COALESCE(compatibility."makeId", model."makeId") = ${filters.makeId} THEN 0 ELSE 1 END,`
+      : Prisma.empty;
 
-  return rows.map((row) => ({
-    partId: row.partId,
-    makeId: row.makeId,
-    modelId: row.modelId,
-    yearStart: row.yearStart,
-    yearEnd: row.yearEnd,
-    make: row.makeName ? { name: row.makeName } : null,
-    model: row.modelName ? { name: row.modelName } : null,
-  }));
+  return prisma.$queryRaw<StoreCompatibilitySummary[]>(Prisma.sql`
+    WITH ranked_fitments AS (
+      SELECT
+        compatibility."partId" AS "partId",
+        compatibility."yearStart" AS "yearStart",
+        compatibility."yearEnd" AS "yearEnd",
+        make.name AS "makeName",
+        model.name AS "modelName",
+        COUNT(*) OVER (PARTITION BY compatibility."partId")::int AS "fitmentCount",
+        ROW_NUMBER() OVER (
+          PARTITION BY compatibility."partId"
+          ORDER BY ${preferredFitmentOrder} compatibility."createdAt" ASC, compatibility.id ASC
+        ) AS fitment_rank
+      FROM "public"."PartCompatibility" compatibility
+      LEFT JOIN "public"."Model" model ON model.id = compatibility."modelId"
+      LEFT JOIN "public"."Make" make ON make.id = COALESCE(compatibility."makeId", model."makeId")
+      WHERE compatibility."partId" IN (${Prisma.join(partIds)})
+    )
+    SELECT "partId", "yearStart", "yearEnd", "makeName", "modelName", "fitmentCount"
+    FROM ranked_fitments
+    WHERE fitment_rank = 1
+  `);
 }
 
 async function getPublicFitmentOptions() {
@@ -340,7 +328,7 @@ async function getPublicFitmentOptions() {
   `);
 }
 
-function mapStorePartRow(part: StorePart, compatibility: StorePartCompatibility[]): PartsStorePartRow {
+function mapStorePartRow(part: StorePart, compatibility: StoreCompatibilitySummary | null): PartsStorePartRow {
   return {
     id: part.id,
     name: part.name,
@@ -358,13 +346,8 @@ function mapStorePartRow(part: StorePart, compatibility: StorePartCompatibility[
     brandLogoUrl: part.brand.logoUrl,
     brandLogoBackground: part.brand.logoBackground,
     brandLogoNeedsReview: part.brand.logoNeedsReview,
-    compatibility: compatibility.map(formatCompatibility),
-    fitments: compatibility.map((fitment) => ({
-      makeId: fitment.makeId,
-      makeName: fitment.make?.name ?? null,
-      modelId: fitment.modelId,
-      modelName: fitment.model?.name ?? null,
-    })),
+    fitmentSummary: compatibility ? formatCompatibility(compatibility) : null,
+    fitmentCount: compatibility?.fitmentCount ?? 0,
   };
 }
 
@@ -377,8 +360,8 @@ function formatCents(value: number | null) {
   }).format(value / 100);
 }
 
-function formatCompatibility(fitment: StorePartCompatibility) {
-  const makeModel = [fitment.make?.name, fitment.model?.name].filter(Boolean).join(" ");
+function formatCompatibility(fitment: StoreCompatibilitySummary) {
+  const makeModel = [fitment.makeName, fitment.modelName].filter(Boolean).join(" ");
   const years = fitment.yearStart && fitment.yearEnd
     ? fitment.yearStart === fitment.yearEnd ? String(fitment.yearStart) : `${fitment.yearStart}-${fitment.yearEnd}`
     : fitment.yearStart ? `${fitment.yearStart}+` : fitment.yearEnd ? `Through ${fitment.yearEnd}` : null;

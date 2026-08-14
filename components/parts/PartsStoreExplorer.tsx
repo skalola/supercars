@@ -40,13 +40,8 @@ export type PartsStorePartRow = {
   brandLogoUrl: string | null;
   brandLogoBackground: string;
   brandLogoNeedsReview: boolean;
-  compatibility: string[];
-  fitments: Array<{
-    makeId: string | null;
-    makeName: string | null;
-    modelId: string | null;
-    modelName: string | null;
-  }>;
+  fitmentSummary: string | null;
+  fitmentCount: number;
 };
 
 export type PartsGarageCarRow = {
@@ -439,10 +434,10 @@ export function PartsStoreExplorer({
                       {part.torqueGainLabel ? <span>{part.torqueGainLabel}</span> : null}
                     </div>
                     <div className="parts-fitment-list parts-fitment-list-compact">
-                      {part.compatibility.length > 0 ? (
+                      {part.fitmentSummary ? (
                         <>
-                          <span>{part.compatibility[0]}</span>
-                          {part.compatibility.length > 1 ? <span>+{part.compatibility.length - 1} fitments</span> : null}
+                          <span>{part.fitmentSummary}</span>
+                          {part.fitmentCount > 1 ? <span>+{part.fitmentCount - 1} fitments</span> : null}
                         </>
                       ) : (
                         <span>Universal / unscoped fitment</span>
