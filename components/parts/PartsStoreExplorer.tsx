@@ -3,7 +3,10 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { PART_CATEGORY_ICON_BY_SLUG } from "@/lib/parts/category-icons";
 import type { PartsStorePage } from "@/lib/parts/storefront";
+
+export { PART_CATEGORY_ICON_BY_SLUG } from "@/lib/parts/category-icons";
 
 export type PartsCategoryRow = {
   id: string;
@@ -50,7 +53,24 @@ export type PartsGarageCarRow = {
   detail: string;
   makeId: string;
   modelId: string;
+  modelSlug: string;
+  year: number | null;
   imageUrl: string | null;
+  makeName?: string;
+  makeSlug?: string;
+  makeLogoUrl?: string | null;
+  modelName?: string;
+  variant?: string | null;
+  engine?: string | null;
+  horsepower?: string | number | null;
+  torque?: string | number | null;
+  weight?: string | number | null;
+  drivetrain?: string | null;
+  transmission?: string | null;
+  aspiration?: string | null;
+  buildStage?: string;
+  detailPath?: string;
+  exactOwnedVehicle?: boolean;
 };
 
 type PartsStoreExplorerProps = {
@@ -61,24 +81,29 @@ type PartsStoreExplorerProps = {
   catalogNodeCount: number;
   garageCars: PartsGarageCarRow[];
   fitmentMakes: Array<{ id: string; name: string }>;
-  fitmentModels: Array<{ id: string; name: string; makeId: string }>;
+  fitmentModels: Array<{ id: string; name: string; makeId: string; slug: string; productionStartYear: number | null; productionEndYear: number | null }>;
   initialMakeId?: string;
   initialModelId?: string;
 };
 
 const SHOP_CATEGORY_ORDER = [
-  "intake",
-  "exhaust",
-  "ecu-tuning",
-  "forced-induction",
-  "brakes",
-  "suspension",
-  "wheels-tires",
-  "aero-body",
-  "drivetrain",
-  "interior-safety",
-  "fueling",
+  "maintenance-service",
+  "engine",
+  "air-induction",
+  "fuel-system",
   "cooling",
+  "exhaust-emissions",
+  "ecu-electronics",
+  "transmission-drivetrain",
+  "suspension-steering",
+  "brakes",
+  "wheels-tires",
+  "body-exterior",
+  "aerodynamics",
+  "interior",
+  "lighting",
+  "accessories-care",
+  "performance-packages",
 ];
 
 export function PartsStoreExplorer({
@@ -217,7 +242,7 @@ export function PartsStoreExplorer({
             <span>Performance. Precision. Passion.</span>
           </p>
           <p className="parts-store-disclosure">
-            Partner purchase links stay inactive until approved programs are active.
+            SupercarDash may earn a commission when you purchase through partner links.
           </p>
         </div>
       </section>
@@ -533,7 +558,7 @@ export function PartsStoreExplorer({
           </article>
           <article className="parts-disclosure-card">
             <span>Partner Links Pending</span>
-            <p>Purchase routing stays inactive until affiliate partners are approved.</p>
+            <p>SupercarDash may earn a commission when you purchase through partner links.</p>
           </article>
         </aside>
       </section>
@@ -659,24 +684,134 @@ function sortShopCategories(categories: PartsCategoryRow[]) {
   });
 }
 
-function CategoryLineIcon({ slug }: { slug: string }) {
+export function CategoryLineIcon({ slug }: { slug: string }) {
+  const iconName = PART_CATEGORY_ICON_BY_SLUG[slug] ?? "unknown";
   return (
-    <svg className="parts-category-line-icon" viewBox="0 0 48 48" aria-hidden="true">
+    <svg className="parts-category-line-icon" viewBox="0 0 48 48" aria-hidden="true" data-icon={iconName}>
       {getCategoryIconPaths(slug)}
     </svg>
   );
 }
 
 function getCategoryIconPaths(slug: string) {
-  switch (slug) {
+  const normalizedSlug = PART_CATEGORY_ICON_BY_SLUG[slug] ?? "unknown";
+  switch (normalizedSlug) {
+    case "service-tools":
+      return (
+        <>
+          <path d="M29 9a9 9 0 0 0-10 12L8 32a4 4 0 0 0 6 6l11-11A9 9 0 0 0 37 17l-6 6-6-2-2-6Z" />
+          <circle cx="11" cy="35" r="1" />
+        </>
+      );
+    case "engine-block":
+      return (
+        <>
+          <path d="M8 18h5l4-5h15l4 5h4v17H12l-4-5Z" />
+          <rect x="17" y="23" width="14" height="7" rx="1" />
+          <path d="M17 13V9h10v4M40 23h3v7h-3M12 35v4M34 35v4" />
+        </>
+      );
+    case "airflow-filter":
+      return (
+        <>
+          <path d="M7 15c7 0 8-5 15-5M7 24c9 0 10-6 19-6M7 33c7 0 8-5 15-5" />
+          <path d="M30 10h7l4 28H26ZM31 15l-3 18M35 15l1 18M39 15l2 18" />
+        </>
+      );
+    case "fuel-lines":
+      return (
+        <>
+          <rect x="9" y="11" width="18" height="10" rx="2" />
+          <path d="M13 21v16h10V21M27 16h7l5 6v15M34 22v9h5M18 26v-5" />
+          <circle cx="18" cy="29" r="3" />
+        </>
+      );
+    case "emissions-system":
+      return (
+        <>
+          <path d="M6 31h18l7-9h10M24 31l7 7h10" />
+          <path d="M32 15c2-4 7-4 8 0 5 0 6 7 1 9h-9c-5-2-5-7 0-9Z" />
+        </>
+      );
+    case "gear-cluster":
+      return (
+        <>
+          <circle cx="17" cy="19" r="7" />
+          <circle cx="17" cy="19" r="2" />
+          <circle cx="32" cy="31" r="8" />
+          <circle cx="32" cy="31" r="3" />
+          <path d="M17 9v3M17 26v3M7 19h3M24 19h4M10 12l3 3M22 24l3 3M32 19v4M32 39v3M20 31h4M40 31h3M37 36l3 3" />
+        </>
+      );
+    case "steering-wheel":
+      return (
+        <>
+          <circle cx="24" cy="24" r="17" />
+          <circle cx="24" cy="24" r="4" />
+          <path d="M8 21h32M24 28v12M20 27l-9 8M28 27l9 8" />
+        </>
+      );
+    case "car-body":
+      return (
+        <>
+          <path d="M5 29l4-9 8-5h15l7 8 4 2v9H5Z" />
+          <circle cx="14" cy="34" r="4" />
+          <circle cx="35" cy="34" r="4" />
+          <path d="M17 15l3 8h16M9 25h30" />
+        </>
+      );
+    case "airflow-wing":
+      return (
+        <>
+          <path d="M7 12h20c6 0 7-4 13-4M7 21h25c6 0 7 7 2 8M7 30h15c7 0 8 6 16 6" />
+          <path d="M13 40l7-9h17l4 9M20 31l-2 9M36 31l2 9" />
+        </>
+      );
+    case "cabin-seat":
+      return (
+        <>
+          <path d="M17 8h9l4 18H19l-5 13H7l7-18ZM20 26h14l5 13H15" />
+          <path d="M31 10c4 4 6 9 5 15" />
+        </>
+      );
+    case "headlamp":
+      return (
+        <>
+          <path d="M8 15h18c7 0 12 4 14 9-2 5-7 9-14 9H8Z" />
+          <path d="M15 19v10M21 18v12M27 19v10M40 12l4-3M42 18h4M40 36l4 3" />
+        </>
+      );
+    case "care-kit":
+      return (
+        <>
+          <rect x="7" y="17" width="34" height="23" rx="3" />
+          <path d="M17 17v-5h14v5M7 25h34M24 22v7M35 7v6M32 10h6" />
+        </>
+      );
+    case "performance-gauge":
+      return (
+        <>
+          <path d="M8 36a17 17 0 1 1 32 0ZM14 31l-4-4M34 31l4-4M24 19v-6M24 31l10-11" />
+          <circle cx="24" cy="31" r="3" />
+        </>
+      );
+    case "tuning-sliders":
+      return (
+        <>
+          <path d="M8 13h32M8 24h32M8 35h32" />
+          <circle cx="18" cy="13" r="4" />
+          <circle cx="31" cy="24" r="4" />
+          <circle cx="22" cy="35" r="4" />
+        </>
+      );
     case "intake":
       return (
         <>
-          <path d="M8 28c8-16 21-20 32-12" />
-          <path d="M15 31c5-9 13-13 23-9" />
-          <path d="M28 18l9 17" />
-          <path d="M34 21l6 12" />
-          <circle cx="12" cy="32" r="5" />
+          <rect x="16" y="7" width="16" height="4" rx="1" />
+          <path d="M15 12h18l4 22H11Z" />
+          <path d="M18 15l-2 16M22 15l-1 16M26 15l1 16M30 15l2 16" />
+          <rect x="10" y="34" width="28" height="4" rx="1" />
+          <path d="M19 38v4h10v-4M17 42h14" />
         </>
       );
     case "exhaust":
@@ -756,9 +891,8 @@ function getCategoryIconPaths(slug: string) {
     case "interior-safety":
       return (
         <>
-          <path d="M20 8h8l3 18h-9l-5 13H9l7-17Z" />
-          <path d="M23 26h13l3 13H18" />
-          <path d="M31 9c5 4 7 10 5 17" />
+          <path d="M12 8h7l3 14h-8l-4 11H5l5-15ZM15 22h9l3 10" />
+          <path d="M34 16l8 3v8c0 7-4 11-8 13-4-2-8-6-8-13v-8ZM30 27l3 3 6-7" />
         </>
       );
     case "fueling":

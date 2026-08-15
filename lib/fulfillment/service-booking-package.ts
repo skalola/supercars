@@ -28,6 +28,7 @@ export interface GenerateServiceBookingPackageParams {
   notes?: string | null;
   attachedDocumentCount?: number;
   depositAmount?: number;
+  termsAcceptedAt: string;
 }
 
 export function generateServiceBookingPackagePayload(params: GenerateServiceBookingPackageParams) {
@@ -60,13 +61,19 @@ export function generateServiceBookingPackagePayload(params: GenerateServiceBook
     depositFeeRules: {
       depositAmount,
       currency: "USD",
-      status: "PAYABLE_AFTER_ACCEPTANCE",
-      rule: "PLATFORM_FEE_DUE_AFTER_SHOP_ACCEPTANCE",
-      explanation: "SUPERCAR DASH collects only the platform service-booking fee after the shop accepts. Service or repair invoices are paid directly to the shop.",
+      status: "AUTHORIZED_PENDING_PARTNER_ACCEPTANCE",
+      rule: "PLATFORM_FEE_AUTHORIZATION_REQUIRED_BEFORE_SHOP_EMAIL",
+      explanation: "SUPERCAR DASH authorizes the platform service-booking fee before sending the request and captures it only after the shop accepts. Service or repair invoices are paid directly to the shop.",
     },
     notesAndDocuments: {
       customerNotes: params.notes || "Standard service request from Vehicle Passport.",
       attachedDocumentCount: params.attachedDocumentCount || 0,
+    },
+    termsAcceptance: {
+      accepted: true,
+      acceptedAt: params.termsAcceptedAt,
+      termsPath: "/legal/terms",
+      privacyPath: "/legal/privacy",
     },
   };
 }
@@ -106,7 +113,7 @@ export async function dispatchServiceBookingEmail(params: DispatchServiceEmailPa
       "Service Requested": params.serviceName || "Certified Maintenance",
       "Customer Name": params.customerName || "Vehicle Owner",
       "Customer Phone": params.customerPhone || "N/A",
-      "Platform Booking Fee": `$${(params.depositAmount || 100).toLocaleString()} (OWNER_PAYS_AFTER_ACCEPTANCE)`,
+      "Platform Booking Fee": `$${(params.depositAmount || 100).toLocaleString()} (AUTHORIZED_BY_OWNER)`,
     },
   });
 

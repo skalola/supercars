@@ -1,0 +1,59 @@
+name: Catalog maintenance
+
+on:
+  schedule:
+    - cron: "0 8 * * 1"
+    - cron: "0 10 * * 3"
+  workflow_dispatch:
+    inputs:
+      job:
+        description: Maintenance job to run
+        required: true
+        default: inventory
+        type: choice
+        options:
+          - inventory
+          - parts
+
+permissions:
+  contents: read
+
+concurrency:
+  group: catalog-maintenance-${{ github.event.schedule || inputs.job || 'manual' }}
+  cancel-in-progress: false
+
+jobs:
+  inventory:
+    if: github.event.schedule == '0 8 * * 1' || inputs.job == 'inventory'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: touch .env
+      - run: npm run refresh-inventory-weekly
+
+  parts:
+    if: github.event.schedule == '0 10 * * 3' || inputs.job == 'parts'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
+      EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
+      EBAY_EPN_CAMPAIGN_ID: ${{ secrets.EBAY_EPN_CAMPAIGN_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: touch .env
+      - run: npm run refresh:ferrari-part-offers

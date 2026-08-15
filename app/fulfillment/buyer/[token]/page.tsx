@@ -40,13 +40,15 @@ export default async function BuyerFulfillmentPage({ params }: BuyerPageProps) {
       <div className="fulfillment-main-grid" style={styles.mainGrid}>
         {/* Left Column: Transaction Details & Event Audit Log */}
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          {req.requestType === "SERVICE_BOOKING" && req.status === "ACCEPTED_AWAITING_PAYMENT" && (
+          {req.requestType === "SERVICE_BOOKING" &&
+            ["PAYMENT_REQUIRED", "PROCESSING", "FAILED"].includes(req.paymentStatus) &&
+            ["READY_TO_SEND", "PAYMENT_PROCESSING", "ACCEPTED_AWAITING_PAYMENT"].includes(req.status) && (
             <div style={styles.paymentCard}>
               <div style={styles.paymentTag}>Payment required</div>
               <h2 style={styles.paymentTitle}>Confirm your service booking</h2>
               <p style={styles.paymentCopy}>
-                The service shop accepted your request. Pay the SUPERCAR DASH booking fee to confirm the appointment.
-                Service or repair invoices are paid directly to the shop.
+                Pay the SUPERCAR DASH booking fee to send the request to the service shop.
+                Service or repair invoices remain payable directly to the shop.
               </p>
               <form method="post" action="/api/payments/service-booking-checkout" style={styles.paymentForm}>
                 <input type="hidden" name="fulfillmentRequestId" value={req.id} />

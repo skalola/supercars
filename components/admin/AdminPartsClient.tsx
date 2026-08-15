@@ -100,6 +100,9 @@ type AdminAffiliateAnalytics = {
   estimatedCommissionLabel: string;
   topParts: AdminAffiliateAnalyticsRow[];
   topBrands: AdminAffiliateAnalyticsRow[];
+  topModels: AdminAffiliateAnalyticsRow[];
+  topCategories: AdminAffiliateAnalyticsRow[];
+  topProviders: AdminAffiliateAnalyticsRow[];
   recentClicks: AdminRecentAffiliateClickRow[];
 };
 
@@ -112,6 +115,14 @@ type AdminPartsClientProps = {
     totalParts: number;
     publicReadyParts: number;
     needsReviewParts: number;
+    ferrariCanonicalParts: number;
+    ferrariModelsCovered: number;
+    ferrariPartsWithOffers: number;
+    ferrariPartsWithoutOffers: number;
+    activeEbayOffers: number;
+    sourceFailureRuns: number;
+    lastCatalogRefresh: string;
+    lastEbayRefresh: string;
   };
   activeFilters: {
     search: string;
@@ -440,6 +451,14 @@ export function AdminPartsClient({
         <SummaryCard label="Public Ready" value={catalogSummary.publicReadyParts.toLocaleString()} />
         <SummaryCard label="Needs Review" value={catalogSummary.needsReviewParts.toLocaleString()} />
         <SummaryCard label="Affiliate Candidates" value={affiliatePartners.length.toLocaleString()} />
+        <SummaryCard label="Ferrari Canonical Parts" value={catalogSummary.ferrariCanonicalParts.toLocaleString()} />
+        <SummaryCard label="Ferrari Models Covered" value={catalogSummary.ferrariModelsCovered.toLocaleString()} />
+        <SummaryCard label="Parts With Offers" value={catalogSummary.ferrariPartsWithOffers.toLocaleString()} />
+        <SummaryCard label="Parts Without Offers" value={catalogSummary.ferrariPartsWithoutOffers.toLocaleString()} />
+        <SummaryCard label="Active eBay Offers" value={catalogSummary.activeEbayOffers.toLocaleString()} />
+        <SummaryCard label="Source Failure Runs" value={catalogSummary.sourceFailureRuns.toLocaleString()} />
+        <SummaryCard label="Last Catalog Refresh" value={catalogSummary.lastCatalogRefresh} />
+        <SummaryCard label="Last eBay Refresh" value={catalogSummary.lastEbayRefresh} />
       </div>
 
       <div className="admin-parts-analytics-grid" aria-label="Affiliate click analytics">
@@ -454,6 +473,9 @@ export function AdminPartsClient({
       <div className="admin-parts-affiliate-insights">
         <AffiliateInsightPanel title="Top Parts" rows={affiliateAnalytics.topParts} />
         <AffiliateInsightPanel title="Top Brands" rows={affiliateAnalytics.topBrands} />
+        <AffiliateInsightPanel title="Top Models" rows={affiliateAnalytics.topModels} />
+        <AffiliateInsightPanel title="Top Categories" rows={affiliateAnalytics.topCategories} />
+        <AffiliateInsightPanel title="Top Providers" rows={affiliateAnalytics.topProviders} />
         <div className="admin-affiliate-recent-panel">
           <div className="admin-affiliate-panel-heading">
             <p className="eyebrow">Recent Clicks</p>

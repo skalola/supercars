@@ -1,3 +1,12 @@
+import type { Metadata } from "next";
+import { buildPublicMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = buildPublicMetadata({
+  title: "Privacy Policy",
+  description: "Learn how SUPERCAR DASH collects, uses, protects, and shares information across accounts, vehicle ownership, transactions, and community features.",
+  path: "/legal/privacy",
+});
+
 export default function PrivacyPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-12">

@@ -8,8 +8,10 @@
  */
 
 import crypto from "crypto";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getDealerPurchaseDepositCentsForPrice } from "@/lib/pricing/dealer-purchase-fees";
+import { resolvePaymentProvider } from "@/lib/operations/runtime-provider-policy";
 
 export type PaymentProviderName = "ledger" | "stripe";
 
@@ -55,7 +57,7 @@ export interface CreateDealerPurchaseCheckoutInput {
 }
 
 function getPaymentProvider(): PaymentProviderName {
-  return process.env.PAYMENT_PROVIDER === "stripe" ? "stripe" : "ledger";
+  return resolvePaymentProvider(process.env.PAYMENT_PROVIDER);
 }
 
 function normalizeCurrency(currency: string | undefined): string {
@@ -74,6 +76,14 @@ function appBaseUrl(): string {
     process.env.AUTH_URL ||
     "http://localhost:3000"
   ).replace(/\/$/, "");
+}
+
+export function getServiceBookingCheckoutKey(fulfillmentRequestId: string, amountCents: number): string {
+  return `scd:service:${fulfillmentRequestId}:${amountCents}:v2-manual-capture`;
+}
+
+export function getDealerPurchaseCheckoutKey(fulfillmentRequestId: string, amountCents: number): string {
+  return `scd:purchase:${fulfillmentRequestId}:${amountCents}:v1`;
 }
 
 export function getServiceBookingFeeCents(): number {
@@ -99,40 +109,6 @@ export function getDealerPurchaseDepositCents(vehiclePrice?: number | null): num
 
   return 500000;
 }
-
-const paymentConfirmationRequestSelect = {
-  id: true,
-  publicTransactionToken: true,
-  parties: {
-    select: {
-      partyType: true,
-      name: true,
-      email: true,
-    },
-  },
-  partnerTokens: {
-    select: {
-      token: true,
-    },
-    take: 1,
-  },
-  vehicle: {
-    select: {
-      year: true,
-      vin: true,
-      model: {
-        select: {
-          name: true,
-          make: {
-            select: {
-              name: true,
-            },
-          },
-        },
-      },
-    },
-  },
-};
 
 const paidDealerPurchaseRequestSelect = {
   id: true,
@@ -172,6 +148,44 @@ const paidDealerPurchaseRequestSelect = {
               name: true,
             },
           },
+        },
+      },
+    },
+  },
+};
+
+const paidServiceBookingRequestSelect = {
+  id: true,
+  requestType: true,
+  status: true,
+  publicTransactionToken: true,
+  packages: {
+    select: {
+      title: true,
+      scope: true,
+    },
+    take: 1,
+  },
+  parties: {
+    select: {
+      partyType: true,
+      name: true,
+      email: true,
+      phone: true,
+    },
+  },
+  partnerTokens: {
+    select: { token: true },
+    take: 1,
+  },
+  vehicle: {
+    select: {
+      year: true,
+      vin: true,
+      model: {
+        select: {
+          name: true,
+          make: { select: { name: true } },
         },
       },
     },
@@ -255,13 +269,22 @@ function stripeSecretKey(): string {
   return secretKey;
 }
 
-async function stripeRequest<T>(path: string, body: URLSearchParams): Promise<T> {
+async function stripeRequest<T>(
+  path: string,
+  body: URLSearchParams,
+  options?: { idempotencyKey?: string }
+): Promise<T> {
+  const headers: Record<string, string> = {
+    authorization: `Bearer ${stripeSecretKey()}`,
+    "content-type": "application/x-www-form-urlencoded",
+  };
+  if (options?.idempotencyKey) {
+    headers["idempotency-key"] = options.idempotencyKey;
+  }
+
   const response = await fetch(`https://api.stripe.com/v1${path}`, {
     method: "POST",
-    headers: {
-      authorization: `Bearer ${stripeSecretKey()}`,
-      "content-type": "application/x-www-form-urlencoded",
-    },
+    headers,
     body,
   });
 
@@ -284,11 +307,38 @@ async function stripeRequest<T>(path: string, body: URLSearchParams): Promise<T>
 
 export async function createServiceBookingCheckoutSession(
   input: CreateServiceBookingCheckoutInput
-): Promise<{ id: string; url: string; amountCents: number; currency: string }> {
+): Promise<{
+  id: string;
+  url: string;
+  amountCents: number;
+  currency: string;
+  idempotencyKey: string;
+  expiresAt: Date;
+}> {
   if (getPaymentProvider() !== "stripe") {
     throw new Error("PAYMENT_PROVIDER=stripe is required to create Stripe Checkout Sessions.");
   }
 
+  const { body, amountCents, currency } = buildServiceBookingCheckoutParams(input);
+  const idempotencyKey = getServiceBookingCheckoutKey(input.fulfillmentRequestId, amountCents);
+  const session = await stripeRequest<{ id: string; url?: string; expires_at?: number }>(
+    "/checkout/sessions",
+    body,
+    { idempotencyKey }
+  );
+  if (!session.url) throw new Error("Stripe Checkout Session did not return a redirect URL.");
+
+  return {
+    id: session.id,
+    url: session.url,
+    amountCents,
+    currency,
+    idempotencyKey,
+    expiresAt: new Date((session.expires_at || Math.floor(Date.now() / 1000) + 30 * 60) * 1000),
+  };
+}
+
+export function buildServiceBookingCheckoutParams(input: CreateServiceBookingCheckoutInput) {
   const amountCents = input.amountCents;
   if (!Number.isFinite(amountCents) || amountCents <= 0) {
     throw new Error("A valid service-booking fee amount is required.");
@@ -304,6 +354,7 @@ export async function createServiceBookingCheckoutSession(
   body.set("line_items[0][price_data][currency]", currency);
   body.set("line_items[0][price_data][unit_amount]", String(amountCents));
   body.set("line_items[0][price_data][product_data][name]", "SUPERCAR DASH service booking fee");
+  body.set("payment_intent_data[capture_method]", "manual");
   body.set("metadata[serviceBookingId]", input.fulfillmentRequestId);
   body.set("metadata[fulfillmentRequestId]", input.fulfillmentRequestId);
   body.set("metadata[vehicleId]", input.vehicleId);
@@ -314,15 +365,19 @@ export async function createServiceBookingCheckoutSession(
   body.set("payment_intent_data[metadata][fulfillmentRequestId]", input.fulfillmentRequestId);
   body.set("payment_intent_data[metadata][feeType]", "SERVICE_BOOKING");
 
-  const session = await stripeRequest<{ id: string; url?: string }>("/checkout/sessions", body);
-  if (!session.url) throw new Error("Stripe Checkout Session did not return a redirect URL.");
-
-  return { id: session.id, url: session.url, amountCents, currency };
+  return { body, amountCents, currency };
 }
 
 export async function createDealerPurchaseCheckoutSession(
   input: CreateDealerPurchaseCheckoutInput
-): Promise<{ id: string; url: string; amountCents: number; currency: string }> {
+): Promise<{
+  id: string;
+  url: string;
+  amountCents: number;
+  currency: string;
+  idempotencyKey: string;
+  expiresAt: Date;
+}> {
   if (getPaymentProvider() !== "stripe") {
     throw new Error("PAYMENT_PROVIDER=stripe is required to create Stripe Checkout Sessions.");
   }
@@ -353,10 +408,22 @@ export async function createDealerPurchaseCheckoutSession(
   body.set("payment_intent_data[metadata][fulfillmentRequestId]", input.fulfillmentRequestId);
   body.set("payment_intent_data[metadata][feeType]", "DEALER_PURCHASE_DEPOSIT");
 
-  const session = await stripeRequest<{ id: string; url?: string }>("/checkout/sessions", body);
+  const idempotencyKey = getDealerPurchaseCheckoutKey(input.fulfillmentRequestId, amountCents);
+  const session = await stripeRequest<{ id: string; url?: string; expires_at?: number }>(
+    "/checkout/sessions",
+    body,
+    { idempotencyKey }
+  );
   if (!session.url) throw new Error("Stripe Checkout Session did not return a redirect URL.");
 
-  return { id: session.id, url: session.url, amountCents, currency };
+  return {
+    id: session.id,
+    url: session.url,
+    amountCents,
+    currency,
+    idempotencyKey,
+    expiresAt: new Date((session.expires_at || Math.floor(Date.now() / 1000) + 30 * 60) * 1000),
+  };
 }
 
 function assertStripePaymentMethod(paymentMethod: string | undefined): string {
@@ -392,7 +459,11 @@ export async function authorizeDeposit(input: AuthorizeDepositInput): Promise<Pa
   if (input.fulfillmentRequestId) body.set("metadata[fulfillmentRequestId]", input.fulfillmentRequestId);
   if (input.publicTransactionToken) body.set("metadata[publicTransactionToken]", input.publicTransactionToken);
 
-  const paymentIntent = await stripeRequest<{ id: string }>("/payment_intents", body);
+  const paymentIntent = await stripeRequest<{ id: string }>("/payment_intents", body, {
+    idempotencyKey: input.fulfillmentRequestId
+      ? `scd:authorize:${input.fulfillmentRequestId}:${toMinorUnits(input.amount)}:v1`
+      : undefined,
+  });
   return {
     provider,
     transactionRef: `stripe:${paymentIntent.id}`,
@@ -408,7 +479,9 @@ export async function captureDeposit(transactionRef: string, amount?: number): P
 
   const body = new URLSearchParams();
   if (amount !== undefined) body.set("amount_to_capture", String(toMinorUnits(amount)));
-  const paymentIntent = await stripeRequest<{ id: string }>(`/payment_intents/${ref.id}/capture`, body);
+  const paymentIntent = await stripeRequest<{ id: string }>(`/payment_intents/${ref.id}/capture`, body, {
+    idempotencyKey: `scd:capture:${ref.id}:${amount === undefined ? "all" : toMinorUnits(amount)}:v1`,
+  });
   return { provider: "stripe", transactionRef, providerActionId: paymentIntent.id };
 }
 
@@ -418,7 +491,11 @@ export async function voidDeposit(transactionRef: string): Promise<PaymentOperat
     return { provider: "ledger", transactionRef };
   }
 
-  const paymentIntent = await stripeRequest<{ id: string }>(`/payment_intents/${ref.id}/cancel`, new URLSearchParams());
+  const paymentIntent = await stripeRequest<{ id: string }>(
+    `/payment_intents/${ref.id}/cancel`,
+    new URLSearchParams(),
+    { idempotencyKey: `scd:void:${ref.id}:v1` }
+  );
   return { provider: "stripe", transactionRef, providerActionId: paymentIntent.id };
 }
 
@@ -431,13 +508,17 @@ export async function refundDeposit(transactionRef: string, amount?: number): Pr
   const body = new URLSearchParams();
   body.set("payment_intent", ref.id);
   if (amount !== undefined) body.set("amount", String(toMinorUnits(amount)));
-  const refund = await stripeRequest<{ id: string }>("/refunds", body);
+  const refund = await stripeRequest<{ id: string }>("/refunds", body, {
+    idempotencyKey: `scd:refund:${ref.id}:${amount === undefined ? "all" : toMinorUnits(amount)}:v1`,
+  });
   return { provider: "stripe", transactionRef, providerActionId: refund.id };
 }
 
 export function verifyStripeWebhookSignature(payload: string, signatureHeader: string | null): boolean {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!secret) return true;
+  if (!secret) {
+    return process.env.NODE_ENV !== "production" && getPaymentProvider() !== "stripe";
+  }
   if (!signatureHeader) return false;
 
   const timestamp = signatureHeader
@@ -450,6 +531,10 @@ export function verifyStripeWebhookSignature(payload: string, signatureHeader: s
     ?.slice(3);
 
   if (!timestamp || !signature) return false;
+  const timestampSeconds = Number(timestamp);
+  if (!Number.isFinite(timestampSeconds) || Math.abs(Date.now() / 1000 - timestampSeconds) > 5 * 60) {
+    return false;
+  }
 
   const expected = crypto
     .createHmac("sha256", secret)
@@ -463,54 +548,132 @@ export function verifyStripeWebhookSignature(payload: string, signatureHeader: s
   }
 }
 
-function stripeEventAlreadyProcessed(eventId: string | undefined) {
-  if (!eventId) return Promise.resolve(false);
-  return prisma.fulfillmentEvent
-    .findFirst({
-      where: {
-        note: "Stripe webhook processed",
-        metadata: { contains: `"stripeEventId":"${eventId}"` },
+type StripeWebhookEvent = {
+  id?: string;
+  type?: string;
+  data?: {
+    object?: {
+      id?: string;
+      amount_total?: number;
+      amount?: number;
+      payment_intent?: string;
+      metadata?: {
+        dealerPurchaseId?: string;
+        serviceBookingId?: string;
+        fulfillmentRequestId?: string;
+        publicTransactionToken?: string;
+        feeType?: string;
+      };
+    };
+  };
+};
+
+async function claimStripeWebhookEvent(event: StripeWebhookEvent) {
+  if (!event.id) throw new Error("Stripe webhook event is missing its provider event id.");
+
+  try {
+    const record = await prisma.paymentWebhookEvent.create({
+      data: {
+        provider: "STRIPE",
+        eventId: event.id,
+        eventType: event.type || "unknown",
       },
       select: { id: true },
-    })
-    .then(Boolean);
+    });
+    return { recordId: record.id, alreadyProcessed: false, processing: false };
+  } catch (error) {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") {
+      throw error;
+    }
+  }
+
+  const existing = await prisma.paymentWebhookEvent.findUnique({
+    where: { provider_eventId: { provider: "STRIPE", eventId: event.id } },
+    select: { id: true, status: true, updatedAt: true },
+  });
+  if (!existing) throw new Error("Stripe webhook idempotency record could not be loaded.");
+  if (existing.status === "PROCESSED") {
+    return { recordId: existing.id, alreadyProcessed: true, processing: false };
+  }
+
+  const staleBefore = new Date(Date.now() - 10 * 60 * 1000);
+  const canRetry = existing.status === "FAILED" || existing.updatedAt < staleBefore;
+  if (!canRetry) {
+    return { recordId: existing.id, alreadyProcessed: false, processing: true };
+  }
+
+  const claimed = await prisma.paymentWebhookEvent.updateMany({
+    where: {
+      id: existing.id,
+      status: existing.status,
+      updatedAt: existing.updatedAt,
+    },
+    data: {
+      status: "PROCESSING",
+      attempts: { increment: 1 },
+      errorMessage: null,
+      processedAt: null,
+    },
+  });
+  return {
+    recordId: existing.id,
+    alreadyProcessed: false,
+    processing: claimed.count === 0,
+  };
 }
 
-async function sendServiceBookingPaymentConfirmations(fulfillmentRequestId: string) {
+async function dispatchAuthorizedServiceBookingRequest(fulfillmentRequestId: string) {
   const req = await prisma.fulfillmentRequest.findUnique({
     where: { id: fulfillmentRequestId },
-    select: paymentConfirmationRequestSelect,
+    select: paidServiceBookingRequestSelect,
   });
-  if (!req) return;
+  if (!req || req.requestType !== "SERVICE_BOOKING") return;
 
   const vehicleSummary = req.vehicle
     ? `${req.vehicle.year} ${req.vehicle.model.make.name} ${req.vehicle.model.name} (VIN: ${req.vehicle.vin})`
     : "Service Booking";
   const owner = req.parties.find((party) => party.partyType === "BUYER");
   const shop = req.parties.find((party) => party.partyType === "SERVICE_CENTER");
+  const packageRecord = req.packages[0];
+  const packageScope = parseJsonRecord(packageRecord?.scope);
+  const customerContact = parseUnknownRecord(packageScope.customerContact);
+  const decisionTokenUrl = req.partnerTokens[0]
+    ? `/fulfillment/${req.partnerTokens[0].token}`
+    : `/transactions/${req.publicTransactionToken}`;
+  let dispatched = false;
+
+  if (shop?.email) {
+    const { dispatchServiceBookingEmail } = await import("@/lib/fulfillment/service-booking-package");
+    const result = await dispatchServiceBookingEmail({
+      fulfillmentRequestId,
+      shopName: shop.name,
+      shopEmail: shop.email,
+      decisionTokenUrl,
+      packageTitle: packageRecord?.title || "Service Booking Request",
+      vehicleSummary,
+      serviceName: typeof packageScope.serviceRequested === "string" ? packageScope.serviceRequested : undefined,
+      customerName: owner?.name,
+      customerPhone: typeof customerContact.phone === "string" ? customerContact.phone : owner?.phone || undefined,
+      depositAmount: getServiceBookingFeeCents() / 100,
+    });
+    dispatched = result.dispatched;
+  }
+
+  await prisma.fulfillmentRequest.update({
+    where: { id: fulfillmentRequestId },
+    data: { status: dispatched ? "SENT" : "DRAFT" },
+  });
 
   const { sendFulfillmentEmail } = await import("@/lib/mail/mail-service");
   if (owner?.email) {
     await sendFulfillmentEmail({
       fulfillmentRequestId,
-      templateType: "ACCEPTED_NOTIFICATION",
+      templateType: "BUYER_CONFIRMATION",
       recipientName: owner.name,
       recipientEmail: owner.email,
-      packageTitle: "Service booking confirmed",
+      packageTitle: dispatched ? "Service booking request sent" : "Service booking authorization received",
       vehicleSummary,
       reviewUrl: `/transactions/${req.publicTransactionToken}`,
-    });
-  }
-
-  if (shop?.email) {
-    await sendFulfillmentEmail({
-      fulfillmentRequestId,
-      templateType: "ACCEPTED_NOTIFICATION",
-      recipientName: shop.name,
-      recipientEmail: shop.email,
-      packageTitle: "Owner payment received for service booking",
-      vehicleSummary,
-      reviewUrl: `/fulfillment/${req.partnerTokens?.[0]?.token || req.publicTransactionToken}`,
     });
   }
 }
@@ -584,35 +747,20 @@ function parseJsonRecord(value: string | null | undefined): Record<string, unkno
   }
 }
 
+function parseUnknownRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
 function numberFromScope(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
-export async function processStripeWebhookPayload(payload: string): Promise<PaymentWebhookResult> {
-  const event = JSON.parse(payload) as {
-    id?: string;
-    type?: string;
-    data?: {
-      object?: {
-        id?: string;
-        amount_total?: number;
-        amount?: number;
-        payment_intent?: string;
-        metadata?: {
-          dealerPurchaseId?: string;
-          serviceBookingId?: string;
-          fulfillmentRequestId?: string;
-          publicTransactionToken?: string;
-          feeType?: string;
-        };
-      };
-    };
-  };
-
-  if (await stripeEventAlreadyProcessed(event.id)) {
-    return { received: true, eventType: event.type || "unknown", fulfillmentRequestId: null, alreadyProcessed: true };
-  }
-
+async function processStripeWebhookEvent(
+  event: StripeWebhookEvent,
+  payload: string
+): Promise<PaymentWebhookResult> {
   const eventType = event.type || "unknown";
   const object = event.data?.object;
   const fulfillmentRequestId = object?.metadata?.serviceBookingId || object?.metadata?.fulfillmentRequestId;
@@ -727,7 +875,7 @@ export async function processStripeWebhookPayload(payload: string): Promise<Paym
       amountCents: object.amount_total,
     });
 
-    if (req.status === "CONFIRMED" || req.paymentStatus === "PAID") {
+    if (req.paymentStatus === "AUTHORIZED" || req.paymentStatus === "PAID") {
       await prisma.fulfillmentEvent.create({
         data: {
           fulfillmentRequestId: req.id,
@@ -738,6 +886,9 @@ export async function processStripeWebhookPayload(payload: string): Promise<Paym
           metadata,
         },
       });
+      if (req.status === "READY_TO_SEND" || req.status === "DRAFT" || req.status === "PAYMENT_PROCESSING") {
+        await dispatchAuthorizedServiceBookingRequest(req.id);
+      }
       return { received: true, eventType, fulfillmentRequestId: req.id, alreadyProcessed: true };
     }
 
@@ -745,9 +896,10 @@ export async function processStripeWebhookPayload(payload: string): Promise<Paym
       await tx.fulfillmentRequest.update({
         where: { id: req.id },
         data: {
-          status: "CONFIRMED",
-          paymentStatus: "PAID",
-          collectedAmount: expectedCents / 100,
+          status: "READY_TO_SEND",
+          paymentStatus: "AUTHORIZED",
+          collectedAmount: 0,
+          refundableAmount: expectedCents / 100,
           payoutStatus: "UNSETTLED",
         },
       });
@@ -755,7 +907,7 @@ export async function processStripeWebhookPayload(payload: string): Promise<Paym
       for (const fee of req.fees.filter((fee) => fee.feeType === "SERVICE_FEE")) {
         await tx.fulfillmentFee.update({
           where: { id: fee.id },
-          data: { status: "CAPTURED" },
+          data: { status: "AUTHORIZED" },
         });
       }
 
@@ -764,8 +916,7 @@ export async function processStripeWebhookPayload(payload: string): Promise<Paym
         await tx.depositIntent.update({
           where: { id: checkoutIntent.id },
           data: {
-            status: "CAPTURED",
-            capturedAt: new Date(),
+            status: "AUTHORIZED",
             transactionRef: `stripe_checkout:${object.id};payment_intent:${object.payment_intent || "unknown"}`,
           },
         });
@@ -775,15 +926,21 @@ export async function processStripeWebhookPayload(payload: string): Promise<Paym
         data: {
           fulfillmentRequestId: req.id,
           previousStatus: req.status,
-          newStatus: "CONFIRMED",
+          newStatus: "READY_TO_SEND",
           actorType: "SYSTEM",
-          note: "Stripe webhook processed",
-          metadata,
+          note: "Stripe Checkout authorized service-booking fee for capture after shop acceptance",
+          metadata: JSON.stringify({
+            stripeEventId: event.id || null,
+            stripeSessionId: object.id,
+            stripePaymentIntentId: typeof object.payment_intent === "string" ? object.payment_intent : null,
+            amountCents: object.amount_total,
+            captureMethod: "manual",
+          }),
         },
       });
     });
 
-    await sendServiceBookingPaymentConfirmations(req.id);
+    await dispatchAuthorizedServiceBookingRequest(req.id);
     return { received: true, eventType, fulfillmentRequestId: req.id };
   }
 
@@ -800,13 +957,13 @@ export async function processStripeWebhookPayload(payload: string): Promise<Paym
         },
         data: object?.metadata?.feeType === "DEALER_PURCHASE_DEPOSIT"
           ? { paymentStatus: "FAILED" }
-          : { paymentStatus: "FAILED", status: "ACCEPTED_AWAITING_PAYMENT" },
+          : { paymentStatus: "FAILED", status: "READY_TO_SEND" },
       });
       await prisma.fulfillmentEvent.create({
         data: {
           fulfillmentRequestId: requestId,
           previousStatus: "PAYMENT_PROCESSING",
-          newStatus: "ACCEPTED_AWAITING_PAYMENT",
+          newStatus: object?.metadata?.feeType === "DEALER_PURCHASE_DEPOSIT" ? "PAYMENT_PROCESSING" : "READY_TO_SEND",
           actorType: "SYSTEM",
           note: "Stripe webhook processed",
           metadata: JSON.stringify({ stripeEventId: event.id || null, eventType, stripeObjectId: object?.id || null }),
@@ -850,4 +1007,44 @@ export async function processStripeWebhookPayload(payload: string): Promise<Paym
   }
 
   return { received: true, eventType, fulfillmentRequestId: request.id };
+}
+
+export async function processStripeWebhookPayload(payload: string): Promise<PaymentWebhookResult> {
+  const event = JSON.parse(payload) as StripeWebhookEvent;
+  const claim = await claimStripeWebhookEvent(event);
+  if (claim.processing) {
+    throw new Error("Stripe webhook event is already being processed; retry later.");
+  }
+  if (claim.alreadyProcessed) {
+    return {
+      received: true,
+      eventType: event.type || "unknown",
+      fulfillmentRequestId: null,
+      alreadyProcessed: true,
+    };
+  }
+
+  try {
+    const result = await processStripeWebhookEvent(event, payload);
+    await prisma.paymentWebhookEvent.update({
+      where: { id: claim.recordId },
+      data: {
+        status: "PROCESSED",
+        fulfillmentRequestId: result.fulfillmentRequestId || null,
+        processedAt: new Date(),
+        errorMessage: null,
+      },
+    });
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Stripe webhook processing failed.";
+    await prisma.paymentWebhookEvent.update({
+      where: { id: claim.recordId },
+      data: {
+        status: "FAILED",
+        errorMessage: message.slice(0, 1000),
+      },
+    });
+    throw error;
+  }
 }

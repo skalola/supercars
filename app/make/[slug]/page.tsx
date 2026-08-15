@@ -1,9 +1,25 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { getCatalogMakeWithModels } from "@/lib/makes/catalog";
+import { buildPublicMetadata, humanizeSlug } from "@/lib/seo";
 
 type MakePageProps = {
   params: Promise<{ slug: string }>;
 };
+
+export async function generateMetadata({ params }: MakePageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const make = await getCatalogMakeWithModels(slug);
+  const name = make?.name || humanizeSlug(slug);
+
+  return buildPublicMetadata({
+    title: `${name} Models, Market Data and Ownership`,
+    description: `Explore ${name} models with specifications, ownership tools, market intelligence, live listings, maintenance guidance, and compatible parts.`,
+    path: `/make/${slug}`,
+    image: make?.logoUrl,
+    keywords: [`${name} models`, `${name} market value`, `${name} maintenance`, `${name} parts`],
+  });
+}
 
 export default async function MakePage({ params }: MakePageProps) {
   const { slug } = await params;

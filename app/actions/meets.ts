@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -10,6 +10,14 @@ import { notifyMeetCancelled, notifyMeetCreated, notifyMeetRsvp, notifyMeetUpdat
 import { normalizeMeetType } from "@/lib/meets/meet-types";
 import { isUploadableImageFile, uploadPublicImage } from "@/lib/media/upload-storage";
 import { enforceActionRateLimit } from "@/lib/security/action-rate-limit";
+import { garageItemIdSchema } from "@/lib/validation/community-inputs";
+import {
+  addMeetPhotoInputSchema,
+  createMeetInputSchema,
+  manageMeetRsvpInputSchema,
+  meetRsvpInputSchema,
+  updateMeetInputSchema,
+} from "@/lib/validation/meet-inputs";
 
 export async function createMeetAction(formData: FormData) {
   const session = await auth();
@@ -24,28 +32,22 @@ export async function createMeetAction(formData: FormData) {
     windowMs: 60 * 60 * 1000,
   });
 
-  const title = readString(formData, "title");
-  const type = normalizeMeetType(readString(formData, "type"));
-  const startsAtInput = readString(formData, "startsAt");
-  const city = readString(formData, "city");
-  const state = readString(formData, "state").toUpperCase();
-  const locationName = readString(formData, "locationName");
-  const locationDetail = readString(formData, "locationDetail") || "Address shared after RSVP";
-  const exactAddress = readString(formData, "exactAddress");
-  const description = readString(formData, "description");
-  const visibility = readString(formData, "visibility") === "INVITE_ONLY" ? "INVITE_ONLY" : "PUBLIC";
-  const capacity = parseOptionalInt(readString(formData, "capacity"));
+  const meetInput = createMeetInputSchema.parse({
+    title: readString(formData, "title"),
+    type: normalizeMeetType(readString(formData, "type")),
+    startsAt: readString(formData, "startsAt"),
+    city: readString(formData, "city"),
+    state: readString(formData, "state"),
+    locationName: readString(formData, "locationName"),
+    locationDetail: readString(formData, "locationDetail") || "Address shared after RSVP",
+    exactAddress: readString(formData, "exactAddress"),
+    description: readString(formData, "description"),
+    visibility: readString(formData, "visibility") === "INVITE_ONLY" ? "INVITE_ONLY" : "PUBLIC",
+    capacity: readString(formData, "capacity"),
+  });
+  const { title, type, startsAt, city, state, locationName, locationDetail, exactAddress, description, visibility, capacity } = meetInput;
   const allowedMakes = await readAllowedCatalogMakes(formData);
   const clubId = await readHostableClubId(formData, userId);
-
-  if (!title || !startsAtInput || !city || !state || !locationName) {
-    throw new Error("Title, date/time, city, state, and location name are required.");
-  }
-
-  const startsAt = new Date(startsAtInput);
-  if (Number.isNaN(startsAt.getTime())) {
-    throw new Error("Choose a valid event date and time.");
-  }
 
   const slug = await createUniqueMeetSlug(title, city, startsAt);
   const coordinates = await resolveMeetCoordinates(city, state);
@@ -63,9 +65,9 @@ export async function createMeetAction(formData: FormData) {
       state,
       locationName,
       locationDetail,
-      exactAddress: exactAddress || null,
+      exactAddress,
       capacity,
-      description: description || null,
+      description,
       allowedMakes: JSON.stringify(allowedMakes),
       latitude: coordinates?.latitude ?? null,
       longitude: coordinates?.longitude ?? null,
@@ -78,6 +80,7 @@ export async function createMeetAction(formData: FormData) {
   await notifyMeetCreated(meet.id);
 
   revalidatePath("/meets");
+  updateTag("public-meets");
   revalidatePath(`/garage/${await getUsername(userId)}`);
   redirect(`/meets/${meet.slug}`);
 }
@@ -89,9 +92,11 @@ export async function rsvpMeetAction(formData: FormData) {
   }
   const userId = session.user.id as string;
 
-  const meetId = readString(formData, "meetId");
-  const vehicleId = readString(formData, "vehicleId") || null;
-  const status = normalizeRsvpStatus(readString(formData, "status"));
+  const { meetId, vehicleId, status } = meetRsvpInputSchema.parse({
+    meetId: readString(formData, "meetId"),
+    vehicleId: readString(formData, "vehicleId") || null,
+    status: readString(formData, "status") || "GOING",
+  });
   await enforceActionRateLimit({
     actorId: userId,
     action: "MEET_RSVP",
@@ -99,10 +104,6 @@ export async function rsvpMeetAction(formData: FormData) {
     windowMs: 10 * 60 * 1000,
     bucketKey: meetId || "UNKNOWN_MEET",
   });
-
-  if (!meetId) {
-    throw new Error("Missing meet id.");
-  }
 
   const meet = await prisma.meet.findUnique({
     where: { id: meetId },
@@ -158,6 +159,7 @@ export async function rsvpMeetAction(formData: FormData) {
   }
 
   revalidatePath("/meets");
+  updateTag("public-meets");
   revalidatePath(`/meets/${meet.slug}`);
   revalidatePath("/garage");
   const username = await getUsername(userId);
@@ -172,36 +174,31 @@ export async function updateHostedMeetAction(formData: FormData) {
   }
 
   const userId = session.user.id as string;
-  const meetId = readString(formData, "meetId");
+  const rawMeetId = readString(formData, "meetId");
   await enforceActionRateLimit({
     actorId: userId,
     action: "MEET_HOST_EDIT",
     limit: 20,
     windowMs: 60 * 60 * 1000,
-    bucketKey: meetId || "UNKNOWN_MEET",
+    bucketKey: rawMeetId || "UNKNOWN_MEET",
   });
-  const title = readString(formData, "title");
-  const type = normalizeMeetType(readString(formData, "type"));
-  const startsAtInput = readString(formData, "startsAt");
-  const capacity = parseOptionalInt(readString(formData, "capacity"));
-  const city = readString(formData, "city");
-  const state = readString(formData, "state").toUpperCase();
-  const locationName = readString(formData, "locationName");
-  const locationDetail = readString(formData, "locationDetail") || "Address shared after RSVP";
-  const exactAddress = readString(formData, "exactAddress");
-  const description = readString(formData, "description");
-  const visibility = readString(formData, "visibility") === "INVITE_ONLY" ? "INVITE_ONLY" : "PUBLIC";
+  const meetInput = updateMeetInputSchema.parse({
+    meetId: rawMeetId,
+    title: readString(formData, "title"),
+    type: normalizeMeetType(readString(formData, "type")),
+    startsAt: readString(formData, "startsAt"),
+    capacity: readString(formData, "capacity"),
+    city: readString(formData, "city"),
+    state: readString(formData, "state"),
+    locationName: readString(formData, "locationName"),
+    locationDetail: readString(formData, "locationDetail") || "Address shared after RSVP",
+    exactAddress: readString(formData, "exactAddress"),
+    description: readString(formData, "description"),
+    visibility: readString(formData, "visibility") === "INVITE_ONLY" ? "INVITE_ONLY" : "PUBLIC",
+  });
+  const { meetId, title, type, startsAt, capacity, city, state, locationName, locationDetail, exactAddress, description, visibility } = meetInput;
   const allowedMakes = await readAllowedCatalogMakes(formData);
   const clubId = await readHostableClubId(formData, userId);
-
-  if (!meetId || !title || !startsAtInput || !city || !state || !locationName) {
-    throw new Error("Meet id, title, date/time, city, state, and location name are required.");
-  }
-
-  const startsAt = new Date(startsAtInput);
-  if (Number.isNaN(startsAt.getTime())) {
-    throw new Error("Choose a valid event date and time.");
-  }
 
   const meet = await prisma.meet.findFirst({
     where: {
@@ -228,8 +225,8 @@ export async function updateHostedMeetAction(formData: FormData) {
       state,
       locationName,
       locationDetail,
-      exactAddress: exactAddress || null,
-      description: description || null,
+      exactAddress,
+      description,
       visibility,
       clubId,
       allowedMakes: JSON.stringify(allowedMakes),
@@ -244,6 +241,7 @@ export async function updateHostedMeetAction(formData: FormData) {
   await notifyMeetUpdated(meet.id, userId);
 
   revalidatePath("/meets");
+  updateTag("public-meets");
   revalidatePath(`/meets/${meet.slug}`);
   revalidatePath("/garage");
   const username = await getUsername(userId);
@@ -258,8 +256,10 @@ export async function manageMeetRsvpAction(formData: FormData) {
   }
 
   const userId = session.user.id as string;
-  const rsvpId = readString(formData, "rsvpId");
-  const action = readString(formData, "action");
+  const { rsvpId, action } = manageMeetRsvpInputSchema.parse({
+    rsvpId: readString(formData, "rsvpId"),
+    action: readString(formData, "action"),
+  });
   await enforceActionRateLimit({
     actorId: userId,
     action: "MEET_ATTENDEE_MANAGE",
@@ -267,10 +267,6 @@ export async function manageMeetRsvpAction(formData: FormData) {
     windowMs: 10 * 60 * 1000,
     bucketKey: rsvpId || "UNKNOWN_RSVP",
   });
-  if (!rsvpId) {
-    throw new Error("Missing RSVP id.");
-  }
-
   const rsvp = await prisma.meetRsvp.findUnique({
     where: { id: rsvpId },
     include: {
@@ -292,7 +288,7 @@ export async function manageMeetRsvpAction(formData: FormData) {
     });
     await promoteWaitlistIfSpace(rsvp.meet.id);
   } else {
-    const status = normalizeHostRsvpStatus(action);
+    const status = action;
     if (status === "GOING") {
       const goingCount = await prisma.meetRsvp.count({
         where: { meetId: rsvp.meet.id, status: "GOING", id: { not: rsvp.id } },
@@ -308,9 +304,10 @@ export async function manageMeetRsvpAction(formData: FormData) {
   }
 
   await syncMeetCapacityStatus(rsvp.meet.id);
-  await notifyMeetRsvp(rsvp.meet.id, rsvp.userId, action === "REMOVE" ? "CANCELLED" : normalizeHostRsvpStatus(action));
+  await notifyMeetRsvp(rsvp.meet.id, rsvp.userId, action === "REMOVE" ? "CANCELLED" : action);
 
   revalidatePath("/meets");
+  updateTag("public-meets");
   revalidatePath(`/meets/${rsvp.meet.slug}`);
   revalidatePath("/garage");
   const username = await getUsername(userId);
@@ -325,7 +322,7 @@ export async function cancelHostedMeetAction(formData: FormData) {
   }
   const userId = session.user.id as string;
 
-  const meetId = readString(formData, "meetId");
+  const meetId = garageItemIdSchema.parse(readString(formData, "meetId"));
   await enforceActionRateLimit({
     actorId: userId,
     action: "MEET_CANCEL",
@@ -333,10 +330,6 @@ export async function cancelHostedMeetAction(formData: FormData) {
     windowMs: 60 * 60 * 1000,
     bucketKey: meetId || "UNKNOWN_MEET",
   });
-  if (!meetId) {
-    throw new Error("Missing meet id.");
-  }
-
   const meet = await prisma.meet.findFirst({
     where: {
       id: meetId,
@@ -361,6 +354,7 @@ export async function cancelHostedMeetAction(formData: FormData) {
   await notifyMeetCancelled(meet.id, userId);
 
   revalidatePath("/meets");
+  updateTag("public-meets");
   revalidatePath(`/meets/${meet.slug}`);
   revalidatePath("/garage");
   const username = await getUsername(userId);
@@ -375,11 +369,14 @@ export async function addMeetPhotoAction(formData: FormData) {
   }
 
   const userId = session.user.id as string;
-  const meetId = readString(formData, "meetId");
-  const photoUrl = readString(formData, "photoUrl");
   const photoFile = formData.get("photoFile");
-  const caption = readString(formData, "caption");
-  const vehicleId = readString(formData, "vehicleId") || null;
+  const photoInput = addMeetPhotoInputSchema.parse({
+    meetId: readString(formData, "meetId"),
+    photoUrl: isUploadableImageFile(photoFile) ? null : readString(formData, "photoUrl"),
+    caption: readString(formData, "caption"),
+    vehicleId: readString(formData, "vehicleId") || null,
+  });
+  const { meetId, photoUrl, caption, vehicleId } = photoInput;
   await enforceActionRateLimit({
     actorId: userId,
     action: "MEET_PHOTO_ADD",
@@ -387,10 +384,6 @@ export async function addMeetPhotoAction(formData: FormData) {
     windowMs: 60 * 60 * 1000,
     bucketKey: meetId || "UNKNOWN_MEET",
   });
-
-  if (!meetId) {
-    throw new Error("A completed meet is required.");
-  }
 
   const meet = await prisma.meet.findUnique({
     where: { id: meetId },
@@ -422,15 +415,17 @@ export async function addMeetPhotoAction(formData: FormData) {
     vehicleVin = vehicle.vin;
   }
 
-  let storedPhotoUrl = photoUrl;
+  let storedPhotoUrl: string;
   if (isUploadableImageFile(photoFile)) {
     const upload = await uploadPublicImage({
       file: photoFile,
       folder: `meets/${meet.id}/photos`,
     });
     storedPhotoUrl = upload.url;
-  } else if (!isPublicImageUrl(photoUrl)) {
+  } else if (!photoUrl) {
     throw new Error("Upload a photo or provide a public photo URL.");
+  } else {
+    storedPhotoUrl = photoUrl;
   }
 
   await prisma.meetPhoto.create({
@@ -439,11 +434,12 @@ export async function addMeetPhotoAction(formData: FormData) {
       userId,
       vehicleId,
       url: storedPhotoUrl,
-      caption: caption || null,
+      caption,
     },
   });
 
   revalidatePath("/meets");
+  updateTag("public-meets");
   revalidatePath(`/meets/${meet.slug}`);
   revalidatePath("/garage");
   const username = await getUsername(userId);
@@ -458,18 +454,23 @@ function readString(formData: FormData, key: string) {
 
 async function readAllowedCatalogMakes(formData: FormData) {
   const catalogMakes = await getCatalogMakeNames();
+  if (readString(formData, "allMakes") === "true") return catalogMakes;
   const selectedMakes = new Set(formData.getAll("allowedMakes").map((value) => String(value).trim()).filter(Boolean));
   const allowedMakes = catalogMakes.filter((make) => selectedMakes.has(make));
-  return allowedMakes.length > 0 ? allowedMakes : catalogMakes;
+  if (allowedMakes.length === 0) {
+    throw new Error("Choose at least one allowed make or select All makes.");
+  }
+  return allowedMakes;
 }
 
 async function readHostableClubId(formData: FormData, userId: string) {
   const clubId = readString(formData, "clubId");
   if (!clubId) return null;
+  const validatedClubId = garageItemIdSchema.parse(clubId);
 
   const club = await prisma.carClub.findFirst({
     where: {
-      id: clubId,
+      id: validatedClubId,
       status: "ACTIVE",
       OR: [
         { creatorId: userId },
@@ -495,32 +496,6 @@ async function readHostableClubId(formData: FormData, userId: string) {
 
 async function resolveMeetCoordinates(city: string, state: string) {
   return geocodeLocation(`${city}, ${state}`);
-}
-
-function parseOptionalInt(value: string) {
-  if (!value) return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : null;
-}
-
-function normalizeRsvpStatus(value: string) {
-  if (value === "MAYBE" || value === "CANCELLED") return value;
-  return "GOING";
-}
-
-function normalizeHostRsvpStatus(value: string) {
-  if (value === "MAYBE" || value === "WAITLISTED") return value;
-  return "GOING";
-}
-
-function isPublicImageUrl(value: string) {
-  if (!value || value.length > 1200) return false;
-  try {
-    const url = new URL(value);
-    return ["http:", "https:"].includes(url.protocol);
-  } catch {
-    return false;
-  }
 }
 
 async function createUniqueMeetSlug(title: string, city: string, startsAt: Date) {

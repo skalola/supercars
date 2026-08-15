@@ -89,6 +89,7 @@ export default function MaintenanceIntelligence({
         preferredDate,
         preferredTime,
         notes: `Vehicle Passport service booking for ${makeName} (${vin})`,
+        acceptedTerms: false,
       });
       setBookingTxToken(result.publicTransactionToken);
       setBookingStep(4);

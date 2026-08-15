@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import crypto from "node:crypto";
 
 type RateLimitInput = {
   actorId: string;
@@ -7,6 +8,13 @@ type RateLimitInput = {
   windowMs: number;
   bucketKey?: string | null;
 };
+
+export class ActionRateLimitError extends Error {
+  constructor() {
+    super("Too many requests. Please wait a few minutes and try again.");
+    this.name = "ActionRateLimitError";
+  }
+}
 
 export async function enforceActionRateLimit({
   actorId,
@@ -50,14 +58,23 @@ export async function enforceActionRateLimit({
   });
 
   if (row.count > limit) {
-    throw new Error("Too many requests. Please wait a few minutes and try again.");
+    throw new ActionRateLimitError();
   }
 }
 
+export function isActionRateLimitError(error: unknown): error is ActionRateLimitError {
+  return error instanceof ActionRateLimitError;
+}
+
 export async function pruneExpiredActionRateLimits() {
-  await prisma.actionRateLimit.deleteMany({
+  const result = await prisma.actionRateLimit.deleteMany({
     where: { expiresAt: { lt: new Date() } },
   });
+  return result.count;
+}
+
+export function hashRateLimitIdentifier(value: string) {
+  return crypto.createHash("sha256").update(value.trim().toLowerCase()).digest("hex");
 }
 
 function normalizeBucketKey(value?: string | null) {

@@ -8,10 +8,20 @@ import { createFulfillmentRequest } from "@/lib/fulfillment/service";
 import { resolvePartnerContact } from "@/lib/fulfillment/partner-registry";
 import {
   generateServiceBookingPackagePayload,
-  dispatchServiceBookingEmail,
 } from "@/lib/fulfillment/service-booking-package";
 import { getServiceBookingFeeCents } from "@/lib/payments/payment-service";
 import { isSupportedMake } from "@/lib/supported-makes";
+import { vinClaimSchema } from "@/lib/validation/transaction-inputs";
+import { serviceBookingInputSchema } from "@/lib/validation/owner-transaction-inputs";
+import {
+  completeMaintenanceInputSchema,
+  deleteVehicleModificationInputSchema,
+  serviceRecordInputSchema,
+  vehicleAwardInputSchema,
+  vehicleInstalledPartInputSchema,
+  vehicleModificationInputSchema,
+  vehicleProfileInputSchema,
+} from "@/lib/validation/passport-inputs";
 
 function safeRevalidatePath(vin: string) {
   try {
@@ -23,21 +33,16 @@ function safeRevalidatePath(vin: string) {
   }
 }
 
-function cleanNumber(value?: number | null) {
-  if (value === null || value === undefined || Number.isNaN(value)) return null;
-  return Number.isFinite(value) ? value : null;
-}
-
 async function verifyOwnership(vin: string) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const session = (globalThis as any).mockSession !== undefined ? (globalThis as any).mockSession : await auth();
+  const session = await auth();
   const userId = session?.user?.id;
   if (!userId) {
     throw new Error("Unauthorized: Please sign in.");
   }
 
+  const validatedVin = vinClaimSchema.parse(vin);
   const vehicle = await prisma.vehicle.findUnique({
-    where: { vin },
+    where: { vin: validatedVin },
     select: {
       id: true,
       ownerId: true,
@@ -66,28 +71,28 @@ export async function updateVehicleProfile(
   }
 ) {
   const { vehicleId } = await verifyOwnership(vin);
-  const currentMileage = cleanNumber(data.currentMileage);
+  const profileInput = vehicleProfileInputSchema.parse(data);
 
   await prisma.$transaction([
     prisma.vehicleProfile.upsert({
       where: { vehicleId },
       update: {
-        exteriorColor: data.exteriorColor || null,
-        interiorColor: data.interiorColor || null,
-        currentMileage,
-        ownerNotes: data.ownerNotes || null,
+        exteriorColor: profileInput.exteriorColor,
+        interiorColor: profileInput.interiorColor,
+        currentMileage: profileInput.currentMileage,
+        ownerNotes: profileInput.ownerNotes,
       },
       create: {
         vehicleId,
-        exteriorColor: data.exteriorColor || null,
-        interiorColor: data.interiorColor || null,
-        currentMileage,
-        ownerNotes: data.ownerNotes || null,
+        exteriorColor: profileInput.exteriorColor,
+        interiorColor: profileInput.interiorColor,
+        currentMileage: profileInput.currentMileage,
+        ownerNotes: profileInput.ownerNotes,
       },
     }),
     prisma.vehicle.update({
       where: { id: vehicleId },
-      data: { mileage: currentMileage },
+      data: { mileage: profileInput.currentMileage },
     }),
   ]);
 
@@ -107,19 +112,16 @@ export async function addVehicleModification(
   }
 ) {
   const { userId, vehicleId } = await verifyOwnership(vin);
-
-  if (!data.name || data.name.trim() === "") {
-    throw new Error("Modification name is required.");
-  }
+  const modificationInput = vehicleModificationInputSchema.parse(data);
 
   await prisma.$transaction(async (tx) => {
     const modification = await tx.vehicleModification.create({
       data: {
         vehicleId,
-        name: data.name.trim(),
-        brand: data.brand || null,
-        description: data.description || null,
-        installedDate: data.installedDate || null,
+        name: modificationInput.name,
+        brand: modificationInput.brand,
+        description: modificationInput.description,
+        installedDate: modificationInput.installedDate,
       },
     });
 
@@ -128,13 +130,13 @@ export async function addVehicleModification(
         vehicleId,
         userId,
         legacyModificationId: modification.id,
-        categoryId: data.categoryId || null,
-        customName: data.name.trim(),
-        customBrandName: data.brand || null,
-        installedDate: data.installedDate || null,
-        notes: data.description || null,
-        hpGainOverride: cleanNumber(data.hpGainOverride),
-        torqueGainOverride: cleanNumber(data.torqueGainOverride),
+        categoryId: modificationInput.categoryId,
+        customName: modificationInput.name,
+        customBrandName: modificationInput.brand,
+        installedDate: modificationInput.installedDate,
+        notes: modificationInput.description,
+        hpGainOverride: modificationInput.hpGainOverride,
+        torqueGainOverride: modificationInput.torqueGainOverride,
         verificationStatus: "OWNER_REPORTED",
       },
     });
@@ -154,18 +156,16 @@ export async function addVehicleInstalledPart(
   }
 ) {
   const { userId, vehicleId } = await verifyOwnership(vin);
-
-  if (!data.partId) {
-    throw new Error("Choose a catalog part.");
-  }
+  const installedPartInput = vehicleInstalledPartInputSchema.parse(data);
 
   const part = await prisma.performancePart.findUnique({
-    where: { id: data.partId },
+    where: { id: installedPartInput.partId },
     select: {
       id: true,
       name: true,
       description: true,
       categoryId: true,
+      componentTypeId: true,
       status: true,
       brand: { select: { name: true } },
       category: { select: { name: true } },
@@ -195,8 +195,8 @@ export async function addVehicleInstalledPart(
         vehicleId,
         name: part.name,
         brand: part.brand.name,
-        description: data.notes || part.description || part.category.name,
-        installedDate: data.installedDate || null,
+        description: installedPartInput.notes || part.description || part.category.name,
+        installedDate: installedPartInput.installedDate,
       },
     });
 
@@ -207,10 +207,11 @@ export async function addVehicleInstalledPart(
         partId: part.id,
         legacyModificationId: modification.id,
         categoryId: part.categoryId,
-        installedDate: data.installedDate || null,
-        notes: data.notes || null,
-        hpGainOverride: cleanNumber(data.hpGainOverride),
-        torqueGainOverride: cleanNumber(data.torqueGainOverride),
+        componentTypeId: part.componentTypeId,
+        installedDate: installedPartInput.installedDate,
+        notes: installedPartInput.notes,
+        hpGainOverride: installedPartInput.hpGainOverride,
+        torqueGainOverride: installedPartInput.torqueGainOverride,
         verificationStatus: "OWNER_REPORTED",
       },
     });
@@ -227,12 +228,7 @@ export async function deleteVehicleModification(
   }
 ) {
   const { vehicleId } = await verifyOwnership(vin);
-  const modificationId = data.modificationId?.trim() || null;
-  const installedPartId = data.installedPartId?.trim() || null;
-
-  if (!modificationId && !installedPartId) {
-    throw new Error("Choose a modification to delete.");
-  }
+  const { modificationId, installedPartId } = deleteVehicleModificationInputSchema.parse(data);
 
   await prisma.$transaction(async (tx) => {
     const installedPart = installedPartId
@@ -280,19 +276,16 @@ export async function addServiceRecord(
   }
 ) {
   const { vehicleId } = await verifyOwnership(vin);
-
-  if (!data.serviceDate) {
-    throw new Error("Service date is required.");
-  }
+  const serviceInput = serviceRecordInputSchema.parse(data);
 
   await prisma.serviceRecord.create({
     data: {
       vehicleId,
-      serviceDate: new Date(data.serviceDate),
-      mileage: data.mileage || null,
-      shopName: data.shopName || null,
-      description: data.description || null,
-      cost: data.cost || null,
+      serviceDate: new Date(serviceInput.serviceDate),
+      mileage: serviceInput.mileage,
+      shopName: serviceInput.shopName,
+      description: serviceInput.description,
+      cost: serviceInput.cost,
     },
   });
 
@@ -311,24 +304,17 @@ export async function completeMaintenanceItem(
   }
 ) {
   const { vehicleId } = await verifyOwnership(vin);
-
-  if (!data.serviceDate) {
-    throw new Error("Service date is required.");
-  }
-  if (!data.mileage) {
-    throw new Error("Completed mileage is required.");
-  }
-
-  const dbDescription = `[${data.serviceName}] ${data.description || ""}`.trim();
+  const maintenanceInput = completeMaintenanceInputSchema.parse(data);
+  const dbDescription = `[${maintenanceInput.serviceName}] ${maintenanceInput.description || ""}`.trim();
 
   await prisma.serviceRecord.create({
     data: {
       vehicleId,
-      serviceDate: new Date(data.serviceDate),
-      mileage: data.mileage,
-      shopName: data.shopName || null,
+      serviceDate: new Date(maintenanceInput.serviceDate),
+      mileage: maintenanceInput.mileage,
+      shopName: maintenanceInput.shopName,
       description: dbDescription,
-      cost: data.cost || null,
+      cost: maintenanceInput.cost,
     },
   });
 
@@ -336,11 +322,11 @@ export async function completeMaintenanceItem(
     where: { vehicleId },
   });
 
-  if (!profile || profile.currentMileage === null || data.mileage > profile.currentMileage) {
+  if (!profile || profile.currentMileage === null || maintenanceInput.mileage > profile.currentMileage) {
     await prisma.vehicleProfile.upsert({
       where: { vehicleId },
-      update: { currentMileage: data.mileage },
-      create: { vehicleId, currentMileage: data.mileage },
+      update: { currentMileage: maintenanceInput.mileage },
+      create: { vehicleId, currentMileage: maintenanceInput.mileage },
     });
   }
 
@@ -357,18 +343,15 @@ export async function addVehicleAward(
   }
 ) {
   const { vehicleId } = await verifyOwnership(vin);
-
-  if (!data.title || data.title.trim() === "") {
-    throw new Error("Award title is required.");
-  }
+  const awardInput = vehicleAwardInputSchema.parse(data);
 
   await prisma.vehicleAward.create({
     data: {
       vehicleId,
-      title: data.title,
-      eventName: data.eventName || null,
-      awardDate: data.awardDate ? new Date(data.awardDate) : null,
-      description: data.description || null,
+      title: awardInput.title,
+      eventName: awardInput.eventName,
+      awardDate: awardInput.awardDate ? new Date(awardInput.awardDate) : null,
+      description: awardInput.description,
     },
   });
 
@@ -384,22 +367,28 @@ export interface CreateServiceBookingInput {
   notes?: string;
   customerPhone?: string;
   depositAmount?: number;
+  acceptedTerms: boolean;
 }
 
 export async function createServiceBookingPackage(input: CreateServiceBookingInput) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const session = (globalThis as any).mockSession !== undefined ? (globalThis as any).mockSession : await auth();
+  const session = await auth();
   const userId = session?.user?.id;
   if (!userId) {
     throw new Error("Unauthorized: Please sign in to book service.");
   }
+  const bookingInput = serviceBookingInputSchema.parse(input);
 
-  const user = await prisma.user.findUnique({ where: { id: userId } });
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true, username: true, email: true },
+  });
 
   const vehicle = await prisma.vehicle.findUnique({
-    where: { vin: input.vin },
+    where: { vin: bookingInput.vin },
     select: {
       id: true,
+      ownerId: true,
+      status: true,
       vin: true,
       year: true,
       model: {
@@ -420,6 +409,10 @@ export async function createServiceBookingPackage(input: CreateServiceBookingInp
     throw new Error("Vehicle passport not found.");
   }
 
+  if (vehicle.ownerId !== userId || vehicle.status !== "CLAIMED") {
+    throw new Error("Unauthorized: You do not own this claimed vehicle.");
+  }
+
   if (!isValidVin(vehicle.vin)) {
     throw new Error("Service booking packages require a valid VIN-backed supported supercar vehicle.");
   }
@@ -429,13 +422,9 @@ export async function createServiceBookingPackage(input: CreateServiceBookingInp
     throw new Error("Service booking packages are only supported for supported supercar makes.");
   }
 
-  if (!input.serviceName.trim() || !input.shopName.trim() || !input.preferredDate || !input.preferredTime) {
-    throw new Error("Service name, shop, preferred date, and preferred time are required.");
-  }
-
   // 1. Resolve Certified Service Shop Partner Contact
   const resolvedShop = await resolvePartnerContact({
-    name: input.shopName,
+    name: bookingInput.shopName,
     type: "SERVICE_SHOP",
   });
 
@@ -454,32 +443,35 @@ export async function createServiceBookingPackage(input: CreateServiceBookingInp
     model: vehicle.model.name,
     currentMileage: vehicle.profile?.currentMileage || null,
     passportHealthScore: 100,
-    serviceRequested: input.serviceName,
-    preferredDate: input.preferredDate,
-    preferredTime: input.preferredTime,
+    serviceRequested: bookingInput.serviceName,
+    preferredDate: bookingInput.preferredDate,
+    preferredTime: bookingInput.preferredTime,
     customerName,
     customerEmail,
-    customerPhone: input.customerPhone,
-    shopName: resolvedShop?.name || input.shopName,
+    customerPhone: bookingInput.customerPhone,
+    shopName: resolvedShop?.name || bookingInput.shopName,
     shopEmail: resolvedShop?.email || null,
-    notes: input.notes,
+    notes: bookingInput.notes,
     attachedDocumentCount: await prisma.vehicleDocument.count({ where: { vehicleId: vehicle.id } }),
     depositAmount,
+    termsAcceptedAt: new Date().toISOString(),
   });
 
-  // 3. Create Fulfillment Request (SERVICE_BOOKING) for shop review.
-  // Payment is requested only after the shop accepts the appointment.
+  // 3. Create an undispatched request. Stripe authorization must be verified
+  // before the partner receives the tokenized service package.
   const fulfillmentRequest = await createFulfillmentRequest({
     requestType: "SERVICE_BOOKING",
     vehicleId: vehicle.id,
     buyerId: userId,
-    packageTitle: `Service Appointment — ${input.serviceName}`,
-    packageDescription: `Certified service appointment booking for ${vehicle.year} ${makeName} ${vehicle.model.name} at ${resolvedShop?.name || input.shopName}`,
+    packageTitle: `Service Appointment — ${bookingInput.serviceName}`,
+    packageDescription: `Certified service appointment booking for ${vehicle.year} ${makeName} ${vehicle.model.name} at ${resolvedShop?.name || bookingInput.shopName}`,
     scopedPackageData: bookingPayload,
-    partnerName: resolvedShop?.name || input.shopName,
+    partnerName: resolvedShop?.name || bookingInput.shopName,
     partnerEmail: resolvedShop?.email || null,
     partnerType: "SERVICE_SHOP",
-    status: "SENT",
+    status: "READY_TO_SEND",
+    paymentStatus: "PAYMENT_REQUIRED",
+    suppressBuyerConfirmation: true,
     parties: [
       {
         partyType: "BUYER",
@@ -490,7 +482,7 @@ export async function createServiceBookingPackage(input: CreateServiceBookingInp
       },
       {
         partyType: "SERVICE_CENTER",
-        name: resolvedShop?.name || input.shopName,
+        name: resolvedShop?.name || bookingInput.shopName,
         email: resolvedShop?.email || undefined,
         roleDescription: "Certified Service Center",
       },
@@ -500,29 +492,12 @@ export async function createServiceBookingPackage(input: CreateServiceBookingInp
         feeType: "SERVICE_FEE",
         amount: depositAmount,
         status: "ESTIMATED",
-        description: "SUPERCAR DASH service-booking platform fee, payable after shop acceptance",
+        description: "SUPERCAR DASH service-booking platform fee, authorized before dispatch and captured after acceptance",
       },
     ],
   });
 
-  // 4. Audit & Dispatch Service Booking Email
-  const tokenObj = fulfillmentRequest.partnerTokens?.[0];
-  const decisionTokenUrl = tokenObj ? `/fulfillment/${tokenObj.token}` : `/transactions/${fulfillmentRequest.id}`;
-
-  await dispatchServiceBookingEmail({
-    fulfillmentRequestId: fulfillmentRequest.id,
-    shopName: resolvedShop?.name || input.shopName,
-    shopEmail: resolvedShop?.email || null,
-    decisionTokenUrl,
-    packageTitle: fulfillmentRequest.packages?.[0]?.title || `Service Appointment — ${input.serviceName}`,
-    vehicleSummary: `${vehicle.year} ${makeName} ${vehicle.model.name} (VIN: ${vehicle.vin})`,
-    serviceName: input.serviceName,
-    customerName,
-    customerPhone: input.customerPhone,
-    depositAmount,
-  });
-
-  safeRevalidatePath(input.vin);
+  safeRevalidatePath(bookingInput.vin);
 
   return {
     fulfillmentRequestId: fulfillmentRequest.id,

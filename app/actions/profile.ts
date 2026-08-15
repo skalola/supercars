@@ -5,8 +5,8 @@ import { isUploadableImageFile, uploadPublicImage } from "@/lib/media/upload-sto
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-
-const USERNAME_RE = /^[a-z0-9_-]+$/;
+import { enforceActionRateLimit } from "@/lib/security/action-rate-limit";
+import { profileInputSchema } from "@/lib/validation/community-inputs";
 
 export type UpdateProfileState = {
   ok?: boolean;
@@ -21,13 +21,16 @@ export async function updateProfileAction(
   const userId = session?.user?.id as string | undefined;
   if (!userId) redirect("/login");
 
-  const name = cleanText(formData.get("name"), 80);
-  const username = cleanUsername(formData.get("username"));
+  const parsedProfile = profileInputSchema.safeParse({
+    name: String(formData.get("name") || ""),
+    username: String(formData.get("username") || ""),
+  });
   const profileImage = formData.get("profileImage");
 
-  if (!username) {
+  if (!parsedProfile.success) {
     return { error: "Choose a username with at least 3 letters, numbers, underscores, or hyphens." };
   }
+  const { name, username } = parsedProfile.data;
 
   const [existing, currentUser] = await Promise.all([
     prisma.user.findFirst({
@@ -52,6 +55,12 @@ export async function updateProfileAction(
   let image = currentUser.image;
   if (isUploadableImageFile(profileImage)) {
     try {
+      await enforceActionRateLimit({
+        actorId: userId,
+        action: "profile_upload",
+        limit: 10,
+        windowMs: 60 * 60 * 1000,
+      });
       const upload = await uploadPublicImage({
         file: profileImage,
         folder: `profiles/${userId}`,
@@ -77,16 +86,4 @@ export async function updateProfileAction(
   revalidatePath(`/garage/${username}`);
 
   return { ok: true };
-}
-
-function cleanText(value: FormDataEntryValue | null, maxLength: number) {
-  const text = value?.toString().replace(/\s+/g, " ").trim() || null;
-  if (!text) return null;
-  return text.slice(0, maxLength);
-}
-
-function cleanUsername(value: FormDataEntryValue | null) {
-  const username = value?.toString().trim().toLowerCase() || "";
-  if (username.length < 3 || username.length > 32 || !USERNAME_RE.test(username)) return null;
-  return username;
 }

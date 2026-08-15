@@ -21,6 +21,2367 @@
   --font-clean-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+/* Parts store vehicle-first presentation */
+.parts-store-shell.parts-tuning-shell {
+  min-height: 100vh;
+  padding-top: 22px;
+  padding-bottom: 56px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 78% 8%, rgba(57, 66, 76, 0.28), transparent 34%),
+    linear-gradient(180deg, #0d1015 0, #080a0d 48%, #060708 100%);
+}
+
+.parts-store-shell.parts-tuning-shell .parts-tuning-stage {
+  display: grid;
+  width: min(1440px, 100%);
+  margin: 0 auto;
+  gap: 18px;
+}
+
+.parts-page-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 11px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.parts-page-breadcrumbs a,
+.parts-page-breadcrumbs strong {
+  color: rgba(255, 255, 255, 0.76);
+  text-decoration: none;
+}
+
+.parts-vehicle-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(340px, 1fr);
+  align-items: center;
+  min-height: 330px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background:
+    linear-gradient(115deg, rgba(27, 31, 38, 0.98), rgba(16, 19, 24, 0.9)),
+    #11141a;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.025);
+}
+
+.parts-vehicle-hero-media {
+  position: relative;
+  display: grid;
+  place-items: center;
+  align-self: stretch;
+  min-width: 0;
+  min-height: 330px;
+  padding: 24px 26px 14px;
+  background: radial-gradient(ellipse at 48% 72%, rgba(255, 255, 255, 0.12), transparent 54%);
+}
+
+.parts-vehicle-hero-media::after {
+  position: absolute;
+  right: 8%;
+  bottom: 12%;
+  left: 8%;
+  height: 12%;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  filter: blur(18px);
+  content: "";
+}
+
+.parts-vehicle-car-image {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  max-height: 300px;
+  object-fit: contain;
+  object-position: center;
+  filter: drop-shadow(0 18px 18px rgba(0, 0, 0, 0.38));
+}
+
+.parts-vehicle-make-logo {
+  position: absolute;
+  z-index: 2;
+  top: 22px;
+  left: 24px;
+  width: 42px;
+  height: 50px;
+  object-fit: contain;
+}
+
+.parts-vehicle-hero-media > span {
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.parts-vehicle-hero-content {
+  display: grid;
+  align-content: center;
+  gap: 15px;
+  min-width: 0;
+  padding: clamp(24px, 3vw, 46px);
+}
+
+.parts-selected-vehicle-label {
+  width: fit-content;
+  padding: 5px 9px;
+  border: 1px solid rgba(171, 220, 53, 0.35);
+  border-radius: 4px;
+  background: rgba(123, 157, 29, 0.24);
+  color: #d9f77f;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.parts-vehicle-hero-content h1 {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(27px, 2.5vw, 42px);
+  font-weight: 850;
+  line-height: 1.02;
+  overflow-wrap: anywhere;
+}
+
+.parts-vehicle-summary-line {
+  margin: -6px 0 0;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.parts-vehicle-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.parts-vehicle-metrics > div,
+.parts-vehicle-metadata > div {
+  display: grid;
+  min-width: 0;
+}
+
+.parts-vehicle-metrics strong {
+  font-size: clamp(21px, 2vw, 30px);
+  line-height: 1;
+}
+
+.parts-vehicle-metrics span,
+.parts-vehicle-metadata span {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 9px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.parts-vehicle-metrics i {
+  width: min(42px, 75%);
+  height: 3px;
+  margin-top: 7px;
+  background: #ef233c;
+}
+
+.parts-vehicle-metadata {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.parts-vehicle-metadata strong {
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.parts-vehicle-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.parts-vehicle-actions button,
+.parts-vehicle-actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.025);
+  color: #fff;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 900;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.parts-vehicle-actions a {
+  border-color: #ef233c;
+  color: #ff4157;
+}
+
+.parts-vehicle-selector-drawer {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.45fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 20px;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  background: #101318;
+}
+
+.parts-vehicle-selector-drawer > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.parts-vehicle-selector-drawer > div:first-child span {
+  color: #ef233c;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.parts-vehicle-selector-drawer > div:first-child strong {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.parts-vehicle-selector-drawer .parts-tuning-selector {
+  padding: 0;
+}
+
+.parts-vehicle-library {
+  gap: 16px;
+  padding: 8px 0 0;
+}
+
+.parts-library-section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  color: #fff;
+  text-transform: uppercase;
+}
+
+.parts-library-section-title strong {
+  font-size: 13px;
+}
+
+.parts-library-section-title span {
+  color: rgba(255, 255, 255, 0.46);
+  font-size: 9px;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.parts-system-rail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 7px;
+  min-width: 0;
+}
+
+.parts-system-card {
+  display: grid;
+  grid-template-rows: 45px minmax(27px, auto);
+  place-items: center;
+  min-width: 0;
+  min-height: 92px;
+  padding: 10px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018));
+  color: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+}
+
+.parts-system-card:hover,
+.parts-system-card:focus-visible,
+.parts-system-card.is-active {
+  border-color: #ef233c;
+  color: #fff;
+  outline: none;
+  box-shadow: inset 0 -2px #ef233c;
+}
+
+.parts-system-card .parts-category-line-icon {
+  width: 39px;
+  height: 39px;
+  color: currentColor;
+  filter: brightness(1.35) drop-shadow(0 0 7px rgba(255, 255, 255, 0.2));
+}
+
+.parts-system-card.is-active .parts-category-line-icon {
+  color: #ff334b;
+  filter: brightness(1.25) drop-shadow(0 0 8px rgba(239, 35, 60, 0.58));
+}
+
+.parts-system-card strong {
+  max-width: 100%;
+  font-size: 9px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.parts-components-title {
+  margin-top: 4px;
+}
+
+.parts-store-shell.parts-tuning-shell .parts-component-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.parts-store-shell.parts-tuning-shell .parts-component-tile {
+  grid-template-columns: 54px minmax(0, 1fr) 18px;
+  grid-template-rows: 1fr;
+  min-height: 112px;
+  padding: 14px 16px;
+}
+
+.parts-store-shell.parts-tuning-shell .parts-component-tile .parts-category-line-icon {
+  grid-row: auto;
+  width: 48px;
+  height: 48px;
+}
+
+.parts-component-copy {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.parts-store-shell.parts-tuning-shell .parts-component-copy strong {
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.parts-component-copy small {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: none;
+}
+
+.parts-component-chevron {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 28px;
+  font-weight: 300;
+}
+
+.parts-part-types-panel {
+  display: grid;
+  gap: 14px;
+  padding-top: 4px;
+}
+
+@media (max-width: 1024px) {
+  .parts-vehicle-hero {
+    grid-template-columns: minmax(0, 1.1fr) minmax(330px, 1fr);
+  }
+
+  .parts-vehicle-metadata {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .parts-system-rail {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .parts-store-shell.parts-tuning-shell {
+    padding: 14px 10px 42px;
+  }
+
+  .parts-store-shell.parts-tuning-shell .parts-tuning-stage {
+    gap: 13px;
+  }
+
+  .parts-page-breadcrumbs {
+    padding-inline: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .parts-vehicle-hero {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .parts-vehicle-hero-media {
+    min-height: 0;
+    height: 150px;
+    max-height: 150px;
+    overflow: hidden;
+    padding: 10px 12px 0;
+  }
+
+  .parts-vehicle-car-image {
+    width: 100%;
+    height: 140px;
+    max-height: 140px;
+    object-fit: contain;
+  }
+
+  .parts-vehicle-make-logo {
+    top: 10px;
+    left: 12px;
+    width: 27px;
+    height: 34px;
+  }
+
+  .parts-vehicle-hero-content {
+    gap: 11px;
+    padding: 14px 12px 12px;
+  }
+
+  .parts-selected-vehicle-label,
+  .parts-vehicle-metadata {
+    display: none;
+  }
+
+  .parts-vehicle-hero-content h1 {
+    font-size: clamp(21px, 6.6vw, 29px);
+    line-height: 1.08;
+  }
+
+  .parts-vehicle-summary-line {
+    margin-top: -5px;
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .parts-vehicle-metrics {
+    gap: 8px;
+  }
+
+  .parts-vehicle-metrics strong {
+    font-size: clamp(17px, 5vw, 22px);
+  }
+
+  .parts-vehicle-metrics span {
+    font-size: 8px;
+  }
+
+  .parts-vehicle-actions button,
+  .parts-vehicle-actions a {
+    min-height: 40px;
+    padding-inline: 8px;
+    font-size: 9px;
+  }
+
+  .parts-vehicle-selector-drawer {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 13px;
+  }
+
+  .parts-vehicle-selector-drawer .parts-tuning-selector {
+    grid-template-columns: 1fr;
+  }
+
+  .parts-library-section-title {
+    align-items: center;
+  }
+
+  .parts-library-section-title span {
+    max-width: 48%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .parts-system-rail {
+    display: flex;
+    gap: 6px;
+    margin-inline: -10px;
+    padding: 0 10px 4px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .parts-system-rail::-webkit-scrollbar {
+    display: none;
+  }
+
+  .parts-system-card {
+    flex: 0 0 67px;
+    grid-template-rows: 36px 24px;
+    min-height: 75px;
+    padding: 7px 4px;
+    scroll-snap-align: start;
+  }
+
+  .parts-system-card .parts-category-line-icon {
+    width: 31px;
+    height: 31px;
+  }
+
+  .parts-system-card strong {
+    font-size: 7px;
+  }
+
+  .parts-store-shell.parts-tuning-shell .parts-component-grid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .parts-store-shell.parts-tuning-shell .parts-component-tile {
+    grid-template-columns: 48px minmax(0, 1fr) 16px;
+    min-height: 68px;
+    padding: 9px 12px;
+  }
+
+  .parts-store-shell.parts-tuning-shell .parts-component-tile .parts-category-line-icon {
+    width: 39px;
+    height: 39px;
+  }
+
+  .parts-store-shell.parts-tuning-shell .parts-component-copy strong {
+    font-size: 11px;
+  }
+
+  .parts-component-copy small {
+    font-size: 9px;
+  }
+
+  .parts-library-back {
+    min-height: 38px;
+  }
+}
+
+/* Vehicle-specific Parts navigation and provider offer list */
+.parts-library-workspace {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  min-width: 0;
+}
+
+.parts-system-widget {
+  position: sticky;
+  top: 18px;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 7px;
+  background: linear-gradient(180deg, rgba(18, 21, 26, 0.98), rgba(8, 10, 13, 0.98));
+}
+
+.parts-system-widget > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 0 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  text-transform: uppercase;
+}
+
+.parts-system-widget > header span {
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.parts-system-widget > header small {
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.parts-system-widget .parts-system-rail {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+}
+
+.parts-system-widget .parts-system-card {
+  display: grid;
+  grid-template-columns: 39px minmax(0, 1fr) auto;
+  grid-template-rows: 1fr;
+  place-items: center start;
+  min-height: 51px;
+  padding: 6px 12px;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.parts-system-widget .parts-system-card:last-child {
+  border-bottom: 0;
+}
+
+.parts-system-widget .parts-system-card:hover,
+.parts-system-widget .parts-system-card:focus-visible {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.parts-system-widget .parts-system-card.is-active {
+  border-left: 2px solid #ef233c;
+  background: linear-gradient(90deg, rgba(239, 35, 60, 0.14), rgba(239, 35, 60, 0.025));
+  box-shadow: none;
+}
+
+.parts-system-widget .parts-system-card .parts-category-line-icon {
+  width: 29px;
+  height: 29px;
+}
+
+.parts-system-widget .parts-system-card strong {
+  font-size: 9px;
+  text-align: left;
+}
+
+.parts-system-widget .parts-system-card > span {
+  min-width: 22px;
+  padding: 3px 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 8px;
+  font-weight: 850;
+  text-align: center;
+}
+
+.parts-library-content {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.parts-part-types-panel > p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.part-offer-list-shell {
+  min-width: 0;
+  overflow-x: auto;
+  border: 1px solid #30353b;
+  border-radius: 6px;
+  background: #090b0d;
+}
+
+.part-offer-list {
+  width: 100%;
+  border-collapse: collapse;
+  color: #f5f7fa;
+}
+
+.part-offer-list th {
+  height: 42px;
+  padding: 0 14px;
+  border-bottom: 1px solid #343a41;
+  background: #121519;
+  color: #858d96;
+  font-size: 9px;
+  font-weight: 850;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.part-offer-list th:nth-child(2) { width: 105px; }
+.part-offer-list th:nth-child(3) { width: 150px; }
+.part-offer-list th:nth-child(4) { width: 145px; }
+.part-offer-list th:nth-child(5) { width: 165px; }
+
+.part-offer-list th button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  text-transform: inherit;
+}
+
+.part-offer-list th button span {
+  color: #ef233c;
+  font-size: 13px;
+}
+
+.part-offer-list td {
+  min-width: 0;
+  padding: 12px 14px;
+  border-bottom: 1px solid #262b31;
+  vertical-align: middle;
+}
+
+.part-offer-list tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.part-offer-list tbody tr:hover {
+  background: rgba(255, 255, 255, 0.022);
+}
+
+.part-offer-product {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  min-width: 0;
+}
+
+.part-offer-product-image {
+  display: grid;
+  width: 82px;
+  height: 68px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  background: linear-gradient(145deg, #1a1e23, #0b0d0f);
+}
+
+.part-offer-product-image img {
+  width: 100%;
+  height: 100%;
+  padding: 5px;
+  object-fit: contain;
+}
+
+.part-offer-product-image svg {
+  width: 36px;
+  height: 36px;
+  color: #ef233c;
+}
+
+.part-offer-product > div:last-child {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.part-offer-product strong {
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.part-offer-product span,
+.part-offer-product small {
+  color: #8f97a0;
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.part-offer-quality {
+  display: inline-flex;
+  min-width: 56px;
+  justify-content: center;
+  padding: 5px 7px;
+  border: 1px solid #4b525a;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.part-offer-quality.is-best { border-color: #ef233c; color: #ff4b60; }
+.part-offer-quality.is-better { border-color: #d4a82a; color: #efc64e; }
+.part-offer-quality.is-good { border-color: #4b7659; color: #72cf8c; }
+
+.part-offer-brand {
+  display: block;
+  max-width: 170px;
+  font-size: 11px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.part-offer-list-price {
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.part-offer-retailer-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid #ef233c;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 900;
+  text-align: center;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.part-offer-retailer-link:hover,
+.part-offer-retailer-link:focus-visible {
+  background: #d71920;
+  outline: none;
+}
+
+@media (max-width: 760px) {
+  .parts-library-workspace {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .parts-system-widget {
+    position: static;
+    margin-inline: -10px;
+    border-inline: 0;
+    border-radius: 0;
+  }
+
+  .parts-system-widget > header {
+    min-height: 38px;
+    padding-inline: 10px;
+  }
+
+  .parts-system-widget .parts-system-rail {
+    display: flex;
+    gap: 6px;
+    padding: 7px 10px 9px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .parts-system-widget .parts-system-rail::-webkit-scrollbar {
+    display: none;
+  }
+
+  .parts-system-widget .parts-system-card {
+    flex: 0 0 72px;
+    grid-template-columns: 1fr;
+    grid-template-rows: 34px 22px;
+    place-items: center;
+    min-height: 70px;
+    padding: 6px 4px;
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    border-radius: 5px;
+    scroll-snap-align: start;
+    text-align: center;
+  }
+
+  .parts-system-widget .parts-system-card.is-active {
+    border: 1px solid #ef233c;
+  }
+
+  .parts-system-widget .parts-system-card strong {
+    font-size: 7px;
+    text-align: center;
+  }
+
+  .parts-system-widget .parts-system-card > span {
+    display: none;
+  }
+
+  .part-type-available-section {
+    overflow: hidden;
+  }
+
+  .part-offer-list-shell {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+
+  .part-offer-list,
+  .part-offer-list thead,
+  .part-offer-list tbody,
+  .part-offer-list tr,
+  .part-offer-list th,
+  .part-offer-list td {
+    display: block;
+    width: 100%;
+  }
+
+  .part-offer-list thead tr {
+    margin-bottom: 8px;
+  }
+
+  .part-offer-list thead th {
+    display: none;
+    height: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .part-offer-list thead th:nth-child(4) {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .part-offer-list th button {
+    min-height: 38px;
+    padding: 0 12px;
+    border: 1px solid #343a41;
+    border-radius: 4px;
+    background: #111419;
+  }
+
+  .part-offer-list tbody {
+    display: grid;
+    gap: 9px;
+  }
+
+  .part-offer-list tbody tr {
+    overflow: hidden;
+    border: 1px solid #30353b;
+    border-radius: 6px;
+    background: #0a0c0e;
+  }
+
+  .part-offer-list td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    min-height: 40px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #262b31;
+  }
+
+  .part-offer-list td::before {
+    flex: 0 0 auto;
+    color: #747d87;
+    content: attr(data-label);
+    font-size: 8px;
+    font-weight: 850;
+    text-transform: uppercase;
+  }
+
+  .part-offer-list td:first-child {
+    display: block;
+    padding: 12px;
+  }
+
+  .part-offer-list td:first-child::before {
+    display: none;
+  }
+
+  .part-offer-product {
+    grid-template-columns: 78px minmax(0, 1fr);
+    gap: 11px;
+  }
+
+  .part-offer-product-image {
+    width: 78px;
+    height: 72px;
+  }
+
+  .part-offer-brand {
+    max-width: 62%;
+    text-align: right;
+  }
+
+  .part-offer-retailer-link {
+    width: min(190px, 66%);
+  }
+}
+
+/* Parts storefront: ownership-first hierarchy */
+.parts-store-shell.parts-tuning-shell {
+  --parts-panel: rgba(12, 12, 12, 0.94);
+  --parts-panel-soft: rgba(255, 255, 255, 0.035);
+  --parts-line: rgba(255, 255, 255, 0.13);
+  --parts-muted: rgba(255, 255, 255, 0.58);
+  padding-inline: clamp(12px, 2.4vw, 32px);
+  background:
+    linear-gradient(180deg, rgba(3, 3, 3, 0.08) 0, rgba(3, 3, 3, 0.78) 330px, #070707 620px),
+    url("/images/garage-home-hero.png") center -100px / min(1680px, 120vw) auto no-repeat,
+    #070707;
+}
+
+.parts-store-hero.parts-tuning-hero {
+  min-height: clamp(168px, 16vw, 236px);
+  margin-bottom: 12px;
+  padding-top: clamp(74px, 7vw, 100px);
+}
+
+.parts-store-hero.parts-tuning-hero::after {
+  display: none;
+}
+
+.parts-store-hero.parts-tuning-hero > div {
+  margin-left: 0;
+  padding-bottom: 14px;
+}
+
+.parts-tuning-hero-eyebrow {
+  display: block;
+  margin-bottom: 8px;
+  color: #ef233c;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.parts-store-hero.parts-tuning-hero h1 {
+  margin-bottom: 13px;
+  font-family: var(--font-clean-sans);
+  font-size: clamp(42px, 5vw, 72px);
+  font-style: italic;
+  line-height: 0.94;
+  transform: none;
+}
+
+.parts-store-hero.parts-tuning-hero .parts-store-subtitle {
+  font-size: clamp(12px, 1.3vw, 16px);
+  letter-spacing: 0.04em;
+}
+
+.parts-tuning-stage {
+  width: min(1560px, 100%);
+  gap: 14px;
+}
+
+.parts-tuning-vehicle {
+  min-height: 158px;
+  border: 1px solid var(--parts-line);
+  border-radius: 7px;
+  background:
+    linear-gradient(90deg, rgba(239, 35, 60, 0.1), transparent 38%),
+    var(--parts-panel);
+}
+
+.parts-tuning-vehicle-media img {
+  height: 158px;
+}
+
+.parts-tuning-vehicle-copy > span,
+.parts-tuning-section-heading > span,
+.parts-tuning-category-header div > span,
+.parts-tuning-brand-heading > span {
+  letter-spacing: 0.06em;
+}
+
+.parts-tuning-selector select,
+.parts-offer-brand-select select {
+  appearance: auto;
+  color-scheme: dark;
+}
+
+.parts-vehicle-prompt {
+  width: fit-content;
+  max-width: 100%;
+  padding: 10px 13px;
+  border-left: 2px solid #ef233c;
+  background: rgba(239, 35, 60, 0.08);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.parts-tuning-category-hub,
+.parts-tuning-category-detail,
+.parts-vehicle-library {
+  gap: 16px;
+  min-width: 0;
+  padding-block: clamp(22px, 3vw, 38px);
+}
+
+.parts-tuning-section-heading {
+  max-width: 780px;
+}
+
+.parts-tuning-section-heading h2 {
+  font-size: clamp(26px, 3.5vw, 48px);
+}
+
+.parts-tuning-category-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.parts-tuning-category-tile {
+  grid-template-rows: 58px minmax(32px, auto) auto;
+  min-height: 146px;
+  padding: 15px 10px 12px;
+  border-color: var(--parts-line);
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018));
+}
+
+.parts-tuning-category-tile:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.parts-tuning-category-tile strong {
+  align-self: center;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.parts-tuning-category-tile span {
+  color: var(--parts-muted);
+}
+
+.parts-library-breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.36);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.parts-library-breadcrumbs button,
+.parts-library-breadcrumbs strong {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.68);
+  font: inherit;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.parts-library-breadcrumbs button {
+  cursor: pointer;
+}
+
+.parts-library-breadcrumbs button:hover,
+.parts-library-breadcrumbs button:focus-visible,
+.parts-library-breadcrumbs strong {
+  color: #ffffff;
+  outline: none;
+}
+
+.parts-library-heading p {
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 13px;
+}
+
+.parts-component-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.parts-component-tile {
+  min-height: 94px;
+  border-color: var(--parts-line);
+  background: var(--parts-panel-soft);
+}
+
+.parts-component-tile span {
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.parts-offer-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  padding-block: 4px 12px;
+  border-bottom: 1px solid var(--parts-line);
+}
+
+.parts-offer-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.parts-offer-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--parts-line);
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.64);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.parts-offer-tabs button span {
+  color: rgba(255, 255, 255, 0.42);
+}
+
+.parts-offer-tabs button.is-active {
+  border-color: #ef233c;
+  background: rgba(239, 35, 60, 0.1);
+  color: #ffffff;
+}
+
+.parts-offer-identifiers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 10px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.parts-offer-brand-select {
+  display: grid;
+  flex: 0 0 190px;
+  gap: 5px;
+  min-width: 0;
+}
+
+.parts-offer-brand-select > span {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.parts-offer-brand-select select {
+  width: 100%;
+  min-height: 38px;
+  padding-inline: 10px;
+  border: 1px solid var(--parts-line);
+  border-radius: 4px;
+  background: #111111;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.parts-card-grid.parts-component-offer-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.parts-component-offer-card {
+  grid-template-rows: auto 1fr;
+  border-color: var(--parts-line);
+  border-radius: 6px;
+  background: linear-gradient(180deg, #101010, #070707);
+}
+
+.parts-component-offer-card .parts-card-image {
+  height: auto;
+  aspect-ratio: 16 / 10;
+}
+
+.parts-component-offer-card .parts-card-image > .parts-category-line-icon {
+  width: 76px;
+  height: 76px;
+  color: #ef233c;
+  filter: drop-shadow(0 0 12px rgba(239, 35, 60, 0.5));
+}
+
+.parts-offer-type-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  max-width: calc(100% - 20px);
+  padding: 5px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 3px;
+  background: rgba(5, 5, 5, 0.84);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 8px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.parts-offer-type-badge.is-performance {
+  border-color: rgba(239, 35, 60, 0.55);
+  color: #ff5b68;
+}
+
+.parts-component-offer-card .parts-card-body {
+  grid-template-rows: auto auto auto auto auto 1fr;
+  gap: 8px;
+  padding: 14px;
+}
+
+.parts-component-offer-card .parts-card-brand {
+  justify-content: space-between;
+}
+
+.parts-component-offer-card .parts-card-brand em {
+  flex: 0 0 auto;
+  padding: 3px 5px;
+  border: 1px solid rgba(239, 35, 60, 0.4);
+  border-radius: 3px;
+  color: #ff5b68;
+  font-size: 8px;
+  font-style: normal;
+}
+
+.parts-component-offer-card h3 {
+  display: -webkit-box;
+  min-height: 2.6em;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.3;
+  text-transform: none;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.parts-component-offer-card .parts-card-fitment {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.parts-offer-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.parts-offer-details span {
+  max-width: 100%;
+  padding: 4px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 3px;
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 9px;
+  font-weight: 780;
+  overflow-wrap: anywhere;
+}
+
+.parts-offer-details span:first-child {
+  border-color: rgba(34, 197, 94, 0.34);
+  color: #72d88e;
+}
+
+.parts-offer-seller {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.parts-offer-purchase {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 11px;
+  border-top: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.parts-offer-purchase > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.parts-offer-purchase strong {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.parts-offer-purchase small {
+  color: rgba(255, 255, 255, 0.46);
+  font-size: 9px;
+}
+
+.parts-offer-purchase a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid #ef233c;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #ef233c, #b90812);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 900;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.parts-offer-purchase a:hover,
+.parts-offer-purchase a:focus-visible {
+  filter: brightness(1.12);
+  outline: 2px solid rgba(239, 35, 60, 0.3);
+  outline-offset: 2px;
+}
+
+.parts-offer-disclosure {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.46);
+  font-size: 10px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.parts-vehicle-library .parts-empty-state {
+  min-height: 190px;
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.025);
+  color: #ffffff;
+}
+
+.parts-vehicle-library .parts-empty-state h3 {
+  font-size: clamp(22px, 3vw, 34px);
+}
+
+.parts-vehicle-library .parts-empty-state p {
+  color: rgba(255, 255, 255, 0.56);
+}
+
+@media (max-width: 1180px) {
+  .parts-tuning-category-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .parts-component-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 840px) {
+  .parts-tuning-category-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .parts-card-grid.parts-component-offer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .parts-offer-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .parts-offer-brand-select {
+    flex-basis: auto;
+    width: min(100%, 320px);
+  }
+}
+
+@media (max-width: 620px) {
+  .parts-store-shell.parts-tuning-shell {
+    padding-inline: 10px;
+    background:
+      linear-gradient(180deg, rgba(3, 3, 3, 0.15), #070707 360px),
+      url("/images/garage-home-hero.png") 58% -8px / auto 270px no-repeat,
+      #070707;
+  }
+
+  .parts-store-hero.parts-tuning-hero {
+    min-height: 112px;
+    margin-bottom: 6px;
+    padding-top: 58px;
+  }
+
+  .parts-store-hero.parts-tuning-hero > div {
+    padding-bottom: 8px;
+  }
+
+  .parts-tuning-hero-eyebrow {
+    margin-bottom: 4px;
+    font-size: 8px;
+  }
+
+  .parts-store-hero.parts-tuning-hero h1 {
+    margin-bottom: 7px;
+    font-size: 34px;
+  }
+
+  .parts-store-hero.parts-tuning-hero .parts-store-subtitle {
+    gap: 7px;
+    font-size: 9px;
+  }
+
+  .parts-tuning-vehicle {
+    grid-template-columns: 94px minmax(0, 1fr);
+    min-height: 104px;
+  }
+
+  .parts-tuning-vehicle-media img {
+    height: 104px;
+  }
+
+  .parts-tuning-vehicle-copy {
+    padding: 12px 10px;
+  }
+
+  .parts-tuning-vehicle-copy h2 {
+    font-size: clamp(17px, 5.8vw, 23px);
+  }
+
+  .parts-tuning-selector {
+    padding: 0 10px 12px;
+  }
+
+  .parts-tuning-category-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .parts-tuning-category-tile {
+    min-height: 132px;
+  }
+
+  .parts-component-grid,
+  .parts-card-grid.parts-component-offer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .parts-component-tile {
+    min-height: 76px;
+  }
+
+  .parts-offer-tabs {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .parts-offer-tabs button {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .parts-offer-brand-select {
+    width: 100%;
+  }
+
+  .parts-component-offer-card .parts-card-image {
+    height: auto;
+    aspect-ratio: 4 / 3;
+  }
+
+  .parts-offer-purchase {
+    grid-template-columns: 1fr;
+  }
+
+  .parts-offer-purchase a {
+    width: 100%;
+  }
+}
+
+/* Vehicle-first parts tuning catalog */
+.parts-store-shell.parts-tuning-shell {
+  padding-bottom: clamp(28px, 5vw, 64px);
+}
+
+.parts-store-hero.parts-tuning-hero {
+  grid-template-columns: minmax(0, 1fr);
+  min-height: clamp(210px, 18vw, 270px);
+  margin-bottom: 18px;
+}
+
+.parts-tuning-stage {
+  display: grid;
+  gap: 18px;
+  width: min(1480px, 100%);
+  margin: 0 auto;
+}
+
+.parts-tuning-vehicle {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(210px, 0.56fr) minmax(280px, 0.76fr) minmax(500px, 1.4fr);
+  align-items: center;
+  min-height: 176px;
+  overflow: hidden;
+  border-block: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    linear-gradient(90deg, rgba(239, 35, 60, 0.08), transparent 34%),
+    rgba(7, 7, 7, 0.8);
+}
+
+.parts-tuning-vehicle::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: -1;
+  height: 2px;
+  background: linear-gradient(90deg, #ef233c, rgba(239, 35, 60, 0.1) 38%, transparent 72%);
+  content: "";
+}
+
+.parts-tuning-vehicle:not(.has-image) {
+  grid-template-columns: minmax(240px, 0.7fr) minmax(500px, 1.5fr);
+}
+
+.parts-tuning-vehicle:not(.has-image) .parts-tuning-vehicle-media {
+  display: none;
+}
+
+.parts-tuning-vehicle-media {
+  display: grid;
+  align-self: stretch;
+  min-width: 0;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 70%, rgba(239, 35, 60, 0.2), transparent 52%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.04), transparent);
+}
+
+.parts-tuning-vehicle-media img {
+  width: 100%;
+  height: 176px;
+  object-fit: contain;
+  filter: drop-shadow(0 22px 22px rgba(0, 0, 0, 0.74));
+}
+
+.parts-tuning-vehicle-copy {
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 20px clamp(18px, 2.2vw, 32px);
+}
+
+.parts-tuning-vehicle-copy > span,
+.parts-tuning-section-heading > span,
+.parts-tuning-category-header div > span,
+.parts-tuning-brand-heading > span {
+  color: #ef233c;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.parts-tuning-vehicle-copy h2,
+.parts-tuning-section-heading h2,
+.parts-tuning-category-header h2 {
+  min-width: 0;
+  margin: 0;
+  letter-spacing: 0;
+  line-height: 1.02;
+  text-transform: uppercase;
+}
+
+.parts-tuning-vehicle-copy h2 {
+  overflow-wrap: anywhere;
+  font-size: clamp(22px, 2.3vw, 38px);
+  font-style: italic;
+}
+
+.parts-tuning-vehicle-copy p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.parts-tuning-selector {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+  padding: 20px clamp(18px, 2.2vw, 32px) 20px 0;
+}
+
+.parts-tuning-selector label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.parts-tuning-selector label > span {
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.parts-tuning-selector select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 34px 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.055);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 780;
+}
+
+.parts-tuning-selector select:focus-visible {
+  border-color: #ef233c;
+  outline: 2px solid rgba(239, 35, 60, 0.24);
+  outline-offset: 1px;
+}
+
+.parts-tuning-selector select:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.parts-tuning-category-hub,
+.parts-tuning-category-detail {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  padding: clamp(20px, 3vw, 38px) 0;
+}
+
+.parts-tuning-section-heading {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  text-align: center;
+}
+
+.parts-tuning-section-heading h2 {
+  max-width: 760px;
+  font-size: clamp(24px, 3vw, 42px);
+}
+
+.parts-tuning-loading {
+  min-height: 34px;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.parts-tuning-category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 190px));
+  gap: 10px;
+  justify-content: center;
+  min-width: 0;
+}
+
+.parts-tuning-category-tile {
+  --category-accent: #ef233c;
+  position: relative;
+  display: grid;
+  grid-template-rows: 68px auto auto;
+  gap: 9px;
+  place-items: center;
+  min-width: 0;
+  min-height: 166px;
+  padding: 18px 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 6px;
+  background:
+    radial-gradient(circle at 50% 24%, color-mix(in srgb, var(--category-accent) 14%, transparent), transparent 48%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.016));
+  color: #ffffff;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.parts-tuning-category-tile::after {
+  position: absolute;
+  right: 18%;
+  bottom: 0;
+  left: 18%;
+  height: 2px;
+  background: var(--category-accent);
+  content: "";
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.parts-tuning-category-tile:hover,
+.parts-tuning-category-tile:focus-visible {
+  border-color: color-mix(in srgb, var(--category-accent) 70%, white 10%);
+  background-color: rgba(255, 255, 255, 0.035);
+  outline: none;
+  transform: translateY(-2px);
+}
+
+.parts-tuning-category-tile:hover::after,
+.parts-tuning-category-tile:focus-visible::after {
+  opacity: 1;
+}
+
+.parts-tuning-category-tile:disabled {
+  cursor: not-allowed;
+  transform: none;
+}
+
+.parts-tuning-category-tile:disabled strong,
+.parts-tuning-category-tile:disabled > span {
+  opacity: 0.48;
+}
+
+.parts-tuning-category-tile .parts-category-line-icon {
+  width: 62px;
+  height: 62px;
+  color: var(--category-accent);
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--category-accent, #ef233c) 42%, transparent));
+}
+
+.parts-tuning-category-tile .parts-category-line-icon path,
+.parts-tuning-category-tile .parts-category-line-icon rect,
+.parts-tuning-category-tile .parts-category-line-icon circle {
+  stroke-width: 2.5;
+}
+
+.parts-tuning-category-tile strong {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.parts-tuning-category-tile > span {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.parts-tuning-category-tile[data-category="intake"] { --category-accent: #38bdf8; }
+.parts-tuning-category-tile[data-category="exhaust"] { --category-accent: #fb7185; }
+.parts-tuning-category-tile[data-category="ecu-tuning"] { --category-accent: #22d3ee; }
+.parts-tuning-category-tile[data-category="forced-induction"] { --category-accent: #facc15; }
+.parts-tuning-category-tile[data-category="brakes"] { --category-accent: #ef4444; }
+.parts-tuning-category-tile[data-category="suspension"] { --category-accent: #a78bfa; }
+.parts-tuning-category-tile[data-category="wheels-tires"] { --category-accent: #93c5fd; }
+.parts-tuning-category-tile[data-category="aero-body"] { --category-accent: #e5e7eb; }
+.parts-tuning-category-tile[data-category="drivetrain"] { --category-accent: #86efac; }
+.parts-tuning-category-tile[data-category="interior-safety"] { --category-accent: #d8b4fe; }
+.parts-tuning-category-tile[data-category="fueling"] { --category-accent: #f97316; }
+.parts-tuning-category-tile[data-category="cooling"] { --category-accent: #67e8f9; }
+.parts-tuning-category-tile[data-category="maintenance"] { --category-accent: #86efac; }
+.parts-tuning-category-tile[data-category="engine"] { --category-accent: #fb923c; }
+.parts-tuning-category-tile[data-category="fuel"] { --category-accent: #f97316; }
+.parts-tuning-category-tile[data-category="transmission"] { --category-accent: #a3e635; }
+.parts-tuning-category-tile[data-category="steering"] { --category-accent: #c4b5fd; }
+.parts-tuning-category-tile[data-category="wheels"] { --category-accent: #93c5fd; }
+.parts-tuning-category-tile[data-category="tires"] { --category-accent: #d1d5db; }
+.parts-tuning-category-tile[data-category="aerodynamics"] { --category-accent: #f9a8d4; }
+.parts-tuning-category-tile[data-category="body"] { --category-accent: #e5e7eb; }
+.parts-tuning-category-tile[data-category="carbon-fiber"] { --category-accent: #94a3b8; }
+.parts-tuning-category-tile[data-category="interior"] { --category-accent: #d8b4fe; }
+.parts-tuning-category-tile[data-category="electrical"] { --category-accent: #fde047; }
+.parts-tuning-category-tile[data-category="lighting"] { --category-accent: #fef08a; }
+.parts-tuning-category-tile[data-category="accessories"] { --category-accent: #67e8f9; }
+.parts-tuning-category-tile[data-category="performance"] { --category-accent: #ef233c; }
+
+.parts-vehicle-library {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  padding: clamp(20px, 3vw, 38px) 0;
+}
+
+.parts-tuning-section-heading p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.parts-library-back {
+  width: fit-content;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.parts-library-back:hover,
+.parts-library-back:focus-visible {
+  border-color: #ef233c;
+  outline: none;
+}
+
+.parts-component-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.parts-component-tile {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  gap: 4px 10px;
+  align-items: center;
+  min-width: 0;
+  min-height: 92px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.015));
+  color: #ffffff;
+  cursor: pointer;
+  text-align: left;
+}
+
+.parts-component-tile:hover,
+.parts-component-tile:focus-visible {
+  border-color: rgba(239, 35, 60, 0.78);
+  outline: none;
+}
+
+.parts-component-tile .parts-category-line-icon {
+  grid-row: 1 / 3;
+  width: 40px;
+  height: 40px;
+  color: #ef233c;
+  filter: brightness(1.25) saturate(1.3) drop-shadow(0 0 7px rgba(239, 35, 60, 0.6));
+}
+
+.parts-component-tile strong,
+.parts-component-tile span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.parts-component-tile strong {
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.parts-component-tile span {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.parts-card-grid.parts-component-offer-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.parts-component-offer-card {
+  min-width: 0;
+}
+
+.parts-component-offer-card .parts-card-image {
+  height: clamp(190px, 18vw, 270px);
+}
+
+.parts-component-offer-card h3,
+.parts-component-offer-card .parts-card-fitment {
+  overflow-wrap: anywhere;
+}
+
+.parts-offer-identity {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.parts-offer-identity span {
+  max-width: 100%;
+  padding: 4px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.parts-tuning-category-header {
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) minmax(0, 1fr);
+  align-items: center;
+  gap: 22px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.parts-tuning-category-header > button {
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 5px;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.parts-tuning-category-header > button:hover,
+.parts-tuning-category-header > button:focus-visible {
+  border-color: #ef233c;
+  outline: none;
+}
+
+.parts-tuning-category-header > div {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 2px 14px;
+  align-items: center;
+}
+
+.parts-tuning-category-header .parts-category-line-icon {
+  grid-row: 1 / 3;
+  width: 48px;
+  height: 48px;
+  color: #ef233c;
+  filter: brightness(1.25) saturate(1.35) drop-shadow(0 0 7px rgba(239, 35, 60, 0.86));
+}
+
+.parts-tuning-category-header h2 {
+  font-size: clamp(28px, 4vw, 54px);
+}
+
+.parts-tuning-brand-filter {
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) minmax(0, 1fr);
+  gap: 22px;
+  min-width: 0;
+}
+
+.parts-tuning-brand-heading {
+  display: grid;
+  align-content: center;
+  gap: 5px;
+}
+
+.parts-tuning-brand-heading strong {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.parts-tuning-brand-filter .parts-brand-strip {
+  min-width: 0;
+}
+
+.parts-tuning-brand-filter .parts-brand-chip {
+  width: 154px;
+  min-width: 154px;
+  max-width: 154px;
+  min-height: 64px;
+}
+
+.parts-card-grid.parts-tuning-product-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.parts-tuning-part-card {
+  min-width: 0;
+}
+
+.parts-tuning-part-card .parts-card-image {
+  height: clamp(190px, 18vw, 270px);
+}
+
+.parts-tuning-part-card .parts-card-body {
+  min-width: 0;
+}
+
+.parts-tuning-part-card h3,
+.parts-tuning-part-card h3 a,
+.parts-tuning-part-card .parts-card-fitment {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1180px) {
+  .parts-tuning-vehicle {
+    grid-template-columns: minmax(180px, 0.52fr) minmax(0, 0.72fr) minmax(390px, 1.35fr);
+  }
+
+  .parts-tuning-selector {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .parts-tuning-selector label:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .parts-tuning-category-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    justify-content: stretch;
+  }
+
+  .parts-card-grid.parts-tuning-product-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .parts-component-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .parts-card-grid.parts-component-offer-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 840px) {
+  .parts-tuning-vehicle {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+
+  .parts-tuning-vehicle:not(.has-image) {
+    grid-template-columns: 1fr;
+  }
+
+  .parts-tuning-selector {
+    grid-column: 1 / -1;
+    padding: 0 16px 16px;
+  }
+
+  .parts-tuning-category-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    justify-content: stretch;
+  }
+
+  .parts-card-grid.parts-tuning-product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .parts-component-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .parts-card-grid.parts-component-offer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .parts-store-shell.parts-tuning-shell {
+    padding-inline: 10px;
+  }
+
+  .parts-store-hero.parts-tuning-hero {
+    min-height: 126px;
+    margin-bottom: 8px;
+    padding-top: 56px;
+  }
+
+  .parts-tuning-hero::after {
+    right: -60px;
+    bottom: -10px;
+    width: 74vw;
+    height: 120px;
+    opacity: 0.56;
+  }
+
+  .parts-tuning-hero > div {
+    margin-left: 0;
+    padding-bottom: 8px;
+  }
+
+  .parts-tuning-hero h1 {
+    margin-bottom: 10px;
+    font-size: clamp(38px, 13vw, 54px);
+    line-height: 0.9;
+  }
+
+  .parts-tuning-hero .parts-store-subtitle {
+    gap: 8px;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+  }
+
+  .parts-tuning-hero .parts-subtitle-dash {
+    width: 22px;
+  }
+
+  .parts-tuning-stage {
+    gap: 12px;
+  }
+
+  .parts-tuning-vehicle {
+    grid-template-columns: 108px minmax(0, 1fr);
+    min-height: 116px;
+  }
+
+  .parts-tuning-vehicle:not(.has-image) {
+    grid-template-columns: 1fr;
+  }
+
+  .parts-tuning-vehicle-media img {
+    height: 116px;
+  }
+
+  .parts-tuning-vehicle-copy {
+    gap: 4px;
+    padding: 14px 12px;
+  }
+
+  .parts-tuning-vehicle-copy h2 {
+    font-size: clamp(18px, 6vw, 25px);
+  }
+
+  .parts-tuning-vehicle-copy p {
+    font-size: 10px;
+  }
+
+  .parts-tuning-selector {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 0 12px 14px;
+  }
+
+  .parts-tuning-selector label:first-child {
+    grid-column: auto;
+  }
+
+  .parts-tuning-selector label {
+    gap: 4px;
+  }
+
+  .parts-tuning-selector select {
+    min-height: 42px;
+  }
+
+  .parts-tuning-category-hub,
+  .parts-tuning-category-detail {
+    gap: 14px;
+    padding: 18px 0;
+  }
+
+  .parts-tuning-section-heading h2 {
+    font-size: clamp(22px, 7vw, 30px);
+  }
+
+  .parts-tuning-category-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    justify-content: stretch;
+  }
+
+  .parts-tuning-category-tile {
+    grid-template-rows: 52px auto auto;
+    min-height: 138px;
+    padding: 14px 8px 11px;
+  }
+
+  .parts-tuning-category-tile .parts-category-line-icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .parts-tuning-category-header,
+  .parts-tuning-brand-filter {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .parts-tuning-category-header > div {
+    order: -1;
+  }
+
+  .parts-tuning-category-header > button {
+    width: 100%;
+  }
+
+  .parts-tuning-brand-heading {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .parts-tuning-brand-filter .parts-brand-chip {
+    width: 138px;
+    min-width: 138px;
+    max-width: 138px;
+    min-height: 58px;
+  }
+
+  .parts-card-grid.parts-tuning-product-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .parts-tuning-part-card .parts-card-image {
+    height: min(76vw, 320px);
+  }
+
+
+  .parts-vehicle-library {
+    gap: 14px;
+    padding: 18px 0;
+  }
+
+  .parts-library-back {
+    width: 100%;
+  }
+
+  .parts-component-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .parts-component-tile {
+    min-height: 76px;
+    padding: 11px 12px;
+  }
+
+  .parts-card-grid.parts-component-offer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .parts-component-offer-card .parts-card-image {
+    height: min(76vw, 320px);
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -925,6 +3286,7 @@ canvas {
 }
 
 .garage-profile-hero {
+  --garage-club-badge-size: 125px;
   position: relative;
   display: grid;
   grid-template-columns: minmax(460px, 0.82fr) minmax(460px, 1fr);
@@ -935,8 +3297,8 @@ canvas {
   align-content: start;
   gap: 7px 26px;
   width: 100%;
-  min-height: clamp(318px, 25vw, 380px);
-  max-height: 380px;
+  min-height: clamp(452px, 35vw, 520px);
+  max-height: none;
   margin: 0 auto;
   overflow: hidden;
   isolation: isolate;
@@ -1111,6 +3473,7 @@ canvas {
   gap: 6px;
   justify-items: start;
   min-width: 0;
+  width: 100%;
   margin-top: 2px;
 }
 
@@ -1122,17 +3485,26 @@ canvas {
   text-transform: uppercase;
 }
 
-.garage-profile-clubs div {
+.garage-profile-club-list {
   display: flex;
   flex-wrap: nowrap;
   gap: 10px;
-  overflow: hidden;
+  width: 100%;
+  max-width: 100%;
+  padding: 2px 0 8px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: inline proximity;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(239, 35, 60, 0.58) transparent;
 }
 
 .garage-profile-clubs a {
   display: inline-grid;
-  width: 42px;
-  height: 42px;
+  flex: 0 0 var(--garage-club-badge-size);
+  width: var(--garage-club-badge-size);
+  height: var(--garage-club-badge-size);
+  aspect-ratio: 1;
   overflow: hidden;
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -1143,12 +3515,13 @@ canvas {
   color: #ffffff;
   font-size: 10px;
   font-weight: 950;
+  scroll-snap-align: start;
   text-decoration: none;
 }
 
 .garage-profile-clubs a img {
-  width: 78%;
-  height: 78%;
+  width: 84%;
+  height: 84%;
   object-fit: contain;
 }
 
@@ -2196,48 +4569,6 @@ canvas {
   text-decoration: none;
 }
 
-.garage-rail-badge-list {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.garage-rail-badge-list a {
-  display: grid;
-  gap: 5px;
-  justify-items: center;
-  min-width: 0;
-  color: rgba(255, 255, 255, 0.68);
-  font-size: 10px;
-  font-weight: 700;
-  text-align: center;
-  text-decoration: none;
-}
-
-.garage-rail-badge-list strong {
-  max-width: 100%;
-  overflow: hidden;
-  font-size: 10px;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.garage-rail-badge-mark {
-  display: inline-grid;
-  width: 40px;
-  height: 40px;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.055);
-  color: #ffffff;
-  font-size: 11px;
-  font-weight: 950;
-  letter-spacing: 0.04em;
-}
-
-.garage-rail-badge-mark img,
 .garage-rail-logo img {
   width: 78%;
   height: 78%;
@@ -4103,6 +6434,34 @@ canvas {
   font-size: 14px;
 }
 
+.vehicle-service-booking-terms {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 13px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.vehicle-service-booking-terms input {
+  width: 17px;
+  height: 17px;
+  margin: 1px 0 0;
+  accent-color: #e20f1b;
+}
+
+.vehicle-service-booking-terms a {
+  color: #ffffff;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .vehicle-service-booking-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5150,6 +7509,17 @@ canvas {
   font-weight: inherit;
   line-height: inherit;
   text-transform: none;
+}
+
+.vehicle-intelligence-part-list .vehicle-parts-recommendation-reason {
+  display: -webkit-box;
+  margin: 1px 0;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 10px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .vehicle-intelligence-part-placeholder {
@@ -9230,6 +11600,188 @@ canvas {
   background: rgba(255, 255, 255, 0.06);
 }
 
+.meet-make-select {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.meet-make-select-label {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.meet-make-dropdown {
+  position: relative;
+  min-width: 0;
+}
+
+.meet-make-dropdown summary {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  min-height: 54px;
+  padding: 9px 42px 9px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  cursor: pointer;
+  list-style: none;
+}
+
+.meet-make-dropdown summary::-webkit-details-marker {
+  display: none;
+}
+
+.meet-make-dropdown summary::after {
+  position: absolute;
+  top: 50%;
+  right: 15px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid rgba(255, 255, 255, 0.72);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.72);
+  content: "";
+  transform: translateY(-65%) rotate(45deg);
+  transition: transform 160ms ease;
+}
+
+.meet-make-dropdown[open] summary::after {
+  transform: translateY(-30%) rotate(225deg);
+}
+
+.meet-make-dropdown summary span,
+.meet-make-dropdown summary small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meet-make-dropdown summary span {
+  font-size: 14px;
+  font-weight: 760;
+}
+
+.meet-make-dropdown summary small {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 11px;
+}
+
+.meet-make-dropdown-menu {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 8px);
+  left: 0;
+  display: grid;
+  width: min(460px, 100%);
+  min-width: 320px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: #0d0f11;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.62);
+}
+
+.meet-host-form .meet-make-all-option,
+.meet-host-form .meet-make-option {
+  display: flex;
+  grid-template-columns: none;
+  align-items: center;
+  min-width: 0;
+}
+
+.meet-host-form .meet-make-all-option {
+  gap: 12px;
+  padding: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(214, 10, 28, 0.08);
+}
+
+.meet-host-form .meet-make-all-option > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.meet-host-form .meet-make-all-option strong {
+  color: #fff;
+  font-size: 13px;
+}
+
+.meet-host-form .meet-make-all-option small {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 11px;
+}
+
+.meet-host-form .meet-make-all-option input,
+.meet-host-form .meet-make-option input {
+  width: 17px;
+  min-width: 17px;
+  height: 17px;
+  min-height: 17px;
+  padding: 0;
+  accent-color: #e3192c;
+}
+
+.meet-make-search {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.meet-host-form .meet-make-search input {
+  min-height: 40px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.meet-make-options {
+  display: grid;
+  max-height: min(320px, 44vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+}
+
+.meet-host-form .meet-make-option {
+  gap: 10px;
+  min-height: 40px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.meet-host-form .meet-make-option:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.meet-host-form .meet-make-option span {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.meet-host-form .meet-make-option:has(input:disabled) {
+  cursor: default;
+  opacity: 0.38;
+}
+
+.meet-make-options p {
+  margin: 0;
+  padding: 18px 10px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  text-align: center;
+}
+
 .meet-host-actions,
 .meet-rsvp-buttons {
   display: flex;
@@ -9759,6 +12311,11 @@ canvas {
   line-height: 1.65;
 }
 
+.auth-heading {
+  display: grid;
+  gap: 18px;
+}
+
 .auth-session-card {
   display: grid;
   gap: 10px;
@@ -9817,6 +12374,46 @@ canvas {
 
 .auth-form input:focus {
   border-color: rgba(226, 15, 27, 0.78);
+}
+
+.auth-form button:disabled,
+.auth-google-button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.auth-form-error {
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 10px 12px;
+  border-left: 2px solid #e20f1b;
+  background: rgba(226, 15, 27, 0.08);
+  color: #ffb5ba !important;
+  font-size: 12px !important;
+  line-height: 1.45 !important;
+}
+
+.auth-mode-toggle {
+  width: 100%;
+  min-height: 40px;
+  margin: -2px auto 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.76);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.4;
+  text-decoration: underline;
+  text-decoration-color: rgba(226, 15, 27, 0.72);
+  text-underline-offset: 4px;
+}
+
+.auth-mode-toggle:hover,
+.auth-mode-toggle:focus-visible {
+  color: #ffffff;
 }
 
 .auth-divider {
@@ -12747,11 +15344,157 @@ canvas {
   line-height: 1.45;
 }
 
+.part-detail-offers,
 .part-detail-recommendations {
   display: grid;
   gap: 14px;
   margin-top: 8px;
   padding: clamp(14px, 1.8vw, 18px);
+}
+
+.part-detail-offers {
+  width: min(1600px, calc(100% - clamp(24px, 4vw, 56px)));
+  margin-right: auto;
+  margin-left: auto;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  background: linear-gradient(145deg, rgba(18, 20, 22, 0.97), rgba(6, 7, 8, 0.98));
+}
+
+.part-detail-offer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.part-detail-offer-card {
+  display: grid;
+  grid-template-columns: 108px minmax(0, 1fr) minmax(130px, auto);
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.part-detail-offer-media {
+  display: grid;
+  place-items: center;
+  width: 108px;
+  height: 84px;
+  overflow: hidden;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.42);
+}
+
+.part-detail-offer-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.part-detail-offer-media span {
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.part-detail-offer-copy {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.part-detail-offer-copy > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+
+.part-detail-offer-copy span,
+.part-detail-offer-copy em {
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.part-detail-offer-copy em {
+  padding: 3px 6px;
+  border: 1px solid rgba(255, 198, 47, 0.38);
+  border-radius: 999px;
+  color: #ffd65a;
+}
+
+.part-detail-offer-copy em.is-high {
+  border-color: rgba(70, 211, 105, 0.4);
+  color: #5bdd78;
+}
+
+.part-detail-offer-copy strong {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 1.28;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.part-detail-offer-copy p,
+.part-detail-offer-copy small {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 11px;
+}
+
+.part-detail-offer-action {
+  display: grid;
+  justify-items: stretch;
+  gap: 7px;
+  min-width: 130px;
+}
+
+.part-detail-offer-action > strong {
+  color: #ffffff;
+  font-size: 18px;
+  text-align: right;
+}
+
+.part-detail-offer-action a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid #ef1b24;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #ef1b24, #b90812);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 900;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.part-detail-offer-action small {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 9px;
+  text-align: right;
+}
+
+.parts-store-affiliate-disclosure {
+  width: min(1600px, calc(100% - clamp(24px, 4vw, 56px)));
+  margin: 12px auto 0;
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: center;
 }
 
 .part-detail-related-grid {
@@ -13182,6 +15925,7 @@ canvas {
 }
 
 .model-intelligence-hero-copy {
+  container-type: inline-size;
   z-index: 2;
   display: grid;
   align-content: start;
@@ -13212,18 +15956,48 @@ canvas {
 }
 
 .model-intelligence-hero h1 {
+  display: grid;
+  gap: 2px;
   max-width: 620px;
   margin: 0;
   font-family: Impact, Haettenschweiler, "Arial Narrow", var(--font-geist-sans), sans-serif;
-  font-size: clamp(34px, 4.4vw, 72px);
   font-style: italic;
   font-weight: 900;
-  letter-spacing: 0.018em;
+  letter-spacing: 0;
   line-height: 0.92;
   text-transform: uppercase;
   transform: skewX(-4deg);
   transform-origin: left bottom;
   text-shadow: 0 18px 44px rgba(0, 0, 0, 0.86);
+}
+
+.model-intelligence-title-make {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: clamp(22px, 7cqi, 32px);
+}
+
+.model-intelligence-title-model {
+  font-size: clamp(34px, 11cqi, 50px);
+}
+
+.model-intelligence-hero h1.is-medium .model-intelligence-title-model {
+  font-size: clamp(26px, 8.2cqi, 40px);
+}
+
+.model-intelligence-hero h1.is-long .model-intelligence-title-model {
+  font-size: clamp(18px, 5.8cqi, 30px);
+}
+
+.model-intelligence-hero h1.is-compact .model-intelligence-title-model {
+  font-size: clamp(11px, 3.7cqi, 20px);
+}
+
+.model-intelligence-title-make,
+.model-intelligence-title-model {
+  display: block;
+  max-width: 100%;
+  overflow: visible;
+  white-space: nowrap;
 }
 
 .model-intelligence-hero-copy p,
@@ -13958,7 +16732,6 @@ canvas {
   }
 
   .model-intelligence-hero h1 {
-    font-size: clamp(30px, 10vw, 44px);
     line-height: 0.95;
   }
 
@@ -14752,6 +17525,7 @@ canvas {
   }
 
   .garage-profile-hero {
+    --garage-club-badge-size: clamp(104px, 16vw, 124px);
     grid-template-columns: 1fr;
     grid-template-areas:
       "identity"
@@ -15718,14 +18492,15 @@ canvas {
   }
 
   .garage-profile-clubs {
+    --garage-club-badge-size: clamp(76px, 22vw, 96px);
     gap: 5px;
     margin-top: 5px;
   }
 
   .garage-profile-clubs a {
-    width: 26px;
-    height: 26px;
-    border-radius: 8px;
+    width: var(--garage-club-badge-size);
+    height: var(--garage-club-badge-size);
+    border-radius: 999px;
     font-size: 9px;
   }
 
@@ -15830,6 +18605,18 @@ canvas {
   .meet-host-hero,
   .meet-host-form {
     padding: 24px;
+  }
+
+  .meet-make-dropdown-menu {
+    position: static;
+    width: 100%;
+    min-width: 0;
+    margin-top: 8px;
+    box-shadow: none;
+  }
+
+  .meet-make-options {
+    max-height: min(280px, 42vh);
   }
 
   .meet-detail-actions,
@@ -16500,8 +19287,8 @@ canvas {
 
 .club-detail-logo {
   flex: 0 0 auto;
-  width: clamp(96px, 12vw, 150px);
-  height: clamp(96px, 12vw, 150px);
+  width: clamp(96px, 10vw, 125px);
+  height: clamp(96px, 10vw, 125px);
   padding: clamp(12px, 1.6vw, 20px);
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 12px;
@@ -16595,7 +19382,8 @@ canvas {
 }
 
 .club-list-header span,
-.club-list-header a {
+.club-list-header a,
+.club-list-header button {
   color: rgba(255, 255, 255, 0.58);
   font-size: 10px;
   font-weight: 850;
@@ -16610,9 +19398,22 @@ canvas {
   gap: 6px;
 }
 
+.club-list-header button {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
 .club-list-header a:hover,
 .club-list-header a:focus-visible,
-.club-list-header a.is-active {
+.club-list-header a.is-active,
+.club-list-header button:hover,
+.club-list-header button:focus-visible,
+.club-list-header button.is-active {
   color: #ffffff;
   outline: none;
 }
@@ -16814,6 +19615,297 @@ canvas {
 .club-form input:disabled {
   opacity: 0.48;
   cursor: not-allowed;
+}
+
+.club-logo-upload-field {
+  display: grid;
+  gap: 10px;
+}
+
+.club-logo-upload-label {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.club-logo-upload-control {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.club-logo-upload-preview {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.38);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.club-logo-upload-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.club-logo-upload-control > div {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.club-logo-upload-control button {
+  width: fit-content;
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid rgba(226, 15, 27, 0.48);
+  border-radius: 6px;
+  background: rgba(226, 15, 27, 0.12);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.club-logo-upload-control button:hover,
+.club-logo-upload-control button:focus-visible {
+  border-color: rgba(255, 70, 82, 0.82);
+  background: rgba(226, 15, 27, 0.2);
+  outline: none;
+}
+
+.club-logo-upload-control small {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.club-logo-upload-error {
+  margin: 0;
+  color: #ff8790;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.club-logo-upload-field > input.sr-only {
+  width: 1px;
+  min-height: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+}
+
+.club-logo-crop-modal {
+  position: fixed;
+  z-index: 260;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.club-logo-crop-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(12px);
+}
+
+.club-logo-crop-panel {
+  position: relative;
+  display: grid;
+  width: min(460px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: #0b0c0f;
+  box-shadow: 0 32px 100px rgba(0, 0, 0, 0.72);
+}
+
+.club-logo-crop-panel > header,
+.club-logo-crop-panel > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+}
+
+.club-logo-crop-panel > header {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.club-logo-crop-panel > header > div {
+  display: grid;
+  gap: 3px;
+}
+
+.club-logo-crop-panel > header span {
+  color: #ff4b59;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.club-logo-crop-panel > header strong {
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 780;
+}
+
+.club-logo-crop-close {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.club-logo-crop-workspace {
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  padding: 20px 18px;
+}
+
+.club-logo-crop-area {
+  position: relative;
+  width: min(320px, calc(100vw - 72px));
+  overflow: hidden;
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: #050506;
+  cursor: grab;
+  outline: none;
+  touch-action: none;
+  user-select: none;
+}
+
+.club-logo-crop-area:active {
+  cursor: grabbing;
+}
+
+.club-logo-crop-area:focus-visible {
+  border-color: rgba(255, 69, 82, 0.82);
+  box-shadow: 0 0 0 3px rgba(226, 15, 27, 0.18);
+}
+
+.club-logo-crop-image-position {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+
+.club-logo-crop-image-position img {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  pointer-events: none;
+  transform-origin: center;
+  will-change: transform;
+}
+
+.club-logo-crop-guide {
+  position: absolute;
+  inset: 7%;
+  border: 2px solid rgba(255, 255, 255, 0.88);
+  border-radius: 999px;
+  box-shadow: 0 0 0 40px rgba(0, 0, 0, 0.38);
+  pointer-events: none;
+}
+
+.club-logo-crop-workspace > p {
+  max-width: 34ch;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.club-logo-zoom-control {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 44px;
+  gap: 12px;
+  align-items: center;
+  width: min(320px, 100%);
+}
+
+.club-logo-zoom-control span,
+.club-logo-zoom-control strong {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.club-logo-zoom-control strong {
+  text-align: right;
+}
+
+.club-logo-zoom-control input {
+  width: 100%;
+  min-height: 24px;
+  padding: 0;
+  accent-color: #e20f1b;
+}
+
+.club-logo-crop-panel > footer {
+  justify-content: flex-end;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.club-logo-crop-panel > footer button {
+  min-width: 108px;
+  min-height: 40px;
+  padding: 0 15px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.club-logo-crop-cancel {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.club-logo-crop-apply {
+  border: 1px solid #ef233c;
+  background: #d91424;
+  color: #ffffff;
+}
+
+.club-logo-crop-apply:disabled {
+  opacity: 0.48;
+  cursor: wait;
 }
 
 .club-model-selectors {
@@ -17525,6 +20617,20 @@ canvas {
   background: rgba(255, 255, 255, 0.045);
 }
 
+.club-edit-modal-content > .club-form {
+  align-self: start;
+  align-content: start;
+}
+
+.club-edit-modal-content > .club-form > button {
+  align-self: start;
+  width: 100%;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 16px;
+  line-height: 1;
+}
+
 .club-edit-section {
   display: grid;
   grid-column: 1 / -1;
@@ -17599,6 +20705,28 @@ canvas {
   gap: 14px;
   align-items: center;
   padding: 14px;
+}
+
+.club-moderation-row > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.club-moderation-row > div strong,
+.club-moderation-row > div span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.club-moderation-row > div span {
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 11px;
+  font-weight: 750;
+  text-transform: capitalize;
 }
 
 .club-moderation-row form {
@@ -18062,6 +21190,10 @@ canvas {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .part-detail-offer-grid {
+    grid-template-columns: 1fr;
+  }
+
   .part-detail-related-card {
     grid-template-columns: 82px minmax(0, 1fr);
   }
@@ -18105,7 +21237,31 @@ canvas {
   }
 
   .part-detail-disclosure {
-    display: none;
+    display: block;
+  }
+
+  .part-detail-offer-card {
+    grid-template-columns: 84px minmax(0, 1fr);
+  }
+
+  .part-detail-offer-media {
+    width: 84px;
+    height: 76px;
+  }
+
+  .part-detail-offer-action {
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr) minmax(148px, auto);
+    align-items: center;
+  }
+
+  .part-detail-offer-action > strong,
+  .part-detail-offer-action small {
+    text-align: left;
+  }
+
+  .part-detail-offer-action small {
+    grid-column: 1 / -1;
   }
 
   .part-detail-related-grid {
@@ -18329,5 +21485,1597 @@ canvas {
 
   .club-invite-signup-card {
     padding: 16px;
+  }
+}
+
+/* Final parts storefront cascade overrides */
+.parts-store-shell.parts-tuning-shell .parts-tuning-category-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.parts-store-shell.parts-tuning-shell .parts-component-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.parts-store-shell.parts-tuning-shell .parts-card-grid.parts-component-offer-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.parts-store-shell.parts-tuning-shell .parts-component-offer-card .parts-card-image {
+  height: auto;
+  aspect-ratio: 16 / 10;
+}
+
+.parts-store-shell.parts-tuning-shell .parts-offer-purchase a {
+  border-color: #ef233c;
+  background: linear-gradient(180deg, #ef233c, #b90812);
+}
+
+@media (max-width: 1180px) {
+  .parts-store-shell.parts-tuning-shell .parts-tuning-category-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .parts-store-shell.parts-tuning-shell .parts-component-grid,
+  .parts-store-shell.parts-tuning-shell .parts-card-grid.parts-component-offer-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 840px) {
+  .parts-store-shell.parts-tuning-shell .parts-tuning-category-grid,
+  .parts-store-shell.parts-tuning-shell .parts-component-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .parts-store-shell.parts-tuning-shell .parts-card-grid.parts-component-offer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .parts-store-shell.parts-tuning-shell {
+    padding-inline: 10px;
+  }
+
+  .parts-store-shell.parts-tuning-shell .parts-store-hero.parts-tuning-hero {
+    min-height: 112px;
+    margin-bottom: 6px;
+    padding-top: 58px;
+  }
+
+  .parts-store-shell.parts-tuning-shell .parts-tuning-category-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .parts-store-shell.parts-tuning-shell .parts-component-grid,
+  .parts-store-shell.parts-tuning-shell .parts-card-grid.parts-component-offer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .parts-store-shell.parts-tuning-shell .parts-component-offer-card .parts-card-image {
+    height: auto;
+    aspect-ratio: 4 / 3;
+  }
+
+  .parts-store-shell.parts-tuning-shell .parts-offer-tabs {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .parts-store-shell.parts-tuning-shell .parts-offer-tabs button {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .parts-store-shell.parts-tuning-shell .parts-offer-purchase {
+    grid-template-columns: 1fr;
+  }
+
+  .parts-store-shell.parts-tuning-shell .parts-offer-purchase a {
+    width: 100%;
+  }
+}
+/* Vehicle-aware universal part type detail */
+.part-type-detail-shell {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  color: #f5f7fa;
+}
+
+.part-type-detail-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin-bottom: 18px;
+  color: #aab0b8;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.part-type-detail-breadcrumbs a { color: #f2f4f7; }
+.part-type-detail-breadcrumbs strong { overflow: hidden; color: #fff; text-overflow: ellipsis; white-space: nowrap; }
+
+.part-type-browser {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  margin-top: 16px;
+  padding: 20px;
+  border: 1px solid #272c32;
+  border-top: 2px solid #d71920;
+  border-radius: 6px;
+  background:
+    linear-gradient(90deg, rgba(215, 25, 32, .08), transparent 34%),
+    linear-gradient(145deg, rgba(19, 21, 24, .98), rgba(7, 8, 10, .98));
+}
+
+.part-type-browser-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 22px;
+  min-width: 0;
+}
+
+.part-type-browser-heading span,
+.part-type-browser-level-heading span {
+  color: #e12229;
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.part-type-browser-heading h2 {
+  margin: 4px 0 0;
+  color: #fff;
+  font-size: clamp(20px, 2.2vw, 30px);
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.part-type-browser-heading p {
+  max-width: 520px;
+  margin: 0;
+  color: #929aa3;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.part-type-browser-systems {
+  display: grid;
+  grid-auto-columns: minmax(148px, 1fr);
+  grid-auto-flow: column;
+  gap: 8px;
+  min-width: 0;
+  padding-bottom: 4px;
+  overflow-x: auto;
+  scrollbar-color: #424850 transparent;
+  scrollbar-width: thin;
+}
+
+.part-type-browser-systems button {
+  --browser-accent: #e12229;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  min-height: 66px;
+  padding: 10px 12px;
+  border: 1px solid #323840;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, .025);
+  color: #aeb5bd;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+}
+
+.part-type-browser-systems button:hover,
+.part-type-browser-systems button:focus-visible,
+.part-type-browser-systems button.is-active {
+  border-color: var(--browser-accent);
+  background: color-mix(in srgb, var(--browser-accent) 10%, #0b0d0f);
+  color: #fff;
+  outline: none;
+}
+
+.part-type-browser-systems button[data-category="air-induction"] { --browser-accent: #38bdf8; }
+.part-type-browser-systems button[data-category="exhaust-emissions"] { --browser-accent: #fb7185; }
+.part-type-browser-systems button[data-category="ecu-electronics"] { --browser-accent: #22d3ee; }
+.part-type-browser-systems button[data-category="brakes"] { --browser-accent: #ef4444; }
+.part-type-browser-systems button[data-category="suspension-steering"] { --browser-accent: #a78bfa; }
+.part-type-browser-systems button[data-category="wheels-tires"] { --browser-accent: #93c5fd; }
+.part-type-browser-systems button[data-category="transmission-drivetrain"] { --browser-accent: #86efac; }
+.part-type-browser-systems button[data-category="engine"] { --browser-accent: #fb923c; }
+.part-type-browser-systems button[data-category="cooling"] { --browser-accent: #67e8f9; }
+.part-type-browser-systems button[data-category="maintenance-service"] { --browser-accent: #86efac; }
+
+.part-type-browser-systems svg {
+  width: 34px;
+  height: 34px;
+  color: currentColor;
+  filter: drop-shadow(0 0 7px color-mix(in srgb, currentColor 48%, transparent));
+}
+
+.part-type-browser-systems button > span,
+.part-type-browser-option-carousel button > span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.part-type-browser-systems strong,
+.part-type-browser-option-carousel strong {
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.part-type-browser-systems strong { overflow-wrap: normal; word-break: normal; }
+.part-type-browser-option-carousel strong { overflow-wrap: anywhere; }
+
+.part-type-browser-systems small,
+.part-type-browser-option-carousel small {
+  color: #7f8790;
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.part-type-browser-carousel-stage {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 1px solid #2b3036;
+  animation: part-type-carousel-reveal 180ms ease-out;
+}
+
+@keyframes part-type-carousel-reveal {
+  from { opacity: .45; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.part-type-browser-level-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  min-width: 0;
+  min-height: 28px;
+}
+
+.part-type-browser-level-heading > div {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.part-type-browser-level-heading strong,
+.part-type-browser-level-heading > small {
+  color: #cbd0d6;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.part-type-browser-level-heading > small {
+  color: #747c85;
+  font-size: 9px;
+}
+
+.part-type-browser-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid #363c43;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, .025);
+  color: #cbd0d6;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.part-type-browser-back:hover,
+.part-type-browser-back:focus-visible {
+  border-color: #e12229;
+  color: #fff;
+  outline: none;
+}
+
+.part-type-browser-back span {
+  color: #e12229;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.part-type-browser-option-carousel {
+  display: grid;
+  grid-auto-columns: minmax(225px, 1fr);
+  grid-auto-flow: column;
+  gap: 8px;
+  min-width: 0;
+  padding-bottom: 4px;
+  overflow-x: auto;
+  scrollbar-color: #424850 transparent;
+  scrollbar-width: thin;
+}
+
+.part-type-browser-option-carousel.is-parts {
+  grid-auto-columns: minmax(270px, 1fr);
+}
+
+.part-type-browser-option-carousel button {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 18px;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  min-height: 84px;
+  padding: 12px 14px;
+  border: 1px solid #30363d;
+  border-radius: 5px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, .045), rgba(255, 255, 255, .018));
+  color: #c6ccd3;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.part-type-browser-option-carousel button:hover,
+.part-type-browser-option-carousel button:focus-visible,
+.part-type-browser-option-carousel button.is-active {
+  border-color: rgba(225, 34, 41, .9);
+  background: rgba(225, 34, 41, .08);
+  color: #fff;
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.part-type-browser-option-carousel svg {
+  width: 40px;
+  height: 40px;
+  color: #e5e7eb;
+  filter: drop-shadow(0 0 8px rgba(225, 34, 41, .24));
+}
+
+.part-type-browser-option-carousel button:hover svg,
+.part-type-browser-option-carousel button:focus-visible svg,
+.part-type-browser-option-carousel button.is-active svg {
+  color: #fff;
+  filter: drop-shadow(0 0 10px rgba(225, 34, 41, .48));
+}
+
+.part-type-browser-option-carousel i {
+  color: #e12229;
+  font-size: 20px;
+  font-style: normal;
+  text-align: right;
+}
+
+.part-type-browser-option-carousel.is-parts small {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.part-type-browser-empty,
+.part-type-browser-status {
+  display: grid;
+  place-content: center;
+  min-height: 150px;
+  padding: 22px;
+  border: 1px dashed #343a42;
+  color: #878f98;
+  text-align: center;
+}
+
+.part-type-browser-empty span {
+  color: rgba(225, 34, 41, .7);
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.part-type-browser-empty p { max-width: 300px; margin: 7px 0 0; font-size: 12px; line-height: 1.5; }
+.part-type-browser-empty-wide { min-height: 104px; }
+.part-type-browser-status { grid-column: 1 / -1; min-height: 82px; font-size: 12px; }
+.part-type-browser-error { margin: 0; padding: 10px 12px; border-left: 2px solid #e12229; background: rgba(225, 34, 41, .08); color: #f1b4b7; font-size: 11px; }
+
+.part-type-component-panel,
+.part-type-recommendation-panel,
+.part-type-support-panel,
+.part-type-available-section {
+  border: 1px solid #272c32;
+  background: linear-gradient(145deg, rgba(19, 21, 24, .98), rgba(7, 8, 10, .98));
+}
+
+.part-type-component-panel { padding: 28px; border-top: 2px solid #d71920; }
+.part-type-detail-identity { display: flex; gap: 26px; align-items: center; min-width: 0; }
+.part-type-detail-icon {
+  display: grid;
+  flex: 0 0 112px;
+  width: 112px;
+  height: 112px;
+  place-items: center;
+  border: 1px solid #474f59;
+  background: radial-gradient(circle at center, rgba(215, 25, 32, .19), transparent 70%);
+}
+.part-type-detail-icon svg { width: 72px; height: 72px; color: #ff3038; filter: drop-shadow(0 0 12px rgba(255, 34, 43, .38)); }
+.part-type-detail-identity span,
+.part-type-panel-heading span,
+.part-type-available-section > header span { color: #e12229; font-size: 11px; text-transform: uppercase; }
+.part-type-detail-identity h1 { margin: 6px 0 10px; font-size: clamp(32px, 4vw, 62px); line-height: 1; text-transform: uppercase; }
+.part-type-detail-identity p { max-width: 760px; margin: 0; color: #a6adb6; line-height: 1.6; }
+
+.part-type-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 16px; margin-top: 16px; }
+.part-type-detail-grid.is-support-only { grid-template-columns: minmax(0, 1fr); }
+.part-type-detail-grid.is-recommendation-only { grid-template-columns: minmax(0, 1fr); }
+.part-type-detail-grid.is-recommendation-only .part-type-detail-rail { grid-template-columns: minmax(0, 1fr); }
+.part-type-detail-main { display: grid; gap: 16px; min-width: 0; }
+.part-type-detail-rail { display: grid; align-content: start; gap: 16px; min-width: 0; }
+.part-type-component-panel,
+.part-type-recommendation-panel,
+.part-type-support-panel { padding: 22px; }
+
+.part-type-panel-heading { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 18px; }
+.part-type-panel-heading h2,
+.part-type-available-section h2 { margin: 4px 0 0; font-size: 20px; text-transform: uppercase; }
+.part-type-panel-heading a { padding: 9px 12px; border: 1px solid #4a4f56; color: #fff; font-size: 11px; text-transform: uppercase; }
+.part-type-recommendation-panel { border-left: 3px solid #e7b933; }
+.part-type-recommendation-panel.is-positive { border-left-color: #45d26b; }
+.part-type-recommendation-panel.is-negative { border-left-color: #e12229; }
+.part-type-recommendation-panel p { margin: 0; color: #c1c6cc; font-size: 15px; line-height: 1.6; }
+.part-type-detail-rail .part-type-recommendation-panel { padding: 20px; }
+.part-type-detail-rail .part-type-recommendation-panel .part-type-panel-heading { margin-bottom: 2px; }
+.part-type-build-guidance { display: grid; gap: 0; }
+.part-type-build-guidance > div { padding: 14px 0; border-top: 1px solid #2d3238; }
+.part-type-build-guidance > div:first-child { border-top: 0; }
+.part-type-build-guidance span {
+  display: block;
+  margin-bottom: 6px;
+  color: #858d96;
+  font-size: 9px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+.part-type-detail-rail .part-type-build-guidance p {
+  color: #b5bbc2;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.part-type-next-upgrade strong {
+  display: block;
+  color: #fff;
+  font-size: 18px;
+  line-height: 1.2;
+}
+.part-type-next-upgrade small {
+  display: block;
+  margin-top: 7px;
+  color: #a1a8b0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.part-type-next-upgrade a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 40px;
+  margin-top: 13px;
+  border: 1px solid rgba(239, 35, 60, .9);
+  border-radius: 5px;
+  background: linear-gradient(180deg, #f01928, #b90d18);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 900;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+.part-type-next-upgrade a:hover,
+.part-type-next-upgrade a:focus-visible {
+  border-color: rgba(255, 255, 255, .42);
+  background: linear-gradient(180deg, #ff2635, #c70f1c);
+  outline: 2px solid rgba(239, 35, 60, .26);
+  outline-offset: 2px;
+}
+.part-type-relationship-row { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 14px; padding: 12px 0; border-top: 1px solid #2d3238; }
+.part-type-relationship-row > strong { font-size: 11px; text-transform: uppercase; }
+.part-type-relationship-row > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.part-type-relationship-row span { padding: 6px 9px; background: #14171a; color: #d9dde2; font-size: 11px; }
+
+.part-type-available-section { margin-top: 16px; padding: 24px; }
+.part-type-available-section > header { display: flex; justify-content: space-between; gap: 20px; align-items: end; margin-bottom: 18px; }
+.part-type-available-section > header p { margin: 0; color: #858c95; font-size: 12px; }
+.part-type-offer-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.part-type-offer-card { min-width: 0; overflow: hidden; border: 1px solid #30353b; background: #0a0c0e; }
+.part-type-offer-image { position: relative; display: grid; height: 220px; place-items: center; background: linear-gradient(145deg, #181b1e, #08090a); }
+.part-type-offer-image img { width: 100%; height: 100%; object-fit: contain; padding: 12px; }
+.part-type-offer-image svg { width: 80px; height: 80px; color: #e12229; }
+.part-type-offer-image > span { position: absolute; top: 10px; left: 10px; padding: 5px 8px; background: #d71920; color: #fff; font-size: 10px; text-transform: uppercase; }
+.part-type-offer-body { padding: 16px; }
+.part-type-offer-body > small { color: #e12229; text-transform: uppercase; }
+.part-type-offer-body h3 { min-height: 44px; margin: 7px 0; font-size: 16px; line-height: 1.35; }
+.part-type-offer-body > p { margin: 0 0 10px; color: #979ea7; font-size: 11px; }
+.part-type-offer-meta { display: flex; flex-wrap: wrap; gap: 7px; }
+.part-type-offer-meta span { padding: 5px 7px; border: 1px solid #30353b; color: #b7bdc4; font-size: 10px; }
+.part-type-offer-price { display: flex; justify-content: space-between; align-items: end; margin: 16px 0 10px; }
+.part-type-offer-price span { color: #838b94; font-size: 10px; text-transform: uppercase; }
+.part-type-offer-price strong { font-size: 22px; }
+.part-type-offer-body > a { display: block; padding: 12px; background: #d71920; color: #fff; text-align: center; text-transform: uppercase; }
+.part-type-offer-body details { margin-top: 10px; border-top: 1px solid #2d3238; }
+.part-type-offer-body summary { padding: 11px 0; color: #c7ccd2; cursor: pointer; font-size: 11px; }
+.part-type-offer-body details div { display: grid; gap: 5px; }
+.part-type-offer-body details a { display: flex; justify-content: space-between; gap: 12px; padding: 8px; background: #131619; color: #e4e7ea; font-size: 11px; }
+.part-type-no-offers { padding: 34px; border: 1px dashed #3b424a; text-align: center; }
+.part-type-no-offers p { margin: 7px 0 0; color: #8f969f; }
+.part-type-affiliate-disclosure { margin: 16px 0 0; color: #737b84; font-size: 10px; text-align: center; }
+
+@media (max-width: 980px) {
+  .part-type-browser-empty { min-height: 92px; }
+  .part-type-detail-grid { grid-template-columns: 1fr; }
+  .part-type-detail-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .part-type-offer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .part-type-detail-breadcrumbs { overflow: hidden; }
+  .part-type-browser { gap: 12px; padding: 14px 12px; }
+  .part-type-browser-heading { align-items: flex-start; flex-direction: column; gap: 7px; }
+  .part-type-browser-heading p { max-width: none; text-align: left; }
+  .part-type-browser-systems { grid-auto-columns: 126px; margin-inline: -12px; padding-inline: 12px; }
+  .part-type-browser-systems button { grid-template-columns: 30px minmax(0, 1fr); min-height: 60px; padding: 8px; }
+  .part-type-browser-systems svg { width: 28px; height: 28px; }
+  .part-type-browser-systems strong { font-size: 10px; }
+  .part-type-browser-carousel-stage { gap: 10px; margin-inline: -12px; padding: 12px 12px 0; }
+  .part-type-browser-level-heading { align-items: flex-start; padding-inline: 0; }
+  .part-type-browser-level-heading > div { align-items: flex-start; flex-direction: column; gap: 3px; }
+  .part-type-browser-level-heading > small { max-width: 150px; line-height: 1.4; text-align: right; }
+  .part-type-browser-option-carousel { grid-auto-columns: 230px; margin-inline: -12px; padding-inline: 12px; }
+  .part-type-browser-option-carousel.is-parts { grid-auto-columns: 280px; }
+  .part-type-browser-option-carousel button { grid-template-columns: 38px minmax(0, 1fr) 16px; min-height: 72px; padding: 10px 12px; }
+  .part-type-browser-option-carousel svg { width: 34px; height: 34px; }
+  .part-type-browser-empty { min-height: 76px; padding: 14px; }
+  .part-type-detail-identity { align-items: flex-start; gap: 14px; }
+  .part-type-detail-icon { flex-basis: 66px; width: 66px; height: 66px; }
+  .part-type-detail-icon svg { width: 44px; height: 44px; }
+  .part-type-detail-identity h1 { font-size: clamp(27px, 10vw, 42px); }
+  .part-type-component-panel,
+  .part-type-recommendation-panel,
+  .part-type-support-panel,
+  .part-type-available-section { padding: 16px; }
+  .part-type-detail-rail { grid-template-columns: 1fr; }
+  .part-type-relationship-row { grid-template-columns: 1fr; }
+  .part-type-available-section > header { align-items: flex-start; flex-direction: column; }
+  .part-type-offer-grid { grid-template-columns: 1fr; }
+  .part-type-offer-image { height: 210px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .part-type-browser-carousel-stage { animation: none; }
+}
+
+/* Keep the vehicle-first Parts Store rules above legacy storefront overrides. */
+.parts-workspace-shell {
+  --parts-workspace-max: 1440px;
+  overflow-x: clip;
+  min-height: 100vh;
+  padding: 22px clamp(12px, 2.4vw, 32px) 56px;
+  background:
+    radial-gradient(circle at 78% 8%, rgba(57, 66, 76, 0.28), transparent 34%),
+    linear-gradient(180deg, #0d1015 0, #080a0d 48%, #060708 100%);
+  color: #fff;
+}
+
+.parts-workspace-content {
+  display: grid;
+  gap: 18px;
+  width: min(var(--parts-workspace-max), 100%);
+  min-width: 0;
+  margin: 0 auto;
+}
+
+.parts-store-shell.parts-tuning-shell {
+  padding-top: 22px;
+  padding-bottom: 56px;
+  background:
+    radial-gradient(circle at 78% 8%, rgba(57, 66, 76, 0.28), transparent 34%),
+    linear-gradient(180deg, #0d1015 0, #080a0d 48%, #060708 100%);
+}
+
+.parts-store-shell.parts-tuning-shell .parts-tuning-stage {
+  width: min(var(--parts-workspace-max), 100%);
+}
+
+.parts-store-shell.parts-tuning-shell .parts-vehicle-library {
+  gap: 16px;
+  padding: 8px 0 0;
+}
+
+.parts-store-shell.parts-tuning-shell .parts-component-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.parts-store-shell.parts-tuning-shell .parts-component-tile {
+  grid-template-columns: 54px minmax(0, 1fr) 18px;
+  grid-template-rows: 1fr;
+  min-height: 112px;
+  padding: 14px 16px;
+}
+
+@media (max-width: 700px) {
+  .parts-workspace-shell,
+  .parts-store-shell.parts-tuning-shell {
+    padding: 14px 10px 42px;
+  }
+
+  .parts-store-shell.parts-tuning-shell .parts-component-grid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .parts-store-shell.parts-tuning-shell .parts-component-tile {
+    grid-template-columns: 48px minmax(0, 1fr) 16px;
+    min-height: 68px;
+    padding: 9px 12px;
+  }
+}
+
+/* Mirror the Garage hero hierarchy when a Parts vehicle is selected. */
+.parts-vehicle-hero.parts-garage-layout {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(430px, 0.82fr) minmax(400px, 1fr);
+  grid-template-areas:
+    "identity image"
+    "stats image"
+    ". actions";
+  align-content: center;
+  align-items: start;
+  gap: 16px 28px;
+  min-height: clamp(318px, 25vw, 380px);
+  max-height: 380px;
+  padding: clamp(24px, 2.6vw, 36px) clamp(24px, 4vw, 52px) 22px;
+  overflow: hidden;
+  border-color: rgba(255, 255, 255, 0.14);
+  background:
+    linear-gradient(90deg, rgba(7, 8, 10, 0.98) 0%, rgba(9, 11, 14, 0.94) 34%, rgba(9, 11, 14, 0.28) 68%, rgba(5, 6, 8, 0.16) 100%),
+    linear-gradient(180deg, #11151a, #080a0d);
+}
+
+.parts-vehicle-hero.parts-garage-layout.has-performance-accent {
+  grid-template-areas:
+    "identity image"
+    "stats image"
+    "accent actions";
+  min-height: clamp(350px, 28vw, 420px);
+  max-height: 420px;
+}
+
+.parts-vehicle-hero.parts-garage-layout.has-recommendation-summary {
+  grid-template-areas:
+    "identity recommendation"
+    "stats image"
+    ". actions";
+}
+
+.parts-vehicle-hero.parts-garage-layout.has-performance-accent.has-recommendation-summary {
+  grid-template-areas:
+    "identity recommendation"
+    "stats image"
+    "accent actions";
+}
+
+.parts-vehicle-hero.parts-garage-layout::before {
+  position: absolute;
+  z-index: 0;
+  top: -8%;
+  right: -4%;
+  bottom: -7%;
+  left: 36%;
+  background-image: var(--parts-vehicle-hero-image);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  content: "";
+  filter: drop-shadow(0 22px 20px rgba(0, 0, 0, 0.5));
+  transform: scale(1.08);
+}
+
+.parts-vehicle-hero.parts-garage-layout::after {
+  position: absolute;
+  z-index: 3;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #ef233c 0 18%, rgba(239, 35, 60, 0.12) 48%, transparent 82%);
+  content: "";
+}
+
+.parts-vehicle-hero-shade {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(4, 5, 7, 0.22) 0 40%, transparent 70%),
+    linear-gradient(180deg, transparent 62%, rgba(5, 6, 8, 0.42));
+}
+
+.parts-vehicle-hero-identity {
+  position: relative;
+  z-index: 2;
+  grid-area: identity;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+  min-width: 0;
+}
+
+.parts-vehicle-make-badge {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  border-radius: 50%;
+  background: rgba(5, 6, 8, 0.7);
+}
+
+.parts-vehicle-make-badge img {
+  width: 70%;
+  height: 70%;
+  object-fit: contain;
+}
+
+.parts-vehicle-make-badge span {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.parts-vehicle-identity-copy {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.parts-garage-layout .parts-selected-vehicle-label {
+  margin-bottom: 1px;
+}
+
+.parts-vehicle-identity-copy h1 {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(27px, 2.4vw, 39px);
+  font-weight: 820;
+  line-height: 1.03;
+  overflow-wrap: anywhere;
+}
+
+.parts-garage-layout .parts-vehicle-summary-line {
+  margin: 0;
+  max-width: 520px;
+}
+
+.parts-garage-layout .parts-vehicle-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 14px;
+}
+
+.parts-garage-layout .parts-vehicle-metadata > div {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.parts-garage-layout .parts-vehicle-metadata strong {
+  font-size: 10px;
+}
+
+.parts-garage-layout .parts-vehicle-metadata span {
+  margin: 0;
+  font-size: 8px;
+}
+
+.parts-garage-layout .parts-vehicle-metrics {
+  position: relative;
+  z-index: 2;
+  grid-area: stats;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  width: min(578px, calc(100% - 72px));
+  margin-left: 72px;
+}
+
+.parts-garage-layout .parts-vehicle-metrics article {
+  display: grid;
+  min-width: 0;
+  padding: 0 15px;
+  border-right: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.parts-garage-layout .parts-vehicle-metrics article:first-child {
+  padding-left: 0;
+}
+
+.parts-garage-layout .parts-vehicle-metrics article:last-child {
+  border-right: 0;
+}
+
+.parts-garage-layout .parts-vehicle-metrics span {
+  order: 0;
+  margin: 0 0 5px;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.parts-garage-layout .parts-vehicle-metrics strong {
+  order: 1;
+  color: #fff;
+  font-size: clamp(20px, 2vw, 28px);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.parts-garage-layout .parts-vehicle-metrics small {
+  order: 2;
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.parts-vehicle-gain-accent {
+  position: relative;
+  z-index: 2;
+  grid-area: accent;
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) repeat(2, minmax(92px, 0.55fr));
+  align-items: stretch;
+  width: min(578px, calc(100% - 72px));
+  margin-left: 72px;
+  overflow: hidden;
+  border: 1px solid rgba(239, 35, 60, 0.4);
+  border-left: 3px solid #ef233c;
+  border-radius: 5px;
+  background: linear-gradient(90deg, rgba(239, 35, 60, 0.16), rgba(10, 12, 15, 0.88) 56%);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.035);
+}
+
+.parts-vehicle-gain-accent > div,
+.parts-vehicle-gain-accent > article {
+  display: grid;
+  align-content: center;
+  min-width: 0;
+  padding: 10px 13px;
+}
+
+.parts-vehicle-gain-accent > article {
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.parts-vehicle-gain-accent span,
+.parts-vehicle-gain-accent small {
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.parts-vehicle-gain-accent strong {
+  margin: 3px 0;
+  overflow: hidden;
+  color: #ff4157;
+  font-size: 17px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parts-vehicle-gain-accent > div strong {
+  color: #ffffff;
+  font-size: 13px;
+}
+
+.parts-vehicle-gain-accent.is-pending {
+  border-color: rgba(231, 185, 51, 0.38);
+  border-left-color: #e7b933;
+  background: linear-gradient(90deg, rgba(231, 185, 51, 0.12), rgba(10, 12, 15, 0.88) 56%);
+}
+
+.parts-vehicle-gain-accent.is-pending > article strong {
+  color: #eac95f;
+  font-size: 10px;
+}
+
+.parts-vehicle-gain-accent.is-pending > article {
+  padding-inline: 10px;
+}
+
+.parts-vehicle-recommendation-summary {
+  position: relative;
+  z-index: 2;
+  grid-area: recommendation;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-self: start;
+  justify-self: end;
+  gap: 9px;
+  align-items: center;
+  width: min(440px, 100%);
+  min-width: 0;
+  min-height: 118px;
+  padding: 12px 14px;
+  border: 1px solid rgba(69, 210, 107, .36);
+  border-left: 3px solid #45d26b;
+  border-radius: 5px;
+  background: rgba(5, 7, 9, .8);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .28);
+  backdrop-filter: blur(12px);
+}
+
+.parts-vehicle-recommendation-summary > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.parts-recommendation-kicker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.parts-recommendation-kicker em {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  border: 1px solid rgba(69, 210, 107, .32);
+  border-radius: 3px;
+  color: #a9efba;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 850;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.parts-recommendation-kicker em[data-confidence="LOW"],
+.parts-recommendation-kicker em[data-confidence="UNKNOWN"] {
+  border-color: rgba(231, 185, 51, .4);
+  color: #eac95f;
+}
+
+.parts-vehicle-recommendation-summary span {
+  color: #45d26b;
+  font-size: 9px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.parts-vehicle-recommendation-summary strong {
+  overflow: hidden;
+  color: #fff;
+  font-size: 17px;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parts-vehicle-recommendation-summary p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: rgba(255, 255, 255, .62);
+  font-size: 10px;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.parts-vehicle-recommendation-summary dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin: 4px 0 0;
+}
+
+.parts-vehicle-recommendation-summary dl > div {
+  min-width: 0;
+  padding-top: 5px;
+  border-top: 1px solid rgba(255, 255, 255, .09);
+}
+
+.parts-vehicle-recommendation-summary dt {
+  margin-bottom: 2px;
+  color: rgba(255, 255, 255, .42);
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.parts-vehicle-recommendation-summary dd {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: rgba(255, 255, 255, .74);
+  font-size: 9px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.parts-vehicle-recommendation-summary small {
+  color: rgba(255, 255, 255, .48);
+  font-size: 8px;
+  line-height: 1.35;
+}
+
+.parts-vehicle-recommendation-summary small.is-warning {
+  color: #eac95f;
+}
+
+.parts-vehicle-recommendation-summary small.is-disclosure {
+  display: -webkit-box;
+  overflow: hidden;
+  color: rgba(255, 255, 255, .4);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+}
+
+.parts-vehicle-recommendation-summary > a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: end;
+  min-height: 36px;
+  padding: 0 11px;
+  border: 1px solid rgba(69, 210, 107, .58);
+  border-radius: 4px;
+  background: rgba(69, 210, 107, .09);
+  color: #d8ffe2;
+  font-size: 9px;
+  font-weight: 900;
+  text-decoration: none;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.parts-vehicle-recommendation-summary > a:hover,
+.parts-vehicle-recommendation-summary > a:focus-visible {
+  border-color: #45d26b;
+  background: rgba(69, 210, 107, .17);
+  color: #fff;
+  outline: none;
+}
+
+.parts-garage-layout .parts-vehicle-actions {
+  position: relative;
+  z-index: 2;
+  grid-area: actions;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-self: center;
+  justify-self: end;
+  width: min(390px, 100%);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+@media (max-width: 980px) {
+  .parts-vehicle-hero.parts-garage-layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "image"
+      "identity"
+      "stats"
+      "actions";
+    gap: 15px;
+    min-height: 0;
+    max-height: none;
+    padding: 184px 22px 20px;
+  }
+
+  .parts-vehicle-hero.parts-garage-layout.has-performance-accent {
+    grid-template-areas:
+      "image"
+      "identity"
+      "stats"
+      "accent"
+      "actions";
+    min-height: 0;
+    max-height: none;
+  }
+
+  .parts-vehicle-hero.parts-garage-layout.has-recommendation-summary {
+    grid-template-areas:
+      "image"
+      "identity"
+      "stats"
+      "recommendation"
+      "actions";
+  }
+
+  .parts-vehicle-hero.parts-garage-layout.has-performance-accent.has-recommendation-summary {
+    grid-template-areas:
+      "image"
+      "identity"
+      "stats"
+      "recommendation"
+      "accent"
+      "actions";
+  }
+
+  .parts-vehicle-hero.parts-garage-layout::before {
+    top: 8px;
+    right: 12px;
+    bottom: auto;
+    left: 12px;
+    height: 170px;
+    background-position: center;
+    background-size: contain;
+    transform: none;
+  }
+
+  .parts-vehicle-hero-shade {
+    background: linear-gradient(180deg, transparent 0 30%, rgba(7, 8, 10, 0.94) 48%, rgba(7, 8, 10, 0.99) 100%);
+  }
+
+  .parts-garage-layout .parts-vehicle-metrics,
+  .parts-vehicle-gain-accent,
+  .parts-garage-layout .parts-vehicle-actions,
+  .parts-vehicle-recommendation-summary {
+    width: 100%;
+  }
+
+  .parts-vehicle-recommendation-summary {
+    justify-self: stretch;
+  }
+
+  .parts-garage-layout .parts-vehicle-metrics,
+  .parts-vehicle-gain-accent {
+    width: calc(100% - 72px);
+    margin-left: 72px;
+  }
+
+  .parts-garage-layout .parts-vehicle-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-self: stretch;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .parts-vehicle-hero.parts-garage-layout {
+    gap: 13px;
+    padding: 140px 14px 15px;
+    border-radius: 6px;
+  }
+
+  .parts-vehicle-hero.parts-garage-layout::before {
+    top: 5px;
+    right: 8px;
+    left: 8px;
+    height: 130px;
+  }
+
+  .parts-vehicle-hero-identity {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .parts-vehicle-make-badge {
+    width: 42px;
+    height: 42px;
+  }
+
+  .parts-vehicle-identity-copy {
+    gap: 6px;
+  }
+
+  .parts-vehicle-identity-copy h1 {
+    font-size: clamp(22px, 7vw, 28px);
+    line-height: 1.06;
+  }
+
+  .parts-garage-layout .parts-vehicle-summary-line {
+    font-size: 10px;
+  }
+
+  .parts-garage-layout .parts-vehicle-metadata {
+    display: none;
+  }
+
+  .parts-garage-layout .parts-vehicle-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: calc(100% - 52px);
+    margin-left: 52px;
+    row-gap: 10px;
+  }
+
+  .parts-garage-layout .parts-vehicle-metrics article {
+    padding: 0 10px;
+  }
+
+  .parts-garage-layout .parts-vehicle-metrics article:nth-child(odd) {
+    padding-left: 0;
+  }
+
+  .parts-garage-layout .parts-vehicle-metrics article:nth-child(even) {
+    border-right: 0;
+  }
+
+  .parts-garage-layout .parts-vehicle-metrics article:nth-child(n + 3) {
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .parts-garage-layout .parts-vehicle-metrics strong {
+    font-size: 21px;
+  }
+
+  .parts-vehicle-gain-accent {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: calc(100% - 52px);
+    margin-left: 52px;
+  }
+
+  .parts-vehicle-recommendation-summary {
+    min-height: 0;
+    padding: 10px 11px;
+  }
+
+  .parts-vehicle-recommendation-summary dl {
+    grid-template-columns: 1fr;
+  }
+
+  .parts-vehicle-gain-accent > div {
+    grid-column: 1 / -1;
+    padding: 9px 11px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .parts-vehicle-gain-accent > article {
+    min-height: 52px;
+    padding: 8px 11px;
+  }
+
+  .parts-vehicle-gain-accent > article:nth-of-type(1) {
+    border-left: 0;
+  }
+
+  .parts-garage-layout .parts-vehicle-actions button,
+  .parts-garage-layout .parts-vehicle-actions a {
+    min-height: 42px;
+    padding-inline: 10px;
+  }
+}
+
+@media (max-width: 420px) {
+  .parts-garage-layout .parts-vehicle-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Parts offer rows share the same visual language as Garage and Inventory. */
+.part-offer-list-shell {
+  overflow: hidden;
+  border-color: rgba(255, 255, 255, 0.14);
+  border-radius: 7px;
+  background: rgba(8, 9, 11, 0.96);
+  color: #fff;
+  font-family: var(--font-clean-sans);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.025);
+}
+
+.part-offer-list {
+  table-layout: fixed;
+  font-family: inherit;
+}
+
+.part-offer-list th {
+  height: 44px;
+  padding-inline: 16px;
+  border-bottom-color: rgba(255, 255, 255, 0.14);
+  background: linear-gradient(180deg, #15181c, #101216);
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.part-offer-list th:first-child {
+  width: auto;
+}
+
+.part-offer-list th:nth-child(2) { width: 112px; }
+.part-offer-list th:nth-child(3) { width: 150px; }
+.part-offer-list th:nth-child(4) { width: 136px; }
+.part-offer-list th:nth-child(5) { width: 172px; }
+
+.part-offer-list th button {
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.86);
+  font-family: inherit;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.part-offer-list th button span {
+  color: rgba(255, 255, 255, 0.36);
+}
+
+.part-offer-list th button.is-active span {
+  color: #ef233c;
+}
+
+.part-offer-list td {
+  height: 104px;
+  padding: 12px 16px;
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.part-offer-list tbody tr {
+  transition: background-color 160ms ease;
+}
+
+.part-offer-list tbody tr:hover {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.part-offer-product {
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 16px;
+}
+
+.part-offer-product-image {
+  width: 104px;
+  height: 78px;
+  border-color: rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
+  background:
+    radial-gradient(circle at 50% 44%, rgba(255, 255, 255, 0.11), transparent 58%),
+    linear-gradient(145deg, #1a1d22, #0d0f12);
+}
+
+.part-offer-product-image img {
+  width: 100%;
+  height: 100%;
+  padding: 7px;
+  object-fit: contain;
+  object-position: center;
+}
+
+.part-offer-product-image svg {
+  width: 40px;
+  height: 40px;
+  color: #ef233c;
+  filter: drop-shadow(0 0 10px rgba(239, 35, 60, 0.3));
+}
+
+.part-offer-product-copy {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.part-offer-product-copy > strong {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #f7f7f8;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.32;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.part-offer-product-copy > span,
+.part-offer-product-copy > small {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 9px;
+  font-weight: 550;
+  letter-spacing: 0;
+  line-height: 1.35;
+}
+
+.part-offer-quality {
+  min-width: 62px;
+  min-height: 25px;
+  align-items: center;
+  padding: 0 9px;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.part-offer-quality.is-best {
+  border-color: rgba(239, 35, 60, 0.72);
+  background: rgba(239, 35, 60, 0.08);
+  color: #ff5366;
+}
+
+.part-offer-quality.is-better {
+  border-color: rgba(212, 168, 42, 0.68);
+  background: rgba(212, 168, 42, 0.08);
+  color: #efc64e;
+}
+
+.part-offer-quality.is-good {
+  border-color: rgba(75, 118, 89, 0.82);
+  background: rgba(75, 118, 89, 0.1);
+  color: #72cf8c;
+}
+
+.part-offer-brand {
+  max-width: 100%;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.part-offer-list-price {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 760;
+  letter-spacing: 0;
+}
+
+.part-offer-retailer-link {
+  min-height: 40px;
+  padding-inline: 12px;
+  border-color: rgba(239, 35, 60, 0.9);
+  border-radius: 5px;
+  background: linear-gradient(180deg, #f01928, #b90d18);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(226, 15, 27, 0.18);
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.part-offer-retailer-link:hover,
+.part-offer-retailer-link:focus-visible {
+  border-color: rgba(255, 255, 255, 0.42);
+  background: linear-gradient(180deg, #ff2635, #c70f1c);
+  filter: none;
+  outline: 2px solid rgba(239, 35, 60, 0.26);
+  outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+  .part-offer-list-shell {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .part-offer-list thead tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .part-offer-list thead th:nth-child(-n + 4) {
+    display: flex;
+    width: auto;
+  }
+
+  .part-offer-list thead th:nth-child(4) {
+    width: auto;
+  }
+
+  .part-offer-list th button {
+    justify-content: space-between;
+    width: 100%;
+    min-height: 38px;
+    padding-inline: 11px;
+    border-color: rgba(255, 255, 255, 0.16);
+    border-radius: 5px;
+    background: #121519;
+  }
+
+  .part-offer-list tbody {
+    gap: 10px;
+  }
+
+  .part-offer-list tbody tr {
+    border-color: rgba(255, 255, 255, 0.14);
+    border-radius: 7px;
+    background: linear-gradient(180deg, #111419, #090b0e);
+  }
+
+  .part-offer-list td {
+    height: auto;
+    min-height: 42px;
+    padding: 9px 12px;
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .part-offer-list td:first-child {
+    padding: 12px;
+  }
+
+  .part-offer-product {
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .part-offer-product-image {
+    width: 96px;
+    height: 78px;
+  }
+
+  .part-offer-product-copy > strong {
+    font-size: 12px;
+  }
+
+  .part-offer-brand {
+    max-width: 68%;
+  }
+
+  .part-offer-retailer-link {
+    width: min(210px, 68%);
+    min-height: 42px;
+  }
+}
+
+@media (max-width: 420px) {
+  .part-offer-product {
+    grid-template-columns: 82px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .part-offer-product-image {
+    width: 82px;
+    height: 72px;
+  }
+
+  .part-offer-list td {
+    gap: 10px;
+  }
+
+  .part-offer-retailer-link {
+    width: min(190px, 66%);
   }
 }

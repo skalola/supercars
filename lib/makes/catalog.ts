@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { unstable_cache } from "next/cache";
+import { compareCatalogNames, sortCatalogLabels } from "@/lib/makes/catalog-order";
 
 export type MakeOption = {
   id: string;
@@ -94,12 +95,12 @@ export const getCatalogModelsByMakeIds = unstable_cache(
       ],
     });
 
-    return models.map((model) => ({
+    return sortCatalogLabels(models.map((model) => ({
       ...model,
       name: model.name.trim(),
-    }));
+    })));
   },
-  ["catalog-models-by-make-v1"],
+  ["catalog-models-by-make-v2"],
   { revalidate: 86_400, tags: ["make-model-catalog"] },
 );
 
@@ -138,9 +139,10 @@ export const getCatalogMakeSummaries = unstable_cache(
     return rows.map((row) => ({
       ...row,
       name: row.name.trim(),
+      modelPreviewNames: [...row.modelPreviewNames].sort(compareCatalogNames),
     }));
   },
-  ["catalog-make-summaries-v1"],
+  ["catalog-make-summaries-v2"],
   { revalidate: 86_400, tags: ["make-model-catalog"] },
 );
 
@@ -171,12 +173,12 @@ export const getCatalogMakeWithModels = unstable_cache(
     return {
       ...make,
       name: make.name.trim(),
-      models: make.models.map((model) => ({
+      models: sortCatalogLabels(make.models.map((model) => ({
         ...model,
         name: model.name.trim(),
-      })),
+      }))),
     };
   },
-  ["catalog-make-with-models-v1"],
+  ["catalog-make-with-models-v2"],
   { revalidate: 86_400, tags: ["make-model-catalog"] }
 );

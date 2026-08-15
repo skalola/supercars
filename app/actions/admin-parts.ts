@@ -4,6 +4,16 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { assertAdmin } from "@/lib/admin/auth";
 import { prisma } from "@/lib/prisma";
 import { toPartSlug } from "@/lib/parts/slug";
+import {
+  addPartBrandInputSchema,
+  addPartCategoryInputSchema,
+  addPerformancePartInputSchema,
+  upsertPreferredPartBrandInputSchema,
+  updateAffiliatePartnerInputSchema,
+  updatePerformancePartAffiliateInputSchema,
+} from "@/lib/validation/admin-parts-inputs";
+import { validationMessage } from "@/lib/validation/common-inputs";
+import { buildPreferredBrandScopeKey } from "@/lib/parts/ecosystem-config";
 
 type AddPartCategoryInput = {
   name: string;
@@ -14,6 +24,8 @@ type AddPartBrandInput = {
   name: string;
   websiteUrl?: string | null;
   country?: string | null;
+  brandType?: string | null;
+  description?: string | null;
 };
 
 type AddPerformancePartInput = {
@@ -72,23 +84,21 @@ const activeAffiliatePartnerStatuses = new Set(["APPROVED", "ACTIVE"]);
 export async function addPartCategoryAction(input: AddPartCategoryInput) {
   try {
     await assertAdmin();
-
-    const name = input.name.trim();
-    if (!name) {
-      return { success: false, message: "Category name is required." };
-    }
+    const parsed = addPartCategoryInputSchema.safeParse(input);
+    if (!parsed.success) return { success: false, message: validationMessage(parsed.error) };
+    const { name, description } = parsed.data;
 
     const category = await prisma.partCategory.upsert({
       where: { slug: toPartSlug(name) },
       update: {
         name,
-        description: cleanText(input.description),
+        description,
         active: true,
       },
       create: {
         name,
         slug: toPartSlug(name),
-        description: cleanText(input.description),
+        description,
         active: true,
         displayOrder: await getNextCategoryDisplayOrder(),
       },
@@ -104,25 +114,27 @@ export async function addPartCategoryAction(input: AddPartCategoryInput) {
 export async function addPartBrandAction(input: AddPartBrandInput) {
   try {
     await assertAdmin();
-
-    const name = input.name.trim();
-    if (!name) {
-      return { success: false, message: "Brand name is required." };
-    }
+    const parsed = addPartBrandInputSchema.safeParse(input);
+    if (!parsed.success) return { success: false, message: validationMessage(parsed.error) };
+    const { name, websiteUrl, country, brandType, description } = parsed.data;
 
     const brand = await prisma.partBrand.upsert({
       where: { slug: toPartSlug(name) },
       update: {
         name,
-        websiteUrl: cleanUrl(input.websiteUrl),
-        country: cleanText(input.country),
+        websiteUrl,
+        country,
+        brandType,
+        description,
         active: true,
       },
       create: {
         name,
         slug: toPartSlug(name),
-        websiteUrl: cleanUrl(input.websiteUrl),
-        country: cleanText(input.country),
+        websiteUrl,
+        country,
+        brandType,
+        description,
         active: true,
       },
     });
@@ -134,18 +146,70 @@ export async function addPartBrandAction(input: AddPartBrandInput) {
   }
 }
 
+export async function upsertPreferredPartBrandAction(input: unknown) {
+  try {
+    await assertAdmin();
+    const parsed = upsertPreferredPartBrandInputSchema.safeParse(input);
+    if (!parsed.success) return { success: false, message: validationMessage(parsed.error) };
+    const data = parsed.data;
+    const [make, brand, category, component, provider] = await Promise.all([
+      prisma.make.findUnique({ where: { id: data.vehicleMakeId }, select: { id: true, slug: true } }),
+      prisma.partBrand.findUnique({ where: { id: data.partBrandId }, select: { id: true, slug: true } }),
+      data.componentCategoryId
+        ? prisma.partCategory.findUnique({ where: { id: data.componentCategoryId }, select: { id: true, slug: true } })
+        : null,
+      data.componentTypeId
+        ? prisma.partComponentType.findUnique({ where: { id: data.componentTypeId }, select: { id: true, slug: true, categoryId: true } })
+        : null,
+      data.offerProviderId
+        ? prisma.partOfferProvider.findUnique({ where: { id: data.offerProviderId }, select: { id: true, active: true } })
+        : null,
+    ]);
+    if (!make || !brand) return { success: false, message: "Choose a valid vehicle make and part brand." };
+    if (data.componentCategoryId && !category) return { success: false, message: "Choose a valid component category." };
+    if (data.componentTypeId && !component) return { success: false, message: "Choose a valid component type." };
+    if (component && category && component.categoryId !== category.id) {
+      return { success: false, message: "Component type does not belong to the selected category." };
+    }
+    if (data.offerProviderId && !provider) return { success: false, message: "Choose a valid offer provider." };
+    if (data.affiliateEnabled && !["APPROVED", "ACTIVE"].includes(data.affiliateStatus)) {
+      return { success: false, message: "Affiliate mapping must be approved or active before it can be enabled." };
+    }
+    if (data.affiliateEnabled && (!provider || !provider.active)) {
+      return { success: false, message: "Affiliate mapping requires an active offer provider." };
+    }
+
+    const scopeKey = buildPreferredBrandScopeKey({
+      makeSlug: make.slug,
+      brandSlug: brand.slug,
+      categorySlug: category?.slug,
+      componentSlug: component?.slug,
+    });
+    await prisma.preferredPartBrand.upsert({
+      where: { scopeKey },
+      update: data,
+      create: { ...data, scopeKey },
+    });
+    revalidateParts();
+    return { success: true, message: "Preferred-brand mapping saved." };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : "Failed to save preferred-brand mapping." };
+  }
+}
+
 export async function addPerformancePartAction(input: AddPerformancePartInput) {
   try {
     await assertAdmin();
+    const parsed = addPerformancePartInputSchema.safeParse(input);
+    if (!parsed.success) return { success: false, message: validationMessage(parsed.error) };
+    input = parsed.data;
+    const name = input.name;
 
-    const name = input.name.trim();
-    if (!name) {
-      return { success: false, message: "Part name is required." };
-    }
-
-    const [category, brand] = await Promise.all([
+    const [category, brand, make, model] = await Promise.all([
       prisma.partCategory.findUnique({ where: { id: input.categoryId } }),
       prisma.partBrand.findUnique({ where: { id: input.brandId } }),
+      input.makeId ? prisma.make.findUnique({ where: { id: input.makeId }, select: { id: true } }) : null,
+      input.modelId ? prisma.model.findUnique({ where: { id: input.modelId }, select: { id: true, makeId: true } }) : null,
     ]);
 
     if (!category) {
@@ -154,6 +218,18 @@ export async function addPerformancePartAction(input: AddPerformancePartInput) {
 
     if (!brand) {
       return { success: false, message: "Choose a valid part brand." };
+    }
+
+    if (input.makeId && !make) {
+      return { success: false, message: "Choose a valid compatible make." };
+    }
+
+    if (input.modelId && !model) {
+      return { success: false, message: "Choose a valid compatible model." };
+    }
+
+    if (model && input.makeId && model.makeId !== input.makeId) {
+      return { success: false, message: "Compatible model does not belong to the selected make." };
     }
 
     const status = normalizeEnum(input.status, partStatuses, "MANUAL_REVIEW");
@@ -220,16 +296,6 @@ export async function addPerformancePartAction(input: AddPerformancePartInput) {
       Boolean(input.engine);
 
     if (hasCompatibility) {
-      if (input.modelId) {
-        const model = await prisma.model.findUnique({ where: { id: input.modelId }, select: { makeId: true } });
-        if (!model) {
-          return { success: false, message: "Choose a valid compatible model." };
-        }
-        if (input.makeId && model.makeId !== input.makeId) {
-          return { success: false, message: "Compatible model does not belong to the selected make." };
-        }
-      }
-
       const compatibilityScope = {
         partId: part.id,
         makeId: input.makeId || null,
@@ -269,6 +335,9 @@ export async function addPerformancePartAction(input: AddPerformancePartInput) {
 export async function updatePerformancePartAffiliateAction(input: UpdatePerformancePartAffiliateInput) {
   try {
     await assertAdmin();
+    const parsed = updatePerformancePartAffiliateInputSchema.safeParse(input);
+    if (!parsed.success) return { success: false, message: validationMessage(parsed.error) };
+    input = parsed.data;
 
     const part = await prisma.performancePart.findUnique({
       where: { id: input.partId },
@@ -324,6 +393,9 @@ export async function updatePerformancePartAffiliateAction(input: UpdatePerforma
 export async function updateAffiliatePartnerAction(input: UpdateAffiliatePartnerInput) {
   try {
     await assertAdmin();
+    const parsed = updateAffiliatePartnerInputSchema.safeParse(input);
+    if (!parsed.success) return { success: false, message: validationMessage(parsed.error) };
+    input = parsed.data;
 
     const partner = await prisma.affiliatePartner.findUnique({
       where: { id: input.partnerId },

@@ -5,6 +5,7 @@ import { createMeetAction } from "@/app/actions/meets";
 import { getCatalogMakeOptions } from "@/lib/makes/catalog";
 import { MEET_TYPE_OPTIONS } from "@/lib/meets/meet-types";
 import { prisma } from "@/lib/prisma";
+import { AllowedMakesDropdown } from "../AllowedMakesDropdown";
 
 export const dynamic = "force-dynamic";
 
@@ -126,15 +127,7 @@ export default async function HostMeetPage({ searchParams }: { searchParams?: Pr
           <textarea name="description" rows={4} placeholder="Describe the drive, staging rules, and owner expectations." />
         </label>
 
-        <fieldset className="meet-make-fieldset">
-          <legend>Allowed Makes</legend>
-          {makes.map((make) => (
-            <label key={make.id}>
-              <input name="allowedMakes" type="checkbox" value={make.name} defaultChecked />
-              <span>{make.name}</span>
-            </label>
-          ))}
-        </fieldset>
+        <AllowedMakesDropdown makes={makes} />
 
         <div className="meet-host-actions">
           <Link href="/meets">Cancel</Link>

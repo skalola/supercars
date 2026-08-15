@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import type { GarageClubSummaryItem } from "./garage-clubs";
 
 export type GarageServiceWatchItem = {
   id: string;
@@ -24,14 +23,12 @@ export type GarageRecentActivityItem = {
 };
 
 export default function GarageSupportRail({
-  clubs,
   serviceWatch,
   recentActivity,
   isOwner,
   garageHref,
   trackerHref,
 }: {
-  clubs: GarageClubSummaryItem[];
   serviceWatch: GarageServiceWatchItem[];
   recentActivity: GarageRecentActivityItem[];
   isOwner: boolean;
@@ -40,30 +37,6 @@ export default function GarageSupportRail({
 }) {
   return (
     <div className="garage-support-rail">
-      <section className="garage-rail-card garage-club-badges-card" aria-label="Club badges">
-        <div className="garage-rail-heading">
-          <h2>Club Badges</h2>
-          <Link href="/clubs">View all</Link>
-        </div>
-        {clubs.length > 0 ? (
-          <div className="garage-rail-badge-list">
-            {clubs.slice(0, 5).map((club) => (
-              <Link key={club.id} href={club.href} title={club.name}>
-                <span className="garage-rail-badge-mark">
-                  {club.logoUrl ? <Image src={club.logoUrl} alt="" width={44} height={44} unoptimized /> : club.name.slice(0, 2).toUpperCase()}
-                </span>
-                <strong>{club.status === "PENDING" ? "Pending" : club.role === "OWNER" ? "Owner" : "Member"}</strong>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <div className="garage-rail-empty">
-            <p>{isOwner ? "Join or start a club to showcase badges here." : "No public club badges yet."}</p>
-            <Link href={isOwner ? "/clubs#create-club" : "/clubs"}>{isOwner ? "Start a Club" : "Browse Clubs"}</Link>
-          </div>
-        )}
-      </section>
-
       <section className="garage-rail-card" aria-label="Service watch">
         <div className="garage-rail-heading">
           <h2>Service Watch</h2>

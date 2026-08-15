@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import Image from "next/image";
-import type { Session } from "next-auth";
+import type { Metadata } from "next";
 import type { Prisma } from "@prisma/client";
 import { auth, signIn } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -12,6 +12,8 @@ import MarketPriceHistory from "@/components/market/MarketPriceHistory";
 import { isListingMatchForModel } from "@/lib/inventory/validate-listing-identity";
 import { getPartDetailPath } from "@/lib/parts/routes";
 import { getModelPageCatalogData } from "@/lib/model-catalog/model-page-data";
+import { isDisplayableModelImage, selectModelHeroImage } from "@/lib/model-catalog/model-display";
+import { absoluteUrl, buildPublicMetadata, humanizeSlug, safeJsonLd } from "@/lib/seo";
 
 
 
@@ -28,16 +30,11 @@ type ModelImageRecord = {
 };
 
 function getHeroImage(images: ModelImageRecord[]) {
-  const displayableImages = images.filter(
-    (image) => image.reviewStatus !== "NEEDS_REVIEW" && image.type?.toLowerCase() !== "candidate",
-  );
-  return displayableImages.find((image) => image.type?.toLowerCase() === "hero") ?? displayableImages[0] ?? null;
+  return selectModelHeroImage(images);
 }
 
 function getDisplayableModelImages(images: ModelImageRecord[]) {
-  return images.filter(
-    (image) => image.reviewStatus !== "NEEDS_REVIEW" && image.type?.toLowerCase() !== "candidate",
-  );
+  return images.filter(isDisplayableModelImage);
 }
 
 function getListingImage(listing: ModelListingPreview) {
@@ -52,11 +49,35 @@ type ModelPageProps = {
   }>;
 };
 
+export async function generateMetadata({ params }: ModelPageProps): Promise<Metadata> {
+  const { slug, modelSlug } = await params;
+  const catalogData = await getModelPageCatalogData(slug, modelSlug);
+  const makeName = catalogData?.model.make.name || humanizeSlug(slug);
+  const modelName = catalogData?.model.name || humanizeSlug(modelSlug);
+  const heroImage = catalogData ? getHeroImage(catalogData.model.images)?.url : null;
+  const years = catalogData
+    ? formatYears(catalogData.model.productionStartYear, catalogData.model.productionEndYear)
+    : null;
+
+  return buildPublicMetadata({
+    title: `${makeName} ${modelName} Specs, Value and Listings`,
+    description: [
+      `Explore the ${makeName} ${modelName}`,
+      years ? `(${years})` : null,
+      "with specifications, price history, live inventory, maintenance intelligence, and compatible parts.",
+    ].filter(Boolean).join(" "),
+    path: `/make/${slug}/${modelSlug}`,
+    image: heroImage,
+    keywords: [`${makeName} ${modelName}`, `${modelName} price`, `${modelName} specs`, `${modelName} for sale`],
+  });
+}
+
 function formatYears(startYear: number | null, endYear: number | null) {
   if (!startYear) {
     return null;
   }
 
+  if (endYear === startYear) return String(startYear);
   return endYear ? `${startYear} - ${endYear}` : `${startYear} - present`;
 }
 
@@ -144,13 +165,10 @@ const modelListingPreviewSelect = {
   },
 } satisfies Prisma.ListingSelect;
 
-type ModelPageSession = Session | null;
-
 export default async function ModelPage({ params }: ModelPageProps) {
   const { slug, modelSlug } = await params;
-  const mockSession = (globalThis as typeof globalThis & { mockSession?: ModelPageSession }).mockSession;
   const [session, catalogData] = await Promise.all([
-    mockSession !== undefined ? Promise.resolve(mockSession) : auth(),
+    auth(),
     getModelPageCatalogData(slug, modelSlug),
   ]);
 
@@ -356,6 +374,14 @@ export default async function ModelPage({ params }: ModelPageProps) {
     ["Weight", model.spec?.weight],
   ].filter((entry): entry is [string, string] => Boolean(entry[1]));
   const modelTitle = `${model.make.name} ${model.name}`;
+  const modelTitleDensity =
+    model.name.length > 44
+      ? "is-compact"
+      : model.name.length > 32
+        ? "is-long"
+        : model.name.length > 20
+          ? "is-medium"
+          : "";
   const inventoryHref = `/inventory?make=${encodeURIComponent(model.make.slug)}&model=${encodeURIComponent(model.slug)}`;
   const partsHref = `/parts?make=${encodeURIComponent(model.make.slug)}&model=${encodeURIComponent(model.slug)}`;
   const productionYears = formatYears(model.productionStartYear, model.productionEndYear);
@@ -413,9 +439,23 @@ export default async function ModelPage({ params }: ModelPageProps) {
     if (priorityDelta !== 0) return priorityDelta;
     return (a.intervalMiles || 0) - (b.intervalMiles || 0);
   });
+  const modelJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ProductModel",
+    name: modelTitle,
+    description: model.description && !/catalog seed|future inventory|internal/i.test(model.description)
+      ? model.description
+      : `Explore ${modelTitle} specifications, market intelligence, maintenance guidance, listings, and compatible parts.`,
+    url: absoluteUrl(`/make/${model.make.slug}/${model.slug}`),
+    image: heroImage?.url ? [absoluteUrl(heroImage.url)] : undefined,
+    brand: { "@type": "Brand", name: model.make.name },
+    model: model.name,
+    releaseDate: model.productionStartYear ? String(model.productionStartYear) : undefined,
+  };
 
   return (
     <main className="model-intelligence-shell">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(modelJsonLd) }} />
       <section className="model-intelligence-hero">
         <div className="vehicle-intelligence-hero-shade" aria-hidden="true" />
         <div className="vehicle-intelligence-hero-copy model-intelligence-hero-copy">
@@ -426,7 +466,10 @@ export default async function ModelPage({ params }: ModelPageProps) {
             {model.make.logoUrl ? <img src={model.make.logoUrl} alt="" loading="lazy" /> : null}
             <span>{model.make.name}</span>
           </div>
-          <h1>{modelTitle}</h1>
+          <h1 className={modelTitleDensity} aria-label={modelTitle}>
+            <span className="model-intelligence-title-make">{model.make.name}</span>
+            <span className="model-intelligence-title-model">{model.name}</span>
+          </h1>
           <div className="vehicle-intelligence-meta">
             {heroMeta.map((value) => (
               <span key={value}>{value}</span>

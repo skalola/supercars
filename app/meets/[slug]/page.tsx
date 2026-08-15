@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { addMeetPhotoAction, manageMeetRsvpAction, updateHostedMeetAction } from "@/app/actions/meets";
@@ -7,10 +8,27 @@ import { getCatalogMakeOptions } from "@/lib/makes/catalog";
 import { projectContiguousUsToPercent } from "@/lib/maps/us-projection";
 import { getMeetTypeBadgeClass, MEET_TYPE_OPTIONS, normalizeMeetType } from "@/lib/meets/meet-types";
 import { prisma } from "@/lib/prisma";
+import { absoluteUrl, buildPublicMetadata, privateMetadata, safeJsonLd, SITE_NAME } from "@/lib/seo";
 import { CountryMapGraphic } from "../CountryMapGraphic";
 import { getMeetBySlug } from "../meet-data";
+import { AllowedMakesDropdown } from "../AllowedMakesDropdown";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const meet = await getMeetBySlug(slug);
+  if (!meet || meet.status === "Invite Only" || meet.status === "Cancelled") return privateMetadata;
+
+  return buildPublicMetadata({
+    title: `${meet.title} | ${meet.city}, ${meet.state}`,
+    description: `${meet.type} in ${meet.city}, ${meet.state} on ${meet.dateLabel}. ${meet.description}`.slice(0, 160),
+    path: `/meets/${slug}`,
+    image: meet.heroImage,
+    type: "article",
+    keywords: [meet.title, `${meet.city} car meet`, meet.type, ...meet.allowedMakes.slice(0, 5)],
+  });
+}
 
 export default async function MeetDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -125,9 +143,37 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
     : [];
   const attendeeRows = isHost ? privateMeetContext?.rsvps || [] : [];
   const attendeeCsv = buildRosterCsv(attendeeRows);
+  const eventJsonLd = meet.status === "Invite Only" ? null : {
+    "@context": "https://schema.org",
+    "@type": "Event",
+    name: meet.title,
+    description: meet.description,
+    startDate: meet.startsAt,
+    eventStatus: meet.status === "Cancelled"
+      ? "https://schema.org/EventCancelled"
+      : "https://schema.org/EventScheduled",
+    eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+    image: [absoluteUrl(meet.heroImage)],
+    location: {
+      "@type": "Place",
+      name: meet.locationName,
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: meet.city,
+        addressRegion: meet.state,
+        addressCountry: "US",
+      },
+    },
+    organizer: {
+      "@type": "Organization",
+      name: meet.club?.name || SITE_NAME,
+      url: meet.club ? absoluteUrl(`/clubs/${meet.club.slug}`) : absoluteUrl("/meets"),
+    },
+  };
 
   return (
     <main className="meet-detail-shell">
+      {eventJsonLd ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(eventJsonLd) }} /> : null}
       <section className="meet-detail-hero">
         <div className="meet-detail-hero-copy">
           <Link href="/meets" className="meet-back-link">
@@ -298,15 +344,10 @@ export default async function MeetDetailPage({ params }: { params: Promise<{ slu
                 <span>Description</span>
                 <textarea name="description" rows={4} defaultValue={privateMeetContext.description || ""} />
               </label>
-              <fieldset className="meet-make-fieldset">
-                <legend>Allowed Makes</legend>
-                {makeOptions.map((make) => (
-                  <label key={make.id}>
-                    <input name="allowedMakes" type="checkbox" value={make.name} defaultChecked={parseAllowedMakes(privateMeetContext.allowedMakes).includes(make.name)} />
-                    <span>{make.name}</span>
-                  </label>
-                ))}
-              </fieldset>
+              <AllowedMakesDropdown
+                makes={makeOptions}
+                defaultSelectedNames={parseAllowedMakes(privateMeetContext.allowedMakes)}
+              />
               <div className="meet-host-actions">
                 <button type="submit">Save Changes</button>
               </div>

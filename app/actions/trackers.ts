@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { trackerPreferenceInputSchema } from "@/lib/validation/community-inputs";
 
 export type TrackerType = "listing" | "price" | "maintenance" | "events";
 
@@ -18,6 +19,10 @@ export async function toggleTrackerPreference(type: TrackerType, enabled: boolea
   if (!session?.user?.id) {
     return { ok: false, reason: "unauthenticated" };
   }
+  const parsed = trackerPreferenceInputSchema.safeParse({ type, enabled });
+  if (!parsed.success) return { ok: false, reason: "invalid_tracker" };
+  type = parsed.data.type;
+  enabled = parsed.data.enabled;
 
   const field = preferenceFieldByType[type];
   if (!field) {

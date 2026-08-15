@@ -1,3 +1,12 @@
+import type { Metadata } from "next";
+import { buildPublicMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = buildPublicMetadata({
+  title: "Financial Privacy Notice",
+  description: "Review the SUPERCAR DASH financial privacy notice and how personal financial information is handled in transaction and referral workflows.",
+  path: "/legal/financial-privacy",
+});
+
 export default function FinancialPrivacyPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-12">

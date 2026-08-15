@@ -1,20 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { canReuseCheckoutSession } from "@/lib/payments/payment-policy";
+import { enforceActionRateLimit, isActionRateLimitError } from "@/lib/security/action-rate-limit";
+import { checkoutRequestSchema } from "@/lib/validation/transaction-inputs";
 import {
   createDealerPurchaseCheckoutSession,
+  getDealerPurchaseCheckoutKey,
   getDealerPurchaseDepositCents,
 } from "@/lib/payments/payment-service";
 
 export async function POST(request: NextRequest) {
   const contentType = request.headers.get("content-type") || "";
-  const payload = contentType.includes("application/json")
-    ? await request.json()
-    : Object.fromEntries((await request.formData()).entries());
-  const returnTo = String(payload.returnTo || "/login");
+  let rawPayload: unknown;
+  try {
+    rawPayload = contentType.includes("application/json")
+      ? await request.json()
+      : Object.fromEntries((await request.formData()).entries());
+  } catch {
+    return NextResponse.json({ error: "Invalid checkout request body." }, { status: 400 });
+  }
+  const parsedInput = checkoutRequestSchema.safeParse(rawPayload);
+  if (!parsedInput.success) {
+    return NextResponse.json({ error: "Invalid dealer-purchase checkout request." }, { status: 400 });
+  }
+  const returnTo = parsedInput.data.returnTo || "/transactions";
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const session = (globalThis as any).mockSession !== undefined ? (globalThis as any).mockSession : await auth();
+  const session = await auth();
   const userId = session?.user?.id;
   if (!userId) {
     return NextResponse.json(
@@ -23,9 +35,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const fulfillmentRequestId = String(payload.fulfillmentRequestId || "");
-  if (!fulfillmentRequestId) {
-    return NextResponse.json({ error: "Missing dealer purchase request id." }, { status: 400 });
+  const fulfillmentRequestId = parsedInput.data.fulfillmentRequestId;
+  try {
+    await enforceActionRateLimit({
+      actorId: userId,
+      action: "checkout_create",
+      bucketKey: fulfillmentRequestId,
+      limit: 5,
+      windowMs: 15 * 60 * 1000,
+    });
+  } catch (error) {
+    if (isActionRateLimitError(error)) {
+      return NextResponse.json({ error: error.message }, { status: 429 });
+    }
+    throw error;
   }
 
   const requestRecord = await prisma.fulfillmentRequest.findUnique({
@@ -55,6 +78,14 @@ export async function POST(request: NextRequest) {
           feeType: true,
         },
       },
+      depositIntents: {
+        select: {
+          checkoutKey: true,
+          checkoutUrl: true,
+          checkoutExpiresAt: true,
+          status: true,
+        },
+      },
     },
   });
 
@@ -80,6 +111,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Purchase request is missing a valid listing price." }, { status: 400 });
   }
   const depositDollars = depositCents / 100;
+  const checkoutKey = getDealerPurchaseCheckoutKey(requestRecord.id, depositCents);
+  const reusableCheckout = requestRecord.depositIntents.find(
+    (intent) =>
+      intent.checkoutKey === checkoutKey &&
+      canReuseCheckoutSession(intent)
+  );
+  if (reusableCheckout?.checkoutUrl) {
+    return NextResponse.json({ url: reusableCheckout.checkoutUrl });
+  }
+
   const sessionResult = await createDealerPurchaseCheckoutSession({
     fulfillmentRequestId: requestRecord.id,
     listingId: requestRecord.listingId,
@@ -115,14 +156,29 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    await tx.depositIntent.create({
-      data: {
+    await tx.depositIntent.upsert({
+      where: { checkoutKey: sessionResult.idempotencyKey },
+      create: {
         fulfillmentRequestId: requestRecord.id,
         amount: depositDollars,
         currency: "USD",
         status: "HELD",
         paymentMethod: "STRIPE_CHECKOUT",
         transactionRef: `stripe_checkout:${sessionResult.id}`,
+        checkoutKey: sessionResult.idempotencyKey,
+        checkoutSessionId: sessionResult.id,
+        checkoutUrl: sessionResult.url,
+        checkoutExpiresAt: sessionResult.expiresAt,
+      },
+      update: {
+        amount: depositDollars,
+        currency: "USD",
+        status: "HELD",
+        paymentMethod: "STRIPE_CHECKOUT",
+        transactionRef: `stripe_checkout:${sessionResult.id}`,
+        checkoutSessionId: sessionResult.id,
+        checkoutUrl: sessionResult.url,
+        checkoutExpiresAt: sessionResult.expiresAt,
       },
     });
 

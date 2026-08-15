@@ -1,11 +1,12 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { CSSProperties } from "react";
-import { auth, signIn } from "@/auth";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import GarageTabs from "./GarageTabs";
 import GarageSupportRail from "./GarageSupportRail";
+import GarageClubBadges from "./GarageClubBadges";
 import { getGarageDashboardData } from "./garage-data";
 
 export default async function GaragePage() {
@@ -19,12 +20,7 @@ export default async function GaragePage() {
           <h1>Build Your Digital Garage</h1>
           <p>Sign in to claim VIN-backed vehicles, save dream models, and track ownership from one collection view.</p>
           <div className="garage-empty-actions">
-            <form action={async () => {
-              "use server";
-              await signIn("google", { redirectTo: "/garage" });
-            }}>
-              <button type="submit" className="garage-primary-button">Login with Google</button>
-            </form>
+            <Link href="/login?returnTo=/garage" className="garage-primary-button">Sign up / Login</Link>
           </div>
         </section>
       </main>
@@ -92,17 +88,7 @@ export default async function GaragePage() {
               <span>{heroVehicleLabel}</span>
             </div>
           </div>
-          <div className="garage-profile-clubs" aria-label="Car club badges">
-            <span>Car Clubs</span>
-            <div>
-              {clubSummary.slice(0, 5).map((club) => (
-                <Link key={club.id} href={club.href} title={club.name} aria-label={club.name}>
-                  {club.logoUrl ? <Image src={club.logoUrl} alt="" width={40} height={40} unoptimized /> : <span>{club.name.slice(0, 2).toUpperCase()}</span>}
-                </Link>
-              ))}
-              {clubSummary.length === 0 ? <small>No club badges yet</small> : null}
-            </div>
-          </div>
+          <GarageClubBadges clubs={clubSummary} />
         </div>
 
         <div className="garage-page-stats garage-profile-stats" aria-label="Garage summary">
@@ -124,7 +110,6 @@ export default async function GaragePage() {
         <GarageTabs claimedVehicles={claimedVehicles} savedVehicles={savedVehicles} previousVehicles={previousVehicles} isOwner />
         <aside className="garage-support-grid" aria-label="Garage social summary">
           <GarageSupportRail
-            clubs={clubSummary}
             serviceWatch={serviceWatch}
             recentActivity={recentActivity}
             isOwner

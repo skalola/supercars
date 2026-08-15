@@ -25,8 +25,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     return NextResponse.redirect(new URL("/parts?outbound=part-unavailable", request.url), { status: 303 });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const session = (globalThis as any).mockSession !== undefined ? (globalThis as any).mockSession : await auth();
+  const session = await auth();
   const userId = session?.user?.id || undefined;
   const affiliateReady = isAffiliateTrackingReady(part) && isSafeOutboundUrl(part.affiliateUrl);
   const sourceReady = isSafeOutboundUrl(part.sourceUrl);
@@ -93,13 +92,16 @@ function getClientIp(request: NextRequest) {
 
 function hashHeaderValue(value: string | null | undefined) {
   if (!value) return undefined;
-  const salt =
-    process.env.AFFILIATE_CLICK_SALT ||
-    process.env.AUTH_SECRET ||
-    process.env.NEXTAUTH_SECRET ||
-    "supercar-dash-affiliate-clicks";
+  const salt = getClickHashSalt();
+  if (!salt) return undefined;
 
   return createHash("sha256").update(`${salt}:${value}`).digest("hex");
+}
+
+function getClickHashSalt() {
+  const configured = process.env.AFFILIATE_CLICK_SALT || process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+  if (configured) return configured;
+  return process.env.NODE_ENV === "production" ? null : "supercar-dash-affiliate-clicks";
 }
 
 function createDedupeClickRef({

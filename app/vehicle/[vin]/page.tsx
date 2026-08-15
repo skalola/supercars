@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import Link from "next/link";
-import type { Session } from "next-auth";
+import type { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
@@ -13,6 +13,7 @@ import type { VehicleGalleryImage } from "@/components/market/VehiclePhotoGaller
 import { AddToFavoritesButton } from "@/components/garage/AddToFavoritesButton";
 import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
 import { calculateModifiedPerformance } from "@/lib/parts/performance";
+import { rankBuildAwarePartRecommendations } from "@/lib/parts/recommendations";
 import { getPartDetailPath } from "@/lib/parts/routes";
 import {
   getExplicitCompatibilityScopeForVehicle,
@@ -22,11 +23,51 @@ import ServiceBookingActionButton from "./ServiceBookingActionButton";
 import ServiceBookingModule from "./ServiceBookingModule";
 import AddServiceRecordButton from "./AddServiceRecordButton";
 import type { CSSProperties } from "react";
+import { absoluteUrl, buildPublicMetadata, privateMetadata, safeJsonLd } from "@/lib/seo";
 
 type VehiclePageProps = {
   params: Promise<{ vin: string }>;
   searchParams?: Promise<{ success?: string }>;
 };
+
+export async function generateMetadata({ params }: VehiclePageProps): Promise<Metadata> {
+  const { vin } = await params;
+  const vehicle = await prisma.vehicle.findUnique({
+    where: { vin },
+    select: {
+      year: true,
+      trim: true,
+      mileage: true,
+      inventoryStatus: true,
+      model: {
+        select: {
+          name: true,
+          make: { select: { name: true } },
+          images: { where: { reviewStatus: { notIn: ["NEEDS_REVIEW", "REJECTED"] } }, select: { url: true }, orderBy: [{ type: "asc" }, { createdAt: "asc" }], take: 1 },
+        },
+      },
+      images: { where: { validationStatus: "VALID" }, select: { url: true }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }], take: 1 },
+      photos: { select: { filePath: true }, orderBy: [{ isHero: "desc" }, { displayOrder: "asc" }, { createdAt: "asc" }], take: 1 },
+      listings: { where: { status: "ACTIVE", validationStatus: "VALID" }, select: { imageUrl: true, askingPrice: true, price: true }, take: 1 },
+    },
+  });
+  if (!vehicle || ["REMOVED", "NEEDS_REVIEW", "ADMIN_TEST"].includes(vehicle.inventoryStatus || "")) return privateMetadata;
+  const name = [vehicle.year, vehicle.model.make.name, vehicle.model.name, vehicle.trim].filter(Boolean).join(" ");
+  const listing = vehicle.listings[0];
+  const price = listing?.askingPrice || listing?.price;
+  const details = [
+    vehicle.mileage != null ? `${vehicle.mileage.toLocaleString()} miles` : null,
+    price != null ? `${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(price)}` : null,
+  ].filter(Boolean).join(" and ");
+
+  return buildPublicMetadata({
+    title: `${name} Vehicle Passport`,
+    description: `View the VIN-backed ${name} vehicle passport${details ? ` with ${details}` : ""}, market intelligence, maintenance guidance, and ownership details.`,
+    path: `/vehicle/${vin}`,
+    image: vehicle.photos[0]?.filePath || vehicle.images[0]?.url || listing?.imageUrl || vehicle.model.images[0]?.url,
+    keywords: [name, `${vehicle.model.name} value`, `${vehicle.model.name} maintenance`, "vehicle passport"],
+  });
+}
 
 const vehiclePageSelect = {
   id: true,
@@ -37,6 +78,7 @@ const vehiclePageSelect = {
   color: true,
   mileage: true,
   engine: true,
+  turbo: true,
   transmission: true,
   drivetrain: true,
   engineHP: true,
@@ -56,6 +98,7 @@ const vehiclePageSelect = {
         },
       },
       images: {
+        where: { reviewStatus: { notIn: ["NEEDS_REVIEW", "REJECTED"] } },
         select: {
           url: true,
           type: true,
@@ -70,6 +113,8 @@ const vehiclePageSelect = {
           engine: true,
           horsepower: true,
           torque: true,
+          transmission: true,
+          drivetrain: true,
         },
       },
     },
@@ -120,7 +165,7 @@ const vehiclePageSelect = {
           estimatedHpGain: true,
           estimatedTorqueGain: true,
           category: {
-            select: { name: true },
+            select: { name: true, slug: true },
           },
           brand: {
             select: { name: true },
@@ -128,7 +173,7 @@ const vehiclePageSelect = {
         },
       },
       category: {
-        select: { name: true },
+        select: { name: true, slug: true },
       },
     },
     orderBy: { createdAt: "desc" },
@@ -189,13 +234,10 @@ type VehiclePageVehicle = Prisma.VehicleGetPayload<{ select: typeof vehiclePageS
 type VehiclePageModelImage = VehiclePageVehicle["model"]["images"][number];
 type VehiclePageServiceRecord = VehiclePageVehicle["serviceRecords"][number];
 type VehiclePageMaintenanceRule = Prisma.MaintenanceRuleGetPayload<{ select: typeof vehiclePageMaintenanceRuleSelect }>;
-type VehiclePageSession = Session | null;
-
 export default async function VehiclePage({ params, searchParams }: VehiclePageProps) {
   const { vin } = await params;
-  const mockSession = (globalThis as typeof globalThis & { mockSession?: VehiclePageSession }).mockSession;
   const [session, vehicle] = await Promise.all([
-    mockSession !== undefined ? Promise.resolve(mockSession) : auth(),
+    auth(),
     prisma.vehicle.findUnique({
       where: { vin },
       select: vehiclePageSelect,
@@ -268,10 +310,15 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
         slug: true,
         imageUrl: true,
         retailPriceCents: true,
+        description: true,
         estimatedHpGain: true,
+        estimatedTorqueGain: true,
+        gainBasis: true,
+        installComplexity: true,
         category: {
           select: {
             name: true,
+            slug: true,
           },
         },
         brand: {
@@ -280,11 +327,22 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
             slug: true,
           },
         },
+        catalogNode: {
+          select: {
+            name: true,
+            slug: true,
+          },
+        },
         compatibility: {
           where: getExplicitCompatibilityScopeForVehicle(vehicle),
           select: {
+            makeId: true,
+            modelId: true,
             yearStart: true,
             yearEnd: true,
+            trim: true,
+            engine: true,
+            notes: true,
             make: {
               select: { name: true },
             },
@@ -301,7 +359,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
         { brand: { name: "asc" } },
         { name: "asc" },
       ],
-      take: 3,
+      take: 24,
     }),
     prisma.listing.findMany({
       where: {
@@ -329,7 +387,20 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
     stockTorque: vehicle.model.spec?.torque,
     installedParts: vehicle.installedParts || [],
   });
-  const recommendedParts = rawRecommendedParts;
+  const recommendedParts = rankBuildAwarePartRecommendations({
+    candidates: rawRecommendedParts,
+    installedParts: vehicle.installedParts || [],
+    vehicle: {
+      engine: vehicle.engine || vehicle.model.spec?.engine,
+      transmission: vehicle.transmission || vehicle.model.spec?.transmission,
+      trim: vehicle.trim,
+      drivetrain: vehicle.drivetrain || vehicle.model.spec?.drivetrain,
+      forcedInduction: vehicle.turbo,
+      stockHorsepower: vehicle.engineHP || vehicle.model.spec?.horsepower,
+      stockTorque: vehicle.model.spec?.torque,
+    },
+    limit: 3,
+  });
   const unlinkedModifications = (vehicle.modifications || []).filter((mod) => !mod.catalogInstall);
 
   const priorityOrder: Record<string, number> = {
@@ -418,9 +489,37 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
   const galleryPreviewImages = galleryImages.length >= 3 ? galleryImages.slice(0, 5) : [];
   const visibleServiceRecords = vehicle.serviceRecords.slice(0, 4);
   const hiddenServiceRecords = vehicle.serviceRecords.slice(4);
+  const vehicleJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Vehicle",
+    name: vehicleTitle,
+    url: absoluteUrl(`/vehicle/${vehicle.vin}`),
+    vehicleIdentificationNumber: vehicle.vin,
+    vehicleModelDate: String(vehicle.year),
+    model: vehicle.model.name,
+    manufacturer: {
+      "@type": "Organization",
+      name: vehicle.model.make.name,
+    },
+    color: vehicle.profile?.exteriorColor || vehicle.color || undefined,
+    image: resolvedHeroImage ? [absoluteUrl(resolvedHeroImage)] : undefined,
+    mileageFromOdometer: currentMileage != null ? {
+      "@type": "QuantitativeValue",
+      value: currentMileage,
+      unitCode: "SMI",
+    } : undefined,
+    offers: isForSale && askingPrice ? {
+      "@type": "Offer",
+      price: askingPrice,
+      priceCurrency: "USD",
+      availability: "https://schema.org/InStock",
+      url: absoluteUrl(`/vehicle/${vehicle.vin}`),
+    } : undefined,
+  };
 
   return (
       <main className="vehicle-intelligence-shell">
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(vehicleJsonLd) }} />
         {isOwner ? (
           <ServiceBookingModule
             vin={vehicle.vin}
@@ -730,7 +829,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
 
             <section className="vehicle-intelligence-card">
               <div className="vehicle-intelligence-card-heading">
-                <span>Recommended Parts</span>
+                <span>Next Recommended Parts</span>
                 <Link href="/parts">View Parts Store</Link>
               </div>
               {recommendedParts.length === 0 ? (
@@ -751,6 +850,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
                             <Link href={partDetailHref}>{part.name}</Link>
                           </strong>
                           <small>{[formatPartPrice(part.retailPriceCents), part.estimatedHpGain ? `+${part.estimatedHpGain.toLocaleString()} hp` : null, fitment[0]].filter(Boolean).join(" · ")}</small>
+                          <p className="vehicle-parts-recommendation-reason">{part.recommendationReason}</p>
                           <Link href={partDetailHref}>View Part</Link>
                         </div>
                       </article>

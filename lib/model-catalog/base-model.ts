@@ -54,6 +54,18 @@ export function scoreBaseModelFallback(targetBase: string, sourceBase: string) {
   return sharedTokens.length >= 2 && sharedRatio >= 0.5 ? Math.round(80 + sharedRatio * 10) : 0;
 }
 
+export function isBaseModelFallbackCompatible(
+  targetModelName: string,
+  sourceModelName: string,
+  makeName: string,
+) {
+  const targetBase = canonicalBaseModelName(targetModelName, makeName);
+  const sourceBase = canonicalBaseModelName(sourceModelName, makeName);
+  if (!targetBase || !sourceBase) return false;
+  if (targetBase === sourceBase) return true;
+  return scoreBaseModelFallback(targetBase, sourceBase) >= 90;
+}
+
 export function isGenericModelToken(token: string) {
   return [
     "srt",

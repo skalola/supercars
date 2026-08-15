@@ -1,11 +1,18 @@
 "use server";
 
 import { auth } from "@/auth";
-import { isUploadableImageFile, uploadPublicFile, uploadPublicImage } from "@/lib/media/upload-storage";
+import { deleteStoredFile, isUploadableImageFile, uploadPrivateFile, uploadPublicImage } from "@/lib/media/upload-storage";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import fs from "fs";
-import path from "path";
+import { enforceActionRateLimit } from "@/lib/security/action-rate-limit";
+import { vinClaimSchema } from "@/lib/validation/transaction-inputs";
+import {
+  mediaRecordIdSchema,
+  uploadedVehiclePhotoSchema,
+  vehicleDocumentMetadataSchema,
+  vehiclePhotoMetadataSchema,
+  vehiclePhotoOrderSchema,
+} from "@/lib/validation/media-inputs";
 
 function safeRevalidatePath(vin: string) {
   try {
@@ -18,15 +25,15 @@ function safeRevalidatePath(vin: string) {
 }
 
 async function verifyOwnership(vin: string) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const session = (globalThis as any).mockSession !== undefined ? (globalThis as any).mockSession : await auth();
+  const session = await auth();
   const userId = session?.user?.id;
   if (!userId) {
     throw new Error("Unauthorized: Please sign in.");
   }
 
+  const validatedVin = vinClaimSchema.parse(vin);
   const vehicle = await prisma.vehicle.findUnique({
-    where: { vin },
+    where: { vin: validatedVin },
     select: {
       id: true,
       ownerId: true,
@@ -50,10 +57,17 @@ async function verifyOwnership(vin: string) {
 // ----------------------------------------------------
 
 export async function uploadVehiclePhoto(vin: string, formData: FormData) {
-  const { vehicleId } = await verifyOwnership(vin);
+  const { userId, vehicleId } = await verifyOwnership(vin);
+  await enforceActionRateLimit({
+    actorId: userId,
+    action: "vehicle_upload",
+    bucketKey: vehicleId,
+    limit: 30,
+    windowMs: 60 * 60 * 1000,
+  });
 
   const file = formData.get("file");
-  const caption = formData.get("caption") as string | null;
+  const { caption } = vehiclePhotoMetadataSchema.parse({ caption: String(formData.get("caption") || "") });
 
   if (!isUploadableImageFile(file)) {
     throw new Error("No file provided.");
@@ -73,7 +87,7 @@ export async function uploadVehiclePhoto(vin: string, formData: FormData) {
     data: {
       vehicleId,
       filePath: upload.url,
-      caption: caption || null,
+      caption,
       isHero: existingCount === 0, // Mark as hero if it's the first photo
       displayOrder: existingCount,
     },
@@ -82,8 +96,57 @@ export async function uploadVehiclePhoto(vin: string, formData: FormData) {
   safeRevalidatePath(vin);
 }
 
+export async function registerUploadedVehiclePhoto(
+  vin: string,
+  input: { url: string; pathname: string; caption?: string },
+) {
+  const { userId, vehicleId } = await verifyOwnership(vin);
+  await enforceActionRateLimit({
+    actorId: userId,
+    action: "vehicle_upload",
+    bucketKey: vehicleId,
+    limit: 30,
+    windowMs: 60 * 60 * 1000,
+  });
+  const upload = uploadedVehiclePhotoSchema.parse(input);
+  const expectedPrefix = `vehicles/${vehicleId}/photos/`;
+  if (!upload.pathname.startsWith(expectedPrefix)) {
+    throw new Error("The uploaded photo does not belong to this vehicle.");
+  }
+
+  const uploadUrl = new URL(upload.url);
+  const decodedPathname = decodeURIComponent(uploadUrl.pathname).replace(/^\//, "");
+  if (!uploadUrl.hostname.endsWith(".blob.vercel-storage.com") || decodedPathname !== upload.pathname) {
+    throw new Error("The uploaded photo location is invalid.");
+  }
+
+  const existingCount = await prisma.vehiclePhoto.count({ where: { vehicleId } });
+  if (existingCount >= 100) {
+    await deleteStoredFile(upload.url).catch(() => undefined);
+    throw new Error("This vehicle gallery already contains the maximum of 100 photos.");
+  }
+
+  try {
+    await prisma.vehiclePhoto.create({
+      data: {
+        vehicleId,
+        filePath: upload.url,
+        caption: upload.caption,
+        isHero: existingCount === 0,
+        displayOrder: existingCount,
+      },
+    });
+  } catch (error) {
+    await deleteStoredFile(upload.url).catch(() => undefined);
+    throw error;
+  }
+
+  safeRevalidatePath(vin);
+}
+
 export async function deleteVehiclePhoto(vin: string, photoId: string) {
   const { vehicleId } = await verifyOwnership(vin);
+  photoId = mediaRecordIdSchema.parse(photoId);
 
   const photo = await prisma.vehiclePhoto.findUnique({
     where: { id: photoId },
@@ -99,7 +162,7 @@ export async function deleteVehiclePhoto(vin: string, photoId: string) {
     throw new Error("Photo not found.");
   }
 
-  await deleteLocalUploadIfPresent(photo.filePath, "photo");
+  await deleteStoredFile(photo.filePath);
 
   // Delete from DB
   await prisma.vehiclePhoto.delete({
@@ -126,6 +189,7 @@ export async function deleteVehiclePhoto(vin: string, photoId: string) {
 
 export async function setHeroPhoto(vin: string, photoId: string) {
   const { vehicleId } = await verifyOwnership(vin);
+  photoId = mediaRecordIdSchema.parse(photoId);
 
   const photos = await prisma.vehiclePhoto.findMany({
     where: { vehicleId },
@@ -146,6 +210,7 @@ export async function setHeroPhoto(vin: string, photoId: string) {
 
 export async function reorderVehiclePhotos(vin: string, photoIds: string[]) {
   const { vehicleId } = await verifyOwnership(vin);
+  photoIds = vehiclePhotoOrderSchema.parse(photoIds);
 
   const existingPhotos = await prisma.vehiclePhoto.findMany({
     where: { vehicleId },
@@ -186,23 +251,25 @@ async function persistVehiclePhotoOrder(vehicleId: string, photoIds: string[]) {
 // ----------------------------------------------------
 
 export async function uploadVehicleDocument(vin: string, formData: FormData) {
-  const { vehicleId } = await verifyOwnership(vin);
+  const { userId, vehicleId } = await verifyOwnership(vin);
+  await enforceActionRateLimit({
+    actorId: userId,
+    action: "vehicle_upload",
+    bucketKey: vehicleId,
+    limit: 30,
+    windowMs: 60 * 60 * 1000,
+  });
 
   const file = formData.get("file");
-  const title = formData.get("title") as string | null;
-  const documentType = formData.get("documentType") as string | null;
+  const metadata = vehicleDocumentMetadataSchema.parse({
+    title: String(formData.get("title") || ""),
+    documentType: String(formData.get("documentType") || ""),
+  });
 
   if (!isUploadableFile(file)) {
     throw new Error("No file provided.");
   }
-  if (!title || title.trim() === "") {
-    throw new Error("Document title is required.");
-  }
-  if (!documentType || documentType.trim() === "") {
-    throw new Error("Document type is required.");
-  }
-
-  const upload = await uploadPublicFile({
+  const upload = await uploadPrivateFile({
     file,
     folder: `vehicles/${vehicleId}/documents`,
   });
@@ -210,8 +277,8 @@ export async function uploadVehicleDocument(vin: string, formData: FormData) {
   await prisma.vehicleDocument.create({
     data: {
       vehicleId,
-      title: title.trim(),
-      documentType: documentType.trim(),
+      title: metadata.title,
+      documentType: metadata.documentType,
       filePath: upload.url,
     },
   });
@@ -221,6 +288,7 @@ export async function uploadVehicleDocument(vin: string, formData: FormData) {
 
 export async function deleteVehicleDocument(vin: string, docId: string) {
   const { vehicleId } = await verifyOwnership(vin);
+  docId = mediaRecordIdSchema.parse(docId);
 
   const doc = await prisma.vehicleDocument.findUnique({
     where: { id: docId },
@@ -235,7 +303,7 @@ export async function deleteVehicleDocument(vin: string, docId: string) {
     throw new Error("Document not found.");
   }
 
-  await deleteLocalUploadIfPresent(doc.filePath, "document");
+  await deleteStoredFile(doc.filePath);
 
   // Delete from DB
   await prisma.vehicleDocument.delete({
@@ -247,17 +315,4 @@ export async function deleteVehicleDocument(vin: string, docId: string) {
 
 function isUploadableFile(value: FormDataEntryValue | null): value is File {
   return typeof File !== "undefined" && value instanceof File && value.size > 0;
-}
-
-async function deleteLocalUploadIfPresent(filePath: string, label: string) {
-  if (!filePath.startsWith("/uploads/")) return;
-
-  const fullPath = path.join(process.cwd(), "public", filePath);
-  try {
-    if (fs.existsSync(fullPath)) {
-      await fs.promises.unlink(fullPath);
-    }
-  } catch (e) {
-    console.error(`Could not delete local ${label} file:`, e);
-  }
 }

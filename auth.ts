@@ -4,6 +4,8 @@ import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { ensureDefaultClubMembership } from "@/lib/clubs/default-club";
 import { prisma } from "@/lib/prisma";
+import { enforceActionRateLimit, hashRateLimitIdentifier } from "@/lib/security/action-rate-limit";
+import { verifyPassword } from "@/lib/auth/password";
 
 const credentialUserSelect = {
   id: true,
@@ -13,6 +15,140 @@ const credentialUserSelect = {
   role: true,
 };
 
+const accountCredentialProvider = Credentials({
+  id: "credentials",
+  name: "Username or Email",
+  credentials: {
+    identifier: { label: "Username or email", type: "text" },
+    password: { label: "Password", type: "password" },
+  },
+  async authorize(credentials) {
+    const identifier = String(credentials?.identifier || "").trim().toLowerCase();
+    const password = String(credentials?.password || "");
+
+    await enforceActionRateLimit({
+      actorId: hashRateLimitIdentifier(identifier || "missing-identifier"),
+      action: "credential_login",
+      limit: 10,
+      windowMs: 15 * 60 * 1000,
+    });
+
+    const user = identifier
+      ? await prisma.user.findFirst({
+          where: {
+            OR: [
+              { email: { equals: identifier, mode: "insensitive" } },
+              { username: { equals: identifier, mode: "insensitive" } },
+            ],
+          },
+          select: { ...credentialUserSelect, passwordHash: true },
+        })
+      : null;
+
+    if (!(await verifyPassword(password, user?.passwordHash))) return null;
+    if (!user) return null;
+
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      image: user.image,
+      role: user.role || "USER",
+    };
+  },
+});
+
+const adminTestEmail = process.env.ADMIN_TEST_EMAIL?.trim().toLowerCase() || "";
+const adminTestPassword = process.env.ADMIN_TEST_PASSWORD || "";
+const userTestEmail = process.env.USER_TEST_EMAIL?.trim().toLowerCase() || "";
+const userTestPassword = process.env.USER_TEST_PASSWORD || "";
+const testCredentialsConfigured = Boolean(
+  adminTestEmail && adminTestPassword && userTestEmail && userTestPassword,
+);
+
+export const testCredentialsEnabled = testCredentialsConfigured && (
+  process.env.NODE_ENV !== "production" || process.env.ENABLE_TEST_CREDENTIALS === "true"
+);
+
+const testCredentialProviders = testCredentialsEnabled
+  ? [
+      Credentials({
+        id: "admin-test",
+        name: "Admin Test Login",
+        credentials: {
+          email: { label: "Email", type: "email" },
+          password: { label: "Password", type: "password" },
+        },
+        async authorize(credentials) {
+          const email = String(credentials?.email || "").trim().toLowerCase();
+          const password = String(credentials?.password || "");
+
+          await enforceActionRateLimit({
+            actorId: hashRateLimitIdentifier(email || "missing-email"),
+            action: "credential_login",
+            limit: 10,
+            windowMs: 15 * 60 * 1000,
+          });
+
+          if (email !== adminTestEmail || password !== adminTestPassword) {
+            return null;
+          }
+
+          const user = await getOrCreateCredentialUser({
+            email,
+            name: "SUPERCARS Admin",
+            role: "ADMIN",
+          });
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            image: user.image,
+            role: user.role || "ADMIN",
+          };
+        },
+      }),
+      Credentials({
+        id: "user-test",
+        name: "Regular Test Login",
+        credentials: {
+          email: { label: "Email", type: "email" },
+          password: { label: "Password", type: "password" },
+        },
+        async authorize(credentials) {
+          const email = String(credentials?.email || "").trim().toLowerCase();
+          const password = String(credentials?.password || "");
+
+          await enforceActionRateLimit({
+            actorId: hashRateLimitIdentifier(email || "missing-email"),
+            action: "credential_login",
+            limit: 10,
+            windowMs: 15 * 60 * 1000,
+          });
+
+          if (email !== userTestEmail || password !== userTestPassword) {
+            return null;
+          }
+
+          const user = await getOrCreateCredentialUser({
+            email,
+            name: "SUPERCARS Test User",
+            role: "USER",
+          });
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            image: user.image,
+            role: user.role || "USER",
+          };
+        },
+      }),
+    ]
+  : [];
+
 export const { handlers: { GET, POST }, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: {
@@ -20,70 +156,8 @@ export const { handlers: { GET, POST }, auth, signIn, signOut } = NextAuth({
   },
   providers: [
     Google,
-    Credentials({
-      id: "admin-test",
-      name: "Admin Test Login",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        const email = String(credentials?.email || "").trim().toLowerCase();
-        const password = String(credentials?.password || "");
-        const expectedEmail = (process.env.ADMIN_TEST_EMAIL || "admin@supercars.test").toLowerCase();
-        const expectedPassword = process.env.ADMIN_TEST_PASSWORD || "supercars-admin";
-
-        if (email !== expectedEmail || password !== expectedPassword) {
-          return null;
-        }
-
-        const user = await getOrCreateCredentialUser({
-          email,
-          name: "SUPERCARS Admin",
-          role: "ADMIN",
-        });
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.image,
-          role: user.role || "ADMIN",
-        };
-      },
-    }),
-    Credentials({
-      id: "user-test",
-      name: "Regular Test Login",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        const email = String(credentials?.email || "").trim().toLowerCase();
-        const password = String(credentials?.password || "");
-        const expectedEmail = (process.env.USER_TEST_EMAIL || "user@supercars.test").toLowerCase();
-        const expectedPassword = process.env.USER_TEST_PASSWORD || "supercars-user";
-
-        if (email !== expectedEmail || password !== expectedPassword) {
-          return null;
-        }
-
-        const user = await getOrCreateCredentialUser({
-          email,
-          name: "SUPERCARS Test User",
-          role: "USER",
-        });
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.image,
-          role: user.role || "USER",
-        };
-      },
-    }),
+    accountCredentialProvider,
+    ...testCredentialProviders,
   ],
   callbacks: {
     jwt: ({ token, user }) => {

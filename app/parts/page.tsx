@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
-import { PartsStoreExplorer } from "@/components/parts/PartsStoreExplorer";
-import { getPublicPartsStoreShell, queryPublicPartsStore } from "@/lib/parts/storefront";
+import { PartsTuningShop } from "@/components/parts/PartsTuningShop";
+import { getPublicPartsStoreShell } from "@/lib/parts/storefront";
+import { calculateModifiedPerformance } from "@/lib/parts/performance";
 import { prisma } from "@/lib/prisma";
 import { unstable_cache } from "next/cache";
 
@@ -18,29 +19,11 @@ export default async function PartsPage({ searchParams }: PartsPageProps) {
     getGarageCars(userId),
     getInitialPartsFilter(resolvedSearchParams.make, resolvedSearchParams.model),
   ]);
-  const requestedInitialPage = await queryPublicPartsStore({
-    categoryId: publicCatalog.categoryRows[0]?.id,
-    makeId: initialFilter.makeId || undefined,
-    modelId: initialFilter.modelId || undefined,
-  });
-  const initialCategoryId = requestedInitialPage.total > 0
-    ? publicCatalog.categoryRows[0]?.id || ""
-    : publicCatalog.categoryRows.find((category) => requestedInitialPage.categoryCounts[category.id] > 0)?.id || "";
-  const initialPage = initialCategoryId && initialCategoryId !== publicCatalog.categoryRows[0]?.id
-    ? await queryPublicPartsStore({
-        categoryId: initialCategoryId,
-        makeId: initialFilter.makeId || undefined,
-        modelId: initialFilter.modelId || undefined,
-      })
-    : requestedInitialPage;
 
   return (
-    <PartsStoreExplorer
+    <PartsTuningShop
       categories={publicCatalog.categoryRows}
       brands={publicCatalog.brandRows}
-      initialPage={initialPage}
-      initialCategoryId={initialCategoryId}
-      catalogNodeCount={publicCatalog.catalogNodeCount}
       garageCars={garageCars}
       fitmentMakes={publicCatalog.fitmentMakes}
       fitmentModels={publicCatalog.fitmentModels}
@@ -52,7 +35,7 @@ export default async function PartsPage({ searchParams }: PartsPageProps) {
 
 const getPublicPartsStoreShellCached = unstable_cache(
   getPublicPartsStoreShell,
-  ["public-parts-store-catalog-v2"],
+  ["public-parts-store-catalog-v3"],
   {
     // Admin catalog mutations invalidate this tag immediately. The fallback TTL
     // only covers out-of-band imports, so avoid refetching the full catalog hourly.
@@ -120,6 +103,19 @@ async function getGarageCars(userId: string | undefined) {
         year: true,
         trim: true,
         modelId: true,
+        engine: true,
+        engineHP: true,
+        turbo: true,
+        transmission: true,
+        drivetrain: true,
+        installedParts: {
+          where: { installStatus: "INSTALLED" },
+          select: {
+            hpGainOverride: true,
+            torqueGainOverride: true,
+            part: { select: { estimatedHpGain: true, estimatedTorqueGain: true } },
+          },
+        },
         photos: {
           orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
           select: { filePath: true },
@@ -133,10 +129,14 @@ async function getGarageCars(userId: string | undefined) {
         model: {
           select: {
             name: true,
+            slug: true,
             makeId: true,
-            make: {
-              select: { name: true },
+            productionStartYear: true,
+            productionEndYear: true,
+            spec: {
+              select: { engine: true, horsepower: true, torque: true, transmission: true, drivetrain: true, weight: true },
             },
+            make: { select: { name: true, slug: true, logoUrl: true } },
             images: {
               orderBy: [{ type: "asc" }, { createdAt: "asc" }],
               select: { url: true },
@@ -156,10 +156,14 @@ async function getGarageCars(userId: string | undefined) {
         model: {
           select: {
             name: true,
+            slug: true,
             makeId: true,
-            make: {
-              select: { name: true },
+            productionStartYear: true,
+            productionEndYear: true,
+            spec: {
+              select: { engine: true, horsepower: true, torque: true, transmission: true, drivetrain: true, weight: true },
             },
+            make: { select: { name: true, slug: true, logoUrl: true } },
             images: {
               orderBy: [{ type: "asc" }, { createdAt: "asc" }],
               select: { url: true },
@@ -174,19 +178,38 @@ async function getGarageCars(userId: string | undefined) {
   ]);
 
   const claimedModelIds = new Set(claimedVehicles.map((vehicle) => vehicle.modelId));
-  const claimedRows = claimedVehicles.map((vehicle) => ({
-    id: `claimed:${vehicle.id}`,
-    label: [
-      vehicle.year,
-      vehicle.model.make.name,
-      vehicle.model.name,
-      vehicle.trim,
-    ].filter(Boolean).join(" "),
-    detail: vehicle.vin ? `VIN ${vehicle.vin.slice(-6)}` : "Claimed",
-    makeId: vehicle.model.makeId,
-    modelId: vehicle.modelId,
-    imageUrl: vehicle.photos[0]?.filePath || vehicle.images[0]?.url || vehicle.model.images[0]?.url || null,
-  }));
+  const claimedRows = claimedVehicles.map((vehicle) => {
+    const performance = calculateModifiedPerformance({
+      stockHorsepower: vehicle.engineHP ?? vehicle.model.spec?.horsepower,
+      stockTorque: vehicle.model.spec?.torque,
+      installedParts: vehicle.installedParts,
+    });
+    return {
+      id: `claimed:${vehicle.id}`,
+      label: [vehicle.year, vehicle.model.make.name, vehicle.model.name, vehicle.trim].filter(Boolean).join(" "),
+      detail: vehicle.vin ? `VIN ${vehicle.vin.slice(-6)}` : "Claimed",
+      makeId: vehicle.model.makeId,
+      modelId: vehicle.modelId,
+      modelSlug: vehicle.model.slug,
+      year: vehicle.year,
+      imageUrl: vehicle.photos[0]?.filePath || vehicle.images[0]?.url || vehicle.model.images[0]?.url || null,
+      makeName: vehicle.model.make.name,
+      makeSlug: vehicle.model.make.slug,
+      makeLogoUrl: vehicle.model.make.logoUrl,
+      modelName: vehicle.model.name,
+      variant: vehicle.trim,
+      engine: vehicle.engine ?? vehicle.model.spec?.engine,
+      horsepower: performance.modifiedHorsepower,
+      torque: performance.modifiedTorque,
+      weight: vehicle.model.spec?.weight,
+      drivetrain: vehicle.drivetrain ?? vehicle.model.spec?.drivetrain,
+      transmission: vehicle.transmission ?? vehicle.model.spec?.transmission,
+      aspiration: getAspiration(vehicle.turbo, vehicle.engine ?? vehicle.model.spec?.engine),
+      buildStage: vehicle.installedParts.length > 0 ? "Current build" : "Stock specification",
+      detailPath: `/vehicle/${vehicle.vin}`,
+      exactOwnedVehicle: true,
+    };
+  });
   const savedRows = savedVehicles
     .filter((item) => !claimedModelIds.has(item.modelId))
     .map((item) => ({
@@ -195,8 +218,32 @@ async function getGarageCars(userId: string | undefined) {
       detail: "Dream Garage",
       makeId: item.model.makeId,
       modelId: item.modelId,
+      modelSlug: item.model.slug,
+      year: item.model.productionEndYear ?? item.model.productionStartYear,
       imageUrl: item.model.images[0]?.url || null,
+      makeName: item.model.make.name,
+      makeSlug: item.model.make.slug,
+      makeLogoUrl: item.model.make.logoUrl,
+      modelName: item.model.name,
+      variant: null,
+      engine: item.model.spec?.engine,
+      horsepower: item.model.spec?.horsepower,
+      torque: item.model.spec?.torque,
+      weight: item.model.spec?.weight,
+      drivetrain: item.model.spec?.drivetrain,
+      transmission: item.model.spec?.transmission,
+      aspiration: getAspiration(null, item.model.spec?.engine),
+      buildStage: "Stock specification",
+      detailPath: `/make/${item.model.make.slug}/${item.model.slug}`,
+      exactOwnedVehicle: false,
     }));
 
   return [...claimedRows, ...savedRows].sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function getAspiration(forcedInduction?: string | null, engine?: string | null) {
+  const value = `${forcedInduction ?? ""} ${engine ?? ""}`;
+  if (/turbo|supercharg|forced induction/i.test(value)) return "Forced Induction";
+  if (/naturally aspirated|\bN\/?A\b/i.test(value)) return "Naturally Aspirated";
+  return null;
 }

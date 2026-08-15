@@ -1,6 +1,6 @@
 import React from "react";
 import { Prisma } from "@prisma/client";
-import { auth } from "@/auth";
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import InventoryExplorer from "@/components/market/InventoryExplorer";
 import {
@@ -30,12 +30,7 @@ const SUPPORTED_INVENTORY_MAKES = ["Ferrari", "Lamborghini", "McLaren"];
 
 export default async function InventoryPage({ searchParams }: InventoryPageProps) {
   const resolvedSearchParams = (await searchParams) || {};
-  const [mappedMakes, session] = await Promise.all([
-    getCatalogMakeOptions(),
-    auth(),
-  ]);
-
-  const isAdmin = session?.user?.role === "ADMIN";
+  const mappedMakes = await getCatalogMakeOptions();
   const selectedMakeId = resolveMakeId(mappedMakes, resolvedSearchParams.make);
   const selectedMake = mappedMakes.find((make) => make.id === selectedMakeId);
   const selectedMakeCatalog = selectedMake
@@ -52,7 +47,6 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
   const requestedPage = Math.max(1, Number.parseInt(resolvedSearchParams.page || "1", 10) || 1);
 
   const where = buildInventoryWhere({
-    isAdmin,
     makeId: selectedMakeId,
     modelId: selectedModelId,
     year: selectedYear,
@@ -61,15 +55,8 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
   });
 
   const [listings, summary] = await Promise.all([
-    prisma.listing.findMany({
-      where,
-      select: inventoryListingSelect,
-      orderBy: { createdAt: "desc" },
-      skip: (requestedPage - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-    }),
-    getInventorySummary({
-      isAdmin,
+    getCachedInventoryListings(where, requestedPage),
+    getCachedInventorySummary({
       makeId: selectedMakeId,
       modelId: selectedModelId,
       year: selectedYear,
@@ -162,15 +149,31 @@ const inventoryListingSelect = {
   },
 } satisfies Prisma.ListingSelect;
 
+const getCachedInventoryListings = unstable_cache(
+  async (where: Prisma.ListingWhereInput, page: number) => prisma.listing.findMany({
+    where,
+    select: inventoryListingSelect,
+    orderBy: { createdAt: "desc" },
+    skip: (page - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
+  }),
+  ["public-inventory-listings-v1"],
+  { revalidate: 300, tags: ["public-inventory"] },
+);
+
+const getCachedInventorySummary = unstable_cache(
+  getInventorySummary,
+  ["public-inventory-summary-v1"],
+  { revalidate: 300, tags: ["public-inventory"] },
+);
+
 async function getInventorySummary({
-  isAdmin,
   makeId,
   modelId,
   year,
   minPrice,
   maxPrice,
 }: {
-  isAdmin: boolean;
   makeId?: string;
   modelId?: string;
   year?: number;
@@ -189,13 +192,8 @@ async function getInventorySummary({
     : Prisma.empty;
   const makeClause = makeId ? Prisma.sql`AND make."id" = ${makeId}` : Prisma.empty;
   const modelClause = modelId ? Prisma.sql`AND model."id" = ${modelId}` : Prisma.empty;
-  const visibilityClause = isAdmin
-    ? Prisma.sql`AND (
-        (listing."validationStatus" = 'VALID' AND vehicle."inventoryStatus" IN ('ACTIVE', 'VALID', 'WARNING'))
-        OR (listing."validationStatus" = 'ADMIN_TEST' AND vehicle."inventoryStatus" = 'ADMIN_TEST')
-      )`
-    : Prisma.sql`AND listing."validationStatus" = 'VALID'
-        AND vehicle."inventoryStatus" IN ('ACTIVE', 'VALID', 'WARNING')`;
+  const visibilityClause = Prisma.sql`AND listing."validationStatus" = 'VALID'
+      AND vehicle."inventoryStatus" IN ('ACTIVE', 'VALID', 'WARNING')`;
   const selectedYearClause = year ? Prisma.sql`WHERE year = ${year}` : Prisma.empty;
 
   const [summary] = await prisma.$queryRaw<InventorySummaryRow[]>(Prisma.sql`
@@ -241,14 +239,12 @@ async function getInventorySummary({
 }
 
 function buildInventoryWhere({
-  isAdmin,
   makeId,
   modelId,
   year,
   minPrice,
   maxPrice,
 }: {
-  isAdmin: boolean;
   makeId?: string;
   modelId?: string;
   year?: number;
@@ -289,19 +285,6 @@ function buildInventoryWhere({
               },
             },
           },
-          ...(isAdmin
-            ? [
-                {
-                  validationStatus: "ADMIN_TEST",
-                  vehicle: {
-                    is: {
-                      inventoryStatus: "ADMIN_TEST",
-                      model: modelFilter,
-                    },
-                  },
-                },
-              ]
-            : []),
         ],
       },
       ...(year ? [{ year }] : []),

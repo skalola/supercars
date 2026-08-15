@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { garageAlertInputSchema, garageItemIdSchema } from "@/lib/validation/community-inputs";
 
 type GarageAlertType = "price" | "listing";
 
@@ -13,6 +14,7 @@ export async function toggleGarageItem(modelId: string) {
   }
 
   const userId = session.user.id;
+  modelId = garageItemIdSchema.parse(modelId);
 
   const existing = await prisma.garageItem.findUnique({
     where: {
@@ -73,9 +75,10 @@ export async function toggleGarageAlert(itemId: string, alertType: GarageAlertTy
     return { ok: false, reason: "unauthenticated" };
   }
 
+  const alertInput = garageAlertInputSchema.parse({ itemId, alertType, enabled });
   const item = await prisma.garageItem.findFirst({
     where: {
-      id: itemId,
+      id: alertInput.itemId,
       userId: session.user.id as string,
     },
     select: {
@@ -104,13 +107,13 @@ export async function toggleGarageAlert(itemId: string, alertType: GarageAlertTy
   }
 
   const data =
-    alertType === "price"
+    alertInput.alertType === "price"
       ? {
-          priceTrackerAlertsEnabled: enabled,
-          priceTrackerBaseline: enabled ? await getCurrentLowestListingPrice(item.modelId) : null,
+          priceTrackerAlertsEnabled: alertInput.enabled,
+          priceTrackerBaseline: alertInput.enabled ? await getCurrentLowestListingPrice(item.modelId) : null,
         }
       : {
-          listingTrackerAlertsEnabled: enabled,
+          listingTrackerAlertsEnabled: alertInput.enabled,
         };
 
   await prisma.garageItem.update({
@@ -123,8 +126,8 @@ export async function toggleGarageAlert(itemId: string, alertType: GarageAlertTy
 
   return {
     ok: true,
-    enabled,
-    alertType,
+    enabled: alertInput.enabled,
+    alertType: alertInput.alertType,
     label: `${item.model.make.name} ${item.model.name}`,
   };
 }
@@ -135,6 +138,7 @@ export async function removeClaimedVehicle(vehicleId: string) {
     return { ok: false, reason: "unauthenticated" };
   }
 
+  vehicleId = garageItemIdSchema.parse(vehicleId);
   const vehicle = await prisma.vehicle.findFirst({
     where: {
       id: vehicleId,
@@ -175,6 +179,7 @@ export async function removeSavedGarageItem(itemId: string) {
     return { ok: false, reason: "unauthenticated" };
   }
 
+  itemId = garageItemIdSchema.parse(itemId);
   const item = await prisma.garageItem.findFirst({
     where: {
       id: itemId,

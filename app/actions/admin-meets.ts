@@ -1,9 +1,11 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { assertAdmin } from "@/lib/admin/auth";
 import { notifyMeetCancelled } from "@/lib/meets/meet-notifications";
 import { prisma } from "@/lib/prisma";
+import { adminMeetStatusInputSchema, adminRecordIdSchema } from "@/lib/validation/admin-inputs";
+import { validationMessage } from "@/lib/validation/common-inputs";
 
 type AdminMeetActionResult = {
   success: boolean;
@@ -13,6 +15,10 @@ type AdminMeetActionResult = {
 export async function updateMeetStatusAction(meetId: string, status: "PUBLISHED" | "HIDDEN" | "CANCELLED" | "COMPLETED"): Promise<AdminMeetActionResult> {
   try {
     await assertAdmin();
+    const parsed = adminMeetStatusInputSchema.safeParse({ meetId, status });
+    if (!parsed.success) return { success: false, message: validationMessage(parsed.error) };
+    meetId = parsed.data.meetId;
+    status = parsed.data.status;
 
     const meet = await prisma.meet.findUnique({
       where: { id: meetId },
@@ -39,6 +45,7 @@ export async function updateMeetStatusAction(meetId: string, status: "PUBLISHED"
 
     revalidatePath("/admin/meets");
     revalidatePath("/meets");
+    updateTag("public-meets");
     revalidatePath(`/meets/${meet.slug}`);
 
     return { success: true, message: `${meet.title} marked ${status.toLowerCase()}.` };
@@ -50,6 +57,9 @@ export async function updateMeetStatusAction(meetId: string, status: "PUBLISHED"
 export async function deleteMeetAction(meetId: string): Promise<AdminMeetActionResult> {
   try {
     await assertAdmin();
+    const parsedId = adminRecordIdSchema.safeParse(meetId);
+    if (!parsedId.success) return { success: false, message: validationMessage(parsedId.error) };
+    meetId = parsedId.data;
 
     const meet = await prisma.meet.findUnique({
       where: { id: meetId },
@@ -64,6 +74,7 @@ export async function deleteMeetAction(meetId: string): Promise<AdminMeetActionR
 
     revalidatePath("/admin/meets");
     revalidatePath("/meets");
+    updateTag("public-meets");
     revalidatePath(`/meets/${meet.slug}`);
 
     return { success: true, message: `${meet.title} deleted.` };
@@ -75,6 +86,9 @@ export async function deleteMeetAction(meetId: string): Promise<AdminMeetActionR
 export async function deleteMeetPhotoAction(photoId: string): Promise<AdminMeetActionResult> {
   try {
     await assertAdmin();
+    const parsedId = adminRecordIdSchema.safeParse(photoId);
+    if (!parsedId.success) return { success: false, message: validationMessage(parsedId.error) };
+    photoId = parsedId.data;
 
     const photo = await prisma.meetPhoto.findUnique({
       where: { id: photoId },
@@ -94,6 +108,7 @@ export async function deleteMeetPhotoAction(photoId: string): Promise<AdminMeetA
 
     revalidatePath("/admin/meets");
     revalidatePath("/meets");
+    updateTag("public-meets");
     revalidatePath(`/meets/${photo.meet.slug}`);
     if (photo.vehicle?.vin) revalidatePath(`/vehicle/${photo.vehicle.vin}`);
     revalidatePath("/garage");

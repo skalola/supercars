@@ -115,6 +115,13 @@ export default async function AdminPartsPage({
     recentClickCount,
     configuredParts,
     makeOptions,
+    ferrariCanonicalParts,
+    ferrariModelsCovered,
+    ferrariPartsWithOffers,
+    activeEbayOffers,
+    latestCatalogRun,
+    latestOfferRun,
+    sourceFailureRuns,
   ] = await Promise.all([
     prisma.partCategory.findMany({
       select: {
@@ -181,6 +188,12 @@ export default async function AdminPartsPage({
             },
           },
         },
+        modelPartComponent: {
+          select: {
+            componentType: { select: { name: true, category: { select: { name: true } } } },
+            model: { select: { name: true, make: { select: { name: true } } } },
+          },
+        },
         affiliatePartner: {
           select: { name: true },
         },
@@ -209,6 +222,36 @@ export default async function AdminPartsPage({
       },
     }),
     getCatalogMakeOptions(),
+    prisma.performancePart.count({
+      where: { compatibility: { some: { model: { make: { slug: "ferrari" } } } } },
+    }),
+    prisma.model.count({
+      where: { make: { slug: "ferrari" }, partCompatibility: { some: {} } },
+    }),
+    prisma.performancePart.count({
+      where: {
+        compatibility: { some: { model: { make: { slug: "ferrari" } } } },
+        offers: { some: { active: true, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] } },
+      },
+    }),
+    prisma.partOffer.count({
+      where: {
+        provider: "EBAY",
+        active: true,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+    }),
+    prisma.partSourceRun.findFirst({
+      where: { source: "SCUDERIA_CAR_PARTS" },
+      select: { status: true, startedAt: true, completedAt: true },
+      orderBy: { startedAt: "desc" },
+    }),
+    prisma.partSourceRun.findFirst({
+      where: { source: "EBAY_BROWSE_API" },
+      select: { status: true, startedAt: true, completedAt: true },
+      orderBy: { startedAt: "desc" },
+    }),
+    prisma.partSourceRun.count({ where: { status: { in: ["FAILED", "PARTIAL", "BLOCKED"] } } }),
   ]);
   const totalPages = Math.max(1, Math.ceil(filteredPartCount / ADMIN_PARTS_PAGE_LIMIT));
   const page = Math.min(requestedPage, totalPages);
@@ -292,9 +335,9 @@ export default async function AdminPartsPage({
   const clickRouteCounts = countClickRoutes(recentClicks);
   const recentClickRows: AdminRecentAffiliateClickRow[] = recentClicks.map((click) => ({
     id: click.id,
-    partName: click.part.name,
-    brandName: click.part.brand.name,
-    categoryName: click.part.category.name,
+    partName: click.part?.name || click.modelPartComponent?.componentType.name || "Component offer",
+    brandName: click.part?.brand.name || click.modelPartComponent?.model.make.name || "Marketplace",
+    categoryName: click.part?.category.name || click.modelPartComponent?.componentType.category.name || "Uncategorized",
     affiliatePartnerName: click.affiliatePartner?.name ?? null,
     routeType: getClickRouteType(click.sourcePath),
     routeSource: getClickRouteSource(click.sourcePath),
@@ -332,6 +375,14 @@ export default async function AdminPartsPage({
           totalParts,
           publicReadyParts,
           needsReviewParts: Math.max(0, totalParts - publicReadyParts),
+          ferrariCanonicalParts,
+          ferrariModelsCovered,
+          ferrariPartsWithOffers,
+          ferrariPartsWithoutOffers: Math.max(0, ferrariCanonicalParts - ferrariPartsWithOffers),
+          activeEbayOffers,
+          sourceFailureRuns,
+          lastCatalogRefresh: formatRunDate(latestCatalogRun),
+          lastEbayRefresh: formatRunDate(latestOfferRun),
         }}
         activeFilters={filters}
         affiliateAnalytics={{
@@ -343,6 +394,9 @@ export default async function AdminPartsPage({
           estimatedCommissionLabel: formatCents(estimatedCommissionCents),
           topParts: analyticsRows.topParts,
           topBrands: analyticsRows.topBrands,
+          topModels: analyticsRows.topModels,
+          topCategories: analyticsRows.topCategories,
+          topProviders: analyticsRows.topProviders,
           recentClicks: recentClickRows,
         }}
         makes={makeOptions}
@@ -426,7 +480,7 @@ async function getAffiliateAnalyticsRows() {
     clicks: bigint;
     estimatedCommissionCents: number;
   };
-  const [topParts, topBrands, commission] = await Promise.all([
+  const [topParts, topBrands, topModels, topCategories, topProviders, commission] = await Promise.all([
     prisma.$queryRaw<AnalyticsRow[]>(Prisma.sql`
       SELECT part."name" AS label,
         concat_ws(' · ', brand."name", category."name", affiliate."name") AS detail,
@@ -452,6 +506,39 @@ async function getAffiliateAnalyticsRows() {
       ORDER BY clicks DESC, brand."name" ASC
       LIMIT 6
     `),
+    prisma.$queryRaw<AnalyticsRow[]>(Prisma.sql`
+      SELECT model."name" AS label, make."name" AS detail,
+        COUNT(DISTINCT click."id")::bigint AS clicks,
+        0::double precision AS "estimatedCommissionCents"
+      FROM "PartAffiliateClick" click
+      JOIN "PartCompatibility" fitment ON fitment."partId" = click."partId"
+      JOIN "Model" model ON model."id" = fitment."modelId"
+      JOIN "Make" make ON make."id" = model."makeId"
+      GROUP BY model."id", make."name"
+      ORDER BY clicks DESC, model."name" ASC
+      LIMIT 6
+    `),
+    prisma.$queryRaw<AnalyticsRow[]>(Prisma.sql`
+      SELECT category."name" AS label, 'Category' AS detail,
+        COUNT(click."id")::bigint AS clicks,
+        0::double precision AS "estimatedCommissionCents"
+      FROM "PartAffiliateClick" click
+      JOIN "PerformancePart" part ON part."id" = click."partId"
+      JOIN "PartCategory" category ON category."id" = part."categoryId"
+      GROUP BY category."id"
+      ORDER BY clicks DESC, category."name" ASC
+      LIMIT 6
+    `),
+    prisma.$queryRaw<AnalyticsRow[]>(Prisma.sql`
+      SELECT COALESCE(click."provider", affiliate."name", 'Source') AS label, 'Provider' AS detail,
+        COUNT(click."id")::bigint AS clicks,
+        0::double precision AS "estimatedCommissionCents"
+      FROM "PartAffiliateClick" click
+      LEFT JOIN "AffiliatePartner" affiliate ON affiliate."id" = click."affiliatePartnerId"
+      GROUP BY COALESCE(click."provider", affiliate."name", 'Source')
+      ORDER BY clicks DESC, label ASC
+      LIMIT 6
+    `),
     prisma.$queryRaw<Array<{ total: number }>>(Prisma.sql`
       SELECT COALESCE(SUM(part."retailPriceCents" * part."commissionRateBps" / 10000.0), 0)::double precision AS total
       FROM "PartAffiliateClick" click
@@ -468,6 +555,9 @@ async function getAffiliateAnalyticsRows() {
   return {
     topParts: topParts.map(mapRow),
     topBrands: topBrands.map(mapRow),
+    topModels: topModels.map(mapRow),
+    topCategories: topCategories.map(mapRow),
+    topProviders: topProviders.map(mapRow),
     estimatedCommissionCents: Math.round(commission[0]?.total ?? 0),
   };
 }
@@ -479,6 +569,17 @@ function formatCents(value: number | null) {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(value / 100);
+}
+
+function formatRunDate(run: { status: string; startedAt: Date; completedAt: Date | null } | null) {
+  if (!run) return "Never";
+  const date = run.completedAt ?? run.startedAt;
+  return `${run.status} / ${new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date)}`;
 }
 
 function formatCompatibility(partCompatibility: {

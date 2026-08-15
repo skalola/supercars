@@ -38,8 +38,8 @@ export default function ServiceBookingModule({
   const [locationStatus, setLocationStatus] = useState("");
   const [preferredDate, setPreferredDate] = useState("");
   const [preferredTime, setPreferredTime] = useState("10:00 AM");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [transactionToken, setTransactionToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const bookingRule = defaultRule ?? {
@@ -108,7 +108,7 @@ export default function ServiceBookingModule({
     setSelectedShop("");
     setPreferredDate(tomorrow.toISOString().split("T")[0]);
     setPreferredTime("10:00 AM");
-    setTransactionToken(null);
+    setAcceptedTerms(false);
     setError(null);
     setOpen(true);
     if (!userCoordinates) requestServiceLocation();
@@ -126,6 +126,11 @@ export default function ServiceBookingModule({
   }, [openBooking, vin]);
 
   async function submitBooking() {
+    if (!acceptedTerms) {
+      setError("Accept the Terms of Use and Privacy Policy to continue to payment.");
+      return;
+    }
+
     try {
       setSubmitting(true);
       setError(null);
@@ -136,9 +141,37 @@ export default function ServiceBookingModule({
         preferredDate,
         preferredTime,
         notes: `Vehicle Passport service booking for ${makeName} (${vin})`,
+        acceptedTerms: true,
       });
-      setTransactionToken(result.publicTransactionToken);
-      setStep(4);
+
+      const response = await fetch("/api/payments/service-booking-checkout", {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          fulfillmentRequestId: result.fulfillmentRequestId,
+          returnTo: `/transactions/${result.publicTransactionToken}`,
+        }),
+      });
+      const responseText = await response.text();
+      let checkout: { url?: string; error?: string } = {};
+      if (responseText) {
+        try {
+          checkout = JSON.parse(responseText) as { url?: string; error?: string };
+        } catch {
+          throw new Error(
+            response.ok
+              ? "Stripe Checkout returned an invalid response."
+              : `Stripe Checkout could not be started (${response.status}).`,
+          );
+        }
+      }
+      if (!response.ok || !checkout.url) {
+        throw new Error(checkout.error || `Unable to start Stripe Checkout (${response.status}).`);
+      }
+      window.location.assign(checkout.url);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit service booking request.");
     } finally {
@@ -205,7 +238,7 @@ export default function ServiceBookingModule({
           <div className="vehicle-service-booking-body">
             <div className="vehicle-service-booking-copy">
               <strong>Preferred appointment</strong>
-              <p>The shop can accept, decline, or ignore the request. Payment is only requested after acceptance.</p>
+              <p>The shop can accept, decline, or ignore the request after Stripe confirms your payment authorization.</p>
             </div>
             <label className="vehicle-service-booking-field">
               Date
@@ -230,32 +263,33 @@ export default function ServiceBookingModule({
           <div className="vehicle-service-booking-body">
             <div className="vehicle-service-booking-copy">
               <strong>Review request</strong>
-              <p>This sends the shop a tokenized fulfillment request. The SUPERCAR DASH booking fee is handled only after shop acceptance.</p>
+              <p>Your payment will show as pending until your appointment is accepted by the service team.</p>
             </div>
             <dl className="vehicle-service-booking-review">
               <div><dt>Service</dt><dd>{bookingRule.serviceName}</dd></div>
               <div><dt>Shop</dt><dd>{selectedShop}</dd></div>
               <div><dt>Appointment</dt><dd>{preferredDate} at {preferredTime}</dd></div>
             </dl>
+            <label className="vehicle-service-booking-terms">
+              <input
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(event) => {
+                  setAcceptedTerms(event.target.checked);
+                  if (event.target.checked) setError(null);
+                }}
+              />
+              <span>
+                I agree to the <Link href="/legal/terms" target="_blank">Terms of Use</Link> and{" "}
+                <Link href="/legal/privacy" target="_blank">Privacy Policy</Link> terms.
+              </span>
+            </label>
             {error ? <p className="vehicle-service-booking-error">{error}</p> : null}
             <div className="vehicle-service-booking-actions">
               <button type="button" onClick={() => setStep(2)}>Back</button>
-              <button type="button" disabled={submitting} onClick={submitBooking}>
-                {submitting ? "Sending..." : "Send Request"}
+              <button type="button" disabled={submitting || !acceptedTerms} onClick={submitBooking}>
+                {submitting ? "Opening Stripe..." : "Authorize & Send Request"}
               </button>
-            </div>
-          </div>
-        ) : null}
-
-        {step === 4 ? (
-          <div className="vehicle-service-booking-body">
-            <div className="vehicle-service-booking-copy">
-              <strong>Request sent</strong>
-              <p>The shop has the booking package. You can track the request from your transactions page.</p>
-            </div>
-            <div className="vehicle-service-booking-actions">
-              <button type="button" onClick={() => setOpen(false)}>Close</button>
-              {transactionToken ? <Link href={`/transactions/${transactionToken}`}>View Transaction</Link> : null}
             </div>
           </div>
         ) : null}

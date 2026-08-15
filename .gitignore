@@ -43,6 +43,8 @@ next-env.d.ts
 
 # local production database telemetry
 .neon-usage/
+.private-uploads/
+.db-backups/
 
 # local ad hoc database count scripts and conflict copies
 /db_counts*.ts

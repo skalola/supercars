@@ -46,12 +46,12 @@ export default function ClaimForm({ modelId, modelName, makeName }: { modelId: s
       }
 
       // VIN is valid and matches the model, now execute the claim server action
-      await claimVehicle(modelId, normalizedVin, parseInt(data.ModelYear) || 2024, data);
+      await claimVehicle(modelId, normalizedVin);
       
       router.refresh();
       router.push("/garage");
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Could not verify this VIN.");
     } finally {
       setLoading(false);
     }

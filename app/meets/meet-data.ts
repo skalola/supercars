@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { unstable_cache } from "next/cache";
 import { normalizeMeetType } from "@/lib/meets/meet-types";
 import { prisma } from "@/lib/prisma";
 
@@ -6,6 +7,7 @@ export type MeetEvent = {
   id: string | null;
   slug: string;
   title: string;
+  startsAt: string;
   dateLabel: string;
   timeLabel: string;
   city: string;
@@ -69,7 +71,7 @@ const stateCoordinates: Record<string, { latitude: number; longitude: number }> 
   WA: { latitude: 47.7511, longitude: -120.7401 },
 };
 
-export async function getUpcomingMeetEvents() {
+export const getUpcomingMeetEvents = unstable_cache(async () => {
   try {
     const rows = await prisma.meet.findMany({
       where: {
@@ -83,9 +85,9 @@ export async function getUpcomingMeetEvents() {
   } catch {
     return [];
   }
-}
+}, ["public-upcoming-meets-v1"], { revalidate: 300, tags: ["public-meets"] });
 
-export async function getMeetBySlug(slug: string) {
+export const getMeetBySlug = unstable_cache(async (slug: string) => {
   try {
     const row = await prisma.meet.findUnique({
       where: { slug },
@@ -96,7 +98,7 @@ export async function getMeetBySlug(slug: string) {
     return null;
   }
   return null;
-}
+}, ["public-meet-detail-v1"], { revalidate: 300, tags: ["public-meets"] });
 
 const meetSelect = {
   id: true,
@@ -191,6 +193,7 @@ function serializeMeet(row: MeetRow): MeetEvent {
     id: row.id,
     slug: row.slug,
     title: row.title,
+    startsAt: row.startsAt.toISOString(),
     dateLabel: formatDate(row.startsAt),
     timeLabel: formatTime(row.startsAt),
     city: row.city,

@@ -1,14 +1,14 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { assertAdmin } from "@/lib/admin/auth";
 import { prisma } from "@/lib/prisma";
+import { adminClubTransferInputSchema, adminRecordIdSchema } from "@/lib/validation/admin-inputs";
 
 export async function adminHideClubAction(formData: FormData) {
   await assertAdmin();
-  const clubId = readString(formData, "clubId");
-  if (!clubId) throw new Error("Missing club id.");
+  const clubId = adminRecordIdSchema.parse(readString(formData, "clubId"));
 
   await prisma.carClub.update({
     where: { id: clubId },
@@ -17,26 +17,28 @@ export async function adminHideClubAction(formData: FormData) {
 
   revalidatePath("/admin/clubs");
   revalidatePath("/clubs");
+  updateTag("public-clubs");
   redirect("/admin/clubs");
 }
 
 export async function adminDeleteClubAction(formData: FormData) {
   await assertAdmin();
-  const clubId = readString(formData, "clubId");
-  if (!clubId) throw new Error("Missing club id.");
+  const clubId = adminRecordIdSchema.parse(readString(formData, "clubId"));
 
   await prisma.carClub.delete({ where: { id: clubId } });
 
   revalidatePath("/admin/clubs");
   revalidatePath("/clubs");
+  updateTag("public-clubs");
   redirect("/admin/clubs");
 }
 
 export async function adminTransferClubAction(formData: FormData) {
   await assertAdmin();
-  const clubId = readString(formData, "clubId");
-  const userId = readString(formData, "userId");
-  if (!clubId || !userId) throw new Error("Club and new owner are required.");
+  const { clubId, userId } = adminClubTransferInputSchema.parse({
+    clubId: readString(formData, "clubId"),
+    userId: readString(formData, "userId"),
+  });
 
   await prisma.$transaction([
     prisma.carClub.update({
@@ -52,6 +54,7 @@ export async function adminTransferClubAction(formData: FormData) {
 
   revalidatePath("/admin/clubs");
   revalidatePath("/clubs");
+  updateTag("public-clubs");
   redirect("/admin/clubs");
 }
 

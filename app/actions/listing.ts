@@ -3,6 +3,8 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { vehicleListingInputSchema } from "@/lib/validation/community-inputs";
+import { vinClaimSchema } from "@/lib/validation/transaction-inputs";
 
 function safeRevalidatePath(vin: string) {
   try {
@@ -14,15 +16,15 @@ function safeRevalidatePath(vin: string) {
 }
 
 async function verifyOwnership(vin: string) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const session = (globalThis as any).mockSession !== undefined ? (globalThis as any).mockSession : await auth();
+  const session = await auth();
   const userId = session?.user?.id;
   if (!userId) {
     throw new Error("Unauthorized: Please sign in.");
   }
 
+  const validatedVin = vinClaimSchema.parse(vin);
   const vehicle = await prisma.vehicle.findUnique({
-    where: { vin },
+    where: { vin: validatedVin },
     select: {
       id: true,
       ownerId: true,
@@ -52,11 +54,8 @@ async function verifyOwnership(vin: string) {
 }
 
 export async function listVehicleForSale(vin: string, askingPrice: number) {
-  const { userId, vehicle } = await verifyOwnership(vin);
-
-  if (!askingPrice || askingPrice <= 0) {
-    throw new Error("Please enter a valid asking price.");
-  }
+  const listingInput = vehicleListingInputSchema.parse({ vin, askingPrice });
+  const { userId, vehicle } = await verifyOwnership(listingInput.vin);
 
   // Deactivate any existing active listings for this vehicle (status: REMOVED)
   await prisma.listing.updateMany({
@@ -74,8 +73,8 @@ export async function listVehicleForSale(vin: string, askingPrice: number) {
     data: {
       modelId: vehicle.modelId,
       year: vehicle.year,
-      price: askingPrice,
-      askingPrice: askingPrice,
+      price: listingInput.askingPrice,
+      askingPrice: listingInput.askingPrice,
       mileage: vehicle.profile?.currentMileage || vehicle.mileage || null,
       color: vehicle.profile?.exteriorColor || vehicle.color || null,
       status: "ACTIVE",
@@ -88,7 +87,7 @@ export async function listVehicleForSale(vin: string, askingPrice: number) {
 }
 
 export async function removeFromSale(vin: string) {
-  const { vehicle } = await verifyOwnership(vin);
+  const { vehicle } = await verifyOwnership(vinClaimSchema.parse(vin));
 
   // Deactivate active listings
   await prisma.listing.updateMany({

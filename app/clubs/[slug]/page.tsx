@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
@@ -6,13 +7,33 @@ import { leaveClubAction, manageClubMemberAction, requestJoinClubAction, updateC
 import { getCatalogMakeOptions } from "@/lib/makes/catalog";
 import { getMeetTypeBadgeClass, normalizeMeetType } from "@/lib/meets/meet-types";
 import { prisma } from "@/lib/prisma";
+import { absoluteUrl, buildPublicMetadata, privateMetadata, safeJsonLd } from "@/lib/seo";
 import ClubConfirmButton from "../ClubConfirmButton";
 import ClubEditModal from "../ClubEditModal";
 import ClubInviteLink from "../ClubInviteLink";
+import ClubLogoCropField from "../ClubLogoCropField";
 import ClubModelSelector from "../ClubModelSelector";
 
 export const dynamic = "force-dynamic";
 const DEFAULT_CLUB_LOGO = "/images/supercar-dash-wordmark.svg";
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const club = await prisma.carClub.findUnique({
+    where: { slug },
+    select: { name: true, description: true, city: true, state: true, logoUrl: true, status: true, visibility: true },
+  });
+  if (!club || club.status !== "ACTIVE" || club.visibility !== "PUBLIC") return privateMetadata;
+  const location = [club.city, club.state].filter(Boolean).join(", ");
+
+  return buildPublicMetadata({
+    title: `${club.name}${location ? ` | ${location}` : ""}`,
+    description: (club.description || `Meet members, explore linked cars, and discover upcoming events from ${club.name}.`).slice(0, 160),
+    path: `/clubs/${slug}`,
+    image: club.logoUrl,
+    keywords: [club.name, location ? `${location} car club` : "car club", "enthusiast car community"],
+  });
+}
 
 function getClubDetailSelect(now = new Date()) {
   return {
@@ -88,6 +109,24 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
     notFound();
   }
 
+  const clubJsonLd = club.visibility === "PUBLIC" ? {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: club.name,
+    description: club.description || undefined,
+    url: absoluteUrl(`/clubs/${club.slug}`),
+    logo: absoluteUrl(club.logoUrl || DEFAULT_CLUB_LOGO),
+    location: club.city || club.state ? {
+      "@type": "Place",
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: club.city || undefined,
+        addressRegion: club.state || undefined,
+        addressCountry: "US",
+      },
+    } : undefined,
+  } : null;
+
   const viewerUserId = session?.user?.id as string | undefined;
   const viewerMembership = viewerUserId ? club.members.find((member) => member.userId === viewerUserId) : null;
   const isAdmin = session?.user?.role === "ADMIN";
@@ -112,6 +151,7 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
 
   return (
     <main className="club-detail-shell">
+      {clubJsonLd ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(clubJsonLd) }} /> : null}
       <section className="club-detail-hero" style={{ backgroundImage: `linear-gradient(90deg, rgba(0,0,0,.88), rgba(0,0,0,.32)), url("${heroImage}")` }}>
         <div>
           <Link href="/clubs" className="meet-back-link">&lt; Back to Clubs</Link>
@@ -280,10 +320,7 @@ export default async function ClubDetailPage({ params }: { params: Promise<{ slu
                     <option value="PRIVATE">Private Approval</option>
                   </select>
                 </label>
-                <label>
-                  <span>Club Logo</span>
-                  <input name="logoFile" type="file" accept="image/jpeg,image/png,image/webp" />
-                </label>
+                <ClubLogoCropField initialLogoUrl={club.logoUrl} />
                 <label>
                   <span>Description</span>
                   <textarea name="description" rows={4} defaultValue={club.description || ""} />

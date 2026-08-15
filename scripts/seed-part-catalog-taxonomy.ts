@@ -5,6 +5,7 @@ import {
   type PartCatalogNodeSeed,
 } from "@/lib/parts/catalog-taxonomy";
 import { getCatalogNodePlaceholderUrl } from "@/lib/parts/visual-placeholders";
+import { toStoragePartSystemSlug } from "@/lib/parts/category-system";
 
 const prisma = new PrismaClient();
 
@@ -29,18 +30,19 @@ async function seedNode(
   stats: SeedStats
 ) {
   const path = toPath(parentPath, node.slug);
-  const category = node.categorySlug
-    ? await prisma.partCategory.findUnique({ where: { slug: node.categorySlug } })
+  const storageCategorySlug = node.categorySlug ? toStoragePartSystemSlug(node.categorySlug) : null;
+  const category = storageCategorySlug
+    ? await prisma.partCategory.findUnique({ where: { slug: storageCategorySlug } })
     : null;
 
   if (node.categorySlug && !category) {
-    stats.missingCategories.push(`${path}: ${node.categorySlug}`);
+    stats.missingCategories.push(`${path}: ${storageCategorySlug}`);
   }
 
-  const iconUrl = getCatalogNodePlaceholderUrl(node.slug, node.categorySlug);
+  const iconUrl = getCatalogNodePlaceholderUrl(node.slug, storageCategorySlug);
   const existing = await prisma.partCatalogNode.findUnique({
     where: { path },
-    select: { id: true, iconUrl: true },
+    select: { id: true, iconUrl: true, categoryId: true },
   });
 
   const catalogNode = existing
@@ -67,12 +69,15 @@ async function seedNode(
 
   if (existing) {
     stats.existing += 1;
-    if (!existing.iconUrl) {
+    if (!existing.iconUrl || existing.categoryId !== (category?.id ?? null)) {
       await prisma.partCatalogNode.update({
         where: { id: existing.id },
-        data: { iconUrl },
+        data: {
+          ...(!existing.iconUrl ? { iconUrl } : {}),
+          ...(existing.categoryId !== (category?.id ?? null) ? { categoryId: category?.id ?? null } : {}),
+        },
       });
-      stats.iconBackfilled += 1;
+      if (!existing.iconUrl) stats.iconBackfilled += 1;
     }
   } else {
     stats.created += 1;

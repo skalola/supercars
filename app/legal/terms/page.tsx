@@ -1,3 +1,12 @@
+import type { Metadata } from "next";
+import { buildPublicMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = buildPublicMetadata({
+  title: "Terms of Use",
+  description: "Review the SUPERCAR DASH terms governing use of the digital garage, vehicle marketplace, fulfillment, meets, clubs, and parts services.",
+  path: "/legal/terms",
+});
+
 export default function TermsPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-12">

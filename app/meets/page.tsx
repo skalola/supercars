@@ -2,7 +2,7 @@ import { MeetsMapExperience } from "./MeetsMapExperience";
 import { getCatalogMakeOptions } from "@/lib/makes/catalog";
 import { getUpcomingMeetEvents } from "./meet-data";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 export default async function MeetsPage() {
   const [meetEvents, makeOptions] = await Promise.all([

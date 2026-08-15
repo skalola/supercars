@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { logoutAction } from "@/app/actions/auth-session";
 import { ClaimVinButton } from "@/components/garage/ClaimVinButton";
+import { clearCachedNavigationSession } from "@/components/site/navigation-session-cache";
 
-type SiteHeaderProps = {
+export type SiteHeaderProps = {
   isSignedIn: boolean;
   isAdmin: boolean;
   userLabel: string;
@@ -152,7 +153,7 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
               <Link href="/transactions" className="site-account-link" role="menuitem" onClick={closeMenus}>
                 Transactions
               </Link>
-              <form action={logoutAction}>
+              <form action={logoutAction} onSubmit={clearCachedNavigationSession}>
                 <button type="submit" className="site-account-button" role="menuitem">
                   Log out
                 </button>

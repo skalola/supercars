@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   createDealerPurchasePackage,
   createInsuranceQuotePackage,
@@ -95,6 +96,20 @@ export default function PurchaseWizard({
     setDeliverySubmitted(false);
     setIsOpen(false);
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsOpen(false);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
 
   const handleFinalSubmit = async () => {
     const { streetAddress, city, state, postalCode } = deliveryAddress;
@@ -193,9 +208,16 @@ export default function PurchaseWizard({
     );
   }
 
-  return (
-    <div className="purchase-wizard-backdrop">
-      <div className="purchase-wizard-panel">
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      className="purchase-wizard-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) resetWizard();
+      }}
+    >
+      <div className="purchase-wizard-panel" role="dialog" aria-modal="true" aria-labelledby="purchase-wizard-title">
         {/* Header */}
         <div style={{
           padding: "20px 24px",
@@ -206,7 +228,7 @@ export default function PurchaseWizard({
           background: "#f8fafc"
         }}>
           <div>
-            <h3 style={{ fontSize: "18px", fontWeight: 800, color: "#111827", margin: 0 }}>
+            <h3 id="purchase-wizard-title" style={{ fontSize: "18px", fontWeight: 800, color: "#111827", margin: 0 }}>
               Vehicle Purchase Experience
             </h3>
             <p style={{ fontSize: "13px", color: "#6b7280", margin: "2px 0 0 0" }}>
@@ -248,6 +270,7 @@ export default function PurchaseWizard({
           </div>
           <button
             onClick={resetWizard}
+            aria-label="Close purchase wizard"
             style={{
               background: "none",
               border: "none",
@@ -841,6 +864,7 @@ export default function PurchaseWizard({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -5,6 +5,7 @@
 
 import { useState, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
+import { upload } from "@vercel/blob/client";
 import {
   updateVehicleProfile,
   addVehicleModification,
@@ -14,12 +15,13 @@ import {
 } from "@/app/actions/passport";
 import { calculateModifiedPerformance } from "@/lib/parts/performance";
 import {
-  uploadVehiclePhoto,
+  registerUploadedVehiclePhoto,
   deleteVehiclePhoto,
   reorderVehiclePhotos,
   uploadVehicleDocument,
   deleteVehicleDocument
 } from "@/app/actions/media";
+import { isAcceptedVehiclePhoto, prepareVehiclePhoto } from "@/lib/media/client-image-upload";
 import type { ManualPartTypeGroup } from "@/lib/parts/manual-part-options";
 
 const CUSTOM_OPTION_VALUE = "__custom";
@@ -76,6 +78,7 @@ export default function VehicleEditorForm({
   // 5. Photos State
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
   const [photoCaption, setPhotoCaption] = useState("");
+  const [photoUploadStatus, setPhotoUploadStatus] = useState("");
   const [draggedPhotoId, setDraggedPhotoId] = useState<string | null>(null);
 
   // 6. Documents State
@@ -112,21 +115,46 @@ export default function VehicleEditorForm({
     }
     setLoading(true);
     try {
-      for (const photoFile of photoFiles) {
-        const formData = new FormData();
-        formData.append("file", photoFile);
-        formData.append("caption", photoCaption);
-        await uploadVehiclePhoto(vehicle.vin, formData);
+      for (const [index, photoFile] of photoFiles.entries()) {
+        setPhotoUploadStatus(`Preparing photo ${index + 1} of ${photoFiles.length}...`);
+        const prepared = await prepareVehiclePhoto(photoFile);
+        const pathname = `vehicles/${vehicle.id}/photos/${crypto.randomUUID()}.jpg`;
+        const blob = await upload(pathname, prepared.file, {
+          access: "public",
+          handleUploadUrl: "/api/vehicle-photos/upload",
+          clientPayload: JSON.stringify({ vin: vehicle.vin }),
+          contentType: "image/jpeg",
+          multipart: prepared.file.size > 5 * 1024 * 1024,
+          onUploadProgress: ({ percentage }) => {
+            setPhotoUploadStatus(
+              `Uploading photo ${index + 1} of ${photoFiles.length} (${Math.round(percentage)}%)...`,
+            );
+          },
+        });
+        setPhotoUploadStatus(`Saving photo ${index + 1} of ${photoFiles.length}...`);
+        await registerUploadedVehiclePhoto(vehicle.vin, {
+          url: blob.url,
+          pathname: blob.pathname,
+          caption: photoCaption,
+        });
+        setPhotoFiles((current) => current.filter((file) => file !== photoFile));
       }
       showSuccess(`${photoFiles.length} ${photoFiles.length === 1 ? "photo" : "photos"} uploaded successfully.`);
       setPhotoFiles([]);
       setPhotoCaption("");
+      setPhotoUploadStatus("");
       const fileInput = document.getElementById("photo-file-input") as HTMLInputElement;
       if (fileInput) fileInput.value = "";
       router.refresh();
     } catch (err: any) {
-      showError(err.message || "Could not upload photo.");
+      const message = err?.message || "Could not upload photo.";
+      showError(
+        /unexpected response/i.test(message)
+          ? "The photo upload was interrupted. Check your connection and try again."
+          : message,
+      );
     } finally {
+      setPhotoUploadStatus("");
       setLoading(false);
     }
   }
@@ -966,13 +994,29 @@ export default function VehicleEditorForm({
                 multiple
                 id="photo-file-input"
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={(e) => setPhotoFiles(Array.from(e.target.files || []).slice(0, 8))}
+                accept="image/jpeg,image/png,image/heic,image/heif,.jpg,.jpeg,.png,.heic,.heif"
+                onChange={(event) => {
+                  const selected = Array.from(event.target.files || []).slice(0, 8);
+                  const invalid = selected.filter((file) => !isAcceptedVehiclePhoto(file));
+                  if (invalid.length > 0) {
+                    showError("Choose JPG, JPEG, PNG, HEIC, or HEIF photos only.");
+                    setPhotoFiles([]);
+                    event.target.value = "";
+                    return;
+                  }
+                  setPhotoFiles(selected);
+                  setErrorMessage(null);
+                }}
                 style={inputStyle}
               />
               <small style={{ display: "block", marginTop: "6px", color: "#6b7280" }}>
-                Select up to 8 JPG, PNG, or WebP images. Each image can be up to 8 MB.
+                Select up to 8 JPG, JPEG, PNG, HEIC, or HEIF photos. iPhone photos are converted and optimized automatically.
               </small>
+              {photoUploadStatus ? (
+                <small role="status" aria-live="polite" style={{ display: "block", marginTop: "8px", color: "#b91c1c", fontWeight: 700 }}>
+                  {photoUploadStatus}
+                </small>
+              ) : null}
             </div>
             <div>
               <label style={labelStyle}>Caption / Description</label>
@@ -1015,7 +1059,7 @@ export default function VehicleEditorForm({
                             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                               <span style={{ fontSize: "18px" }}>📄</span>
                               <div>
-                                <a href={doc.filePath} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 600, color: "#1d4ed8", fontSize: "14px", textDecoration: "none" }}>
+                                <a href={`/api/vehicle-documents/${doc.id}`} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 600, color: "#1d4ed8", fontSize: "14px", textDecoration: "none" }}>
                                   {doc.title}
                                 </a>
                                 <p style={{ fontSize: "11px", color: "#9ca3af", margin: "2px 0 0 0" }}>Uploaded: {new Date(doc.createdAt).toLocaleDateString()}</p>

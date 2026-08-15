@@ -4,14 +4,13 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-
-const VIN_RE = /^[A-HJ-NPR-Z0-9]{17}$/;
+import { enforceActionRateLimit } from "@/lib/security/action-rate-limit";
+import { vinClaimSchema } from "@/lib/validation/transaction-inputs";
+import { garageItemIdSchema } from "@/lib/validation/community-inputs";
 
 export async function claimVehicle(
-  modelId: string, 
-  vin: string, 
-  year: number, 
-  decodedData: Record<string, string | null | undefined>
+  modelId: string,
+  vin: string,
 ) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -19,75 +18,49 @@ export async function claimVehicle(
   }
 
   const userId = session.user.id;
+  const parsedVin = vinClaimSchema.safeParse(vin);
+  if (!parsedVin.success) throw new Error("Enter a valid 17-character VIN.");
+  vin = parsedVin.data;
+  modelId = garageItemIdSchema.parse(modelId);
+  await enforceActionRateLimit({
+    actorId: userId,
+    action: "claim_vehicle",
+    bucketKey: vin,
+    limit: 5,
+    windowMs: 60 * 60 * 1000,
+  });
 
   try {
+    const [decodedData, selectedModel] = await Promise.all([
+      decodeVin(vin),
+      prisma.model.findUnique({
+        where: { id: modelId },
+        select: { id: true, name: true, make: { select: { name: true } } },
+      }),
+    ]);
+    if (!decodedData?.Make || !decodedData.Model || !selectedModel) {
+      throw new Error("Could not verify this VIN against the selected model.");
+    }
+
+    const makeMatches = vehicleNamesMatch(decodedData.Make, selectedModel.make.name);
+    const modelMatches = vehicleNamesMatch(decodedData.Model, selectedModel.name);
+    if (!makeMatches || !modelMatches) {
+      throw new Error("This VIN does not match the selected vehicle.");
+    }
+
     const existingVehicle = await prisma.vehicle.findUnique({
       where: { vin },
       select: {
-        id: true,
+        year: true,
       },
     });
-
-    const vehicleData = {
-      ownerId: userId,
-      status: "CLAIMED",
+    await upsertClaimedVehicle({
+      userId,
       modelId,
-      year,
-      color: decodedData.color,
-      mileage: null, // Not provided by NHTSA API
-      transmission: decodedData.TransmissionStyle,
-      drivetrain: decodedData.DriveType,
-      engine: decodedData.EngineModel,
-      bodyStyle: decodedData.BodyClass,
-      fuelType: decodedData.FuelTypePrimary,
-      manufacturer: decodedData.Manufacturer,
-      plantCountry: decodedData.PlantCountry,
-      // New comprehensive fields
-      trim: decodedData.Trim,
-      series: decodedData.Series,
-      vehicleType: decodedData.VehicleType,
-      doors: decodedData.Doors,
-      engineConfiguration: decodedData.EngineConfiguration,
-      engineCylinders: decodedData.EngineCylinders,
-      displacement: decodedData.DisplacementL,
-      turbo: decodedData.Turbo,
-      transmissionSpeeds: decodedData.TransmissionSpeeds,
-      plantCity: decodedData.PlantCity,
-      gvwr: decodedData.GVWR,
-      brakeSystem: decodedData.BrakeSystemType,
-      electrificationLevel: decodedData.ElectrificationLevel,
-      // Additional fields requested
-      destinationMarket: decodedData.DestinationMarket,
-      engineHP: decodedData.EngineHP,
-      engineKW: decodedData.EngineKW,
-      engineManufacturer: decodedData.EngineManufacturer,
-      plantState: decodedData.PlantState,
-      abs: decodedData.ABS,
-      esc: decodedData.ESC,
-      tpms: decodedData.TPMS,
-      rearVisibilitySystem: decodedData.RearVisibilitySystem,
-      parkAssist: decodedData.ParkAssist,
-      adaptiveDrivingBeam: decodedData.AdaptiveDrivingBeam,
-      airBagLocFront: decodedData.AirBagLocFront,
-      airBagLocKnee: decodedData.AirBagLocKnee,
-      airBagLocSide: decodedData.AirBagLocSide,
-      pretensioner: decodedData.Pretensioner,
-      seatBeltsAll: decodedData.SeatBeltsAll,
-    };
-
-    if (existingVehicle) {
-      await prisma.vehicle.update({
-        where: { id: existingVehicle.id },
-        data: vehicleData,
-      });
-    } else {
-      await prisma.vehicle.create({
-        data: {
-          vin,
-          ...vehicleData,
-        },
-      });
-    }
+      vin,
+      year: existingVehicle?.year ?? (Number(decodedData.ModelYear) || new Date().getFullYear()),
+      decodedData,
+    });
   } catch (e) {
     console.error("Claim error:", e);
     throw new Error("Could not process vehicle claim.");
@@ -102,10 +75,18 @@ export async function claimVehicleByVin(vinInput: string) {
     return { ok: false, reason: "unauthenticated", message: "Sign in to claim a vehicle." };
   }
 
-  const vin = vinInput.trim().toUpperCase();
-  if (!VIN_RE.test(vin)) {
+  const parsedVin = vinClaimSchema.safeParse(vinInput);
+  if (!parsedVin.success) {
     return { ok: false, reason: "invalid_vin", message: "Enter a valid 17-character VIN." };
   }
+  const vin = parsedVin.data;
+  await enforceActionRateLimit({
+    actorId: session.user.id,
+    action: "claim_vehicle",
+    bucketKey: vin,
+    limit: 5,
+    windowMs: 60 * 60 * 1000,
+  });
 
   const decodedData = await decodeVin(vin);
   if (!decodedData?.Make || !decodedData?.Model) {
@@ -187,6 +168,12 @@ function normalizeVehicleText(value: string) {
     .trim();
 }
 
+function vehicleNamesMatch(left: string, right: string) {
+  const normalizedLeft = normalizeVehicleText(left);
+  const normalizedRight = normalizeVehicleText(right);
+  return normalizedLeft === normalizedRight || normalizedLeft.includes(normalizedRight) || normalizedRight.includes(normalizedLeft);
+}
+
 async function upsertClaimedVehicle({
   userId,
   modelId,
@@ -245,12 +232,34 @@ async function upsertClaimedVehicle({
     seatBeltsAll: decodedData.SeatBeltsAll,
   };
 
-  await prisma.vehicle.upsert({
-    where: { vin },
-    update: vehicleData,
-    create: {
+  const updated = await prisma.vehicle.updateMany({
+    where: {
       vin,
-      ...vehicleData,
+      OR: [{ ownerId: null }, { ownerId: userId }],
     },
+    data: vehicleData,
   });
+  if (updated.count > 0) return;
+
+  try {
+    await prisma.vehicle.create({ data: { vin, ...vehicleData } });
+    return;
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) throw error;
+  }
+
+  const retried = await prisma.vehicle.updateMany({
+    where: {
+      vin,
+      OR: [{ ownerId: null }, { ownerId: userId }],
+    },
+    data: vehicleData,
+  });
+  if (retried.count === 0) {
+    throw new Error("This vehicle is already claimed by another owner.");
+  }
+}
+
+function isUniqueConstraintError(error: unknown) {
+  return Boolean(error && typeof error === "object" && "code" in error && error.code === "P2002");
 }

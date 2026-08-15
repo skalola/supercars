@@ -3,6 +3,7 @@ import {
   executePartnerDecisionByAction,
   getPartnerFulfillmentPackage,
 } from "@/lib/fulfillment/service";
+import { partnerDecisionSubmissionSchema } from "@/lib/validation/transaction-inputs";
 
 interface RouteParams {
   params: Promise<{
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     note = parsed.note;
     submittedVia = parsed.submittedVia;
   } catch {
-    // Body is optional
+    return NextResponse.json({ error: "Invalid partner decision submission." }, { status: 400 });
   }
 
   const result = await executePartnerDecisionByAction(token, "DECLINE", note, {
@@ -81,9 +82,9 @@ async function readDecisionSubmission(request: NextRequest): Promise<{
 }> {
   const contentType = request.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
-    const body = await request.json();
+    const body = partnerDecisionSubmissionSchema.parse(await request.json());
     return {
-      note: typeof body.note === "string" ? body.note : undefined,
+      note: body.note,
       submittedVia: "JSON",
     };
   }
@@ -93,9 +94,9 @@ async function readDecisionSubmission(request: NextRequest): Promise<{
     contentType.includes("multipart/form-data")
   ) {
     const formData = await request.formData();
-    const note = formData.get("note");
+    const body = partnerDecisionSubmissionSchema.parse({ note: formData.get("note") || undefined });
     return {
-      note: typeof note === "string" ? note : undefined,
+      note: body.note,
       submittedVia: "FORM",
     };
   }

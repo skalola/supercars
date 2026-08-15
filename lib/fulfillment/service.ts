@@ -16,6 +16,10 @@ import {
   refundDeposit,
   voidDeposit,
 } from "@/lib/payments/payment-service";
+import {
+  getCancellationSettlement,
+  getPartnerDecisionStatus,
+} from "@/lib/payments/payment-policy";
 import type {
   CreateFulfillmentRequestInput,
   FulfillmentActorType,
@@ -26,6 +30,11 @@ import type {
   PartnerDecisionInput,
 } from "./types";
 import { Prisma } from "@prisma/client";
+import {
+  enforceActionRateLimit,
+  hashRateLimitIdentifier,
+  isActionRateLimitError,
+} from "@/lib/security/action-rate-limit";
 
 const TERMINAL_FULFILLMENT_STATUSES = new Set([
   "ACCEPTED",
@@ -567,7 +576,7 @@ export async function createFulfillmentRequest(input: CreateFulfillmentRequestIn
 
   // If partner email is unresolved/missing, set initial status to DRAFT to prevent dispatching to guessed emails
   let initialStatus: FulfillmentStatus = input.status || "SENT";
-  if (!partnerEmailValid && initialStatus === "SENT") {
+  if (!partnerEmailValid && (initialStatus === "SENT" || initialStatus === "READY_TO_SEND")) {
     initialStatus = "DRAFT";
   }
 
@@ -589,7 +598,7 @@ export async function createFulfillmentRequest(input: CreateFulfillmentRequestIn
   const expectedPartnerCommission =
     input.fees?.filter((f) => f.feeType === "REFERRAL_FEE").reduce((acc, f) => acc + f.amount, 0) || 0;
   const refundableAmount = input.depositIntent?.amount || 0;
-  const initialPaymentStatus = input.depositIntent ? "AUTHORIZED" : "NOT_REQUIRED";
+  const initialPaymentStatus = input.paymentStatus || (input.depositIntent ? "AUTHORIZED" : "NOT_REQUIRED");
   const authorizedDeposit = input.depositIntent
     ? await authorizeDeposit({
         amount: input.depositIntent.amount,
@@ -708,7 +717,7 @@ export async function createFulfillmentRequest(input: CreateFulfillmentRequestIn
 
   // Dispatch Buyer Confirmation Email if buyer email is available
   const buyerParty = fulfillmentRequest.parties.find((p) => p.partyType === "BUYER");
-  if (buyerParty && buyerParty.email) {
+  if (!input.suppressBuyerConfirmation && buyerParty && buyerParty.email) {
     const vehicleSummary = fulfillmentRequest.vehicle
       ? `${fulfillmentRequest.vehicle.year} ${fulfillmentRequest.vehicle.model.make.name} ${fulfillmentRequest.vehicle.model.name} (VIN: ${fulfillmentRequest.vehicle.vin})`
       : "Vehicle Fulfillment Request";
@@ -820,7 +829,7 @@ export async function getPartnerFulfillmentPackage(token: string) {
         : null,
       depositHold: req.depositIntents[0]
         ? {
-            amount: req.depositIntents[0].amount,
+            amount: Number(req.depositIntents[0].amount),
             currency: req.depositIntents[0].currency,
             status: req.depositIntents[0].status,
           }
@@ -879,6 +888,11 @@ export async function getBuyerFulfillmentTransaction(publicToken: string) {
     success: true,
     request: {
       ...req,
+      fees: req.fees.map((fee) => ({ ...fee, amount: Number(fee.amount) })),
+      depositIntents: req.depositIntents.map((deposit) => ({
+        ...deposit,
+        amount: Number(deposit.amount),
+      })),
       events: [...req.events].reverse(),
     },
   };
@@ -896,6 +910,19 @@ export async function submitPartnerDecision(input: PartnerDecisionInput) {
 
   if (!tokenRecord) {
     return { error: "INVALID_TOKEN", message: "Token not found or invalid." };
+  }
+  try {
+    await enforceActionRateLimit({
+      actorId: hashRateLimitIdentifier(input.token),
+      action: "partner_decision",
+      limit: 10,
+      windowMs: 60 * 60 * 1000,
+    });
+  } catch (error) {
+    if (isActionRateLimitError(error)) {
+      return { error: "RATE_LIMITED", message: error.message };
+    }
+    throw error;
   }
 
   if (tokenRecord.actionTaken) {
@@ -919,29 +946,39 @@ export async function submitPartnerDecision(input: PartnerDecisionInput) {
   }
 
   const previousStatus = req.status;
-  const newStatus: FulfillmentStatus =
-    input.decision === "ACCEPTED"
-      ? req.requestType === "SERVICE_BOOKING"
-        ? "ACCEPTED_AWAITING_PAYMENT"
-        : "ACCEPTED"
-      : "DECLINED";
+  const hasAuthorizedServiceBooking = req.requestType === "SERVICE_BOOKING" &&
+    (req.paymentStatus === "AUTHORIZED" || req.paymentStatus === "PAID");
+  const newStatus = (
+    getPartnerDecisionStatus(req.requestType, input.decision, req.paymentStatus)
+  ) as FulfillmentStatus;
   const eligibleDeposits = req.depositIntents.filter((deposit) => deposit.status === "AUTHORIZED" || deposit.status === "HELD");
-  const refundableDealerDeposits = req.depositIntents.filter((deposit) => deposit.status === "CAPTURED");
+  const capturedDeposits = req.depositIntents.filter((deposit) => deposit.status === "CAPTURED");
   let totalCaptured = 0;
 
   try {
-    if (input.decision === "ACCEPTED" && req.requestType !== "SERVICE_BOOKING") {
+    if (
+      req.requestType === "SERVICE_BOOKING" &&
+      req.paymentStatus === "AUTHORIZED" &&
+      eligibleDeposits.length === 0
+    ) {
+      throw new Error("Authorized service booking is missing its payment authorization record.");
+    }
+    if (
+      input.decision === "ACCEPTED" &&
+      (req.requestType !== "SERVICE_BOOKING" || hasAuthorizedServiceBooking)
+    ) {
       for (const deposit of eligibleDeposits) {
-        await captureDeposit(deposit.transactionRef || "", deposit.amount);
-        totalCaptured += deposit.amount;
+        const amount = Number(deposit.amount);
+        await captureDeposit(deposit.transactionRef || "", amount);
+        totalCaptured += amount;
       }
     } else if (input.decision === "DECLINED") {
       for (const deposit of eligibleDeposits) {
         await voidDeposit(deposit.transactionRef || "");
       }
-      if (req.requestType === "DEALER_PURCHASE") {
-        for (const deposit of refundableDealerDeposits) {
-          await refundDeposit(deposit.transactionRef || "", deposit.amount);
+      if (req.requestType === "DEALER_PURCHASE" || req.requestType === "SERVICE_BOOKING") {
+        for (const deposit of capturedDeposits) {
+          await refundDeposit(deposit.transactionRef || "", Number(deposit.amount));
         }
       }
     }
@@ -1002,24 +1039,56 @@ export async function submitPartnerDecision(input: PartnerDecisionInput) {
 
     // Handle Payment Hold / DepositIntent capture/release rules
     if (input.decision === "ACCEPTED" && req.requestType === "SERVICE_BOOKING") {
-      for (const fee of req.fees) {
-        if (fee.feeType === "SERVICE_FEE" && fee.status === "ESTIMATED") {
-          await tx.fulfillmentFee.update({
-            where: { id: fee.id },
-            data: { status: "AUTHORIZED" },
-          });
+      if (hasAuthorizedServiceBooking) {
+        for (const deposit of req.depositIntents) {
+          if (deposit.status === "AUTHORIZED" || deposit.status === "HELD") {
+            await tx.depositIntent.update({
+              where: { id: deposit.id },
+              data: {
+                status: "CAPTURED",
+                capturedAt: new Date(),
+              },
+            });
+          }
         }
-      }
+        for (const fee of req.fees) {
+          if (fee.feeType === "SERVICE_FEE" && (fee.status === "AUTHORIZED" || fee.status === "ESTIMATED")) {
+            await tx.fulfillmentFee.update({
+              where: { id: fee.id },
+              data: { status: "CAPTURED" },
+            });
+          }
+        }
+        await tx.fulfillmentRequest.update({
+          where: { id: req.id },
+          data: {
+            status: "CONFIRMED",
+            paymentStatus: "PAID",
+            partnerAcceptedAt: new Date(),
+            collectedAmount: totalCaptured || req.collectedAmount,
+            payoutStatus: "PENDING_RECONCILIATION",
+          },
+        });
+      } else {
+        for (const fee of req.fees) {
+          if (fee.feeType === "SERVICE_FEE" && fee.status === "ESTIMATED") {
+            await tx.fulfillmentFee.update({
+              where: { id: fee.id },
+              data: { status: "AUTHORIZED" },
+            });
+          }
+        }
 
-      await tx.fulfillmentRequest.update({
-        where: { id: req.id },
-        data: {
-          status: "ACCEPTED_AWAITING_PAYMENT",
-          paymentStatus: "PAYMENT_REQUIRED",
-          partnerAcceptedAt: new Date(),
-          payoutStatus: "UNSETTLED",
-        },
-      });
+        await tx.fulfillmentRequest.update({
+          where: { id: req.id },
+          data: {
+            status: "ACCEPTED_AWAITING_PAYMENT",
+            paymentStatus: "PAYMENT_REQUIRED",
+            partnerAcceptedAt: new Date(),
+            payoutStatus: "UNSETTLED",
+          },
+        });
+      }
     } else if (input.decision === "ACCEPTED") {
       for (const deposit of req.depositIntents) {
         if (deposit.status === "AUTHORIZED" || deposit.status === "HELD") {
@@ -1069,7 +1138,7 @@ export async function submitPartnerDecision(input: PartnerDecisionInput) {
               releasedAt: new Date(),
             },
           });
-        } else if (req.requestType === "DEALER_PURCHASE" && deposit.status === "CAPTURED") {
+        } else if ((req.requestType === "DEALER_PURCHASE" || req.requestType === "SERVICE_BOOKING") && deposit.status === "CAPTURED") {
           await tx.depositIntent.update({
             where: { id: deposit.id },
             data: {
@@ -1080,7 +1149,8 @@ export async function submitPartnerDecision(input: PartnerDecisionInput) {
         }
       }
       for (const fee of req.fees) {
-        if (fee.status === "AUTHORIZED" || fee.status === "ESTIMATED") {
+        if (fee.status === "AUTHORIZED" || fee.status === "ESTIMATED" ||
+          (req.requestType === "SERVICE_BOOKING" && fee.status === "CAPTURED")) {
           await tx.fulfillmentFee.update({
             where: { id: fee.id },
             data: { status: "REFUNDED" },
@@ -1092,7 +1162,10 @@ export async function submitPartnerDecision(input: PartnerDecisionInput) {
         where: { id: req.id },
         data: {
           status: newStatus,
-          paymentStatus: req.requestType === "DEALER_PURCHASE" && refundableDealerDeposits.length > 0 ? "REFUNDED" : "VOIDED",
+          paymentStatus:
+            (req.requestType === "DEALER_PURCHASE" || req.requestType === "SERVICE_BOOKING") && capturedDeposits.length > 0
+              ? "REFUNDED"
+              : "VOIDED",
           refundableAmount: 0,
           payoutStatus: "UNSETTLED",
         },
@@ -1114,15 +1187,17 @@ export async function submitPartnerDecision(input: PartnerDecisionInput) {
       recipientEmail: buyerParty.email,
       packageTitle:
         input.decision === "ACCEPTED" && req.requestType === "SERVICE_BOOKING"
-          ? `Service booking accepted by '${tokenRecord.partnerName || "Service shop"}' — payment required`
+          ? hasAuthorizedServiceBooking
+            ? `Service booking confirmed by '${tokenRecord.partnerName || "Service shop"}'`
+            : `Service booking accepted by '${tokenRecord.partnerName || "Service shop"}' — payment required`
           : `Request ${input.decision.toLowerCase()} by partner '${tokenRecord.partnerName || "Partner"}'`,
       vehicleSummary,
       reviewUrl:
-        input.decision === "ACCEPTED" && req.requestType === "SERVICE_BOOKING"
+        input.decision === "ACCEPTED" && req.requestType === "SERVICE_BOOKING" && !hasAuthorizedServiceBooking
           ? `/fulfillment/buyer/${req.publicTransactionToken}`
           : `/transactions/${req.publicTransactionToken}`,
       additionalDetails:
-        input.decision === "ACCEPTED" && req.requestType === "SERVICE_BOOKING"
+        input.decision === "ACCEPTED" && req.requestType === "SERVICE_BOOKING" && !hasAuthorizedServiceBooking
           ? {
               "Next Step": "Pay the SUPERCAR DASH service-booking fee to confirm the appointment.",
               "Payment Status": "PAYMENT_REQUIRED",
@@ -1276,7 +1351,8 @@ export async function getUserFulfillmentTransactions(
     `),
     prisma.$queryRaw<SummaryDepositRow[]>(Prisma.sql`
       SELECT DISTINCT ON (deposit."fulfillmentRequestId")
-        deposit."id", deposit."fulfillmentRequestId", deposit."amount", deposit."currency", deposit."status"
+        deposit."id", deposit."fulfillmentRequestId", deposit."amount"::double precision AS "amount",
+        deposit."currency", deposit."status"
       FROM "DepositIntent" deposit
       WHERE deposit."fulfillmentRequestId" IN (${Prisma.join(requestIds)})
       ORDER BY deposit."fulfillmentRequestId", deposit."createdAt" DESC
@@ -1288,6 +1364,9 @@ export async function getUserFulfillmentTransactions(
 
   return requests.map((request) => ({
     ...request,
+    expectedPlatformFee: Number(request.expectedPlatformFee),
+    expectedPartnerCommission: Number(request.expectedPartnerCommission),
+    collectedAmount: Number(request.collectedAmount),
     parties: partyByRequestId.has(request.id) ? [partyByRequestId.get(request.id)!] : [],
     fees: [],
     depositIntents: depositByRequestId.has(request.id) ? [depositByRequestId.get(request.id)!] : [],
@@ -1435,10 +1514,10 @@ export async function getFulfillmentByIdForUser(idOrToken: string, userId?: stri
         requestType: req.requestType,
         status: req.status,
         paymentStatus: req.paymentStatus,
-        expectedPlatformFee: req.expectedPlatformFee,
-        expectedPartnerCommission: req.expectedPartnerCommission,
-        collectedAmount: req.collectedAmount,
-        refundableAmount: req.refundableAmount,
+        expectedPlatformFee: Number(req.expectedPlatformFee),
+        expectedPartnerCommission: Number(req.expectedPartnerCommission),
+        collectedAmount: Number(req.collectedAmount),
+        refundableAmount: Number(req.refundableAmount),
         payoutStatus: req.payoutStatus,
         cancellationReason: req.cancellationReason,
         cancelledByActor: req.cancelledByActor,
@@ -1464,7 +1543,7 @@ export async function getFulfillmentByIdForUser(idOrToken: string, userId?: stri
         },
         depositHold: req.depositIntents[0]
           ? {
-              amount: req.depositIntents[0].amount,
+              amount: Number(req.depositIntents[0].amount),
               currency: req.depositIntents[0].currency,
               status: req.depositIntents[0].status,
             }
@@ -1485,10 +1564,10 @@ export async function getFulfillmentByIdForUser(idOrToken: string, userId?: stri
       requestType: req.requestType,
       status: req.status,
       paymentStatus: req.paymentStatus,
-      expectedPlatformFee: req.expectedPlatformFee,
-      expectedPartnerCommission: req.expectedPartnerCommission,
-      collectedAmount: req.collectedAmount,
-      refundableAmount: req.refundableAmount,
+      expectedPlatformFee: Number(req.expectedPlatformFee),
+      expectedPartnerCommission: Number(req.expectedPartnerCommission),
+      collectedAmount: Number(req.collectedAmount),
+      refundableAmount: Number(req.refundableAmount),
       payoutStatus: req.payoutStatus,
       cancellationReason: req.cancellationReason,
       cancelledByActor: req.cancelledByActor,
@@ -1511,8 +1590,11 @@ export async function getFulfillmentByIdForUser(idOrToken: string, userId?: stri
         scopedData: parsedScope,
       },
       parties: req.parties,
-      fees: req.fees,
-      depositIntents: req.depositIntents,
+      fees: req.fees.map((fee) => ({ ...fee, amount: Number(fee.amount) })),
+      depositIntents: req.depositIntents.map((deposit) => ({
+        ...deposit,
+        amount: Number(deposit.amount),
+      })),
       events: userFacingEvents,
       nextSteps: getNextStepsForStatus(req.status),
     },
@@ -1643,7 +1725,7 @@ export async function reDispatchFulfillmentRequest(
 
       return {
         feeType,
-        amount: fee.amount,
+        amount: Number(fee.amount),
         currency: fee.currency,
         description: fee.description || undefined,
         status,
@@ -1651,7 +1733,7 @@ export async function reDispatchFulfillmentRequest(
     }),
     depositIntent: original.depositIntents[0]
       ? {
-          amount: original.depositIntents[0].amount,
+          amount: Number(original.depositIntents[0].amount),
           paymentMethod: original.depositIntents[0].paymentMethod || "CREDIT_CARD_HOLD",
         }
       : undefined,
@@ -1698,9 +1780,8 @@ export async function cancelFulfillmentRequest(params: CancelFulfillmentRequestP
 
   const isPreAcceptance = req.status !== "ACCEPTED";
   const previousStatus = req.status;
-  const policyFee = 100;
-  const originalDeposit = req.depositIntents[0]?.amount || req.collectedAmount || 0;
-  const refundAmount = Math.max(0, originalDeposit - policyFee);
+  const originalDeposit = Number(req.depositIntents[0]?.amount || req.collectedAmount || 0);
+  const { policyFee, refundAmount } = getCancellationSettlement(originalDeposit);
 
   try {
     if (isPreAcceptance) {
@@ -1713,7 +1794,7 @@ export async function cancelFulfillmentRequest(params: CancelFulfillmentRequestP
       let remainingRefundAmount = refundAmount;
       for (const deposit of req.depositIntents) {
         if (deposit.status === "CAPTURED") {
-          const amountToRefund = Math.min(deposit.amount, remainingRefundAmount);
+          const amountToRefund = Math.min(Number(deposit.amount), remainingRefundAmount);
           if (amountToRefund > 0) {
             await refundDeposit(deposit.transactionRef || "", amountToRefund);
             remainingRefundAmount -= amountToRefund;
@@ -1870,7 +1951,7 @@ export async function cancelConfirmedServiceBookingByPartner(token: string) {
   const capturedDeposits = req.depositIntents.filter((deposit) => deposit.status === "CAPTURED");
   try {
     for (const deposit of capturedDeposits) {
-      await refundDeposit(deposit.transactionRef || "", deposit.amount);
+      await refundDeposit(deposit.transactionRef || "", Number(deposit.amount));
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Refund failed.";
@@ -1887,7 +1968,7 @@ export async function cancelConfirmedServiceBookingByPartner(token: string) {
     return { success: false, message: `Refund failed: ${message}` };
   }
 
-  const refundedAmount = capturedDeposits.reduce((sum, deposit) => sum + deposit.amount, 0);
+  const refundedAmount = capturedDeposits.reduce((sum, deposit) => sum + Number(deposit.amount), 0);
   const cancellationReason = `Service partner '${tokenRecord.partnerName || "Service partner"}' cancelled confirmed appointment and refunded the booking fee.`;
 
   await prisma.$transaction(async (tx) => {

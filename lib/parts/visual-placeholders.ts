@@ -1,3 +1,5 @@
+import { toStoragePartSystemSlug } from "./category-system";
+
 const BRAND_BASE = "/parts/placeholders/brand";
 const NODE_BASE = "/parts/placeholders/node";
 
@@ -14,6 +16,20 @@ const CATEGORY_COLORS: Record<string, { accent: string; glow: string }> = {
   "aero-body": { accent: "#f43f5e", glow: "#881337" },
   drivetrain: { accent: "#c084fc", glow: "#581c87" },
   "interior-safety": { accent: "#f9a8d4", glow: "#831843" },
+  "maintenance-service": { accent: "#f8fafc", glow: "#334155" },
+  engine: { accent: "#fb923c", glow: "#7c2d12" },
+  "air-induction": { accent: "#5eead4", glow: "#134e4a" },
+  "fuel-system": { accent: "#34d399", glow: "#064e3b" },
+  "exhaust-emissions": { accent: "#fb7185", glow: "#7f1d1d" },
+  "ecu-electronics": { accent: "#60a5fa", glow: "#1e3a8a" },
+  "transmission-drivetrain": { accent: "#c084fc", glow: "#581c87" },
+  "suspension-steering": { accent: "#a78bfa", glow: "#4c1d95" },
+  "body-exterior": { accent: "#f43f5e", glow: "#881337" },
+  aerodynamics: { accent: "#e879f9", glow: "#701a75" },
+  interior: { accent: "#f9a8d4", glow: "#831843" },
+  lighting: { accent: "#fde047", glow: "#713f12" },
+  "accessories-care": { accent: "#94a3b8", glow: "#1e293b" },
+  "performance-packages": { accent: "#ef4444", glow: "#7f1d1d" },
 };
 
 export function getBrandPlaceholderUrl(slug: string) {
@@ -65,7 +81,7 @@ export function brandPlaceholderSvg(slug: string) {
 
 export function nodePlaceholderSvg(slug: string, categorySlug?: string | null) {
   const label = titleFromSlug(slug);
-  const palette = CATEGORY_COLORS[categorySlug ?? ""] ?? { accent: "#ef4444", glow: "#450a0a" };
+  const palette = CATEGORY_COLORS[toStoragePartSystemSlug(categorySlug ?? "")] ?? { accent: "#ef4444", glow: "#450a0a" };
   const icon = iconForSlug(slug, categorySlug);
 
   return svgResponseString(`

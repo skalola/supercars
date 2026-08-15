@@ -1,13 +1,55 @@
 import Link from "next/link";
 import Image from "next/image";
+import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import GarageTabs from "../GarageTabs";
 import GarageSupportRail from "../GarageSupportRail";
+import GarageClubBadges from "../GarageClubBadges";
 import { getGarageDashboardData } from "../garage-data";
+import { buildPublicMetadata, humanizeSlug, privateMetadata } from "@/lib/seo";
 
-export default async function UserGaragePage({ params }: { params: Promise<{ username: string }> }) {
+type UserGaragePageProps = { params: Promise<{ username: string }> };
+
+export async function generateMetadata({ params }: UserGaragePageProps): Promise<Metadata> {
+  const { username } = await params;
+  const user = await prisma.user.findUnique({
+    where: { username },
+    select: {
+      name: true,
+      username: true,
+      image: true,
+      vehicles: {
+        where: { status: "CLAIMED", inventoryStatus: { notIn: ["REMOVED", "NEEDS_REVIEW", "ADMIN_TEST"] } },
+        select: {
+          year: true,
+          model: { select: { name: true, make: { select: { name: true } } } },
+          photos: { select: { filePath: true }, orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }], take: 1 },
+          images: { select: { url: true }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }], take: 1 },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+      _count: { select: { vehicles: { where: { status: "CLAIMED" } }, garageItems: true } },
+    },
+  });
+  if (!user) return privateMetadata;
+  const displayName = user.name || user.username || humanizeSlug(username);
+  const topCar = user.vehicles[0];
+  const topCarLabel = topCar ? `${topCar.year} ${topCar.model.make.name} ${topCar.model.name}` : null;
+  const totalCars = user._count.vehicles + user._count.garageItems;
+
+  return buildPublicMetadata({
+    title: `${displayName}'s Digital Garage`,
+    description: `${displayName}'s public enthusiast garage${topCarLabel ? ` featuring a ${topCarLabel}` : ""}. Explore ${totalCars} ${totalCars === 1 ? "car" : "cars"}, club badges, and ownership activity.`,
+    path: `/garage/${encodeURIComponent(username)}`,
+    image: topCar?.photos[0]?.filePath || topCar?.images[0]?.url || user.image,
+    keywords: [`${displayName} garage`, "digital car collection", topCarLabel || "enthusiast cars"],
+  });
+}
+
+export default async function UserGaragePage({ params }: UserGaragePageProps) {
   const { username } = await params;
   const session = await auth();
 
@@ -82,17 +124,7 @@ export default async function UserGaragePage({ params }: { params: Promise<{ use
               <span>{heroVehicleLabel}</span>
             </div>
           </div>
-          <div className="garage-profile-clubs" aria-label="Car club badges">
-            <span>Car Clubs</span>
-            <div>
-              {clubSummary.slice(0, 5).map((club) => (
-                <Link key={club.id} href={club.href} title={club.name} aria-label={club.name}>
-                  {club.logoUrl ? <Image src={club.logoUrl} alt="" width={40} height={40} unoptimized /> : <span>{club.name.slice(0, 2).toUpperCase()}</span>}
-                </Link>
-              ))}
-              {clubSummary.length === 0 ? <small>No club badges yet</small> : null}
-            </div>
-          </div>
+          <GarageClubBadges clubs={clubSummary} />
         </div>
 
         <div className="garage-page-stats garage-profile-stats" aria-label="Garage summary">
@@ -116,7 +148,6 @@ export default async function UserGaragePage({ params }: { params: Promise<{ use
         <GarageTabs claimedVehicles={claimedVehicles} savedVehicles={savedVehicles} previousVehicles={previousVehicles} isOwner={isOwner} />
         <aside className="garage-support-grid" aria-label="Garage social summary">
           <GarageSupportRail
-            clubs={clubSummary}
             serviceWatch={serviceWatch}
             recentActivity={recentActivity}
             isOwner={isOwner}

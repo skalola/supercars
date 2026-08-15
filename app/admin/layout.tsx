@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
+import type { Metadata } from "next";
 import { requireAdmin } from "@/lib/admin/auth";
 import { AdminNav } from "./AdminNav";
+import { privateMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = { ...privateMetadata, title: "Admin Command Center" };
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   await requireAdmin();

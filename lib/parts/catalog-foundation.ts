@@ -14,78 +14,23 @@ export type PartBrandSeed = {
 };
 
 export const PART_CATEGORY_SEEDS: PartCategorySeed[] = [
-  {
-    name: "Intake",
-    slug: "intake",
-    description: "Airboxes, filters, inlets, throttle bodies, and intake plumbing.",
-    displayOrder: 10,
-  },
-  {
-    name: "Exhaust",
-    slug: "exhaust",
-    description: "Mufflers, headers, downpipes, catalysts, valves, tips, and full exhaust systems.",
-    displayOrder: 20,
-  },
-  {
-    name: "ECU & Tuning",
-    slug: "ecu-tuning",
-    description: "ECU calibrations, piggybacks, transmission tunes, and engine management tools.",
-    displayOrder: 30,
-  },
-  {
-    name: "Forced Induction",
-    slug: "forced-induction",
-    description: "Turbocharger, supercharger, intercooler, and charge-air upgrades.",
-    displayOrder: 40,
-  },
-  {
-    name: "Fueling",
-    slug: "fueling",
-    description: "Injectors, pumps, rails, lines, flex-fuel, and fuel-system support parts.",
-    displayOrder: 50,
-  },
-  {
-    name: "Cooling",
-    slug: "cooling",
-    description: "Radiators, heat exchangers, oil coolers, tanks, fans, and coolant system upgrades.",
-    displayOrder: 60,
-  },
-  {
-    name: "Suspension",
-    slug: "suspension",
-    description: "Coilovers, springs, dampers, arms, bushings, links, and alignment hardware.",
-    displayOrder: 70,
-  },
-  {
-    name: "Brakes",
-    slug: "brakes",
-    description: "Pads, rotors, calipers, lines, fluid, and complete big-brake systems.",
-    displayOrder: 80,
-  },
-  {
-    name: "Wheels & Tires",
-    slug: "wheels-tires",
-    description: "Wheels, tires, spacers, studs, lug hardware, and track fitment support.",
-    displayOrder: 90,
-  },
-  {
-    name: "Aero & Body",
-    slug: "aero-body",
-    description: "Splitters, wings, diffusers, ducts, body kits, and carbon exterior parts.",
-    displayOrder: 100,
-  },
-  {
-    name: "Drivetrain",
-    slug: "drivetrain",
-    description: "Clutches, flywheels, axles, differentials, mounts, and transmission hardware.",
-    displayOrder: 110,
-  },
-  {
-    name: "Interior & Safety",
-    slug: "interior-safety",
-    description: "Seats, harnesses, steering wheels, cages, fire systems, and cockpit hardware.",
-    displayOrder: 120,
-  },
+  { name: "Maintenance & Service", slug: "maintenance-service", description: "Routine service parts, fluids, filters, plugs, belts, batteries, and service kits.", displayOrder: 10 },
+  { name: "Engine", slug: "engine", description: "Internal engine, lubrication, ignition, sealing, mounting, and engine-bay components.", displayOrder: 20 },
+  { name: "Air Induction", slug: "air-induction", description: "Intake, filtration, throttle, charge-air, turbocharger, and supercharger components.", displayOrder: 30 },
+  { name: "Fuel System", slug: "fuel-system", description: "Fuel delivery, injection, regulation, filtration, and fuel-system support components.", displayOrder: 40 },
+  { name: "Cooling", slug: "cooling", description: "Radiators, heat exchangers, oil coolers, tanks, fans, hoses, and thermostats.", displayOrder: 50 },
+  { name: "Exhaust & Emissions", slug: "exhaust-emissions", description: "Manifolds, catalysts, pipes, mufflers, valves, sensors, and complete exhaust systems.", displayOrder: 60 },
+  { name: "ECU & Electronics", slug: "ecu-electronics", description: "ECU calibration, controls, sensors, modules, diagnostics, and vehicle electronics.", displayOrder: 70 },
+  { name: "Transmission & Drivetrain", slug: "transmission-drivetrain", description: "Transmissions, clutches, differentials, axles, driveshafts, mounts, and related service parts.", displayOrder: 80 },
+  { name: "Suspension & Steering", slug: "suspension-steering", description: "Dampers, springs, arms, bushings, links, alignment, and steering components.", displayOrder: 90 },
+  { name: "Brakes", slug: "brakes", description: "Pads, rotors, calipers, lines, fluid, cooling, and complete brake systems.", displayOrder: 100 },
+  { name: "Wheels & Tires", slug: "wheels-tires", description: "Wheels, tires, spacers, studs, lug hardware, TPMS, and fitment support.", displayOrder: 110 },
+  { name: "Body & Exterior", slug: "body-exterior", description: "Body panels, trim, glass, grilles, covers, and exterior replacement components.", displayOrder: 120 },
+  { name: "Aerodynamics", slug: "aerodynamics", description: "Splitters, wings, diffusers, ducts, undertrays, and functional aerodynamic components.", displayOrder: 130 },
+  { name: "Interior", slug: "interior", description: "Seats, controls, trim, restraints, safety equipment, and cockpit components.", displayOrder: 140 },
+  { name: "Lighting", slug: "lighting", description: "Headlamps, tail lamps, indicators, bulbs, modules, and lighting controls.", displayOrder: 150 },
+  { name: "Accessories & Care", slug: "accessories-care", description: "Protection, storage, detailing, charging, tools, and vehicle-care accessories.", displayOrder: 160 },
+  { name: "Performance Packages", slug: "performance-packages", description: "Curated multi-system packages whose fitment and supporting requirements must be verified together.", displayOrder: 170 },
 ];
 
 export const PART_BRAND_SEEDS: PartBrandSeed[] = [

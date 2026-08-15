@@ -22,7 +22,7 @@ The fulfillment mail dispatcher defaults to `MAIL_PROVIDER=log`, which renders t
 
 ```bash
 MAIL_PROVIDER=resend # resend | sendgrid | postmark | log
-MAIL_FROM="SUPERCARS <no-reply@your-domain.com>"
+MAIL_FROM="SUPERCAR DASH <no-reply@your-domain.com>"
 MAIL_REPLY_TO="support@your-domain.com"
 NEXT_PUBLIC_APP_URL="https://your-production-domain.com"
 ```
@@ -85,6 +85,53 @@ PAYMENT_PROVIDER="ledger|stripe"
 
 Do not seed, reset, or recrawl inventory during Vercel builds. `postinstall` and `build` only generate Prisma Client and build Next.js.
 
+## Production Reliability
+
+Run pending database migrations as a deliberate release step before deploying code that depends on them:
+
+```bash
+npx prisma migrate deploy
+```
+
+The CI workflow in `.github/workflows/ci.yml` audits high-severity dependencies, validates Prisma, lints transaction-critical code, runs financial regression tests, and performs a production build.
+
+Before a production release, run the repeatable code and configuration gates:
+
+```bash
+npm run release:verify
+npm run release:check-config
+```
+
+The configuration check reports only pass/fail status and never prints secret values. It fails when production is still configured for ledger payments, logged email, test credentials, localhost URLs, or missing auth, cron, Stripe, Resend, Google, database, and Blob settings.
+
+Encrypted database backups require PostgreSQL client tools plus an encryption secret:
+
+```bash
+BACKUP_ENCRYPTION_KEY="..." npm run db:backup
+CONFIRM_RESTORE=supercardash \
+RESTORE_DATABASE_URL="postgresql://disposable-restore-target" \
+BACKUP_ENCRYPTION_KEY="..." \
+npm run db:restore -- .db-backups/supercardash-YYYYMMDDTHHMMSSZ.dump.enc
+```
+
+Use `pg_dump` and `pg_restore` from the same PostgreSQL major version as the source database. The local restore drill was validated with PostgreSQL 16 client and server tools.
+
+Always run restore drills against a disposable Neon branch or separate database, never the production database.
+
+Daily Neon usage alerts use the official consumption API and notify the operations email when network transfer or storage crosses 50%, 70%, or 85% of the configured allowance:
+
+```bash
+NEON_API_KEY="..."
+NEON_ORG_ID="..."
+NEON_PROJECT_ID="..."
+NEON_NETWORK_TRANSFER_LIMIT_BYTES="5368709120"
+NEON_STORAGE_LIMIT_BYTES_MONTH="5368709120"
+OPERATIONS_ALERT_EMAIL="operations@your-domain.com"
+CRON_SECRET="..."
+```
+
+Set quota values to the active Neon plan allowances. Consumption API access depends on the current Neon plan.
+
 ## Fulfillment Expiration Operations
 
 Partner decision links can be ignored instead of accepted or declined. Admins can manually process expired links from `/admin/fulfillment`, or run the same lifecycle processor from the command line:
@@ -99,14 +146,16 @@ See `docs/fulfillment-release-readiness.md` for the fulfillment checkpoint, QA c
 
 ## Test Logins
 
-The local login page includes controlled credentials for testing both regular-user and admin flows:
+The local login page includes controlled credentials for testing both regular-user and admin flows when all values are configured:
 
 ```bash
-USER_TEST_EMAIL="user@supercars.test"
-USER_TEST_PASSWORD="supercars-user"
-ADMIN_TEST_EMAIL="admin@supercars.test"
-ADMIN_TEST_PASSWORD="supercars-admin"
+USER_TEST_EMAIL="..."
+USER_TEST_PASSWORD="..."
+ADMIN_TEST_EMAIL="..."
+ADMIN_TEST_PASSWORD="..."
 ```
+
+Production disables these credential providers unless `ENABLE_TEST_CREDENTIALS="true"` is also explicitly configured. No default test email or password is used when values are absent.
 
 Regular users land in `/transactions`. Admins land in `/admin/fulfillment`. The global navigation reads the active session and exposes sign in, transactions, admin, garage, and logout controls based on role.
 

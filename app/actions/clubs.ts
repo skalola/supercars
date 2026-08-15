@@ -1,12 +1,20 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { createClubInviteToken, verifyClubInviteToken } from "@/lib/clubs/invite-token";
 import { isUploadableImageFile, uploadPublicImage } from "@/lib/media/upload-storage";
 import { prisma } from "@/lib/prisma";
 import { enforceActionRateLimit } from "@/lib/security/action-rate-limit";
+import {
+  clubInviteTokenSchema,
+  clubMemberActionInputSchema,
+  createClubInputSchema,
+  garageItemIdSchema,
+  updateClubModelsInputSchema,
+  updateClubProfileInputSchema,
+} from "@/lib/validation/community-inputs";
 
 const ACTIVE_MEMBER_STATUS = "ACTIVE";
 const PENDING_MEMBER_STATUS = "PENDING";
@@ -27,22 +35,18 @@ export async function createCarClubAction(formData: FormData) {
     windowMs: 60 * 60 * 1000,
   });
 
-  const name = readString(formData, "name");
-  const isNationwide = readString(formData, "nationwide") === "true";
-  const city = isNationwide ? "Nationwide" : readString(formData, "city");
-  const state = isNationwide ? "US" : readString(formData, "state").toUpperCase();
-  const country = readString(formData, "country") || "US";
-  const description = readString(formData, "description");
-  const visibility = readString(formData, "visibility") === "PRIVATE" ? "PRIVATE" : "PUBLIC";
-  const modelIds = uniqueStrings(formData.getAll("modelIds").map((value) => String(value)));
-  const makeIds = uniqueStrings(formData.getAll("makeIds").map((value) => String(value)));
-
-  if (!name || name.length < 3) {
-    throw new Error("Club name must be at least 3 characters.");
-  }
-  if (!city || !state) {
-    throw new Error("City and state are required.");
-  }
+  const clubInput = createClubInputSchema.parse({
+    name: readString(formData, "name"),
+    nationwide: readString(formData, "nationwide") === "true",
+    city: readString(formData, "city"),
+    state: readString(formData, "state"),
+    country: readString(formData, "country") || "US",
+    description: readString(formData, "description"),
+    visibility: readString(formData, "visibility") === "PRIVATE" ? "PRIVATE" : "PUBLIC",
+    modelIds: uniqueStrings(formData.getAll("modelIds").map(String)),
+    makeIds: uniqueStrings(formData.getAll("makeIds").map(String)),
+  });
+  const { name, city, state, country, description, visibility, modelIds, makeIds } = clubInput;
 
   const validModelIds = await resolveModelIds(modelIds, makeIds);
 
@@ -75,6 +79,7 @@ export async function createCarClubAction(formData: FormData) {
   });
 
   revalidatePath("/clubs");
+  updateTag("public-clubs");
   revalidatePath("/garage");
   redirect(`/clubs/${club.slug}`);
 }
@@ -86,8 +91,7 @@ export async function requestJoinClubAction(formData: FormData) {
   }
 
   const userId = session.user.id as string;
-  const clubId = readString(formData, "clubId");
-  if (!clubId) throw new Error("Missing club.");
+  const clubId = garageItemIdSchema.parse(readString(formData, "clubId"));
 
   await enforceActionRateLimit({
     actorId: userId,
@@ -120,6 +124,7 @@ export async function requestJoinClubAction(formData: FormData) {
   });
 
   revalidatePath("/clubs");
+  updateTag("public-clubs");
   revalidatePath(`/clubs/${club.slug}`);
   redirect(`/clubs/${club.slug}`);
 }
@@ -131,9 +136,10 @@ export async function manageClubMemberAction(formData: FormData) {
   }
 
   const actorId = session.user.id as string;
-  const memberId = readString(formData, "memberId");
-  const action = readString(formData, "action");
-  if (!memberId || !action) throw new Error("Missing club member action.");
+  const { memberId, action } = clubMemberActionInputSchema.parse({
+    memberId: readString(formData, "memberId"),
+    action: readString(formData, "action"),
+  });
 
   await enforceActionRateLimit({
     actorId,
@@ -185,6 +191,7 @@ export async function manageClubMemberAction(formData: FormData) {
   }
 
   revalidatePath("/clubs");
+  updateTag("public-clubs");
   revalidatePath(`/clubs/${membership.club.slug}`);
   redirect(`/clubs/${membership.club.slug}#members`);
 }
@@ -196,17 +203,15 @@ export async function updateClubProfileAction(formData: FormData) {
   }
 
   const userId = session.user.id as string;
-  const clubId = readString(formData, "clubId");
-  const name = readString(formData, "name");
-  const city = readString(formData, "city");
-  const state = readString(formData, "state").toUpperCase();
-  const description = readString(formData, "description");
-  const visibility = readString(formData, "visibility") === "PRIVATE" ? "PRIVATE" : "PUBLIC";
+  const { clubId, name, city, state, description, visibility } = updateClubProfileInputSchema.parse({
+    clubId: readString(formData, "clubId"),
+    name: readString(formData, "name"),
+    city: readString(formData, "city"),
+    state: readString(formData, "state"),
+    description: readString(formData, "description"),
+    visibility: readString(formData, "visibility") === "PRIVATE" ? "PRIVATE" : "PUBLIC",
+  });
   const logoFile = formData.get("logoFile");
-
-  if (!clubId || !name || !city || !state) {
-    throw new Error("Club id, name, city, and state are required.");
-  }
 
   const canModerate = await canModerateClub(clubId, userId);
   if (!canModerate) throw new Error("Only club moderators can update this club.");
@@ -239,6 +244,7 @@ export async function updateClubProfileAction(formData: FormData) {
   });
 
   revalidatePath("/clubs");
+  updateTag("public-clubs");
   revalidatePath(`/clubs/${club.slug}`);
   revalidatePath(`/clubs/${nextSlug}`);
   redirect(`/clubs/${nextSlug}#members`);
@@ -251,8 +257,11 @@ export async function updateClubModelsAction(formData: FormData) {
   }
 
   const userId = session.user.id as string;
-  const clubId = readString(formData, "clubId");
-  if (!clubId) throw new Error("Missing club id.");
+  const { clubId, modelIds, makeIds } = updateClubModelsInputSchema.parse({
+    clubId: readString(formData, "clubId"),
+    modelIds: uniqueStrings(formData.getAll("modelIds").map(String)),
+    makeIds: uniqueStrings(formData.getAll("makeIds").map(String)),
+  });
 
   const canModerate = await canModerateClub(clubId, userId);
   if (!canModerate) throw new Error("Only club moderators can update linked models.");
@@ -263,8 +272,6 @@ export async function updateClubModelsAction(formData: FormData) {
   });
   if (!club) throw new Error("Club not found.");
 
-  const modelIds = uniqueStrings(formData.getAll("modelIds").map((value) => String(value)));
-  const makeIds = uniqueStrings(formData.getAll("makeIds").map((value) => String(value)));
   const validModelIds = await resolveModelIds(modelIds, makeIds);
 
   await prisma.$transaction([
@@ -280,6 +287,7 @@ export async function updateClubModelsAction(formData: FormData) {
   ]);
 
   revalidatePath("/clubs");
+  updateTag("public-clubs");
   revalidatePath(`/clubs/${club.slug}`);
   redirect(`/clubs/${club.slug}#members`);
 }
@@ -291,8 +299,7 @@ export async function leaveClubAction(formData: FormData) {
   }
 
   const userId = session.user.id as string;
-  const clubId = readString(formData, "clubId");
-  if (!clubId) throw new Error("Missing club.");
+  const clubId = garageItemIdSchema.parse(readString(formData, "clubId"));
 
   const membership = await prisma.carClubMember.findUnique({
     where: { clubId_userId: { clubId, userId } },
@@ -309,6 +316,7 @@ export async function leaveClubAction(formData: FormData) {
   });
 
   revalidatePath("/clubs");
+  updateTag("public-clubs");
   revalidatePath(`/clubs/${membership.club.slug}`);
   redirect(`/clubs/${membership.club.slug}`);
 }
@@ -320,8 +328,7 @@ export async function createClubInviteAction(formData: FormData) {
   }
 
   const userId = session.user.id as string;
-  const clubId = readString(formData, "clubId");
-  if (!clubId) throw new Error("Missing club.");
+  const clubId = garageItemIdSchema.parse(readString(formData, "clubId"));
 
   await enforceActionRateLimit({
     actorId: userId,
@@ -360,10 +367,14 @@ export async function createClubInviteAction(formData: FormData) {
 
 export async function acceptClubInviteAction(formData: FormData) {
   const session = await auth();
-  const token = readString(formData, "token");
+  const parsedToken = clubInviteTokenSchema.safeParse(readString(formData, "token"));
   if (!session?.user?.id) {
-    redirect(`/login?returnTo=${encodeURIComponent(`/clubs/invite/${token}`)}`);
+    const returnTo = parsedToken.success ? `/clubs/invite/${parsedToken.data}` : "/clubs";
+    redirect(`/login?returnTo=${encodeURIComponent(returnTo)}`);
   }
+
+  if (!parsedToken.success) throw new Error("This club invite is invalid or expired.");
+  const token = parsedToken.data;
 
   const invite = verifyClubInviteToken(token);
   if (!invite) {
@@ -401,6 +412,7 @@ export async function acceptClubInviteAction(formData: FormData) {
   });
 
   revalidatePath("/clubs");
+  updateTag("public-clubs");
   revalidatePath(`/clubs/${club.slug}`);
   revalidatePath("/garage");
   redirect(`/clubs/${club.slug}`);

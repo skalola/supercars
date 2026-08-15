@@ -26,8 +26,13 @@ export type PartsStorePage = {
   page: number;
   pageSize: number;
   totalPages: number;
+  hasMore: boolean;
   categoryCounts: Record<string, number>;
   brandCounts: Record<string, number>;
+};
+
+export type PartsStoreSummary = {
+  categoryCounts: Record<string, number>;
 };
 
 export const publicPartsWhere = {
@@ -64,6 +69,17 @@ const storePartSelect = {
       logoNeedsReview: true,
     },
   },
+  offers: {
+    where: { active: true, affiliateUrl: { not: null } },
+    select: {
+      provider: true,
+      priceCents: true,
+      currency: true,
+      expiresAt: true,
+    },
+    orderBy: [{ confidenceScore: "desc" }, { priceCents: "asc" }],
+    take: 3,
+  },
 } satisfies Prisma.PerformancePartSelect;
 
 type StorePart = Prisma.PerformancePartGetPayload<{ select: typeof storePartSelect }>;
@@ -79,13 +95,17 @@ type StoreCompatibilitySummary = {
 type StoreFitmentOption = {
   makeId: string | null;
   makeName: string | null;
+  makeSlug: string | null;
   modelId: string | null;
   modelName: string | null;
   modelMakeId: string | null;
+  modelSlug: string | null;
+  productionStartYear: number | null;
+  productionEndYear: number | null;
 };
 
 export async function getPublicPartsStoreShell() {
-  const [categories, brands, fitments, catalogNodeCount] = await Promise.all([
+  const [categories, brands, fitments, mappedModels] = await Promise.all([
     prisma.partCategory.findMany({
       where: { active: true },
       select: { id: true, name: true, slug: true },
@@ -104,8 +124,12 @@ export async function getPublicPartsStoreShell() {
       orderBy: { name: "asc" },
     }),
     getPublicFitmentOptions(),
-    prisma.partCatalogNode.count({
-      where: { active: true, placeholderOnly: true, categoryId: { not: null } },
+    prisma.model.findMany({
+      where: {
+        make: { partsMarqueConfig: { partsEnabled: true } },
+        partComponents: { some: { active: true } },
+      },
+      select: { id: true },
     }),
   ]);
 
@@ -115,19 +139,24 @@ export async function getPublicPartsStoreShell() {
     partCount: 0,
   }));
   const brandRows: PartsBrandRow[] = brands.map((brand) => ({ ...brand, partCount: 0 }));
-  const makeMap = new Map<string, { id: string; name: string }>();
-  const modelMap = new Map<string, { id: string; name: string; makeId: string }>();
+  const makeMap = new Map<string, { id: string; name: string; slug: string }>();
+  const mappedModelIds = new Set(mappedModels.map((model) => model.id));
+  const modelMap = new Map<string, { id: string; name: string; makeId: string; slug: string; productionStartYear: number | null; productionEndYear: number | null; partsEngineEnabled: boolean }>();
 
   for (const fitment of fitments) {
     const effectiveMakeId = fitment.makeId ?? fitment.modelMakeId;
-    if (effectiveMakeId && fitment.makeName) {
-      makeMap.set(effectiveMakeId, { id: effectiveMakeId, name: fitment.makeName });
+    if (effectiveMakeId && fitment.makeName && fitment.makeSlug) {
+      makeMap.set(effectiveMakeId, { id: effectiveMakeId, name: fitment.makeName, slug: fitment.makeSlug });
     }
-    if (fitment.modelId && fitment.modelName && fitment.modelMakeId) {
+    if (fitment.modelId && fitment.modelName && fitment.modelMakeId && fitment.modelSlug) {
       modelMap.set(fitment.modelId, {
         id: fitment.modelId,
         name: fitment.modelName,
         makeId: fitment.modelMakeId,
+        slug: fitment.modelSlug,
+        productionStartYear: fitment.productionStartYear,
+        productionEndYear: fitment.productionEndYear,
+        partsEngineEnabled: mappedModelIds.has(fitment.modelId),
       });
     }
   }
@@ -137,11 +166,17 @@ export async function getPublicPartsStoreShell() {
     brandRows,
     fitmentMakes: [...makeMap.values()].sort((a, b) => a.name.localeCompare(b.name)),
     fitmentModels: [...modelMap.values()].sort((a, b) => a.name.localeCompare(b.name)),
-    catalogNodeCount,
   };
 }
 
 export async function queryPublicPartsStore(filters: PartsStoreFilters): Promise<PartsStorePage> {
+  return queryPublicPartsStoreWithOptions(filters, { includeBrandCounts: true });
+}
+
+export async function queryPublicPartsStoreWithOptions(
+  filters: PartsStoreFilters,
+  options: { includeBrandCounts: boolean },
+): Promise<PartsStorePage> {
   const normalized = normalizePartsStoreFilters(filters);
   if (!normalized.search && isCacheablePartsFilter(normalized)) {
     return queryPublicPartsStoreCached(
@@ -150,10 +185,11 @@ export async function queryPublicPartsStore(filters: PartsStoreFilters): Promise
       normalized.makeId || "",
       normalized.modelId || "",
       normalized.page || 1,
+      options.includeBrandCounts,
     );
   }
 
-  return queryPublicPartsStoreUncached(normalized);
+  return queryPublicPartsStoreUncached(normalized, options);
 }
 
 const queryPublicPartsStoreCached = unstable_cache(
@@ -163,24 +199,27 @@ const queryPublicPartsStoreCached = unstable_cache(
     makeId: string,
     modelId: string,
     page: number,
+    includeBrandCounts: boolean,
   ) => queryPublicPartsStoreUncached({
     categoryId: categoryId || undefined,
     brandId: brandId || undefined,
     makeId: makeId || undefined,
     modelId: modelId || undefined,
     page,
-  }),
-  ["public-parts-store-page-v2"],
+  }, { includeBrandCounts }),
+  ["public-parts-store-page-v3"],
   { revalidate: 60 * 60, tags: ["parts-catalog"] },
 );
 
-async function queryPublicPartsStoreUncached(filters: PartsStoreFilters): Promise<PartsStorePage> {
+async function queryPublicPartsStoreUncached(
+  filters: PartsStoreFilters,
+  options: { includeBrandCounts: boolean },
+): Promise<PartsStorePage> {
   const page = Math.max(1, Math.floor(filters.page || 1));
-  const facetWhere = buildPartsWhere({ ...filters, categoryId: undefined, brandId: undefined });
   const categoryWhere = buildPartsWhere({ ...filters, brandId: undefined });
   const resultWhere = buildPartsWhere(filters);
 
-  const [parts, total, categoryCounts, brandCounts] = await Promise.all([
+  const [partRows, brandCounts] = await Promise.all([
     prisma.performancePart.findMany({
       where: resultWhere,
       select: storePartSelect,
@@ -190,33 +229,65 @@ async function queryPublicPartsStoreUncached(filters: PartsStoreFilters): Promis
         { name: "asc" },
       ],
       skip: (page - 1) * PARTS_STORE_PAGE_SIZE,
-      take: PARTS_STORE_PAGE_SIZE,
+      take: PARTS_STORE_PAGE_SIZE + 1,
     }),
-    prisma.performancePart.count({ where: resultWhere }),
-    prisma.performancePart.groupBy({
-      by: ["categoryId"],
-      where: facetWhere,
-      _count: { id: true },
-    }),
-    prisma.performancePart.groupBy({
-      by: ["brandId"],
-      where: categoryWhere,
-      _count: { id: true },
-    }),
+    options.includeBrandCounts
+      ? prisma.performancePart.groupBy({
+          by: ["brandId"],
+          where: categoryWhere,
+          _count: { id: true },
+        })
+      : Promise.resolve([]),
   ]);
+
+  const hasMore = partRows.length > PARTS_STORE_PAGE_SIZE;
+  const parts = hasMore ? partRows.slice(0, PARTS_STORE_PAGE_SIZE) : partRows;
 
   const compatibility = await getCompatibilitySummaries(parts.map((part) => part.id), filters);
   const compatibilityByPartId = new Map(compatibility.map((row) => [row.partId, row]));
 
-  const totalPages = Math.max(1, Math.ceil(total / PARTS_STORE_PAGE_SIZE));
+  const observedTotal = (page - 1) * PARTS_STORE_PAGE_SIZE + parts.length + (hasMore ? 1 : 0);
   return {
     parts: parts.map((part) => mapStorePartRow(part, compatibilityByPartId.get(part.id) ?? null)),
-    total,
-    page: Math.min(page, totalPages),
+    total: observedTotal,
+    page,
     pageSize: PARTS_STORE_PAGE_SIZE,
-    totalPages,
-    categoryCounts: Object.fromEntries(categoryCounts.map((row) => [row.categoryId, row._count.id])),
+    totalPages: hasMore ? page + 1 : page,
+    hasMore,
+    categoryCounts: {},
     brandCounts: Object.fromEntries(brandCounts.map((row) => [row.brandId, row._count.id])),
+  };
+}
+
+export async function queryPublicPartsStoreSummary(
+  filters: Pick<PartsStoreFilters, "makeId" | "modelId">,
+): Promise<PartsStoreSummary> {
+  const normalized = normalizePartsStoreFilters(filters);
+  if (isCacheablePartsFilter(normalized)) {
+    return queryPublicPartsStoreSummaryCached(normalized.makeId || "", normalized.modelId || "");
+  }
+  return queryPublicPartsStoreSummaryUncached(normalized);
+}
+
+const queryPublicPartsStoreSummaryCached = unstable_cache(
+  (makeId: string, modelId: string) => queryPublicPartsStoreSummaryUncached({
+    makeId: makeId || undefined,
+    modelId: modelId || undefined,
+  }),
+  ["public-parts-store-summary-v1"],
+  { revalidate: 60 * 60, tags: ["parts-catalog"] },
+);
+
+async function queryPublicPartsStoreSummaryUncached(
+  filters: Pick<PartsStoreFilters, "makeId" | "modelId">,
+): Promise<PartsStoreSummary> {
+  const counts = await prisma.performancePart.groupBy({
+    by: ["categoryId"],
+    where: buildPartsWhere(filters),
+    _count: { id: true },
+  });
+  return {
+    categoryCounts: Object.fromEntries(counts.map((row) => [row.categoryId, row._count.id])),
   };
 }
 
@@ -309,26 +380,48 @@ async function getCompatibilitySummaries(partIds: string[], filters: PartsStoreF
 
 async function getPublicFitmentOptions() {
   return prisma.$queryRaw<StoreFitmentOption[]>(Prisma.sql`
-    SELECT DISTINCT
-      compatibility."makeId" AS "makeId",
-      make.name AS "makeName",
-      compatibility."modelId" AS "modelId",
-      model.name AS "modelName",
-      model."makeId" AS "modelMakeId"
-    FROM "public"."PartCompatibility" compatibility
-    INNER JOIN "public"."PerformancePart" part ON part.id = compatibility."partId"
-    LEFT JOIN "public"."Model" model ON model.id = compatibility."modelId"
-    LEFT JOIN "public"."Make" make ON make.id = COALESCE(compatibility."makeId", model."makeId")
-    WHERE part.status = 'ACTIVE'
-      AND part."sourceUrl" IS NOT NULL
-      AND part."sourceConfidence" = 'SOURCE_VERIFIED'
-      AND part."imageUrl" IS NOT NULL
-      AND (compatibility."makeId" IS NOT NULL OR compatibility."modelId" IS NOT NULL)
+    SELECT DISTINCT * FROM (
+      SELECT
+        compatibility."makeId" AS "makeId",
+        make.name AS "makeName",
+        make.slug AS "makeSlug",
+        compatibility."modelId" AS "modelId",
+        model.name AS "modelName",
+        model."makeId" AS "modelMakeId",
+        model.slug AS "modelSlug",
+        model."productionStartYear" AS "productionStartYear",
+        model."productionEndYear" AS "productionEndYear"
+      FROM "public"."PartCompatibility" compatibility
+      INNER JOIN "public"."PerformancePart" part ON part.id = compatibility."partId"
+      LEFT JOIN "public"."Model" model ON model.id = compatibility."modelId"
+      LEFT JOIN "public"."Make" make ON make.id = COALESCE(compatibility."makeId", model."makeId")
+      WHERE part.status = 'ACTIVE'
+        AND part."sourceUrl" IS NOT NULL
+        AND part."sourceConfidence" = 'SOURCE_VERIFIED'
+        AND part."imageUrl" IS NOT NULL
+        AND (compatibility."makeId" IS NOT NULL OR compatibility."modelId" IS NOT NULL)
+      UNION ALL
+      SELECT
+        NULL AS "makeId",
+        make.name AS "makeName",
+        make.slug AS "makeSlug",
+        model.id AS "modelId",
+        model.name AS "modelName",
+        model."makeId" AS "modelMakeId",
+        model.slug AS "modelSlug",
+        model."productionStartYear" AS "productionStartYear",
+        model."productionEndYear" AS "productionEndYear"
+      FROM "public"."ModelPartComponent" mapping
+      INNER JOIN "public"."Model" model ON model.id = mapping."modelId"
+      INNER JOIN "public"."Make" make ON make.id = model."makeId"
+      WHERE mapping.active = true
+    ) fitments
     ORDER BY "makeName" ASC NULLS LAST, "modelName" ASC NULLS LAST
   `);
 }
 
 function mapStorePartRow(part: StorePart, compatibility: StoreCompatibilitySummary | null): PartsStorePartRow {
+  const bestOffer = part.offers.find((offer) => !offer.expiresAt || offer.expiresAt > new Date()) ?? null;
   return {
     id: part.id,
     name: part.name,
@@ -336,7 +429,11 @@ function mapStorePartRow(part: StorePart, compatibility: StoreCompatibilitySumma
     detailPath: getPartDetailPath(part),
     description: part.description,
     imageUrl: part.imageUrl,
-    priceLabel: formatCents(part.retailPriceCents),
+    priceLabel: bestOffer
+      ? `${formatCurrency(bestOffer.priceCents, bestOffer.currency)} on ${formatProvider(bestOffer.provider)}`
+      : part.retailPriceCents != null
+        ? `Reference ${formatCurrency(part.retailPriceCents, "USD")}`
+        : "No active offer",
     hpGainLabel: part.estimatedHpGain === null ? null : `+${part.estimatedHpGain.toLocaleString()} hp`,
     torqueGainLabel: part.estimatedTorqueGain === null ? null : `+${part.estimatedTorqueGain.toLocaleString()} lb-ft`,
     categoryId: part.categoryId,
@@ -351,13 +448,17 @@ function mapStorePartRow(part: StorePart, compatibility: StoreCompatibilitySumma
   };
 }
 
-function formatCents(value: number | null) {
-  if (value === null) return "Price pending";
+function formatCurrency(value: number | null, currency: string) {
+  if (value === null) return "Price unavailable";
   return new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
+    currency,
     maximumFractionDigits: 0,
   }).format(value / 100);
+}
+
+function formatProvider(value: string) {
+  return value === "EBAY" ? "eBay" : value.replace(/_/g, " ");
 }
 
 function formatCompatibility(fitment: StoreCompatibilitySummary) {

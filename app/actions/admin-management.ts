@@ -1,8 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { assertAdmin } from "@/lib/admin/auth";
 import { prisma } from "@/lib/prisma";
+import { adminRecordIdSchema } from "@/lib/validation/admin-inputs";
+import { validationMessage } from "@/lib/validation/common-inputs";
 
 type AdminActionResult = {
   success: boolean;
@@ -13,10 +15,9 @@ export async function removeUserAction(userId: string): Promise<AdminActionResul
   try {
     const session = await assertAdmin();
     const adminId = session.user?.id;
-
-    if (!userId) {
-      return { success: false, message: "Missing user id." };
-    }
+    const parsedId = adminRecordIdSchema.safeParse(userId);
+    if (!parsedId.success) return { success: false, message: validationMessage(parsedId.error) };
+    userId = parsedId.data;
 
     if (adminId === userId) {
       return { success: false, message: "You cannot remove the admin account you are currently using." };
@@ -51,10 +52,9 @@ export async function removeUserAction(userId: string): Promise<AdminActionResul
 export async function unpublishListingAction(listingId: string): Promise<AdminActionResult> {
   try {
     await assertAdmin();
-
-    if (!listingId) {
-      return { success: false, message: "Missing listing id." };
-    }
+    const parsedId = adminRecordIdSchema.safeParse(listingId);
+    if (!parsedId.success) return { success: false, message: validationMessage(parsedId.error) };
+    listingId = parsedId.data;
 
     const listing = await prisma.listing.findUnique({
       where: { id: listingId },
@@ -81,6 +81,7 @@ export async function unpublishListingAction(listingId: string): Promise<AdminAc
     revalidatePath("/admin/listings");
     revalidatePath("/admin/overview");
     revalidatePath("/inventory");
+    updateTag("public-inventory");
 
     return { success: true, message: "Listing unpublished." };
   } catch (error) {
@@ -92,10 +93,9 @@ export async function unpublishListingAction(listingId: string): Promise<AdminAc
 export async function removeListingAction(listingId: string): Promise<AdminActionResult> {
   try {
     await assertAdmin();
-
-    if (!listingId) {
-      return { success: false, message: "Missing listing id." };
-    }
+    const parsedId = adminRecordIdSchema.safeParse(listingId);
+    if (!parsedId.success) return { success: false, message: validationMessage(parsedId.error) };
+    listingId = parsedId.data;
 
     const listing = await prisma.listing.findUnique({
       where: { id: listingId },
@@ -113,6 +113,7 @@ export async function removeListingAction(listingId: string): Promise<AdminActio
     revalidatePath("/admin/listings");
     revalidatePath("/admin/overview");
     revalidatePath("/inventory");
+    updateTag("public-inventory");
 
     return {
       success: true,

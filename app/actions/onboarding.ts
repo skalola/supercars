@@ -3,20 +3,20 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-
-const USERNAME_RE = /^[a-z0-9_-]+$/;
+import { usernameInputSchema } from "@/lib/validation/community-inputs";
 
 export async function updateUsername(formData: FormData): Promise<void> {
-  const username = formData.get("username")?.toString()?.trim().toLowerCase();
+  const usernameInput = formData.get("username")?.toString() || "";
   const session = await auth();
   
-  if (!session?.user || !username) {
+  if (!session?.user) {
     redirect("/login");
   }
-
-  if (username.length < 3 || !USERNAME_RE.test(username)) {
+  const parsedUsername = usernameInputSchema.safeParse(usernameInput);
+  if (!parsedUsername.success) {
     return;
   }
+  const username = parsedUsername.data;
 
   try {
     const existingUser = await prisma.user.findUnique({

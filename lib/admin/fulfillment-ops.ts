@@ -172,8 +172,9 @@ export async function getAdminFulfillmentMetrics(): Promise<AdminFulfillmentMetr
   ]);
 
   const totalCommissionExpected =
-    (feeSums._sum.expectedPlatformFee || 0) + (feeSums._sum.expectedPartnerCommission || 0);
-  const totalCommissionCollected = feeSums._sum.collectedAmount || 0;
+    Number(feeSums._sum.expectedPlatformFee || 0) +
+    Number(feeSums._sum.expectedPartnerCommission || 0);
+  const totalCommissionCollected = Number(feeSums._sum.collectedAmount || 0);
 
   const partnerConfidence = {
     verified: 0,
@@ -388,6 +389,9 @@ export async function getAdminFulfillmentRequests(
 
   return requests.map((request) => ({
     ...request,
+    expectedPlatformFee: Number(request.expectedPlatformFee),
+    expectedPartnerCommission: Number(request.expectedPartnerCommission),
+    collectedAmount: Number(request.collectedAmount),
     events: eventByRequestId.has(request.id) ? [eventByRequestId.get(request.id)!] : [],
     parties: partiesByRequestId.get(request.id) ?? [],
   }));
@@ -640,7 +644,7 @@ export async function adminReleaseRefund(requestId: string, note?: string) {
     }
 
     for (const deposit of refundableDeposits) {
-      await refundDeposit(deposit.transactionRef || "", deposit.amount);
+      await refundDeposit(deposit.transactionRef || "", Number(deposit.amount));
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Payment provider settlement failed.";
@@ -659,8 +663,8 @@ export async function adminReleaseRefund(requestId: string, note?: string) {
     };
   }
 
-  const releasedAmount = releasableDeposits.reduce((sum, deposit) => sum + deposit.amount, 0);
-  const refundedAmount = refundableDeposits.reduce((sum, deposit) => sum + deposit.amount, 0);
+  const releasedAmount = releasableDeposits.reduce((sum, deposit) => sum + Number(deposit.amount), 0);
+  const refundedAmount = refundableDeposits.reduce((sum, deposit) => sum + Number(deposit.amount), 0);
 
   await prisma.$transaction(async (tx) => {
     for (const deposit of releasableDeposits) {
@@ -752,8 +756,8 @@ export async function adminDeleteFulfillmentRequest(requestId: string) {
   }
 
   const hasOpenMoneyState =
-    req.collectedAmount > 0 ||
-    req.refundableAmount > 0 ||
+    Number(req.collectedAmount) > 0 ||
+    Number(req.refundableAmount) > 0 ||
     ["AUTHORIZED", "CAPTURE_PENDING", "CAPTURED"].includes(req.paymentStatus) ||
     req.depositIntents.some((deposit) => ["AUTHORIZED", "HELD", "CAPTURED"].includes(deposit.status));
 

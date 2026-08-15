@@ -110,6 +110,8 @@ export interface CreateFulfillmentRequestInput {
   listingId?: string;
   purchaseId?: string;
   notes?: string;
+  suppressBuyerConfirmation?: boolean;
+  paymentStatus?: PaymentStatus;
 
   // Scoped Data Package for Partner
   packageTitle: string;

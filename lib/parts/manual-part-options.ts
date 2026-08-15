@@ -1,4 +1,5 @@
 import { PART_BRAND_SEEDS } from "@/lib/parts/catalog-foundation";
+import { storageSystemAliases, toStoragePartSystemSlug } from "@/lib/parts/category-system";
 
 export type ManualPartTypeGroup = {
   categoryId: string;
@@ -167,6 +168,13 @@ export function getManualPartTypeGroups(categories: Array<{ id: string; slug: st
   return categories.map((category) => ({
     categoryId: category.id,
     categorySlug: category.slug,
-    options: COMMON_PART_TYPES_BY_CATEGORY_SLUG[category.slug] ?? [],
+    options: Array.from(new Set(
+      [category.slug, ...storageSystemAliases(category.slug)]
+        .flatMap((slug) => COMMON_PART_TYPES_BY_CATEGORY_SLUG[slug] ?? []),
+    )).sort((left, right) => left.localeCompare(right)),
   }));
+}
+
+export function normalizeManualPartCategorySlug(categorySlug: string) {
+  return toStoragePartSystemSlug(categorySlug);
 }

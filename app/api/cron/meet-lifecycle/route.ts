@@ -1,28 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processMeetLifecycle } from "@/lib/meets/meet-lifecycle";
+import { isAuthorizedCronRequest } from "@/lib/security/cron-auth";
+import { pruneExpiredActionRateLimits } from "@/lib/security/action-rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 export async function GET(request: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  const authorization = request.headers.get("authorization") || "";
-  const userAgent = request.headers.get("user-agent") || "";
-  const isVercelCron =
-    request.headers.get("x-vercel-cron") === "1" ||
-    /vercel-cron/i.test(userAgent);
-
-  if (secret && authorization !== `Bearer ${secret}`) {
+  if (!isAuthorizedCronRequest(request)) {
     return NextResponse.json({ error: "Unauthorized cron request." }, { status: 401 });
   }
 
-  if (!secret && process.env.VERCEL === "1" && !isVercelCron) {
-    return NextResponse.json({ error: "Cron route is only available to Vercel cron." }, { status: 401 });
-  }
-
   const startedAt = new Date();
-  const result = await processMeetLifecycle();
+  const [result, prunedRateLimits] = await Promise.all([
+    processMeetLifecycle(),
+    pruneExpiredActionRateLimits(),
+  ]);
 
   return NextResponse.json({
     success: true,
@@ -31,5 +25,6 @@ export async function GET(request: NextRequest) {
     reminderCount: result.reminderCount,
     completedCount: result.completedCount,
     reminderWindowEnd: result.reminderWindowEnd.toISOString(),
+    prunedRateLimits,
   });
 }

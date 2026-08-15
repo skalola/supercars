@@ -8,10 +8,16 @@ import {
 } from "@/lib/admin/marketing-settings";
 import { prisma } from "@/lib/prisma";
 import { clearMarketingAutomationGateCache } from "@/lib/admin/marketing-automation";
+import { marketingSettingInputSchema } from "@/lib/validation/admin-inputs";
+import { validationMessage } from "@/lib/validation/common-inputs";
 
 export async function updateMarketingAutomationSettingAction(key: string, enabled: boolean) {
   try {
     const session = await assertAdmin();
+    const parsed = marketingSettingInputSchema.safeParse({ key, enabled });
+    if (!parsed.success) return { success: false, message: validationMessage(parsed.error) };
+    key = parsed.data.key;
+    enabled = parsed.data.enabled;
 
     if (!isMarketingAutomationSettingKey(key)) {
       return { success: false, message: "Unknown marketing automation setting." };

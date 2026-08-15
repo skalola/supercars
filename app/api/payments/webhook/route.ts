@@ -3,6 +3,7 @@ import {
   processStripeWebhookPayload,
   verifyStripeWebhookSignature,
 } from "@/lib/payments/payment-service";
+import { reportServerError } from "@/lib/observability/error-reporting";
 
 export async function POST(request: Request) {
   const payload = await request.text();
@@ -16,7 +17,8 @@ export async function POST(request: Request) {
     const result = await processStripeWebhookPayload(payload);
     return NextResponse.json(result);
   } catch (error) {
+    reportServerError(error, { route: "/api/payments/webhook", provider: "stripe" });
     const message = error instanceof Error ? error.message : "Payment webhook processing failed.";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

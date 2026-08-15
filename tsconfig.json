@@ -31,5 +31,11 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "prisma.config.ts", "db_counts*.ts"]
+  "exclude": [
+    "node_modules",
+    "prisma.config.ts",
+    "db_counts*.ts",
+    ".next/types/* 2.ts",
+    ".next/dev/types/* 2.ts"
+  ]
 }

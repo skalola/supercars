@@ -1,9 +1,18 @@
 import Image from "next/image";
 import Link from "next/link";
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { auth } from "@/auth";
 import { ClaimVinButton } from "@/components/garage/ClaimVinButton";
 import { getHomepageSummary, type HomepageFeaturedGarage, type HomepageGarageVehicle } from "@/lib/garage/homepage-summary";
+import { buildPublicMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = buildPublicMetadata({
+  title: "Your Digital Garage",
+  description: "Build, track, and share your real cars. Explore enthusiast garages, live vehicle market data, owner meets, and compatible parts.",
+  path: "/",
+  keywords: ["digital garage", "car collection tracker", "enthusiast car community", "supercar garage"],
+});
 
 export default async function HomePage() {
   const session = await auth();

@@ -143,8 +143,8 @@ export default async function AdminOverviewPage({
   const activeSessionCount = activeSessionRows[0]?.count ?? 0;
   const activeListingCount = liveInventoryStats.liveListingCount;
   const recentTransactions = recentStats._count.id;
-  const recentTransactionAmount = recentStats._sum.collectedAmount || 0;
-  const previousTransactionAmount = previousVolume._sum.collectedAmount || 0;
+  const recentTransactionAmount = Number(recentStats._sum.collectedAmount || 0);
+  const previousTransactionAmount = Number(previousVolume._sum.collectedAmount || 0);
   const volumeDelta = recentTransactionAmount - previousTransactionAmount;
   const totalInventoryValue = liveInventoryStats.totalLiveListingValue;
   const pricedListingCount = liveInventoryStats.pricedListingCount;
@@ -174,18 +174,18 @@ export default async function AdminOverviewPage({
       key: row.requestType,
       label: row.requestType.replace("_", " "),
       value: row._count.id,
-      collected: row._sum.collectedAmount || 0,
-      platformFee: row._sum.expectedPlatformFee || 0,
-      partnerCommission: row._sum.expectedPartnerCommission || 0,
+      collected: Number(row._sum.collectedAmount || 0),
+      platformFee: Number(row._sum.expectedPlatformFee || 0),
+      partnerCommission: Number(row._sum.expectedPartnerCommission || 0),
     }))
     .sort((a, b) => b.value - a.value);
   const requestVolumeTotal = requestVolumeRows.reduce((sum, row) => sum + row.value, 0);
   const salesRequestCount = salesRequestStats._count.id;
   const completedSalesCount = completedSalesStats._count.id;
-  const completedSalesVolume = completedSalesStats._sum.collectedAmount || 0;
-  const avgCompletedSalePrice = completedSalesStats._avg.collectedAmount || 0;
-  const completedSalesFees = completedSalesStats._sum.expectedPlatformFee || 0;
-  const completedPartnerCommission = completedSalesStats._sum.expectedPartnerCommission || 0;
+  const completedSalesVolume = Number(completedSalesStats._sum.collectedAmount || 0);
+  const avgCompletedSalePrice = Number(completedSalesStats._avg.collectedAmount || 0);
+  const completedSalesFees = Number(completedSalesStats._sum.expectedPlatformFee || 0);
+  const completedPartnerCommission = Number(completedSalesStats._sum.expectedPartnerCommission || 0);
 
   const segmentCards = [
     {

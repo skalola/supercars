@@ -57,7 +57,10 @@ function sign(value: string) {
 }
 
 function getInviteSecret() {
-  return process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "supercar-dash-local-invite-secret";
+  const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+  if (secret) return secret;
+  if (process.env.NODE_ENV !== "production") return "supercar-dash-local-invite-secret";
+  throw new Error("Club invites require AUTH_SECRET in production.");
 }
 
 function base64UrlEncode(value: string) {

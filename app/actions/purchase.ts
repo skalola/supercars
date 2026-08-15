@@ -17,6 +17,11 @@ import {
   dispatchTransportPackageEmail,
 } from "@/lib/fulfillment/transport-package";
 import { isSupportedMake } from "@/lib/supported-makes";
+import {
+  dealerPurchaseInputSchema,
+  insuranceQuoteInputSchema,
+  transportQuoteInputSchema,
+} from "@/lib/validation/owner-transaction-inputs";
 
 const packageVehicleSelect = {
   id: true,
@@ -100,8 +105,7 @@ const purchasePackageSelect = {
 };
 
 async function getAuthenticatedUser() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const session = (globalThis as any).mockSession !== undefined ? (globalThis as any).mockSession : await auth();
+  const session = await auth();
   const userId = session?.user?.id;
   if (!userId) {
     throw new Error("Unauthorized: Please sign in.");
@@ -129,10 +133,11 @@ export async function createDealerPurchasePackage(
 ) {
   const userId = await getAuthenticatedUser();
 
-  const input: CreateDealerPurchaseInput =
+  const rawInput: CreateDealerPurchaseInput =
     typeof listingId === "string"
       ? { listingId, amount: amountInput || 0 }
       : listingId;
+  const input = dealerPurchaseInputSchema.parse(rawInput);
 
   const listing = await prisma.listing.findUnique({
     where: { id: input.listingId },
@@ -150,16 +155,6 @@ export async function createDealerPurchasePackage(
       name: true,
       username: true,
       email: true,
-    },
-  });
-
-  // 1. Create Purchase Record (Status remains PENDING, NOT COMPLETED!)
-  const purchase = await prisma.purchase.create({
-    data: {
-      listingId: input.listingId,
-      buyerId: userId,
-      amount: input.amount || listing.askingPrice || listing.price || 0,
-      status: "PENDING", // Submission means SENT / PENDING, not COMPLETED
     },
   });
 
@@ -181,6 +176,16 @@ export async function createDealerPurchasePackage(
   if (!buyerEmail) {
     throw new Error("Buyer email is required to create a dealer purchase package.");
   }
+
+  // Eligibility is fully validated before persistence so failed requests cannot leave orphan purchases.
+  const purchase = await prisma.purchase.create({
+    data: {
+      listingId: input.listingId,
+      buyerId: userId,
+      amount: input.amount || listing.askingPrice || listing.price || 0,
+      status: "PENDING",
+    },
+  });
 
   const localSeller = listing.seller || listing.vehicle.owner || null;
   const isSiteUserListing = !!listing.sellerId;
@@ -309,10 +314,11 @@ export async function createInsuranceQuotePackage(
 ) {
   const userId = await getAuthenticatedUser();
 
-  const input: CreateInsuranceQuoteInput =
+  const rawInput: CreateInsuranceQuoteInput =
     typeof purchaseIdInput === "string"
       ? { purchaseId: purchaseIdInput, status: statusInput || "QUOTE_STARTED" }
       : purchaseIdInput;
+  const input = insuranceQuoteInputSchema.parse(rawInput);
 
   const purchase = await prisma.purchase.findUnique({
     where: { id: input.purchaseId },
@@ -321,6 +327,10 @@ export async function createInsuranceQuotePackage(
 
   if (!purchase) {
     throw new Error("Purchase order not found.");
+  }
+
+  if (purchase.buyer?.id !== userId) {
+    throw new Error("Unauthorized: You do not own this purchase order.");
   }
 
   const listing = purchase.listing;
@@ -360,7 +370,7 @@ export async function createInsuranceQuotePackage(
   if (!buyerEmail) {
     throw new Error("Buyer email is required to create an insurance quote package.");
   }
-  const agreedValue = purchase.amount || listing.askingPrice || listing.price || 250000;
+  const agreedValue = Number(purchase.amount || listing.askingPrice || listing.price || 250000);
 
   // 3. Build Standardized Insurance Quote Scoped Package Payload
   const quotePayload = generateInsuranceQuotePackagePayload({
@@ -462,7 +472,7 @@ export async function createTransportQuotePackage(
 ) {
   const userId = await getAuthenticatedUser();
 
-  const input: CreateTransportQuoteInput =
+  const rawInput: CreateTransportQuoteInput =
     typeof purchaseIdInput === "string"
       ? {
           purchaseId: purchaseIdInput,
@@ -471,6 +481,7 @@ export async function createTransportQuotePackage(
           deliveryDate: deliveryDateInput || "Flexible",
         }
       : purchaseIdInput;
+  const input = transportQuoteInputSchema.parse(rawInput);
 
   const purchase = await prisma.purchase.findUnique({
     where: { id: input.purchaseId },
@@ -479,6 +490,10 @@ export async function createTransportQuotePackage(
 
   if (!purchase) {
     throw new Error("Purchase order not found.");
+  }
+
+  if (purchase.buyer?.id !== userId) {
+    throw new Error("Unauthorized: You do not own this purchase order.");
   }
 
   const listing = purchase.listing;
@@ -493,9 +508,6 @@ export async function createTransportQuotePackage(
   }
 
   const { streetAddress, city, state, postalCode } = input.address;
-  if (!streetAddress || !city || !state || !postalCode) {
-    throw new Error("Complete delivery address is required to create a transport quote package.");
-  }
 
   const carrierType = input.transportMethod === "STANDARD" || input.transportMethod === "OPEN" ? "OPEN" : "ENCLOSED";
   const estimatedTransportPrice = input.estimatedTransportPrice || (carrierType === "OPEN" ? 1250 : 1850);

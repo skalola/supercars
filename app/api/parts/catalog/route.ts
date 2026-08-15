@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { queryPublicPartsStore } from "@/lib/parts/storefront";
+import { queryPublicPartsStoreWithOptions } from "@/lib/parts/storefront";
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const page = Number.parseInt(params.get("page") || "1", 10);
-  const result = await queryPublicPartsStore({
+  const result = await queryPublicPartsStoreWithOptions({
     categoryId: clean(params.get("category")),
     brandId: clean(params.get("brand")),
     makeId: clean(params.get("make")),
     modelId: clean(params.get("model")),
     search: clean(params.get("q")),
     page: Number.isFinite(page) ? page : 1,
+  }, {
+    includeBrandCounts: params.get("facets") !== "0",
   });
 
   return NextResponse.json(result, {

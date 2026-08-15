@@ -14,6 +14,12 @@ import {
 import type { ContactSource, PartnerConfidence, PartnerType } from "@/lib/fulfillment/partner-registry";
 import { assertAdmin } from "@/lib/admin/auth";
 import { prisma } from "@/lib/prisma";
+import {
+  addVendorInputSchema,
+  adminRecordIdSchema,
+  resolvePartnerEmailInputSchema,
+} from "@/lib/validation/admin-inputs";
+import { validationMessage } from "@/lib/validation/common-inputs";
 
 type AddVendorInput = {
   name: string;
@@ -33,11 +39,18 @@ export async function resolvePartnerEmailAction(
 ) {
   try {
     await assertAdmin();
-    const result = await resolveUnresolvedPartnerContact(
+    const parsed = resolvePartnerEmailInputSchema.safeParse({
       partnerContactId,
       newEmail,
       confidence,
-      source
+      source,
+    });
+    if (!parsed.success) return { success: false, message: validationMessage(parsed.error) };
+    const result = await resolveUnresolvedPartnerContact(
+      parsed.data.partnerContactId,
+      parsed.data.newEmail,
+      parsed.data.confidence,
+      parsed.data.source
     );
     revalidatePath("/admin/partners");
     revalidatePath("/admin/fulfillment");
@@ -52,25 +65,9 @@ export async function addVendorAction(input: AddVendorInput) {
   try {
     await assertAdmin();
 
-    const name = input.name.trim();
-    const type = input.type;
-    const email = input.email?.trim() || null;
-    const phone = input.phone?.trim() || null;
-    const website = input.website?.trim() || null;
-    const location = input.location?.trim() || null;
-    const makeSpecialization = input.makeSpecialization?.trim() || "ALL";
-
-    if (!name) {
-      return { success: false, message: "Vendor name is required." };
-    }
-
-    if (!["DEALER", "INSURER", "TRANSPORTER", "SERVICE_SHOP"].includes(type)) {
-      return { success: false, message: "Choose a valid vendor service type." };
-    }
-
-    if (!email && !phone && !website) {
-      return { success: false, message: "Add at least one contact method: email, phone, or website." };
-    }
+    const parsed = addVendorInputSchema.safeParse(input);
+    if (!parsed.success) return { success: false, message: validationMessage(parsed.error) };
+    const { name, type, email, phone, website, location, makeSpecialization } = parsed.data;
 
     const vendor = await upsertPartnerContact({
       name,
@@ -99,10 +96,9 @@ export async function addVendorAction(input: AddVendorInput) {
 export async function removeVendorAction(partnerContactId: string) {
   try {
     await assertAdmin();
-
-    if (!partnerContactId) {
-      return { success: false, message: "Missing vendor id." };
-    }
+    const parsedId = adminRecordIdSchema.safeParse(partnerContactId);
+    if (!parsedId.success) return { success: false, message: validationMessage(parsedId.error) };
+    partnerContactId = parsedId.data;
 
     const vendor = await prisma.partnerContact.findUnique({
       where: { id: partnerContactId },

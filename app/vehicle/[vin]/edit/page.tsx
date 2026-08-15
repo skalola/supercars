@@ -124,8 +124,7 @@ const vehicleEditSelect = {
 
 export default async function VehicleEditPage({ params }: EditPageProps) {
   const { vin } = await params;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const session = (globalThis as any).mockSession !== undefined ? (globalThis as any).mockSession : await auth();
+  const session = await auth();
   const userId = session?.user?.id;
 
   const vehicle = await prisma.vehicle.findUnique({

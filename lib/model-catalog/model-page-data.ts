@@ -104,7 +104,7 @@ export const getModelPageCatalogData = unstable_cache(
 
     return { model, maintenanceRules };
   },
-  ["model-page-catalog-data-v1"],
+  ["model-page-catalog-data-v2"],
   { revalidate: 86_400, tags: ["make-model-catalog", "model-page-catalog"] },
 );
 

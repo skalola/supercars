@@ -8,15 +8,19 @@ datasource db {
 }
 
 model Make {
-  id                String              @id @default(uuid())
-  name              String              @unique
-  slug              String              @unique
-  logoUrl           String?
-  region            String?
-  models            Model[]
-  partCompatibility PartCompatibility[]
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  id                         String                      @id @default(uuid())
+  name                       String                      @unique
+  slug                       String                      @unique
+  logoUrl                    String?
+  region                     String?
+  models                     Model[]
+  partCompatibility          PartCompatibility[]
+  partCatalogReferences      PartCatalogReference[]
+  preferredPartBrands        PreferredPartBrand[]
+  partsMarqueConfig          PartsMarqueConfig?
+  partApplicabilityOverrides PartApplicabilityOverride[]
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
 }
 
 model Model {
@@ -37,20 +41,26 @@ model Model {
   metadataSourceUrl   String?
   lastMetadataAuditAt DateTime?
 
-  make              Make                  @relation(fields: [makeId], references: [id])
-  vehicles          Vehicle[]
-  spec              ModelSpec?
-  images            ModelImage[]
-  imageCandidates   ModelImageCandidate[]
-  variants          ModelVariant[]
-  garageItems       GarageItem[]
-  carClubs          CarClubModel[]
-  maintenanceRules  MaintenanceRule[]
-  listings          Listing[]
-  marketSales       MarketSale[]
-  marketSnapshots   MarketSnapshot[]
-  marketSummary     MarketModelSummary?
-  partCompatibility PartCompatibility[]
+  make                          Make                           @relation(fields: [makeId], references: [id])
+  vehicles                      Vehicle[]
+  spec                          ModelSpec?
+  images                        ModelImage[]
+  imageCandidates               ModelImageCandidate[]
+  variants                      ModelVariant[]
+  garageItems                   GarageItem[]
+  carClubs                      CarClubModel[]
+  maintenanceRules              MaintenanceRule[]
+  listings                      Listing[]
+  marketSales                   MarketSale[]
+  marketSnapshots               MarketSnapshot[]
+  marketSummary                 MarketModelSummary?
+  partCompatibility             PartCompatibility[]
+  partComponents                ModelPartComponent[]
+  partCatalogReferences         PartCatalogReference[]
+  partPerformanceConfigurations PartPerformanceConfiguration[]
+  preferredPartBrands           PreferredPartBrand[]
+  partApplicabilityOverrides    PartApplicabilityOverride[]
+  engineeringProfiles           ModelEngineeringProfile[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -90,10 +100,86 @@ model ModelVariant {
 
   model Model @relation(fields: [modelId], references: [id])
 
+  partCompatibility             PartCompatibility[]
+  partApplicability             ModelPartApplicability[]
+  partCatalogReferences         PartCatalogReference[]
+  partPerformanceConfigurations PartPerformanceConfiguration[]
+  engineeringProfiles           ModelEngineeringProfile[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([modelId, slug])
+}
+
+model ModelEngineeringProfile {
+  id                      String  @id @default(uuid())
+  profileKey              String  @unique
+  modelId                 String
+  variantId               String?
+  scope                   String  @default("MODEL")
+  yearStart               Int?
+  yearEnd                 Int?
+  engineCode              String?
+  engineDescription       String?
+  aspiration              String  @default("UNKNOWN")
+  drivetrain              String  @default("UNKNOWN")
+  transmissionType        String  @default("UNKNOWN")
+  transmissionDescription String?
+  horsepower              Int?
+  torqueLbFt              Int?
+  weightLb                Int?
+  frontTireWidthMm        Int?
+  rearTireWidthMm         Int?
+  frontWheelDiameterIn    Int?
+  rearWheelDiameterIn     Int?
+  tireCompound            String?
+  tireLoadRating          String?
+  frontRotorDiameterMm    Int?
+  rearRotorDiameterMm     Int?
+  frontBrakePistonCount   Int?
+  rearBrakePistonCount    Int?
+  brakeRotorMaterial      String?
+  oilCooling              String?
+  chargeCooling           String?
+  transmissionCooling     String?
+  brakeCooling            String?
+  sustainedUseRating      String  @default("UNKNOWN")
+  confidence              String  @default("UNKNOWN")
+  reviewStatus            String  @default("NEEDS_REVIEW")
+
+  model    Model                      @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  variant  ModelVariant?              @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  evidence ModelEngineeringEvidence[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([modelId, scope])
+  @@index([variantId])
+  @@index([reviewStatus, confidence])
+}
+
+model ModelEngineeringEvidence {
+  id          String   @id @default(uuid())
+  evidenceKey String   @unique
+  profileId   String
+  fieldName   String
+  sourceType  String
+  sourceName  String
+  sourceUrl   String?
+  rawValue    String?
+  confidence  String   @default("UNKNOWN")
+  notes       String?
+  capturedAt  DateTime @default(now())
+
+  profile ModelEngineeringProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([profileId, fieldName])
+  @@index([sourceType, confidence])
 }
 
 model ModelImage {
@@ -262,6 +348,7 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   image         String?
+  passwordHash  String?
   role          String?   @default("USER")
 
   accounts               Account[]
@@ -586,9 +673,11 @@ model PartCategory {
   displayOrder Int     @default(0)
   active       Boolean @default(true)
 
-  parts          PerformancePart[]
-  installedParts VehicleInstalledPart[]
-  catalogNodes   PartCatalogNode[]
+  parts           PerformancePart[]
+  installedParts  VehicleInstalledPart[]
+  catalogNodes    PartCatalogNode[]
+  componentTypes  PartComponentType[]
+  preferredBrands PreferredPartBrand[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -637,9 +726,13 @@ model PartBrand {
   logoNeedsReview Boolean   @default(false)
   websiteUrl      String?
   country         String?
+  brandType       String    @default("OTHER")
+  qualityWeight   Int       @default(50)
+  description     String?
   active          Boolean   @default(true)
 
-  parts PerformancePart[]
+  parts             PerformancePart[]
+  preferredMappings PreferredPartBrand[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -659,8 +752,10 @@ model AffiliatePartner {
   disclosure       String?
   active           Boolean @default(false)
 
-  parts  PerformancePart[]
-  clicks PartAffiliateClick[]
+  parts          PerformancePart[]
+  offers         PartOffer[]
+  clicks         PartAffiliateClick[]
+  offerProviders PartOfferProvider[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -668,24 +763,89 @@ model AffiliatePartner {
   @@index([status, active])
 }
 
+model PartOfferProvider {
+  id                 String  @id @default(uuid())
+  code               String  @unique
+  name               String
+  providerType       String
+  adapterKey         String?
+  websiteUrl         String?
+  affiliatePartnerId String?
+  active             Boolean @default(false)
+
+  affiliatePartner AffiliatePartner?    @relation(fields: [affiliatePartnerId], references: [id], onDelete: SetNull)
+  offers           PartOffer[]
+  preferredBrands  PreferredPartBrand[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([providerType, active])
+  @@index([affiliatePartnerId])
+}
+
+model PreferredPartBrand {
+  id                  String  @id @default(uuid())
+  scopeKey            String  @unique
+  vehicleMakeId       String
+  vehicleModelId      String?
+  partBrandId         String
+  componentCategoryId String?
+  componentTypeId     String?
+  offerProviderId     String?
+  relationshipType    String
+  priority            Int     @default(100)
+  officialCatalogUrl  String?
+  affiliateEnabled    Boolean @default(false)
+  affiliateStatus     String  @default("NOT_CONTACTED")
+  trackingConfigName  String?
+  active              Boolean @default(true)
+
+  vehicleMake       Make               @relation(fields: [vehicleMakeId], references: [id], onDelete: Cascade)
+  vehicleModel      Model?             @relation(fields: [vehicleModelId], references: [id], onDelete: Cascade)
+  partBrand         PartBrand          @relation(fields: [partBrandId], references: [id], onDelete: Cascade)
+  componentCategory PartCategory?      @relation(fields: [componentCategoryId], references: [id], onDelete: Cascade)
+  componentType     PartComponentType? @relation(fields: [componentTypeId], references: [id], onDelete: Cascade)
+  offerProvider     PartOfferProvider? @relation(fields: [offerProviderId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([vehicleMakeId, active, priority])
+  @@index([vehicleModelId, active, priority])
+  @@index([vehicleMakeId, componentCategoryId, active, priority])
+  @@index([vehicleMakeId, componentTypeId, active, priority])
+  @@index([partBrandId, affiliateStatus])
+  @@index([offerProviderId, active])
+}
+
 model PerformancePart {
   id                 String  @id @default(uuid())
   categoryId         String
   catalogNodeId      String?
+  componentTypeId    String?
   brandId            String
   affiliatePartnerId String?
   name               String
   slug               String
   partNumber         String?
+  oemPartNumber      String?
+  canonicalKey       String? @unique
+  componentType      String?
   description        String?
   imageUrl           String?
   sourceUrl          String?
   sourceName         String?
+  sourceCatalog      String?
+  sourceCategory     String?
+  diagramReference   String?
   sourceConfidence   String  @default("MANUAL_REVIEW")
   status             String  @default("DRAFT")
 
+  /// Legacy catalog reference price. Current purchasable prices belong to PartOffer.
   retailPriceCents  Int?
   currency          String    @default("USD")
+  /// Legacy direct-commerce fields. New providers must create PartOffer records.
   retailerName      String?
   retailerSku       String?
   affiliateUrl      String?
@@ -698,14 +858,31 @@ model PerformancePart {
   gainBasis           String?
   installComplexity   String?
   notes               String?
+  normalizedTitle     String?
+  productFamilyType   String  @default("CANONICAL")
+  partType            String  @default("UNCLASSIFIED")
+  identityConfidence  String  @default("UNVERIFIED")
+  identityKey         String? @unique
+  catalogPublished    Boolean @default(false)
+  offerGapStatus      String  @default("UNASSESSED")
+  material            String?
+  replacementType     String?
 
-  category         PartCategory           @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  catalogNode      PartCatalogNode?       @relation(fields: [catalogNodeId], references: [id], onDelete: SetNull)
-  brand            PartBrand              @relation(fields: [brandId], references: [id], onDelete: Restrict)
-  affiliatePartner AffiliatePartner?      @relation(fields: [affiliatePartnerId], references: [id], onDelete: SetNull)
-  compatibility    PartCompatibility[]
-  installedParts   VehicleInstalledPart[]
-  clicks           PartAffiliateClick[]
+  category                  PartCategory                   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  catalogNode               PartCatalogNode?               @relation(fields: [catalogNodeId], references: [id], onDelete: SetNull)
+  canonicalComponent        PartComponentType?             @relation(fields: [componentTypeId], references: [id], onDelete: SetNull)
+  brand                     PartBrand                      @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  affiliatePartner          AffiliatePartner?              @relation(fields: [affiliatePartnerId], references: [id], onDelete: SetNull)
+  compatibility             PartCompatibility[]
+  offers                    PartOffer[]
+  installedParts            VehicleInstalledPart[]
+  clicks                    PartAffiliateClick[]
+  maintenanceLinks          MaintenanceRulePart[]
+  identifiers               PartIdentifier[]
+  catalogReferences         PartCatalogReference[]
+  images                    PartImage[]
+  performanceEvidence       PartPerformanceEvidence[]
+  performanceConfigurations PartPerformanceConfiguration[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -713,25 +890,377 @@ model PerformancePart {
   @@unique([brandId, slug])
   @@index([categoryId, status])
   @@index([catalogNodeId, status])
+  @@index([componentTypeId, status])
   @@index([brandId, status])
+  @@index([oemPartNumber])
+  @@index([sourceCatalog, status])
   @@index([trackingStatus])
+  @@index([status, lastCheckedAt])
+  @@index([catalogPublished, identityConfidence, status])
+  @@index([componentTypeId, partType, catalogPublished])
+  @@index([offerGapStatus, status])
+}
+
+model PartComponentType {
+  id                 String  @id @default(uuid())
+  categoryId         String
+  name               String
+  slug               String
+  description        String?
+  aliases            Json?
+  systemGroup        String?
+  fitmentRisk        String  @default("MEDIUM")
+  displayOrder       Int     @default(0)
+  performanceRelated Boolean @default(false)
+  active             Boolean @default(true)
+
+  category               PartCategory                  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  searchTemplates        PartComponentSearchTemplate[]
+  modelMappings          ModelPartComponent[]
+  canonicalParts         PerformancePart[]
+  preferredBrands        PreferredPartBrand[]
+  applicabilityOverrides PartApplicabilityOverride[]
+  maintenanceLinks       MaintenanceRulePart[]
+  outgoingRelationships  PartTypeRelationship[]        @relation("PartTypeRelationshipSource")
+  incomingRelationships  PartTypeRelationship[]        @relation("PartTypeRelationshipTarget")
+  installedParts         VehicleInstalledPart[]
+  engineeringEffect      PartEngineeringEffect?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([categoryId, slug])
+  @@index([categoryId, active, displayOrder])
+}
+
+model PartEngineeringEffect {
+  id               String  @id @default(uuid())
+  componentTypeId  String  @unique
+  contractVersion  String  @default("1.0.0")
+  primaryDimension String
+  benefits         Json
+  tradeoffs        Json
+  dependencies     Json
+  risks            Json
+  buildIntentions  Json
+  confidence       String  @default("LOW")
+  evidenceBasis    String?
+  reviewStatus     String  @default("AUTO_BASELINE")
+  active           Boolean @default(true)
+
+  componentType PartComponentType @relation(fields: [componentTypeId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([primaryDimension, active])
+  @@index([reviewStatus, confidence])
+}
+
+model PartComponentSearchTemplate {
+  id              String  @id @default(uuid())
+  componentTypeId String
+  template        String
+  priority        Int     @default(0)
+  brandEnhancer   String?
+  active          Boolean @default(true)
+
+  componentType PartComponentType @relation(fields: [componentTypeId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([componentTypeId, template])
+  @@index([componentTypeId, active, priority])
+}
+
+model PartTypeRelationship {
+  id               String   @id @default(uuid())
+  sourcePartTypeId String
+  targetPartTypeId String
+  relationshipType String
+  reason           String?
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  sourcePartType PartComponentType @relation("PartTypeRelationshipSource", fields: [sourcePartTypeId], references: [id], onDelete: Cascade)
+  targetPartType PartComponentType @relation("PartTypeRelationshipTarget", fields: [targetPartTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([sourcePartTypeId, targetPartTypeId, relationshipType])
+  @@index([sourcePartTypeId, active, relationshipType])
+  @@index([targetPartTypeId, active, relationshipType])
+}
+
+model ModelPartComponent {
+  id                     String    @id @default(uuid())
+  modelId                String
+  componentTypeId        String
+  applicability          String    @default("STANDARD")
+  notes                  String?
+  active                 Boolean   @default(true)
+  lastOfferSearchAt      DateTime?
+  lastOfferSearchStatus  String    @default("NEVER")
+  lastOfferRejectedCount Int       @default(0)
+  catalogGapStatus       String    @default("UNASSESSED")
+
+  model              Model                    @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  componentType      PartComponentType        @relation(fields: [componentTypeId], references: [id], onDelete: Cascade)
+  offerContexts      PartOfferContext[]
+  discoveryQueries   PartDiscoveryQuery[]
+  clicks             PartAffiliateClick[]
+  applicabilityRules ModelPartApplicability[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([modelId, componentTypeId])
+  @@index([modelId, active])
+  @@index([componentTypeId, active])
+  @@index([lastOfferSearchAt, lastOfferSearchStatus])
+  @@index([catalogGapStatus, active])
+}
+
+model ModelPartApplicability {
+  id                   String  @id @default(uuid())
+  modelPartComponentId String
+  modelVariantId       String?
+  ruleKey              String  @unique
+  applicability        String  @default("APPLICABLE")
+  yearStart            Int?
+  yearEnd              Int?
+  engine               String?
+  transmission         String?
+  drivetrain           String?
+  bodyStyle            String?
+  aspiration           String?
+  electrificationLevel String?
+  confidence           String  @default("UNVERIFIED")
+  source               String?
+  notes                String?
+  active               Boolean @default(true)
+
+  modelPartComponent ModelPartComponent @relation(fields: [modelPartComponentId], references: [id], onDelete: Cascade)
+  modelVariant       ModelVariant?      @relation(fields: [modelVariantId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([modelPartComponentId, active])
+  @@index([modelVariantId, active])
+  @@index([applicability, active])
+}
+
+model PartApplicabilityOverride {
+  id             String   @id @default(uuid())
+  vehicleMakeId  String
+  vehicleModelId String?
+  partTypeId     String
+  overrideStatus String
+  reason         String
+  source         String?
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  vehicleMake  Make              @relation(fields: [vehicleMakeId], references: [id], onDelete: Cascade)
+  vehicleModel Model?            @relation(fields: [vehicleModelId], references: [id], onDelete: Cascade)
+  partType     PartComponentType @relation(fields: [partTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([vehicleMakeId, vehicleModelId, partTypeId])
+  @@index([vehicleMakeId, active])
+  @@index([vehicleModelId, active])
+  @@index([partTypeId, active])
+}
+
+model PartsMarqueConfig {
+  id                 String    @id @default(uuid())
+  makeId             String    @unique
+  partsEnabled       Boolean   @default(false)
+  catalogStatus      String    @default("NOT_CONFIGURED")
+  defaultCurrency    String    @default("USD")
+  defaultMarketplace String    @default("EBAY_US")
+  enabledProviders   Json?
+  enabledAt          DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  make Make @relation(fields: [makeId], references: [id], onDelete: Cascade)
+
+  @@index([partsEnabled, catalogStatus])
+}
+
+model PartOffer {
+  id                       String    @id @default(uuid())
+  partId                   String?
+  affiliatePartnerId       String?
+  providerId               String?
+  provider                 String
+  externalItemId           String
+  title                    String
+  subtitle                 String?
+  priceCents               Int?
+  currency                 String    @default("USD")
+  condition                String?
+  sellerName               String?
+  sellerFeedbackPercentage Float?
+  sellerQualityScore       Int?
+  imageUrl                 String?
+  additionalImageUrls      Json?
+  affiliateUrl             String?
+  sourceUrl                String?
+  itemLocation             String?
+  brandName                String?
+  manufacturerPartNumber   String?
+  oemPartNumber            String?
+  compatibilityData        Json?
+  marketplaceCategoryId    String?
+  classification           String    @default("UNKNOWN")
+  quantityAvailable        Int?
+  availability             String    @default("AVAILABLE")
+  oemMatchType             String    @default("NONE")
+  genuineOemStatus         String    @default("NOT_STATED")
+  compatibilityStatus      String    @default("UNKNOWN")
+  fitmentConfidence        String    @default("POSSIBLE")
+  confidenceScore          Int       @default(0)
+  contentHash              String?
+  shippingCostCents        Int?
+  shippingCurrency         String?
+  affiliateReferenceId     String?
+  itemEndDate              DateTime?
+  lastSeenAt               DateTime  @default(now())
+  lastCheckedAt            DateTime  @default(now())
+  expiresAt                DateTime?
+  active                   Boolean   @default(true)
+
+  part             PerformancePart?     @relation(fields: [partId], references: [id], onDelete: SetNull)
+  affiliatePartner AffiliatePartner?    @relation(fields: [affiliatePartnerId], references: [id], onDelete: SetNull)
+  offerProvider    PartOfferProvider?   @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  clicks           PartAffiliateClick[]
+  contexts         PartOfferContext[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, externalItemId])
+  @@index([partId, provider, active])
+  @@index([provider, lastCheckedAt])
+  @@index([providerId, active, lastCheckedAt])
+  @@index([active, availability, lastSeenAt])
+  @@index([classification, active])
+  @@index([manufacturerPartNumber])
+  @@index([oemPartNumber])
+  @@index([expiresAt, active])
+}
+
+model PartIdentifier {
+  id              String   @id @default(uuid())
+  partId          String
+  type            String
+  value           String
+  normalizedValue String
+  source          String
+  confidence      String   @default("POSSIBLE")
+  evidence        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  part PerformancePart @relation(fields: [partId], references: [id], onDelete: Cascade)
+
+  @@unique([partId, type, normalizedValue])
+  @@index([type, normalizedValue])
+  @@index([source, confidence])
+}
+
+model PartDiscoveryQuery {
+  id                   String    @id @default(uuid())
+  modelPartComponentId String
+  queryKey             String    @unique
+  queryText            String
+  template             String
+  status               String    @default("PENDING")
+  attempts             Int       @default(0)
+  listingsExamined     Int       @default(0)
+  listingsAccepted     Int       @default(0)
+  listingsRejected     Int       @default(0)
+  rateLimitEvents      Int       @default(0)
+  lastError            String?
+  lastAttemptAt        DateTime?
+  lastSuccessAt        DateTime?
+  refreshAfter         DateTime?
+  lastRateLimitAt      DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  modelPartComponent ModelPartComponent @relation(fields: [modelPartComponentId], references: [id], onDelete: Cascade)
+
+  @@index([modelPartComponentId, status])
+  @@index([refreshAfter, status])
+  @@index([lastAttemptAt])
+}
+
+model PartOfferContext {
+  id                   String   @id @default(uuid())
+  offerId              String
+  modelPartComponentId String
+  searchQuery          String
+  fitmentConfidence    String   @default("POSSIBLE")
+  confidenceScore      Int      @default(0)
+  matchReasons         Json?
+  active               Boolean  @default(true)
+  lastSeenAt           DateTime @default(now())
+  lastCheckedAt        DateTime @default(now())
+
+  offer              PartOffer          @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  modelPartComponent ModelPartComponent @relation(fields: [modelPartComponentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([offerId, modelPartComponentId])
+  @@index([modelPartComponentId, active, confidenceScore])
+  @@index([lastCheckedAt])
+}
+
+model PartSourceRun {
+  id           String    @id @default(uuid())
+  source       String
+  runType      String
+  makeSlug     String?
+  status       String    @default("RUNNING")
+  stats        Json?
+  failedUrls   Json?
+  errorSummary String?
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+
+  @@index([source, startedAt])
+  @@index([runType, status])
 }
 
 model PartCompatibility {
-  id         String  @id @default(uuid())
-  partId     String
-  makeId     String?
-  modelId    String?
-  yearStart  Int?
-  yearEnd    Int?
-  trim       String?
-  engine     String?
-  notes      String?
-  confidence String  @default("MANUAL_REVIEW")
+  id                   String  @id @default(uuid())
+  partId               String
+  makeId               String?
+  modelId              String?
+  modelVariantId       String?
+  yearStart            Int?
+  yearEnd              Int?
+  trim                 String?
+  engine               String?
+  transmission         String?
+  drivetrain           String?
+  bodyStyle            String?
+  aspiration           String?
+  electrificationLevel String?
+  fitmentKey           String? @unique
+  notes                String?
+  confidence           String  @default("MANUAL_REVIEW")
 
-  part  PerformancePart @relation(fields: [partId], references: [id], onDelete: Cascade)
-  make  Make?           @relation(fields: [makeId], references: [id], onDelete: SetNull)
-  model Model?          @relation(fields: [modelId], references: [id], onDelete: SetNull)
+  part         PerformancePart @relation(fields: [partId], references: [id], onDelete: Cascade)
+  make         Make?           @relation(fields: [makeId], references: [id], onDelete: SetNull)
+  model        Model?          @relation(fields: [modelId], references: [id], onDelete: SetNull)
+  modelVariant ModelVariant?   @relation(fields: [modelVariantId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -739,6 +1268,144 @@ model PartCompatibility {
   @@unique([partId, makeId, modelId, yearStart, yearEnd, trim, engine])
   @@index([makeId, modelId])
   @@index([partId])
+  @@index([modelVariantId])
+}
+
+model CatalogReferenceSource {
+  id            String    @id @default(uuid())
+  code          String    @unique
+  name          String
+  sourceType    String
+  baseUrl       String?
+  accessStatus  String    @default("AVAILABLE")
+  active        Boolean   @default(true)
+  lastCheckedAt DateTime?
+
+  references PartCatalogReference[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sourceType, active])
+  @@index([accessStatus, active])
+}
+
+model PartCatalogReference {
+  id               String    @id @default(uuid())
+  referenceKey     String    @unique
+  partId           String
+  sourceId         String
+  sourceUrl        String
+  sourceBrand      String?
+  sourcePartName   String?
+  sourcePartNumber String?
+  vehicleMakeId    String?
+  vehicleModelId   String?
+  modelVariantId   String?
+  yearStart        Int?
+  yearEnd          Int?
+  sourceCategory   String?
+  sourceComponent  String?
+  confidence       String    @default("UNVERIFIED")
+  status           String    @default("ACTIVE")
+  lastCheckedAt    DateTime?
+  active           Boolean   @default(true)
+
+  part         PerformancePart        @relation(fields: [partId], references: [id], onDelete: Cascade)
+  source       CatalogReferenceSource @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  vehicleMake  Make?                  @relation(fields: [vehicleMakeId], references: [id], onDelete: SetNull)
+  vehicleModel Model?                 @relation(fields: [vehicleModelId], references: [id], onDelete: SetNull)
+  modelVariant ModelVariant?          @relation(fields: [modelVariantId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([partId, active, confidence])
+  @@index([sourceId, active, lastCheckedAt])
+  @@index([vehicleMakeId, vehicleModelId, active])
+  @@index([sourcePartNumber])
+  @@index([status, active])
+}
+
+model PartImage {
+  id             String  @id @default(uuid())
+  partId         String
+  url            String
+  imageType      String  @default("PRODUCT")
+  sourceName     String?
+  sourceUrl      String?
+  license        String?
+  attribution    String?
+  attributionUrl String?
+  confidence     String  @default("UNVERIFIED")
+  reviewStatus   String  @default("UNREVIEWED")
+  displayOrder   Int     @default(0)
+  isPrimary      Boolean @default(false)
+  active         Boolean @default(true)
+
+  part PerformancePart @relation(fields: [partId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([partId, url])
+  @@index([partId, active, displayOrder])
+  @@index([reviewStatus, active])
+}
+
+model PartPerformanceEvidence {
+  id                 String    @id @default(uuid())
+  partId             String
+  sourceType         String
+  sourceName         String?
+  sourceUrl          String?
+  configurationLabel String?
+  horsepowerGain     Int?
+  torqueGain         Int?
+  confidence         String    @default("UNVERIFIED")
+  notes              String?
+  verifiedAt         DateTime?
+  active             Boolean   @default(true)
+
+  part           PerformancePart                @relation(fields: [partId], references: [id], onDelete: Cascade)
+  configurations PartPerformanceConfiguration[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([partId, active, confidence])
+  @@index([sourceType, active])
+}
+
+model PartPerformanceConfiguration {
+  id               String  @id @default(uuid())
+  configurationKey String  @unique
+  partId           String
+  evidenceId       String?
+  modelId          String?
+  modelVariantId   String?
+  yearStart        Int?
+  yearEnd          Int?
+  engine           String?
+  aspiration       String?
+  transmission     String?
+  supportingMods   Json?
+  horsepowerGain   Int?
+  torqueGain       Int?
+  confidence       String  @default("UNVERIFIED")
+  active           Boolean @default(true)
+
+  part         PerformancePart          @relation(fields: [partId], references: [id], onDelete: Cascade)
+  evidence     PartPerformanceEvidence? @relation(fields: [evidenceId], references: [id], onDelete: SetNull)
+  model        Model?                   @relation(fields: [modelId], references: [id], onDelete: SetNull)
+  modelVariant ModelVariant?            @relation(fields: [modelVariantId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([partId, active, confidence])
+  @@index([modelId, modelVariantId, active])
+  @@index([evidenceId])
 }
 
 model VehicleInstalledPart {
@@ -747,6 +1414,7 @@ model VehicleInstalledPart {
   partId               String?
   legacyModificationId String? @unique
   categoryId           String?
+  componentTypeId      String?
   userId               String?
   installStatus        String  @default("INSTALLED")
   installedDate        String?
@@ -761,6 +1429,7 @@ model VehicleInstalledPart {
   part               PerformancePart?     @relation(fields: [partId], references: [id], onDelete: SetNull)
   legacyModification VehicleModification? @relation(fields: [legacyModificationId], references: [id], onDelete: SetNull)
   category           PartCategory?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  componentType      PartComponentType?   @relation(fields: [componentTypeId], references: [id], onDelete: SetNull)
   user               User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
   clicks             PartAffiliateClick[]
 
@@ -770,33 +1439,44 @@ model VehicleInstalledPart {
   @@index([vehicleId, installStatus])
   @@index([partId])
   @@index([categoryId])
+  @@index([componentTypeId])
   @@index([userId])
 }
 
 model PartAffiliateClick {
   id                     String   @id @default(uuid())
-  partId                 String
+  partId                 String?
+  offerId                String?
+  modelPartComponentId   String?
   affiliatePartnerId     String?
   vehicleId              String?
   vehicleInstalledPartId String?
   userId                 String?
   outboundUrl            String
+  provider               String?
+  externalItemId         String?
+  affiliateReferenceId   String?
   clickRef               String   @unique @default(uuid())
   sourcePath             String?
   ipHash                 String?
   userAgentHash          String?
   createdAt              DateTime @default(now())
 
-  part                 PerformancePart       @relation(fields: [partId], references: [id], onDelete: Cascade)
+  part                 PerformancePart?      @relation(fields: [partId], references: [id], onDelete: Cascade)
+  offer                PartOffer?            @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  modelPartComponent   ModelPartComponent?   @relation(fields: [modelPartComponentId], references: [id], onDelete: SetNull)
   affiliatePartner     AffiliatePartner?     @relation(fields: [affiliatePartnerId], references: [id], onDelete: SetNull)
   vehicle              Vehicle?              @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
   vehicleInstalledPart VehicleInstalledPart? @relation(fields: [vehicleInstalledPartId], references: [id], onDelete: SetNull)
   user                 User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([partId, createdAt])
+  @@index([offerId, createdAt])
+  @@index([modelPartComponentId, createdAt])
   @@index([affiliatePartnerId, createdAt])
   @@index([vehicleId, createdAt])
   @@index([userId, createdAt])
+  @@index([createdAt])
 }
 
 model ServiceRecord {
@@ -863,9 +1543,31 @@ model MaintenanceRule {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  model Model? @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  model Model?                @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  parts MaintenanceRulePart[]
 
   @@index([modelId, priority])
+}
+
+model MaintenanceRulePart {
+  id                String  @id @default(uuid())
+  maintenanceRuleId String
+  partId            String?
+  componentTypeId   String?
+  required          Boolean @default(false)
+  notes             String?
+
+  maintenanceRule MaintenanceRule    @relation(fields: [maintenanceRuleId], references: [id], onDelete: Cascade)
+  part            PerformancePart?   @relation(fields: [partId], references: [id], onDelete: Cascade)
+  componentType   PartComponentType? @relation(fields: [componentTypeId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([maintenanceRuleId, partId])
+  @@unique([maintenanceRuleId, componentTypeId])
+  @@index([partId])
+  @@index([componentTypeId])
 }
 
 // ──────────────────────────────────────────────
@@ -1044,7 +1746,7 @@ model Purchase {
   id        String   @id @default(uuid())
   listingId String
   buyerId   String
-  amount    Float
+  amount    Decimal  @db.Decimal(14, 2)
   status    String   @default("PENDING") // PENDING, COMPLETED, CANCELLED
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1106,10 +1808,10 @@ model FulfillmentRequest {
   paymentStatus             String    @default("NOT_REQUIRED")
   cancellationReason        String?
   cancelledByActor          String?
-  expectedPlatformFee       Float     @default(0)
-  expectedPartnerCommission Float     @default(0)
-  collectedAmount           Float     @default(0)
-  refundableAmount          Float     @default(0)
+  expectedPlatformFee       Decimal   @default(0) @db.Decimal(14, 2)
+  expectedPartnerCommission Decimal   @default(0) @db.Decimal(14, 2)
+  collectedAmount           Decimal   @default(0) @db.Decimal(14, 2)
+  refundableAmount          Decimal   @default(0) @db.Decimal(14, 2)
   partnerAcceptedAt         DateTime?
   completedAt               DateTime?
   /// Payout Status: UNSETTLED | PENDING_RECONCILIATION | RECONCILED | PAYOUT_COMPLETED
@@ -1202,7 +1904,7 @@ model FulfillmentFee {
   fulfillmentRequestId String
   /// FeeType: COMMISSION | SERVICE_FEE | TRANSPORT_FEE | REFERRAL_FEE | DEPOSIT
   feeType              String
-  amount               Float
+  amount               Decimal @db.Decimal(14, 2)
   currency             String  @default("USD")
   /// Status: ESTIMATED | AUTHORIZED | CAPTURED | REFUNDED | WAIVED
   status               String  @default("ESTIMATED")
@@ -1219,12 +1921,16 @@ model FulfillmentFee {
 model DepositIntent {
   id                   String    @id @default(uuid())
   fulfillmentRequestId String
-  amount               Float
+  amount               Decimal   @db.Decimal(14, 2)
   currency             String    @default("USD")
   /// Status: AUTHORIZED | HELD | CAPTURED | RELEASED | REFUNDED
   status               String    @default("AUTHORIZED")
   paymentMethod        String?
   transactionRef       String?
+  checkoutKey          String?   @unique
+  checkoutSessionId    String?   @unique
+  checkoutUrl          String?
+  checkoutExpiresAt    DateTime?
   expiresAt            DateTime?
   capturedAt           DateTime?
   releasedAt           DateTime?
@@ -1234,6 +1940,25 @@ model DepositIntent {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([fulfillmentRequestId])
+}
+
+model PaymentWebhookEvent {
+  id                   String    @id @default(uuid())
+  provider             String
+  eventId              String
+  eventType            String
+  /// Status: PROCESSING | PROCESSED | FAILED
+  status               String    @default("PROCESSING")
+  attempts             Int       @default(1)
+  fulfillmentRequestId String?
+  errorMessage         String?
+  receivedAt           DateTime  @default(now())
+  processedAt          DateTime?
+  updatedAt            DateTime  @updatedAt
+
+  @@unique([provider, eventId])
+  @@index([status, receivedAt])
   @@index([fulfillmentRequestId])
 }
 

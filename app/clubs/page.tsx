@@ -1,82 +1,34 @@
-import Link from "next/link";
-import { auth } from "@/auth";
+import { unstable_cache } from "next/cache";
 import { createCarClubAction } from "@/app/actions/clubs";
 import { getCatalogMakeOptions } from "@/lib/makes/catalog";
 import { prisma } from "@/lib/prisma";
 import ClubLocationFields from "./ClubLocationFields";
+import ClubLogoCropField from "./ClubLogoCropField";
 import ClubModelSelector from "./ClubModelSelector";
+import ClubDirectoryList, { type PublicClubListItem } from "./ClubDirectoryList";
 
-export const dynamic = "force-dynamic";
-const DEFAULT_CLUB_LOGO = "/images/supercar-dash-wordmark.svg";
-type ClubSortKey = "created" | "members" | "meets";
-type SortDirection = "asc" | "desc";
-type SortableClub = {
-  name: string;
-  createdAt: Date;
-  _count: {
-    members: number;
-    meets: number;
-  };
-};
+export const revalidate = 300;
 
-export default async function ClubsPage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ sort?: string; dir?: string }>;
-}) {
-  const resolvedSearchParams = await searchParams;
-  const activeSort = resolveSortKey(resolvedSearchParams?.sort);
-  const activeDirection = resolveSortDirection(resolvedSearchParams?.dir);
-  const sessionPromise = auth();
-  const clubsPromise = prisma.carClub.findMany({
-    where: {
-      status: "ACTIVE",
-      visibility: "PUBLIC",
-    },
-      select: {
-        id: true,
-        slug: true,
-        name: true,
-        logoUrl: true,
-        city: true,
-        state: true,
-        createdAt: true,
-        models: {
-          select: {
-            model: {
-              select: {
-                name: true,
-                make: { select: { name: true } },
-              },
-            },
-          },
-          take: 6,
-        },
-        _count: {
-          select: {
-            members: { where: { status: "ACTIVE" } },
-            meets: { where: { status: { in: ["PUBLISHED", "FULL"] } } },
-          },
-        },
-      },
-      orderBy: { createdAt: "asc" },
-      take: 80,
-    }).catch(() => []);
-  const session = await sessionPromise;
-  const [clubs, makeOptions] = await Promise.all([
-    clubsPromise,
-    session?.user?.id ? getCatalogMakeOptions() : Promise.resolve(null),
-  ]);
+export default async function ClubsPage() {
+  const clubsPromise = getPublicClubs();
+  const makeOptionsPromise = getCatalogMakeOptions();
+  const [clubs, makeOptions] = await Promise.all([clubsPromise, makeOptionsPromise]);
 
-  const sortedClubs = [...clubs]
-    .sort((a, b) => compareClubs(a, b, activeSort, activeDirection))
-    .map((club) => {
+  const publicClubs: PublicClubListItem[] = clubs.map((club) => {
       const makeNames = Array.from(new Set(club.models.map(({ model }) => model.make.name))).slice(0, 3);
       const modelNames = club.models.map(({ model }) => model.name).slice(0, 4);
       return {
-        ...club,
+        id: club.id,
+        slug: club.slug,
+        name: club.name,
+        logoUrl: club.logoUrl,
+        city: club.city || "",
+        state: club.state || "",
+        createdAt: serializeDate(club.createdAt),
         makeLabel: makeNames.length > 0 ? makeNames.join(", ") : "All makes",
         modelLabel: modelNames.length > 0 ? modelNames.join(", ") : "All models",
+        memberCount: club._count.members,
+        meetCount: club._count.meets,
       };
     });
 
@@ -98,46 +50,9 @@ export default async function ClubsPage({
         <section className="club-list-section" aria-label="Existing clubs">
           <div className="club-list-title">
             <span>Existing Clubs</span>
-            <strong>{sortedClubs.length} active</strong>
+            <strong>{publicClubs.length} active</strong>
           </div>
-          <div id="club-grid" className="club-list" role="table">
-            <div className="club-list-header" role="row">
-              <span>Name</span>
-              <span>Location</span>
-              <span>Make</span>
-              <span>Model</span>
-              <Link href={getSortHref("members", activeSort, activeDirection)} className={activeSort === "members" ? "is-active" : ""}>
-                Members
-              </Link>
-              <Link href={getSortHref("meets", activeSort, activeDirection)} className={activeSort === "meets" ? "is-active" : ""}>
-                Meets
-              </Link>
-            </div>
-            {clubs.length > 0 ? (
-              sortedClubs.map((club) => (
-                <Link key={club.id} href={`/clubs/${club.slug}`} className="club-list-row" role="row">
-                  <div className="club-list-name-cell" data-label="Name">
-                    <img src={club.logoUrl || DEFAULT_CLUB_LOGO} alt="" />
-                    <div>
-                      <strong>{club.name}</strong>
-                      <small className="club-list-mobile-location">{club.city}, {club.state}</small>
-                    </div>
-                  </div>
-                  <span data-label="Location">{club.city}, {club.state}</span>
-                  <span data-label="Make">{club.makeLabel}</span>
-                  <span data-label="Model">{club.modelLabel}</span>
-                  <strong data-label="Members">{club._count.members}</strong>
-                  <strong data-label="Meets">{club._count.meets}</strong>
-                </Link>
-              ))
-            ) : (
-              <div className="club-empty-state">
-                <span>Club Grid</span>
-                <strong>No clubs yet.</strong>
-                <p>Create the first model-led driver club and attach future meets to it.</p>
-              </div>
-            )}
-          </div>
+          <ClubDirectoryList clubs={publicClubs} />
         </section>
 
         <aside id="create-club" className="club-create-panel">
@@ -145,8 +60,7 @@ export default async function ClubsPage({
             <span>Creator Tools</span>
             <strong>Start a Club</strong>
           </div>
-          {session?.user?.id && makeOptions ? (
-            <form action={createCarClubAction} className="club-form">
+          <form action={createCarClubAction} className="club-form">
               <label>
                 <span>Club Name</span>
                 <input name="name" placeholder="Charlotte V10 Owners" required />
@@ -160,55 +74,59 @@ export default async function ClubsPage({
                   <option value="PRIVATE">Private Approval</option>
                 </select>
               </label>
-              <label>
-                <span>Club Logo</span>
-                <input name="logoFile" type="file" accept="image/jpeg,image/png,image/webp" />
-              </label>
+              <ClubLogoCropField />
               <label>
                 <span>Description</span>
                 <textarea name="description" rows={4} placeholder="Model focus, meet style, and membership expectations." />
               </label>
               <ClubModelSelector makes={makeOptions} />
               <button type="submit">Create Club</button>
-            </form>
-          ) : (
-            <div className="club-empty-state is-compact">
-              <strong>Sign in to create a club.</strong>
-              <p>Club creators become the first moderator automatically.</p>
-              <Link href="/login" className="meets-primary-button">Sign In</Link>
-            </div>
-          )}
+          </form>
         </aside>
       </section>
     </main>
   );
 }
 
-function resolveSortKey(value: string | undefined): ClubSortKey {
-  return value === "members" || value === "meets" ? value : "created";
-}
+const getPublicClubs = unstable_cache(
+  async () => prisma.carClub.findMany({
+    where: {
+      status: "ACTIVE",
+      visibility: "PUBLIC",
+    },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      logoUrl: true,
+      city: true,
+      state: true,
+      createdAt: true,
+      models: {
+        select: {
+          model: {
+            select: {
+              name: true,
+              make: { select: { name: true } },
+            },
+          },
+        },
+        take: 6,
+      },
+      _count: {
+        select: {
+          members: { where: { status: "ACTIVE" } },
+          meets: { where: { status: { in: ["PUBLISHED", "FULL"] } } },
+        },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+    take: 80,
+  }).catch(() => []),
+  ["public-club-directory-v1"],
+  { revalidate: 300, tags: ["public-clubs"] },
+);
 
-function resolveSortDirection(value: string | undefined): SortDirection {
-  return value === "asc" ? "asc" : "desc";
-}
-
-function getSortHref(sortKey: ClubSortKey, activeSort: ClubSortKey, activeDirection: SortDirection) {
-  const nextDirection = activeSort === sortKey && activeDirection === "desc" ? "asc" : "desc";
-  return `/clubs?sort=${sortKey}&dir=${nextDirection}#club-grid`;
-}
-
-function compareClubs(
-  a: SortableClub,
-  b: SortableClub,
-  sortKey: ClubSortKey,
-  direction: SortDirection,
-) {
-  if (sortKey === "members" || sortKey === "meets") {
-    const left = sortKey === "members" ? a._count.members : a._count.meets;
-    const right = sortKey === "members" ? b._count.members : b._count.meets;
-    const numeric = direction === "asc" ? left - right : right - left;
-    return numeric || a.createdAt.getTime() - b.createdAt.getTime() || a.name.localeCompare(b.name);
-  }
-
-  return a.createdAt.getTime() - b.createdAt.getTime() || a.name.localeCompare(b.name);
+function serializeDate(value: Date | string) {
+  return value instanceof Date ? value.toISOString() : value;
 }

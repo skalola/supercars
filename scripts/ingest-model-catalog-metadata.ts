@@ -1,5 +1,9 @@
 import { PrismaClient } from "@prisma/client";
-import { canonicalBaseModelName, scoreBaseModelFallback } from "@/lib/model-catalog/base-model";
+import {
+  canonicalBaseModelName,
+  isBaseModelFallbackCompatible,
+  scoreBaseModelFallback,
+} from "@/lib/model-catalog/base-model";
 import { findModelMetadataCandidates, type ModelCatalogRecord, type ModelMetadataCandidate } from "@/lib/model-catalog";
 
 const prisma = new PrismaClient();
@@ -332,6 +336,7 @@ function findBaseModelFallback(target: BaseFallbackModel, models: BaseFallbackMo
       return image ? { sourceModel, image, confidence } : null;
     })
     .filter((item) => item !== null)
+    .filter((item) => isBaseModelFallbackCompatible(target.name, item.sourceModel.name, target.make.name))
     .filter((item) => item.confidence >= 82)
     .sort((a, b) => b.confidence - a.confidence)[0] || null;
 }

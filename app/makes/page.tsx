@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCatalogMakeSummaries } from "@/lib/makes/catalog";
+import { compareCatalogLabels } from "@/lib/makes/catalog-order";
 import { getMakeMetadata } from "@/lib/makes/make-metadata";
 
 const regionOrder = ["Japan", "Europe", "United Kingdom", "United States", "Korea", "China", "Specialist / Tuner"];
@@ -13,7 +14,7 @@ export default async function MakesPage() {
       region,
       makes: makes
         .filter((make) => (make.region || getMakeMetadata(make.slug).region) === region)
-        .sort((a, b) => b.modelCount - a.modelCount || a.name.localeCompare(b.name)),
+        .sort(compareCatalogLabels),
     }))
     .filter((group) => group.makes.length > 0);
 

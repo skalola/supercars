@@ -15,6 +15,8 @@ import {
   EmailTemplateType,
   EmailTemplateParams,
 } from "./email-templates";
+import { enforceActionRateLimit, hashRateLimitIdentifier } from "@/lib/security/action-rate-limit";
+import { resolveMailProvider } from "@/lib/operations/runtime-provider-policy";
 
 export interface SendFulfillmentEmailInput extends Omit<EmailTemplateParams, "recipientEmail"> {
   fulfillmentRequestId: string;
@@ -61,11 +63,7 @@ interface ProviderSendResult {
 }
 
 function getMailProvider(): MailProviderName {
-  const provider = (process.env.MAIL_PROVIDER || "log").trim().toLowerCase();
-  if (provider === "resend" || provider === "sendgrid" || provider === "postmark") {
-    return provider;
-  }
-  return "log";
+  return resolveMailProvider(process.env.MAIL_PROVIDER);
 }
 
 function getFromAddress(): string {
@@ -192,6 +190,12 @@ export async function sendBasicEmail(input: SendBasicEmailInput): Promise<Omit<S
   const provider = getMailProvider();
 
   try {
+    await enforceActionRateLimit({
+      actorId: hashRateLimitIdentifier(recipientEmail),
+      action: "basic_email",
+      limit: 10,
+      windowMs: 60 * 60 * 1000,
+    });
     const providerResult = await deliverWithProvider({
       to: recipientEmail,
       recipientName: input.recipientName,
@@ -306,6 +310,13 @@ export async function sendFulfillmentEmail(input: SendFulfillmentEmailInput): Pr
 
   let providerResult: ProviderSendResult;
   try {
+    await enforceActionRateLimit({
+      actorId: input.fulfillmentRequestId,
+      action: "fulfillment_email",
+      bucketKey: recipientEmail,
+      limit: 20,
+      windowMs: 60 * 60 * 1000,
+    });
     providerResult = await deliverWithProvider({
       to: recipientEmail,
       recipientName: input.recipientName,

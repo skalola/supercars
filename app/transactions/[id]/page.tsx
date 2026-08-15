@@ -130,7 +130,9 @@ export default async function TransactionDetailPage({ params }: TransactionPageP
           <div style={styles.panelLabel}>Payment</div>
           <h2 style={styles.panelTitle}>{paymentHeadline(req)}</h2>
           <p style={styles.muted}>{paymentCopy(req)}</p>
-          {role === "BUYER" && req.requestType === "SERVICE_BOOKING" && req.status === "ACCEPTED_AWAITING_PAYMENT" && (
+          {role === "BUYER" && req.requestType === "SERVICE_BOOKING" &&
+            ["PAYMENT_REQUIRED", "PROCESSING", "FAILED"].includes(req.paymentStatus) &&
+            ["READY_TO_SEND", "PAYMENT_PROCESSING", "ACCEPTED_AWAITING_PAYMENT"].includes(req.status) && (
             <form method="post" action="/api/payments/service-booking-checkout" style={styles.paymentForm}>
               <input type="hidden" name="fulfillmentRequestId" value={req.id} />
               <input type="hidden" name="returnTo" value={`/transactions/${req.publicTransactionToken}`} />
@@ -353,6 +355,7 @@ function nextStepCopy(status: string, requestType: string, role: "BUYER" | "SELL
     if (status === "COMPLETED") return "This transaction has been marked complete.";
     return "Track the request status here as the buyer and fulfillment partner move through the workflow.";
   }
+  if (status === "READY_TO_SEND" && requestType === "SERVICE_BOOKING") return "Complete the booking fee in Stripe before the request is emailed to the shop.";
   if (status === "SENT" || status === "VIEWED" || status === "READY_TO_SEND") return "The request is with the fulfillment partner for review.";
   if (status === "ACCEPTED" && requestType === "INSURANCE_QUOTE") return "The insurance partner accepted the quote request. Policy binding is completed directly with the carrier.";
   if (status === "ACCEPTED" && requestType === "DEALER_PURCHASE") return "The dealer accepted the purchase request. Final vehicle payment and paperwork are completed directly with the selling dealer.";
@@ -392,7 +395,7 @@ function paymentCopy(req: { paymentStatus: string; requestType?: string; refunda
   if (req.paymentStatus === "REFUNDED") return "A refund has been applied according to the cancellation policy.";
   if (req.paymentStatus === "VOIDED") return "The authorization was released before capture.";
   if (req.paymentStatus === "NOT_REQUIRED") return "This request does not require a buyer deposit.";
-  if (req.paymentStatus === "FAILED") return "Payment failed or was declined. You can retry checkout while the shop acceptance remains active.";
+  if (req.paymentStatus === "FAILED") return "Payment failed or was declined. You can retry checkout before the request is sent to the shop.";
   return "Payment status will update as the request moves forward.";
 }
 

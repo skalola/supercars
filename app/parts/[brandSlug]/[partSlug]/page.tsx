@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { PartDetailBuildActions, type PartDetailFitmentOption, type PartDetailGarageCar } from "@/components/parts/PartDetailBuildActions";
@@ -11,13 +12,34 @@ import { auditPerformancePartTrust } from "@/lib/parts/trust";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { unstable_cache } from "next/cache";
+import { absoluteUrl, buildPublicMetadata, privateMetadata, safeJsonLd } from "@/lib/seo";
 
 type PartDetailPageProps = {
   params: Promise<{
     brandSlug: string;
     partSlug: string;
   }>;
+  searchParams?: Promise<{ vehicleId?: string | string[] }>;
 };
+
+export async function generateMetadata({ params }: PartDetailPageProps): Promise<Metadata> {
+  const { brandSlug, partSlug } = await params;
+  const part = await getPublicPartDetail(brandSlug, partSlug);
+  if (!part || !auditPerformancePartTrust(part).publicEligible) return privateMetadata;
+  const fitmentNames = Array.from(new Set(
+    part.compatibility
+      .flatMap((fitment) => [fitment.make?.name, fitment.model?.name])
+      .filter((value): value is string => Boolean(value)),
+  )).slice(0, 4);
+
+  return buildPublicMetadata({
+    title: `${part.brand.name} ${part.name}`,
+    description: (part.description || `${part.brand.name} ${part.name} for ${fitmentNames.join(" ") || "compatible enthusiast vehicles"}. View fitment, specifications, and current marketplace offers.`).slice(0, 160),
+    path: `/parts/${brandSlug}/${partSlug}`,
+    image: part.imageUrl,
+    keywords: [part.brand.name, part.name, part.category.name, ...fitmentNames],
+  });
+}
 
 const partDetailSelect = {
   id: true,
@@ -26,10 +48,15 @@ const partDetailSelect = {
   name: true,
   slug: true,
   partNumber: true,
+  oemPartNumber: true,
+  componentType: true,
   description: true,
   imageUrl: true,
   sourceUrl: true,
   sourceName: true,
+  sourceCatalog: true,
+  sourceCategory: true,
+  diagramReference: true,
   sourceConfidence: true,
   status: true,
   retailPriceCents: true,
@@ -87,6 +114,33 @@ const partDetailSelect = {
     ],
     take: 100,
   },
+  offers: {
+    where: { active: true },
+    select: {
+      id: true,
+      provider: true,
+      title: true,
+      priceCents: true,
+      currency: true,
+      condition: true,
+      sellerName: true,
+      sellerFeedbackPercentage: true,
+      sellerQualityScore: true,
+      imageUrl: true,
+      affiliateUrl: true,
+      oemMatchType: true,
+      genuineOemStatus: true,
+      compatibilityStatus: true,
+      fitmentConfidence: true,
+      confidenceScore: true,
+      shippingCostCents: true,
+      shippingCurrency: true,
+      expiresAt: true,
+      lastCheckedAt: true,
+    },
+    orderBy: [{ confidenceScore: "desc" }, { priceCents: "asc" }],
+    take: 12,
+  },
 } satisfies Prisma.PerformancePartSelect;
 
 const relatedPartSelect = {
@@ -124,8 +178,10 @@ const relatedPartSelect = {
 
 type RelatedPart = Prisma.PerformancePartGetPayload<{ select: typeof relatedPartSelect }>;
 
-export default async function PartDetailPage({ params }: PartDetailPageProps) {
+export default async function PartDetailPage({ params, searchParams }: PartDetailPageProps) {
   const { brandSlug, partSlug } = await params;
+  const query = await searchParams;
+  const requestedVehicleId = typeof query?.vehicleId === "string" ? query.vehicleId : undefined;
   const session = await auth();
   const userId = session?.user?.id as string | undefined;
 
@@ -142,8 +198,19 @@ export default async function PartDetailPage({ params }: PartDetailPageProps) {
   const compatibleMakeIds = unique(part.compatibility.map((fitment) => fitment.makeId).filter(isPresent));
   const compatibleModelIds = unique(part.compatibility.map((fitment) => fitment.modelId).filter(isPresent));
   const relatedParts = await getRelatedParts(part.id, part.categoryId, part.brandId, compatibleMakeIds, compatibleModelIds);
+  const activeOffers = part.offers.filter((offer) =>
+    Boolean(offer.affiliateUrl) && (!offer.expiresAt || offer.expiresAt > new Date()),
+  );
+  const bestOffer = activeOffers[0] ?? null;
   const title = part.name.toUpperCase();
-  const priceLabel = formatPartPrice(part.retailPriceCents);
+  const priceLabel = bestOffer
+    ? formatOfferPrice(bestOffer.priceCents, bestOffer.currency)
+    : formatPartPrice(part.retailPriceCents);
+  const priceContext = bestOffer
+    ? `${formatProvider(bestOffer.provider)} / ${bestOffer.sellerName || "Marketplace seller"}`
+    : part.retailPriceCents != null
+      ? "Catalog reference price"
+      : "No active purchase offer";
   const galleryImages = buildPartGalleryImages({
     partName: part.name,
     categoryName: part.category.name,
@@ -154,16 +221,41 @@ export default async function PartDetailPage({ params }: PartDetailPageProps) {
   const hasAffiliateLink = isSafeOutboundUrl(part.affiliateUrl);
   const hasSourceLink = isSafeOutboundUrl(part.sourceUrl);
   const hasRetailerLink = hasAffiliateLink || hasSourceLink;
-  const retailerRouteLabel = trackingReady ? "Affiliate Ready" : hasSourceLink ? "Source Tracked" : "Retailer Pending";
-  const retailerRouteDetail = trackingReady
+  const retailerRouteLabel = bestOffer ? "Marketplace Offer" : trackingReady ? "Affiliate Ready" : hasSourceLink ? "Catalog Source" : "Offer Pending";
+  const retailerRouteDetail = bestOffer
+    ? `${formatProvider(bestOffer.provider)} / ${bestOffer.sellerName || "Marketplace seller"}`
+    : trackingReady
     ? part.affiliatePartner?.name || "Approved partner route"
     : hasSourceLink
       ? part.retailerName || part.sourceName || "Original source"
       : "No safe outbound URL captured";
   const retailerHref = hasRetailerLink ? `/out/parts/${part.id}?source=/parts/${part.brand.slug}/${part.slug}` : null;
+  const primaryOfferHref = bestOffer
+    ? `/out/parts/offers/${bestOffer.id}?source=/parts/${part.brand.slug}/${part.slug}${requestedVehicleId ? `&vehicleId=${encodeURIComponent(requestedVehicleId)}` : ""}`
+    : null;
+  const productJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: part.name,
+    description: part.description || undefined,
+    image: part.imageUrl ? [absoluteUrl(part.imageUrl)] : undefined,
+    sku: part.partNumber || part.oemPartNumber || undefined,
+    brand: { "@type": "Brand", name: part.brand.name },
+    category: part.category.name,
+    url: absoluteUrl(`/parts/${part.brand.slug}/${part.slug}`),
+    offers: bestOffer && bestOffer.priceCents != null ? {
+      "@type": "Offer",
+      price: bestOffer.priceCents / 100,
+      priceCurrency: bestOffer.currency,
+      availability: "https://schema.org/InStock",
+      url: absoluteUrl(`/parts/${part.brand.slug}/${part.slug}`),
+      seller: bestOffer.sellerName ? { "@type": "Organization", name: bestOffer.sellerName } : undefined,
+    } : undefined,
+  };
 
   return (
     <main className="part-detail-shell">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(productJsonLd) }} />
       <section className="part-detail-hero">
         <div className="part-detail-showcase">
           <Link href="/parts" className="part-detail-back">
@@ -183,9 +275,9 @@ export default async function PartDetailPage({ params }: PartDetailPageProps) {
         <aside className="part-detail-action-panel">
           <div className="part-detail-price-row">
             <div>
-              <span>Price</span>
+              <span>{bestOffer ? "Best Available Offer" : "Reference Price"}</span>
               <strong>{priceLabel}</strong>
-              <small>{part.retailerName || part.sourceName || "Retailer source"}</small>
+              <small>{priceContext}</small>
             </div>
             <StatTile label="Peak Power" value={formatGain(part.estimatedHpGain, "HP")} />
             <StatTile label="Peak Torque" value={formatGain(part.estimatedTorqueGain, "TQ")} />
@@ -211,9 +303,13 @@ export default async function PartDetailPage({ params }: PartDetailPageProps) {
           </div>
 
           <div className="part-detail-actions">
-            {retailerHref ? (
+            {primaryOfferHref ? (
+              <a href={primaryOfferHref} target="_blank" rel="nofollow sponsored">
+                View Best Offer
+              </a>
+            ) : retailerHref ? (
               <a href={retailerHref} target="_blank" rel={trackingReady ? "nofollow sponsored" : "noopener noreferrer"}>
-                View Retailer
+                View Catalog Source
               </a>
             ) : (
               <span>Retailer pending</span>
@@ -225,13 +321,13 @@ export default async function PartDetailPage({ params }: PartDetailPageProps) {
             ) : null}
           </div>
 
-          <div className={`part-detail-outbound-status${trackingReady ? " is-affiliate" : hasSourceLink ? " is-source" : " is-pending"}`}>
+          <div className={`part-detail-outbound-status${bestOffer || trackingReady ? " is-affiliate" : hasSourceLink ? " is-source" : " is-pending"}`}>
             <span>{retailerRouteLabel}</span>
             <strong>{retailerRouteDetail}</strong>
           </div>
 
           <p className="part-detail-disclosure">
-            SUPERCAR DASH may earn a commission from approved partner links once affiliate routing is activated.
+            SupercarDash may earn a commission when you purchase through partner links.
           </p>
         </aside>
       </section>
@@ -255,10 +351,14 @@ export default async function PartDetailPage({ params }: PartDetailPageProps) {
             <SpecRow label="Brand" value={part.brand.name} />
             <SpecRow label="System" value={part.catalogNode?.name || part.category.name} />
             <SpecRow label="Category" value={part.category.name} />
+            <SpecRow label="Component Type" value={part.componentType || part.name} />
             <SpecRow label="Part Number" value={part.partNumber || "Not listed"} />
+            <SpecRow label="OEM Number" value={part.oemPartNumber || "Not listed"} />
             <SpecRow label="Material" value={inferMaterial(part)} />
-            <SpecRow label="Retailer" value={part.retailerName || part.sourceName || "Not captured"} />
-            <SpecRow label="Source" value={part.sourceName || "Not captured"} />
+            <SpecRow label="Canonical Source" value={part.sourceName || "Not captured"} />
+            <SpecRow label="Source Catalog" value={formatEnumLabel(part.sourceCatalog) || "Not captured"} />
+            <SpecRow label="Source Category" value={part.sourceCategory || "Not captured"} />
+            <SpecRow label="Diagram Reference" value={part.diagramReference || "Not captured"} />
             <SpecRow label="Last Checked" value={formatDate(part.lastCheckedAt)} />
             <SpecRow label="Tracking" value={trackingReady ? "Affiliate ready" : formatEnumLabel(part.trackingStatus)} />
           </dl>
@@ -320,6 +420,58 @@ export default async function PartDetailPage({ params }: PartDetailPageProps) {
         </article>
       </section>
 
+      <section className="part-detail-offers" aria-labelledby="marketplace-offers-title">
+        <div className="part-detail-panel-heading">
+          <span>◇</span>
+          <h2 id="marketplace-offers-title">Available Marketplace Offers</h2>
+          {activeOffers.length > 0 ? <em>{activeOffers.length.toLocaleString()} live</em> : null}
+        </div>
+        {activeOffers.length === 0 ? (
+          <p className="part-detail-muted">No verified marketplace offers are active right now. The canonical part and fitment remain available.</p>
+        ) : (
+          <div className="part-detail-offer-grid">
+            {activeOffers.map((offer) => (
+              <article key={offer.id} className="part-detail-offer-card">
+                <div className="part-detail-offer-media">
+                  {offer.imageUrl ? <img src={offer.imageUrl} alt="" /> : <span>{offer.provider}</span>}
+                </div>
+                <div className="part-detail-offer-copy">
+                  <div>
+                    <span>Marketplace: {formatProvider(offer.provider)}</span>
+                    <em className={`is-${offer.fitmentConfidence.toLowerCase()}`}>
+                      {["EXACT_MATCH", "HIGH_CONFIDENCE", "HIGH"].includes(offer.fitmentConfidence) ? "High-confidence fit" : "Verify fitment"}
+                    </em>
+                  </div>
+                  <strong>{offer.title}</strong>
+                  <p>Seller: {offer.sellerName || "Unavailable"}</p>
+                  <p>{[
+                    offer.condition,
+                    offer.genuineOemStatus === "CLAIMED" ? "Seller claims OEM/genuine" : null,
+                    offer.oemMatchType === "EXACT" ? "Exact OEM number" : null,
+                  ].filter(Boolean).join(" / ") || "Offer details unavailable"}</p>
+                  {offer.sellerFeedbackPercentage != null ? <small>{offer.sellerFeedbackPercentage.toFixed(1)}% seller feedback</small> : null}
+                </div>
+                <div className="part-detail-offer-action">
+                  <strong>{formatOfferPrice(offer.priceCents, offer.currency)}</strong>
+                  <a
+                    href={`/out/parts/offers/${offer.id}?source=/parts/${part.brand.slug}/${part.slug}${requestedVehicleId ? `&vehicleId=${encodeURIComponent(requestedVehicleId)}` : ""}`}
+                    target="_blank"
+                    rel="nofollow sponsored"
+                  >
+                    Buy on {formatProvider(offer.provider)}
+                  </a>
+                  <small>Verify fitment before purchase</small>
+                  {offer.shippingCostCents != null ? (
+                    <small>Shipping {formatOfferPrice(offer.shippingCostCents, offer.shippingCurrency || offer.currency)}</small>
+                  ) : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+        <p className="part-detail-disclosure">SupercarDash may earn a commission when you purchase through partner links.</p>
+      </section>
+
       <section className="part-detail-recommendations">
         <div className="part-detail-panel-heading">
           <span>◇</span>
@@ -344,7 +496,7 @@ export default async function PartDetailPage({ params }: PartDetailPageProps) {
                   <strong>{relatedPart.name}</strong>
                   <small>{[relatedPart.category.name, relatedPart.brand.name].join(" / ")}</small>
                   <p>{formatRelatedFitment(relatedPart.compatibility, { makeIds: compatibleMakeIds, modelIds: compatibleModelIds })}</p>
-                  <em>{formatPartPrice(relatedPart.retailPriceCents)}</em>
+                  <em>{relatedPart.retailPriceCents == null ? "Offer pending" : `Reference ${formatPartPrice(relatedPart.retailPriceCents)}`}</em>
                 </Link>
               );
             })}
@@ -496,7 +648,7 @@ const getPublicPartDetail = unstable_cache(
     },
     select: partDetailSelect,
   }),
-  ["public-part-detail-v1"],
+  ["public-part-detail-v2"],
   { revalidate: 60 * 60, tags: ["parts-catalog"] },
 );
 
@@ -519,7 +671,19 @@ const getRelatedParts = unstable_cache(
       where: {
         id: { not: partId },
         status: "ACTIVE",
-        OR: relatedConditions,
+        AND: [
+          { OR: relatedConditions },
+          ...(makeIds.length > 0 || modelIds.length > 0 ? [{
+            compatibility: {
+              some: {
+                OR: [
+                  ...(makeIds.length > 0 ? [{ makeId: { in: makeIds } }] : []),
+                  ...(modelIds.length > 0 ? [{ modelId: { in: modelIds } }] : []),
+                ],
+              },
+            },
+          }] : []),
+        ],
       },
       select: relatedPartSelect,
       orderBy: [
@@ -544,7 +708,7 @@ const getRelatedParts = unstable_cache(
       .map(({ part }) => part)
       .slice(0, 5);
   },
-  ["public-related-parts-v1"],
+  ["public-related-parts-v2"],
   { revalidate: 60 * 60, tags: ["parts-catalog"] },
 );
 
@@ -606,6 +770,19 @@ function formatPartPrice(value: number | null) {
     currency: "USD",
     maximumFractionDigits: 0,
   }).format(value / 100);
+}
+
+function formatOfferPrice(value: number | null, currency: string) {
+  if (value === null) return "Price unavailable";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 2,
+  }).format(value / 100);
+}
+
+function formatProvider(value: string) {
+  return value === "EBAY" ? "eBay" : formatEnumLabel(value);
 }
 
 function formatGain(value: number | null, unit: string) {
@@ -728,8 +905,8 @@ function getInstallTimeLabel(value: string | null) {
 }
 
 function getTuningLabel(categorySlug: string) {
-  if (categorySlug === "ecu-tuning" || categorySlug === "forced-induction") return "Recommended";
-  if (categorySlug === "exhaust" || categorySlug === "intake") return "Verify";
+  if (categorySlug === "ecu-tuning" || categorySlug === "forced-induction" || categorySlug === "ecu-electronics" || categorySlug === "performance-packages") return "Recommended";
+  if (categorySlug === "exhaust" || categorySlug === "intake" || categorySlug === "exhaust-emissions" || categorySlug === "air-induction") return "Verify";
   return "Not usually required";
 }
 

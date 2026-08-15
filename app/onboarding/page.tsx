@@ -1,6 +1,10 @@
 import { auth } from "@/auth";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { updateUsername } from "@/app/actions/onboarding";
+import { privateMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = { ...privateMetadata, title: "Create Your Garage" };
 
 export default async function OnboardingPage() {
   const session = await auth();
