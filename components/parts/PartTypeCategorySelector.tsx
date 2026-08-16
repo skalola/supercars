@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CategoryLineIcon } from "@/components/parts/PartsStoreExplorer";
-import { getPartTypeDetailPath, getPartTypesApiPath } from "@/lib/parts/parts-api";
+import { getPartOffersApiPath, getPartTypeDetailPath, getPartTypesApiPath } from "@/lib/parts/parts-api";
 
 type PartSystem = {
   id: string;
@@ -58,9 +58,13 @@ export function PartTypeCategorySelector({
   const [activePartTypeSlug, setActivePartTypeSlug] = useState(initialPartTypeSlug);
   const [selectionComplete, setSelectionComplete] = useState(Boolean(initialPartTypeSlug));
   const [loadingSystemSlug, setLoadingSystemSlug] = useState("");
+  const [loadingPartTypeSlug, setLoadingPartTypeSlug] = useState("");
   const [loadError, setLoadError] = useState("");
   const [fitmentNotice, setFitmentNotice] = useState("");
   const [isNavigating, startNavigation] = useTransition();
+  const discoveryRequest = useRef<AbortController | null>(null);
+
+  useEffect(() => () => discoveryRequest.current?.abort(), []);
 
   const activeSystem = systems.find((system) => system.slug === activeSystemSlug) ?? null;
   const orderedSystems = useMemo(
@@ -89,6 +93,7 @@ export function PartTypeCategorySelector({
     : [];
 
   async function selectSystem(system: PartSystem) {
+    discoveryRequest.current?.abort();
     setActiveSystemSlug(system.slug);
     setActiveGroupSlug("");
     setActivePartTypeSlug("");
@@ -110,25 +115,48 @@ export function PartTypeCategorySelector({
     }
   }
 
-  function selectPartType(partType: VehiclePartType) {
+  async function selectPartType(partType: VehiclePartType) {
     if (!activeSystem) return;
+    discoveryRequest.current?.abort();
+    const controller = new AbortController();
+    discoveryRequest.current = controller;
     setActivePartTypeSlug(partType.componentType.slug);
-    if (!partType.mapped) {
-      setSelectionComplete(false);
-      setFitmentNotice(`${partType.componentType.name} is in the parts taxonomy. Verified ${makeSlug.replace(/-/g, " ")} ${modelSlug.replace(/-/g, " ")} fitment is still being mapped.`);
-      return;
-    }
+    setSelectionComplete(false);
+    setLoadingPartTypeSlug(partType.componentType.slug);
+    setLoadError("");
     setFitmentNotice("");
-    setSelectionComplete(true);
-    const path = getPartTypeDetailPath(
-      { makeSlug, modelSlug },
-      { systemSlug: activeSystem.slug, partTypeSlug: partType.componentType.slug, year, vehicleId },
-    );
-    startNavigation(() => router.push(path, { scroll: false }));
+    try {
+      const response = await fetch(getPartOffersApiPath(
+        { makeSlug, modelSlug },
+        { systemSlug: activeSystem.slug, partTypeSlug: partType.componentType.slug, year },
+      ), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ systemSlug: activeSystem.slug, year }),
+        signal: controller.signal,
+      });
+      const payload = await response.json().catch(() => null) as { error?: string } | null;
+      if (!response.ok) throw new Error(payload?.error || "Compatible parts could not be loaded.");
+      if (controller.signal.aborted) return;
+      setSelectionComplete(true);
+      const path = getPartTypeDetailPath(
+        { makeSlug, modelSlug },
+        { systemSlug: activeSystem.slug, partTypeSlug: partType.componentType.slug, year, vehicleId },
+      );
+      startNavigation(() => router.push(path, { scroll: false }));
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setFitmentNotice(error instanceof Error ? error.message : "Compatible parts could not be loaded.");
+    } finally {
+      if (discoveryRequest.current === controller) {
+        discoveryRequest.current = null;
+        setLoadingPartTypeSlug("");
+      }
+    }
   }
 
   return (
-    <section className="part-type-browser" aria-label="Browse compatible parts" aria-busy={loading || Boolean(loadingSystemSlug) || isNavigating}>
+    <section className="part-type-browser" aria-label="Browse compatible parts" aria-busy={loading || Boolean(loadingSystemSlug) || Boolean(loadingPartTypeSlug) || isNavigating}>
       <header className="part-type-browser-heading">
         <div><span>Compatible Catalog</span><h2>Choose a Category</h2></div>
         <p>Move from system to component to a vehicle-specific part without leaving this workspace.</p>
@@ -187,16 +215,17 @@ export function PartTypeCategorySelector({
                 type="button"
                 className={activePartTypeSlug === partType.componentType.slug ? "is-active" : ""}
                 aria-current={activePartTypeSlug === partType.componentType.slug ? "page" : undefined}
-                onClick={() => selectPartType(partType)}
+                onClick={() => void selectPartType(partType)}
+                disabled={Boolean(loadingPartTypeSlug) || isNavigating}
               >
                 <CategoryLineIcon slug={activeSystem.slug} />
                 <span>
                   <strong>{partType.componentType.name}</strong>
-                  <small>{partType.mapped && partType.componentType.description
+                  <small>{partType.componentType.description
                     ? partType.componentType.description
                     : "Review fitment, performance, and available offers"}</small>
                 </span>
-                <i aria-hidden="true">{isNavigating && activePartTypeSlug === partType.componentType.slug ? "..." : "›"}</i>
+                <i aria-hidden="true">{(isNavigating || loadingPartTypeSlug === partType.componentType.slug) && activePartTypeSlug === partType.componentType.slug ? "..." : "›"}</i>
               </button>
             )) : componentGroups.map((group) => (
               <button

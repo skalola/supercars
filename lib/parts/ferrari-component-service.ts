@@ -14,6 +14,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { getUniversalPartComponentGroup } from "@/lib/parts/part-type-hierarchy";
 import { getPartTypeTitleConflict } from "@/lib/parts/offer-quality";
+import { isDisplayEligiblePartOffer } from "@/lib/parts/discovery-contract";
 import { selectModelHeroImage } from "@/lib/model-catalog/model-display";
 import { unstable_cache } from "next/cache";
 
@@ -59,8 +60,7 @@ const getPartTaxonomyTypesCached = unstable_cache(
 export async function getPartModels(makeSlug: string) {
   return prisma.model.findMany({
     where: {
-      make: { slug: makeSlug, partsMarqueConfig: { is: { partsEnabled: true } } },
-      partComponents: { some: { active: true } },
+      make: { slug: makeSlug },
     },
     select: {
       name: true,
@@ -152,7 +152,7 @@ export async function getApplicablePartTypes(input: { makeSlug: string; modelSlu
     prisma.modelPartComponent.findMany({
       where: {
         active: true,
-        model: { slug: input.modelSlug, make: { slug: input.makeSlug, partsMarqueConfig: { is: { partsEnabled: true } } } },
+        model: { slug: input.modelSlug, make: { slug: input.makeSlug } },
         componentType: { active: true, category: { slug: input.systemSlug } },
       },
       select: {
@@ -198,7 +198,7 @@ export async function getAvailableOffers(input: {
   const mapping = await prisma.modelPartComponent.findFirst({
     where: {
       active: true,
-      model: { slug: input.modelSlug, make: { slug: input.makeSlug, partsMarqueConfig: { is: { partsEnabled: true } } } },
+      model: { slug: input.modelSlug, make: { slug: input.makeSlug } },
       componentType: {
         active: true,
         slug: input.componentSlug,
@@ -432,11 +432,10 @@ export async function getAvailableOffers(input: {
 async function resolvePartTypeOfferProvider(makeId: string) {
   const marqueConfig = await prisma.partsMarqueConfig.findUnique({
     where: { makeId },
-    select: { partsEnabled: true, enabledProviders: true },
+    select: { enabledProviders: true },
   });
-  if (!marqueConfig?.partsEnabled) throw new Error("Parts discovery is not enabled for this marque.");
-  const enabledProviderCodes = readProviderCodes(marqueConfig.enabledProviders);
-  if (enabledProviderCodes.length === 0) throw new Error("No offer providers are enabled for this marque.");
+  const configuredProviderCodes = readProviderCodes(marqueConfig?.enabledProviders);
+  const enabledProviderCodes = configuredProviderCodes.length > 0 ? configuredProviderCodes : ["EBAY"];
   const configured = await prisma.partOfferProvider.findMany({
     where: { active: true, code: { in: enabledProviderCodes } },
     select: { id: true, code: true, providerType: true, affiliatePartnerId: true },
@@ -514,8 +513,10 @@ async function buildComponentOfferResponse(
   })]);
   const eligibleCandidateIds = candidateRows.filter((context) => {
     if (getPartTypeTitleConflict(mapping.componentType.name, context.offer.title)) return false;
-    if (["EXACT_MATCH", "HIGH_CONFIDENCE", "HIGH"].includes(context.fitmentConfidence)) return true;
-    return mapping.componentType.fitmentRisk === "LOW" && ["LIKELY_COMPATIBLE", "POSSIBLE"].includes(context.fitmentConfidence);
+    return isDisplayEligiblePartOffer({
+      fitmentConfidence: context.fitmentConfidence,
+      fitmentRisk: mapping.componentType.fitmentRisk,
+    });
   }).map((context) => context.id);
   const pageStart = (page - 1) * COMPONENT_OFFER_PAGE_SIZE;
   const selectedContextIds = eligibleCandidateIds.slice(pageStart, pageStart + COMPONENT_OFFER_PAGE_SIZE);
@@ -641,6 +642,7 @@ async function buildComponentOfferResponse(
     pagination: {
       page,
       pageSize: COMPONENT_OFFER_PAGE_SIZE,
+      total: eligibleCandidateIds.length,
       hasPrevious: page > 1,
       hasMore,
     },

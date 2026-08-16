@@ -31,7 +31,7 @@ export async function getVehiclePartTypeDetail(input: PartDetailContextInput) {
       active: true,
       model: {
         slug: input.modelSlug,
-        make: { slug: input.makeSlug, partsMarqueConfig: { is: { partsEnabled: true } } },
+        make: { slug: input.makeSlug },
       },
       componentType: {
         active: true,
@@ -225,6 +225,7 @@ export async function getVehiclePartTypeDetail(input: PartDetailContextInput) {
     categorySlug: mapping.componentType.category.slug,
     year: selectedYear,
     page: input.offerPage,
+    cacheOnly: !input.refreshOffers,
     ...(input.refreshOffers ? { forceRefresh: true } : {}),
   });
   const offers = offerPayload?.offers ?? [];

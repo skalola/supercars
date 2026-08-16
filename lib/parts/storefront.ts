@@ -105,7 +105,7 @@ type StoreFitmentOption = {
 };
 
 export async function getPublicPartsStoreShell() {
-  const [categories, brands, fitments, mappedModels] = await Promise.all([
+  const [categories, brands, fitments] = await Promise.all([
     prisma.partCategory.findMany({
       where: { active: true },
       select: { id: true, name: true, slug: true },
@@ -124,13 +124,6 @@ export async function getPublicPartsStoreShell() {
       orderBy: { name: "asc" },
     }),
     getPublicFitmentOptions(),
-    prisma.model.findMany({
-      where: {
-        make: { partsMarqueConfig: { partsEnabled: true } },
-        partComponents: { some: { active: true } },
-      },
-      select: { id: true },
-    }),
   ]);
 
   const categoryRows: PartsCategoryRow[] = categories.map((category) => ({
@@ -140,7 +133,6 @@ export async function getPublicPartsStoreShell() {
   }));
   const brandRows: PartsBrandRow[] = brands.map((brand) => ({ ...brand, partCount: 0 }));
   const makeMap = new Map<string, { id: string; name: string; slug: string }>();
-  const mappedModelIds = new Set(mappedModels.map((model) => model.id));
   const modelMap = new Map<string, { id: string; name: string; makeId: string; slug: string; productionStartYear: number | null; productionEndYear: number | null; partsEngineEnabled: boolean }>();
 
   for (const fitment of fitments) {
@@ -156,7 +148,7 @@ export async function getPublicPartsStoreShell() {
         slug: fitment.modelSlug,
         productionStartYear: fitment.productionStartYear,
         productionEndYear: fitment.productionEndYear,
-        partsEngineEnabled: mappedModelIds.has(fitment.modelId),
+        partsEngineEnabled: true,
       });
     }
   }
@@ -415,6 +407,19 @@ async function getPublicFitmentOptions() {
       INNER JOIN "public"."Model" model ON model.id = mapping."modelId"
       INNER JOIN "public"."Make" make ON make.id = model."makeId"
       WHERE mapping.active = true
+      UNION ALL
+      SELECT
+        NULL AS "makeId",
+        make.name AS "makeName",
+        make.slug AS "makeSlug",
+        model.id AS "modelId",
+        model.name AS "modelName",
+        model."makeId" AS "modelMakeId",
+        model.slug AS "modelSlug",
+        model."productionStartYear" AS "productionStartYear",
+        model."productionEndYear" AS "productionEndYear"
+      FROM "public"."Model" model
+      INNER JOIN "public"."Make" make ON make.id = model."makeId"
     ) fitments
     ORDER BY "makeName" ASC NULLS LAST, "modelName" ASC NULLS LAST
   `);

@@ -53,7 +53,7 @@ export async function getPreferredBrands(
     : await prisma.model.findFirst({
       where: {
         slug: vehicleContext.modelSlug,
-        make: { slug: vehicleContext.makeSlug, partsMarqueConfig: { is: { partsEnabled: true } } },
+        make: { slug: vehicleContext.makeSlug },
       },
       select: { id: true, makeId: true },
     }).then((model) => model ? { makeId: model.makeId, modelId: model.id } : null);

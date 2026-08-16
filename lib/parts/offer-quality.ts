@@ -2,6 +2,7 @@ import { normalizeOemPartNumber } from "@/lib/parts/ferrari-taxonomy";
 
 export type OfferConfidence = "EXACT_MATCH" | "HIGH_CONFIDENCE" | "LIKELY_COMPATIBLE" | "POSSIBLE_MATCH" | "REJECTED";
 export type PartFitmentRisk = "LOW" | "MEDIUM" | "HIGH";
+export type OfferYearCompatibility = "MATCH" | "CONFLICT" | "UNKNOWN";
 
 export type OfferQualityInput = {
   makeName?: string;
@@ -171,6 +172,19 @@ export function scoreComponentOffer(input: ComponentOfferQualityInput): OfferQua
   if (REJECTED_TERMS.test(input.title)) return rejected("Non-automotive collectible or reference item");
   const conflictingMake = findConflictingMake(input.title, makeName);
   if (conflictingMake) return rejected(`Different vehicle manufacturer: ${conflictingMake}`);
+  const yearCompatibility = input.year ? getOfferYearCompatibility(input.title, input.year) : "UNKNOWN";
+  if (input.year && yearCompatibility === "CONFLICT") {
+    return rejected(`Explicit offer years do not include ${input.year}`);
+  }
+  const normalizedSelectedModel = normalizeSearchText(input.modelName);
+  const generationAmbiguous = knownModels.some((model) => {
+    const normalizedModel = normalizeSearchText(model);
+    return normalizedModel !== normalizedSelectedModel
+      && (normalizedModel.includes(normalizedSelectedModel) || normalizedSelectedModel.includes(normalizedModel));
+  });
+  if (input.year && generationAmbiguous && yearCompatibility === "UNKNOWN" && input.marketplaceCompatibilityMatch !== "EXACT") {
+    return rejected(`Vehicle generation cannot be verified for ${input.year}`);
+  }
 
   const title = normalizeSearchText(input.title);
   const structured = new Map((input.localizedAspects ?? [])
@@ -311,6 +325,56 @@ export function scoreFerrariComponentOffer(input: ComponentOfferQualityInput): O
   });
 }
 
+export function getOfferYearCompatibility(title: string, selectedYear: number): OfferYearCompatibility {
+  if (!Number.isInteger(selectedYear) || selectedYear < 1886 || selectedYear > new Date().getFullYear() + 2) return "UNKNOWN";
+
+  const normalized = title.replace(/[\u2010-\u2015]/g, "-");
+  const ranges: Array<{ start: number; end: number }> = [];
+  const rangePattern = /\b((?:19|20)\d{2})\s*(?:-|to|thru|through)\s*((?:(?:19|20)\d{2})|\d{2})\b/gi;
+  for (const match of normalized.matchAll(rangePattern)) {
+    const start = Number.parseInt(match[1], 10);
+    const rawEnd = Number.parseInt(match[2], 10);
+    const end = match[2].length === 2 ? resolveShortRangeEnd(start, rawEnd) : rawEnd;
+    if (end >= start && end <= new Date().getFullYear() + 2) ranges.push({ start, end });
+  }
+
+  const openEndedStarts = [...normalized.matchAll(/\b((?:19|20)\d{2})\s*\+/g)]
+    .map((match) => Number.parseInt(match[1], 10));
+  const abbreviatedOpenEndedStarts = [...normalized.matchAll(/\b(\d{2})\s*\+/g)]
+    .map((match) => expandAutomotiveYear(match[1]));
+  const abbreviatedRanges = [...normalized.matchAll(/\b(\d{2})\s*-\s*(\d{2})\b/g)]
+    .filter((match) => !/^(?:mm|cm|in|inch|psi)\b/i.test(normalized.slice((match.index ?? 0) + match[0].length).trimStart()))
+    .map((match) => ({ start: expandAutomotiveYear(match[1]), end: expandAutomotiveYear(match[2]) }))
+    .filter((range) => range.end >= range.start && range.end - range.start <= 40);
+
+  const explicitYears = [...new Set((normalized.match(/\b(?:19|20)\d{2}\b/g) ?? []).map(Number))];
+  const fitmentYears = [...normalized.matchAll(/\b(?:for|fits?|compatible(?:\s+with)?)\s+(?:the\s+)?(?:model\s+year\s+)?((?:19|20)\d{2})\b/gi)]
+    .map((match) => Number.parseInt(match[1], 10));
+  if (
+    ranges.some((range) => selectedYear >= range.start && selectedYear <= range.end)
+    || abbreviatedRanges.some((range) => selectedYear >= range.start && selectedYear <= range.end)
+    || openEndedStarts.some((start) => selectedYear >= start)
+    || abbreviatedOpenEndedStarts.some((start) => selectedYear >= start)
+    || fitmentYears.includes(selectedYear)
+    || explicitYears.includes(selectedYear)
+  ) {
+    return "MATCH";
+  }
+  if (ranges.length > 0 || abbreviatedRanges.length > 0 || openEndedStarts.length > 0 || abbreviatedOpenEndedStarts.length > 0 || fitmentYears.length > 0 || explicitYears.length >= 2) return "CONFLICT";
+  return "UNKNOWN";
+}
+
+function resolveShortRangeEnd(start: number, shortEnd: number) {
+  let end = Math.floor(start / 100) * 100 + shortEnd;
+  if (end < start) end += 100;
+  return end;
+}
+
+function expandAutomotiveYear(value: string) {
+  const year = Number.parseInt(value, 10);
+  return year <= 29 ? 2000 + year : 1900 + year;
+}
+
 function getSellerQualityScore(feedback: number | null | undefined) {
   if (feedback == null || !Number.isFinite(feedback)) return null;
   return Math.max(0, Math.min(100, Math.round(feedback)));
@@ -345,9 +409,16 @@ function containsPhrase(value: string, phrase: string) {
 const GENERIC_MODEL_TOKENS = new Set(["ferrari", "italia", "stradale", "superfast", "berlinetta", "spider", "gtb", "gts", "gt", "gr"]);
 
 function getDistinctiveModelTokens(value: string) {
-  const tokens = normalizeSearchText(value).split(" ").filter((token) => token.length >= 2 && !GENERIC_MODEL_TOKENS.has(token));
-  const coded = tokens.filter((token) => /\d/.test(token) || token.length >= 4);
-  return coded.slice(0, 2);
+  const tokens = value
+    .split(/[^a-z0-9]+/i)
+    .map((raw) => ({ raw, normalized: normalizeSearchText(raw) }))
+    .filter(({ normalized }) => normalized.length >= 2 && !GENERIC_MODEL_TOKENS.has(normalized));
+  const distinctive = tokens.filter(({ raw, normalized }) => (
+    /\d/.test(normalized)
+    || normalized.length >= 4
+    || (normalized.length >= 3 && /^[A-Z]{3,5}$/.test(raw))
+  ));
+  return distinctive.slice(0, 2).map(({ normalized }) => normalized);
 }
 
 const FERRARI_VARIANT_TOKENS = ["italia", "spider", "speciale", "challenge", "gtb", "gts", "tributo"];
@@ -379,6 +450,9 @@ export function getPartTypeTitleConflict(componentName: string, offerTitle: stri
   }
   if (component === "engine air filter" && /\b(fuel filter|oil filter|gas filter|inline filter|small engine|lawn mower)\b/.test(normalizedTitle)) {
     return "Fluid or small-engine filter is not an engine air-filter element";
+  }
+  if (component === "intake system" && /\b(intake manifold|throttle body|fuel rail)\b/.test(normalizedTitle)) {
+    return "Intake manifold or fuel-system hardware is not a complete intake system";
   }
   if (component === "oil filter" && /\b(wrench|socket|housing|cap|cover|adapter)\b/.test(normalizedTitle)) {
     return "Oil-filter tool or housing is not an oil filter element";

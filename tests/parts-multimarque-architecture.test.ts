@@ -7,6 +7,8 @@ import { rankPartOffers } from "../lib/parts/offer-ranking";
 import { getPartOffersApiPath, getPartSystemsApiPath, getPartTypesApiPath } from "../lib/parts/parts-api";
 import { getUniversalPartComponentGroup } from "../lib/parts/part-type-hierarchy";
 import { evaluateUniversalPartApplicability } from "../lib/parts/universal-applicability";
+import { canMaterializePartContext, isDisplayEligiblePartOffer, partDiscoveryRequestSchema } from "../lib/parts/discovery-contract";
+import { getOfferYearCompatibility, scoreComponentOffer } from "../lib/parts/offer-quality";
 
 const fixtures = [
   { makeSlug: "ferrari", makeName: "Ferrari", modelSlug: "458-italia", modelName: "458 Italia", system: "brakes", group: "Brake Pads", partType: "Front Brake Pads", partTypeSlug: "front-brake-pads", engine: "4.5L naturally aspirated V8", brand: "Brembo" },
@@ -120,4 +122,128 @@ test("background offer operations accept a make context", () => {
   assert.match(refresh, /makeSlug:\s*string/);
   assert.match(recovery, /prepareZeroOfferRecovery/);
   assert.match(recovery, /makeSlug:\s*string/);
+});
+
+test("parts discovery accepts a strict selected category contract", () => {
+  assert.equal(partDiscoveryRequestSchema.safeParse({ systemSlug: "air-induction", year: 2022 }).success, true);
+  assert.equal(partDiscoveryRequestSchema.safeParse({ systemSlug: "air-induction", year: 1700 }).success, false);
+  assert.equal(partDiscoveryRequestSchema.safeParse({ systemSlug: "air-induction", unexpected: true }).success, false);
+});
+
+test("only publicly applicable component contexts are materialized", () => {
+  assert.equal(canMaterializePartContext({
+    status: "APPLICABLE",
+    confidence: "MEDIUM",
+    publiclyApplicable: true,
+    source: "UNIVERSAL_RULE",
+    reason: "Supplier fitment must still be validated.",
+    reviewRequired: true,
+  }), true);
+  assert.equal(canMaterializePartContext({
+    status: "VARIANT_DEPENDENT",
+    confidence: "LOW",
+    publiclyApplicable: false,
+    source: "UNIVERSAL_RULE",
+    reason: "Variant data is required.",
+    reviewRequired: true,
+  }), false);
+});
+
+test("low-risk model matches display without weakening higher-risk fitment", () => {
+  assert.equal(isDisplayEligiblePartOffer({ fitmentConfidence: "POSSIBLE_MATCH", fitmentRisk: "LOW" }), true);
+  assert.equal(isDisplayEligiblePartOffer({ fitmentConfidence: "POSSIBLE_MATCH", fitmentRisk: "MEDIUM" }), false);
+  assert.equal(isDisplayEligiblePartOffer({ fitmentConfidence: "POSSIBLE_MATCH", fitmentRisk: "HIGH" }), false);
+  assert.equal(isDisplayEligiblePartOffer({ fitmentConfidence: "HIGH_CONFIDENCE", fitmentRisk: "HIGH" }), true);
+});
+
+test("short uppercase model codes remain distinctive fitment evidence", () => {
+  const result = scoreComponentOffer({
+    makeName: "Acura",
+    modelName: "RSX",
+    componentName: "Intake System",
+    title: "Injen Cold Air Intake System fits 2002-2006 Acura RSX 2.0L",
+    knownModels: ["RSX", "NSX", "Integra"],
+    knownBrands: ["Injen"],
+    year: 2006,
+    condition: "New",
+    sellerFeedbackPercentage: 99,
+    imageUrl: "https://example.test/intake.jpg",
+    fitmentRisk: "MEDIUM",
+    categoryNames: ["Automotive Parts"],
+  });
+  assert.ok(["HIGH_CONFIDENCE", "LIKELY_COMPATIBLE"].includes(result.confidence));
+  assert.ok(result.reasons.some((reason) => reason.includes("Exact model named")));
+});
+
+test("explicit marketplace fitment years cannot cross vehicle generations", () => {
+  assert.equal(getOfferYearCompatibility("Fits 2019-2026 Toyota Supra", 1998), "CONFLICT");
+  assert.equal(getOfferYearCompatibility("Fits 2019+ Toyota Supra", 1998), "CONFLICT");
+  assert.equal(getOfferYearCompatibility("Toyota Supra GR BMW Z4 19+", 1998), "CONFLICT");
+  assert.equal(getOfferYearCompatibility("Cold Air Intake for 2021 Toyota Supra", 1998), "CONFLICT");
+  assert.equal(getOfferYearCompatibility("Fits 2003-06 Nissan 350Z", 2008), "CONFLICT");
+  assert.equal(getOfferYearCompatibility("Mazda MX-5 Miata 06-15", 1997), "CONFLICT");
+  assert.equal(getOfferYearCompatibility("Mazda MX-5 Miata 90-97", 1997), "MATCH");
+  assert.equal(getOfferYearCompatibility("Fits 2003-2008 Nissan 350Z", 2008), "MATCH");
+  assert.equal(getOfferYearCompatibility("Part 2020 for Nissan 350Z", 2008), "UNKNOWN");
+
+  const rejected = scoreComponentOffer({
+    makeName: "Toyota",
+    modelName: "Supra",
+    componentName: "Intake System",
+    title: "Cold Air Intake System For 2019-2026 Toyota Supra 3.0T",
+    knownModels: ["Supra"],
+    knownBrands: [],
+    year: 1998,
+    fitmentRisk: "MEDIUM",
+  });
+  assert.equal(rejected.confidence, "REJECTED");
+  assert.match(rejected.reasons[0], /do not include 1998/);
+
+  const wrongComponent = scoreComponentOffer({
+    makeName: "Toyota",
+    modelName: "Supra",
+    componentName: "Intake System",
+    title: "Billet Air Intake Manifold Upgrade and Fuel Rail for Toyota Supra 2JZGE",
+    knownModels: ["Supra"],
+    knownBrands: [],
+    year: 1998,
+    fitmentRisk: "MEDIUM",
+  });
+  assert.equal(wrongComponent.confidence, "REJECTED");
+  assert.match(wrongComponent.reasons[0], /not a complete intake system/);
+
+  const ambiguousGeneration = scoreComponentOffer({
+    makeName: "Toyota",
+    modelName: "Supra",
+    componentName: "Intake System",
+    title: "Performance Cold Air Intake System for Toyota Supra A90",
+    knownModels: ["Supra", "GR Supra RZ", "Supra RZ"],
+    knownBrands: [],
+    year: 1998,
+    fitmentRisk: "MEDIUM",
+  });
+  assert.equal(ambiguousGeneration.confidence, "REJECTED");
+  assert.match(ambiguousGeneration.reasons[0], /generation cannot be verified/);
+});
+
+test("component selection uses POST discovery and no longer blocks unmapped taxonomy", () => {
+  const selector = readFileSync(new URL("../components/parts/PartTypeCategorySelector.tsx", import.meta.url), "utf8");
+  const route = readFileSync(new URL("../app/api/parts/vehicles/[make]/[model]/part-types/[partType]/offers/route.ts", import.meta.url), "utf8");
+  assert.match(selector, /method:\s*"POST"/);
+  assert.doesNotMatch(selector, /if\s*\(!partType\.mapped\)/);
+  assert.match(route, /export async function POST/);
+  assert.match(route, /resolvePartDiscoveryContext/);
+  assert.match(route, /parts_offer_discovery/);
+});
+
+test("parts selector includes every catalog model while mappings remain on demand", () => {
+  const storefront = readFileSync(new URL("../lib/parts/storefront.ts", import.meta.url), "utf8");
+  const context = readFileSync(new URL("../lib/parts/discovery-context.ts", import.meta.url), "utf8");
+  const service = readFileSync(new URL("../lib/parts/ferrari-component-service.ts", import.meta.url), "utf8");
+  assert.match(storefront, /FROM "public"\."Model" model/);
+  assert.match(context, /modelPartComponent\.create/);
+  assert.match(context, /modelId_componentTypeId/);
+  assert.doesNotMatch(context, /MARQUE_DISABLED|partsEnabled/);
+  assert.doesNotMatch(service, /partsEnabled:\s*true|Parts discovery is not enabled for this marque/);
+  assert.match(service, /configuredProviderCodes\.length > 0 \? configuredProviderCodes : \["EBAY"\]/);
 });

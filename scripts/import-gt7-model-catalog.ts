@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { buildMakeLogoUrl, getMakeMetadata } from "@/lib/makes/make-metadata";
+import { ensurePartsMarqueConfig } from "@/lib/parts/marque-config";
 
 const prisma = new PrismaClient();
 
@@ -46,6 +47,7 @@ async function main() {
 
   let makesUpserted = 0;
   let modelsUpserted = 0;
+  const configuredMakes = new Set<string>();
 
   for (const row of rows) {
     const make = await prisma.make.upsert({
@@ -54,6 +56,10 @@ async function main() {
       create: { name: row.make, slug: slugify(row.make), ...buildMakeMetadata(row.make) },
     });
     makesUpserted += 1;
+    if (!configuredMakes.has(make.id)) {
+      await ensurePartsMarqueConfig(prisma, make.id);
+      configuredMakes.add(make.id);
+    }
 
     const model = await prisma.model.upsert({
       where: { makeId_slug: { makeId: make.id, slug: slugify(row.model) } },

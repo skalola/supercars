@@ -110,6 +110,7 @@
     "backfill:part-offer-hashes": "tsx --env-file .env scripts/backfill-part-offer-content-hashes.ts",
     "report-ferrari-components": "tsx --env-file .env scripts/report-ferrari-component-library.ts",
     "map:parts-applicability": "tsx --env-file .env scripts/map-parts-applicability.ts",
+    "backfill:parts-marques": "tsx --env-file .env scripts/backfill-parts-marque-configs.ts",
     "seed:part-type-relationships": "tsx --env-file .env scripts/seed-part-type-relationships.ts",
     "report:parts-marque-coverage": "tsx --env-file .env scripts/report-parts-marque-coverage.ts",
     "process-fulfillment-expirations": "tsx --env-file .env scripts/process-fulfillment-expirations.ts",
