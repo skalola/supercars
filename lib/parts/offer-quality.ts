@@ -35,6 +35,7 @@ export type ComponentOfferQualityInput = {
   componentName: string;
   knownModels?: string[];
   knownFerrariModels?: string[];
+  knownMakes?: string[];
   knownBrands: string[];
   year?: number | null;
   condition?: string | null;
@@ -170,7 +171,7 @@ export function scoreComponentOffer(input: ComponentOfferQualityInput): OfferQua
     sellerQualityScore: getSellerQualityScore(input.sellerFeedbackPercentage),
   });
   if (REJECTED_TERMS.test(input.title)) return rejected("Non-automotive collectible or reference item");
-  const conflictingMake = findConflictingMake(input.title, makeName);
+  const conflictingMake = findConflictingMake(input.title, makeName, input.knownMakes);
   if (conflictingMake) return rejected(`Different vehicle manufacturer: ${conflictingMake}`);
   const yearCompatibility = input.year ? getOfferYearCompatibility(input.title, input.year) : "UNKNOWN";
   if (input.year && yearCompatibility === "CONFLICT") {
@@ -390,14 +391,15 @@ function normalizeSearchText(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
-const KNOWN_VEHICLE_MAKES = [
+const FALLBACK_VEHICLE_MAKES = [
   "Ferrari", "Lamborghini", "McLaren", "Porsche", "BMW", "Mercedes", "Mercedes-AMG", "Audi", "Maserati",
   "Chevrolet", "Ford", "Toyota", "Honda", "Acura", "Nissan", "Subaru", "Mitsubishi", "Mazda", "Dodge",
 ];
 
-function findConflictingMake(title: string, selectedMake: string) {
+function findConflictingMake(title: string, selectedMake: string, knownMakes: string[] = []) {
   if (containsPhrase(title, selectedMake)) return null;
-  return KNOWN_VEHICLE_MAKES.find((make) => normalizeSearchText(make) !== normalizeSearchText(selectedMake) && containsPhrase(title, make)) ?? null;
+  const makes = [...new Set([...knownMakes, ...FALLBACK_VEHICLE_MAKES])];
+  return makes.find((make) => normalizeSearchText(make) !== normalizeSearchText(selectedMake) && containsPhrase(title, make)) ?? null;
 }
 
 function containsPhrase(value: string, phrase: string) {

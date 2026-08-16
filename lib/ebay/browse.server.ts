@@ -2,6 +2,7 @@ import { getEbayApplicationToken } from "@/lib/ebay/oauth.server";
 import { scoreComponentOffer, scoreOffer, type OfferConfidence } from "@/lib/parts/offer-quality";
 import { normalizeOemPartNumber } from "@/lib/parts/ferrari-taxonomy";
 import type { CanonicalPartOfferQuery, PartOfferProviderAdapter } from "@/lib/parts/offers/provider";
+import { resolveEbayFitmentCategories, resolveEbayVehicleFitment, verifyAndCacheEbayFitmentCategories } from "@/lib/ebay/taxonomy.server";
 
 const EBAY_BROWSE_SEARCH_URL = "https://api.ebay.com/buy/browse/v1/item_summary/search";
 const EBAY_MARKETPLACE_ID = "EBAY_US";
@@ -75,6 +76,9 @@ export type EbayPartOffer = {
 };
 
 export type EbayComponentSearchInput = {
+  providerId?: string;
+  modelId?: string;
+  componentTypeId?: string;
   makeName?: string;
   makeSlug?: string;
   modelName: string;
@@ -82,6 +86,7 @@ export type EbayComponentSearchInput = {
   templates: string[];
   knownModels?: string[];
   knownFerrariModels?: string[];
+  knownMakes?: string[];
   knownBrands: string[];
   aliases?: string[];
   identifiers?: string[];
@@ -108,12 +113,16 @@ export const EBAY_PART_OFFER_PROVIDER: PartOfferProviderAdapter<EbayPartOffer> =
     reason: offer.affiliateUrl ? undefined : "Affiliate URL is missing.",
   }),
   searchPartTypeOffers: (input) => searchEbayOffersForComponent({
+    providerId: input.providerId,
+    modelId: input.modelId,
+    componentTypeId: input.partTypeId,
     makeName: input.makeName,
     makeSlug: input.makeSlug,
     modelName: input.modelName,
     componentName: input.partTypeName,
     templates: input.templates ?? [],
     knownModels: input.knownModels ?? [],
+    knownMakes: input.knownMakes ?? [],
     knownBrands: input.knownBrands ?? [],
     aliases: input.aliases,
     identifiers: input.identifiers,
@@ -153,9 +162,40 @@ export async function searchEbayOffersForComponent(input: EbayComponentSearchInp
   assertServerRuntime();
   const plans = buildComponentSearchPlans(input).slice(0, 10);
   const makeName = input.makeName?.trim() || "Ferrari";
-  const candidates: Array<{ query: string; item: EbayItemSummary }> = [];
+  const candidates: ComponentCandidate[] = [];
+  const taxonomyQueries: string[] = [];
+  let taxonomyCategoryFound = false;
+  if (input.providerId && input.modelId && input.componentTypeId && input.year) {
+    const categories = await resolveEbayFitmentCategories({
+      providerId: input.providerId,
+      componentTypeId: input.componentTypeId,
+      componentName: input.componentName,
+      aliases: input.aliases,
+    }).catch(() => []);
+    for (const category of categories) {
+      const fitment = await resolveEbayVehicleFitment({
+        providerId: input.providerId,
+        category,
+        modelId: input.modelId,
+        year: input.year,
+        makeName,
+        modelName: input.modelName,
+      }).catch(() => null);
+      if (!fitment) continue;
+      taxonomyCategoryFound = true;
+      const query = [input.componentName, ...(input.aliases ?? []).slice(0, 1)].join(" ");
+      taxonomyQueries.push(`${category.categoryId}:${query}`);
+      const items = await browseSearch(query, input.referenceId, Math.min(input.limit ?? 20, 25), {
+        categoryId: category.categoryId,
+        compatibility: fitment,
+      }).catch(() => []);
+      candidates.push(...items.map((item) => ({ query, item, requiredCompatibility: fitment })));
+      const current = normalizeComponentCandidates(candidates, input);
+      if (current.offers.length >= Math.min(8, input.limit ?? 20)) break;
+    }
+  }
   let motorsCategoryId: string | null = null;
-  for (const plan of plans) {
+  for (const plan of candidates.length > 0 ? plans.slice(0, 2) : plans) {
     let items: EbayItemSummary[];
     try {
       items = await browseSearch(plan.query, input.referenceId, Math.min(input.limit ?? 20, 25), {
@@ -169,13 +209,59 @@ export async function searchEbayOffersForComponent(input: EbayComponentSearchInp
       items = await browseSearch(plan.query, input.referenceId, Math.min(input.limit ?? 20, 25));
     }
     candidates.push(...items.map((item) => ({ query: plan.query, item })));
+    if (!taxonomyCategoryFound && input.providerId && input.modelId && input.componentTypeId && input.year) {
+      const categories = await verifyAndCacheEbayFitmentCategories({
+        providerId: input.providerId,
+        componentTypeId: input.componentTypeId,
+        categories: items.flatMap((item) => (item.categories ?? []).flatMap((category) => category.categoryId
+          ? [{ categoryId: category.categoryId, categoryName: category.categoryName ?? null }]
+          : [])),
+      }).catch(() => []);
+      for (const category of categories) {
+        const fitment = await resolveEbayVehicleFitment({
+          providerId: input.providerId,
+          category,
+          modelId: input.modelId,
+          year: input.year,
+          makeName,
+          modelName: input.modelName,
+        }).catch(() => null);
+        if (!fitment) continue;
+        taxonomyCategoryFound = true;
+        taxonomyQueries.push(`${category.categoryId}:${plan.query}`);
+        const compatibleItems = await browseSearch(plan.query, input.referenceId, Math.min(input.limit ?? 20, 25), {
+          categoryId: category.categoryId,
+          compatibility: fitment,
+        }).catch(() => []);
+        candidates.unshift(...compatibleItems.map((item) => ({ query: plan.query, item, requiredCompatibility: fitment })));
+      }
+    }
     motorsCategoryId ??= inferDominantAutomotiveCategory(items);
     const current = normalizeComponentCandidates(candidates, input);
     const strongCount = current.offers.filter((offer) => offer.confidence === "EXACT_MATCH" || offer.confidence === "HIGH_CONFIDENCE").length;
     if (strongCount >= Math.min(8, input.limit ?? 20)) break;
   }
   const result = normalizeComponentCandidates(candidates, input);
-  return { ...result, queries: plans.map((plan) => plan.query), motorsCategoryId };
+  return { ...result, queries: [...taxonomyQueries, ...plans.map((plan) => plan.query)], motorsCategoryId };
+}
+
+type ComponentCandidate = {
+  query: string;
+  item: EbayItemSummary;
+  requiredCompatibility?: { year: number; make: string; model: string } | null;
+};
+
+export function hasRequiredCompatibilityEvidence(
+  properties: EbayItemSummary["compatibilityProperties"],
+  required: { year: number; make: string; model: string },
+) {
+  const values = new Map((properties ?? []).map((property) => [
+    (property.name ?? property.localizedName ?? "").toLowerCase(),
+    normalizeFitmentValue(property.value ?? ""),
+  ]));
+  return values.get("year") === String(required.year)
+    && values.get("make") === normalizeFitmentValue(required.make)
+    && values.get("model") === normalizeFitmentValue(required.model);
 }
 
 export function buildComponentSearchPlans(input: EbayComponentSearchInput) {
@@ -186,12 +272,21 @@ export function buildComponentSearchPlans(input: EbayComponentSearchInput) {
   }));
   const exact = [{
     stage: "VEHICLE_COMPONENT" as const,
+    query: [input.year, makeName, input.modelName, input.componentName].filter(Boolean).join(" "),
+  }, {
+    stage: "VEHICLE_COMPONENT" as const,
     query: `${makeName} ${input.modelName} ${input.componentName}`,
   }];
-  const aliases = (input.aliases ?? []).slice(0, 5).map((alias) => ({
-    stage: "VEHICLE_ALIAS" as const,
-    query: `${makeName} ${input.modelName} ${alias}`,
-  }));
+  const aliases = (input.aliases ?? []).slice(0, 4).flatMap((alias) => ([
+    input.year ? {
+      stage: "VEHICLE_ALIAS" as const,
+      query: `${input.year} ${makeName} ${input.modelName} ${alias}`,
+    } : null,
+    {
+      stage: "VEHICLE_ALIAS" as const,
+      query: `${makeName} ${input.modelName} ${alias}`,
+    },
+  ].filter((plan): plan is { stage: "VEHICLE_ALIAS"; query: string } => Boolean(plan))));
   const configured = input.templates.map((template) => ({
     stage: /\b(BMC|K&N|Novitec|Capristo|Akrapovic|Brembo|Michelin|Pirelli|Eventuri|Bosch|Mahle|Mann|NGK)\b/i.test(template)
       ? "KNOWN_BRAND" as const
@@ -204,7 +299,7 @@ export function buildComponentSearchPlans(input: EbayComponentSearchInput) {
 }
 
 function normalizeComponentCandidates(
-  candidates: Array<{ query: string; item: EbayItemSummary }>,
+  candidates: ComponentCandidate[],
   input: Omit<EbayComponentSearchInput, "templates">,
 ) {
   const seen = new Set<string>();
@@ -220,7 +315,7 @@ function normalizeComponentCandidates(
   }> = [];
   let rejectedCount = 0;
   let missingAffiliateUrlCount = 0;
-  for (const { query, item } of candidates) {
+  for (const { query, item, requiredCompatibility } of candidates) {
     if (!item.itemId || !item.title || seen.has(item.itemId)) continue;
     seen.add(item.itemId);
     const priceCents = parsePriceCents(item.price);
@@ -232,6 +327,7 @@ function normalizeComponentCandidates(
       modelName: input.modelName,
       componentName: input.componentName,
       knownModels: input.knownModels ?? input.knownFerrariModels ?? [],
+      knownMakes: input.knownMakes ?? [],
       knownBrands: input.knownBrands,
       year: input.year,
       condition: item.condition,
@@ -246,7 +342,12 @@ function normalizeComponentCandidates(
       fitmentRisk: input.fitmentRisk,
       identifiers: input.identifiers,
     });
-    const rejectionReason = quality.confidence === "REJECTED"
+    const compatibilityMissing = requiredCompatibility
+      ? !hasRequiredCompatibilityEvidence(item.compatibilityProperties, requiredCompatibility)
+      : false;
+    const rejectionReason = compatibilityMissing
+      ? "eBay did not return exact Year/Make/Model compatibility evidence"
+      : quality.confidence === "REJECTED"
       ? quality.reasons[0] || "Confidence threshold not met"
       : !item.itemAffiliateWebUrl
         ? "Affiliate URL missing from eBay Browse response"
@@ -363,7 +464,7 @@ async function browseSearch(
       `Year:${options.compatibility.year}`,
       `Make:${options.compatibility.make}`,
       `Model:${options.compatibility.model}`,
-    ].join(";"));
+    ].join(","));
   }
 
   const response = await fetch(url, {
@@ -381,6 +482,10 @@ async function browseSearch(
   }
   const payload = (await response.json()) as EbaySearchResponse;
   return payload.itemSummaries ?? [];
+}
+
+function normalizeFitmentValue(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 export class EbayBrowseError extends Error {

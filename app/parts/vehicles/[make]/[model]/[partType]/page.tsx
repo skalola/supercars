@@ -145,7 +145,7 @@ export default async function VehiclePartTypePage({ params, searchParams }: Page
           <p>{detail.offerSummary.productCount.toLocaleString()} products on page {detail.offerSummary.pagination.page.toLocaleString()}</p>
         </header>
         {detail.availableAt.length === 0 ? (
-          <div className="part-type-no-offers"><strong>No verified offers right now</strong><p>The vehicle intelligence above remains valid. Availability is refreshed when qualified supplier products are found.</p></div>
+          <div className="part-type-no-offers"><strong>No qualified eBay matches right now</strong><p>We searched for this vehicle and component without finding a safe match. Availability refreshes automatically as supplier products change.</p></div>
         ) : (
           <PartOfferList products={detail.availableAt} systemSlug={detail.partType.system.slug} />
         )}

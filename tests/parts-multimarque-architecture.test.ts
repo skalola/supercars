@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { buildComponentSearchPlans } from "../lib/ebay/browse.server";
+import { buildComponentSearchPlans, hasRequiredCompatibilityEvidence } from "../lib/ebay/browse.server";
 import { getFixturePreferredBrands } from "../lib/parts/ecosystem-config";
 import { rankPartOffers } from "../lib/parts/offer-ranking";
 import { getPartOffersApiPath, getPartSystemsApiPath, getPartTypesApiPath } from "../lib/parts/parts-api";
@@ -9,6 +9,7 @@ import { getUniversalPartComponentGroup } from "../lib/parts/part-type-hierarchy
 import { evaluateUniversalPartApplicability } from "../lib/parts/universal-applicability";
 import { canMaterializePartContext, isDisplayEligiblePartOffer, partDiscoveryRequestSchema } from "../lib/parts/discovery-contract";
 import { getOfferYearCompatibility, scoreComponentOffer } from "../lib/parts/offer-quality";
+import { orderOfferProviders, runProviderWaterfall } from "../lib/parts/offers/orchestrator";
 
 const fixtures = [
   { makeSlug: "ferrari", makeName: "Ferrari", modelSlug: "458-italia", modelName: "458 Italia", system: "brakes", group: "Brake Pads", partType: "Front Brake Pads", partTypeSlug: "front-brake-pads", engine: "4.5L naturally aspirated V8", brand: "Brembo" },
@@ -151,9 +152,26 @@ test("only publicly applicable component contexts are materialized", () => {
 
 test("low-risk model matches display without weakening higher-risk fitment", () => {
   assert.equal(isDisplayEligiblePartOffer({ fitmentConfidence: "POSSIBLE_MATCH", fitmentRisk: "LOW" }), true);
+  assert.equal(isDisplayEligiblePartOffer({ fitmentConfidence: "LIKELY_COMPATIBLE", fitmentRisk: "MEDIUM" }), true);
   assert.equal(isDisplayEligiblePartOffer({ fitmentConfidence: "POSSIBLE_MATCH", fitmentRisk: "MEDIUM" }), false);
   assert.equal(isDisplayEligiblePartOffer({ fitmentConfidence: "POSSIBLE_MATCH", fitmentRisk: "HIGH" }), false);
   assert.equal(isDisplayEligiblePartOffer({ fitmentConfidence: "HIGH_CONFIDENCE", fitmentRisk: "HIGH" }), true);
+});
+
+test("catalog make names block cross-marque marketplace candidates", () => {
+  const result = scoreComponentOffer({
+    makeName: "Acura",
+    modelName: "RSX",
+    componentName: "Intake System",
+    title: "Cold Air Intake System for Lexus IS 300",
+    knownMakes: ["Acura", "Lexus", "Infiniti"],
+    knownModels: ["RSX"],
+    knownBrands: [],
+    year: 2006,
+    fitmentRisk: "MEDIUM",
+  });
+  assert.equal(result.confidence, "REJECTED");
+  assert.match(result.reasons[0], /Different vehicle manufacturer: Lexus/);
 });
 
 test("short uppercase model codes remain distinctive fitment evidence", () => {
@@ -245,5 +263,60 @@ test("parts selector includes every catalog model while mappings remain on deman
   assert.match(context, /modelId_componentTypeId/);
   assert.doesNotMatch(context, /MARQUE_DISABLED|partsEnabled/);
   assert.doesNotMatch(service, /partsEnabled:\s*true|Parts discovery is not enabled for this marque/);
-  assert.match(service, /configuredProviderCodes\.length > 0 \? configuredProviderCodes : \["EBAY"\]/);
+  assert.match(service, /\.\.\.configuredProviderCodes, "EBAY"/);
+});
+
+test("offer providers run direct suppliers before the eBay fallback", () => {
+  const ordered = orderOfferProviders([
+    { code: "EBAY", providerType: "EBAY" },
+    { code: "SCUDERIA", providerType: "DIRECT_AFFILIATE" },
+    { code: "OEM", providerType: "FACTORY" },
+  ]);
+  assert.deepEqual(ordered.map((provider) => provider.code), ["OEM", "SCUDERIA", "EBAY"]);
+});
+
+test("provider waterfall skips eBay when preferred suppliers fill the target", async () => {
+  const called: string[] = [];
+  const result = await runProviderWaterfall({
+    providers: ["DIRECT", "EBAY"],
+    targetCount: 5,
+    count: (batch: string[]) => batch.length,
+    execute: async (provider) => {
+      called.push(provider);
+      return [provider === "DIRECT" ? ["1", "2", "3", "4", "5"] : ["6"]];
+    },
+  });
+  assert.deepEqual(called, ["DIRECT"]);
+  assert.equal(result.acceptedCount, 5);
+});
+
+test("provider waterfall falls through after a preferred supplier failure", async () => {
+  const called: string[] = [];
+  const result = await runProviderWaterfall({
+    providers: ["DIRECT", "EBAY"],
+    targetCount: 1,
+    execute: async (provider) => {
+      called.push(provider);
+      if (provider === "DIRECT") throw new Error("Partner unavailable");
+      return ["marketplace-offer"];
+    },
+  });
+  assert.deepEqual(called, ["DIRECT", "EBAY"]);
+  assert.equal(result.runs[0]?.error, "Partner unavailable");
+  assert.equal(result.acceptedCount, 1);
+});
+
+test("eBay compatibility evidence must match exact year, make, and model", () => {
+  const required = { year: 2006, make: "Acura", model: "RSX" };
+  assert.equal(hasRequiredCompatibilityEvidence([
+    { name: "Year", value: "2006" },
+    { name: "Make", value: "Acura" },
+    { name: "Model", value: "RSX" },
+  ], required), true);
+  assert.equal(hasRequiredCompatibilityEvidence([
+    { name: "Year", value: "2006" },
+    { name: "Make", value: "Acura" },
+    { name: "Model", value: "TL" },
+  ], required), false);
+  assert.equal(hasRequiredCompatibilityEvidence(undefined, required), false);
 });

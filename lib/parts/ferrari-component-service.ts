@@ -6,6 +6,7 @@ import {
 } from "@/lib/parts/ferrari-product-normalizer";
 import { ensureEbayOfferProvider } from "@/lib/parts/ebay-partner";
 import { getPartOfferProviderAdapter } from "@/lib/parts/offers/registry";
+import { orderOfferProviders, runProviderWaterfall, type ResolvedOfferProvider } from "@/lib/parts/offers/orchestrator";
 import { rankPartOffers } from "@/lib/parts/offer-ranking";
 import {
   buildPreferredBrandSearchTemplates,
@@ -56,6 +57,19 @@ const getPartTaxonomyTypesCached = unstable_cache(
   ["parts-static-component-taxonomy-v1"],
   { revalidate: 86_400, tags: ["parts-catalog"] },
 );
+
+let knownVehicleMakesPromise: Promise<string[]> | null = null;
+
+function getKnownVehicleMakesCached() {
+  knownVehicleMakesPromise ??= prisma.make.findMany({
+    select: { name: true },
+    orderBy: { name: "asc" },
+  }).then((makes) => makes.map((make) => make.name)).catch((error) => {
+    knownVehicleMakesPromise = null;
+    throw error;
+  });
+  return knownVehicleMakesPromise;
+}
 
 export async function getPartModels(makeSlug: string) {
   return prisma.model.findMany({
@@ -265,7 +279,8 @@ export async function getAvailableOffers(input: {
   if (claim.count === 0) return buildComponentOfferResponse(mapping, false, page);
 
   try {
-    const [knownModels, preferredBrands, refreshData] = await Promise.all([
+    const [knownMakes, knownModels, preferredBrands, refreshData] = await Promise.all([
+      getKnownVehicleMakesCached(),
       prisma.model.findMany({
         where: { make: { slug: input.makeSlug } },
         select: { name: true },
@@ -311,92 +326,104 @@ export async function getAvailableOffers(input: {
     );
     const year = input.year ?? mapping.model.productionEndYear ?? mapping.model.productionStartYear;
     const referenceId = buildComponentAffiliateReference(mapping.model.make.slug, mapping.model.slug, mapping.componentType.category.slug, mapping.componentType.slug, year);
-    const provider = await resolvePartTypeOfferProvider(mapping.model.makeId);
-    const search = await provider.adapter.searchPartTypeOffers!({
-      makeName: mapping.model.make.name,
-      makeSlug: mapping.model.make.slug,
-      modelName: mapping.model.name,
-      modelSlug: mapping.model.slug,
-      partTypeId: mapping.componentType.id,
-      partTypeName: mapping.componentType.name,
-      partTypeSlug: mapping.componentType.slug,
-      systemSlug: mapping.componentType.category.slug,
-      templates,
-      knownModels,
-      knownBrands: [...new Set(preferredBrands.map((brand) => brand.name))],
-      aliases: readAliases(mapping.componentType.aliases),
-      identifiers: [...new Set(refreshData.componentType.canonicalParts.flatMap((part) => [
-        part.oemPartNumber,
-        part.partNumber,
-        ...part.identifiers.map((identifier) => identifier.normalizedValue),
-      ]).filter((value): value is string => Boolean(value)))].slice(0, 8),
-      fitmentRisk: normalizeFitmentRisk(mapping.componentType.fitmentRisk),
-      year,
-      referenceId,
-      limit: 20,
-    }) as {
-      offers: EbayComponentOffer[];
-      queries: string[];
-      examinedCount: number;
-      rejectedCount: number;
-      missingAffiliateUrlCount: number;
-      rejectionReasons: Record<string, number>;
-    };
-    if (search.missingAffiliateUrlCount > 0) {
-      console.warn("Part offer provider results omitted affiliate URLs", {
-        provider: provider.code,
+    const providers = await resolvePartTypeOfferProviders(mapping.model.makeId);
+    const identifiers = [...new Set(refreshData.componentType.canonicalParts.flatMap((part) => [
+      part.oemPartNumber,
+      part.partNumber,
+      ...part.identifiers.map((identifier) => identifier.normalizedValue),
+    ]).filter((value): value is string => Boolean(value)))].slice(0, 8);
+    const waterfall = await runProviderWaterfall<ResolvedOfferProvider, ProviderOfferSearch>({
+      providers,
+      targetCount: 20,
+      count: (search) => search.offers.length,
+      execute: async (provider) => {
+        const result = await provider.adapter.searchPartTypeOffers!({
+          providerId: provider.id,
+          modelId: mapping.model.id,
+          makeName: mapping.model.make.name,
+          makeSlug: mapping.model.make.slug,
+          modelName: mapping.model.name,
+          modelSlug: mapping.model.slug,
+          partTypeId: mapping.componentType.id,
+          partTypeName: mapping.componentType.name,
+          partTypeSlug: mapping.componentType.slug,
+          systemSlug: mapping.componentType.category.slug,
+          templates,
+          knownMakes,
+          knownModels,
+          knownBrands: [...new Set(preferredBrands.map((brand) => brand.name))],
+          aliases: readAliases(mapping.componentType.aliases),
+          identifiers,
+          fitmentRisk: normalizeFitmentRisk(mapping.componentType.fitmentRisk),
+          year,
+          referenceId,
+          limit: 20,
+        }) as ProviderSearchResult;
+        return [{ ...result, provider }];
+      },
+    });
+    const searches = waterfall.offers.map(({ offer }) => offer);
+    if (searches.length === 0) {
+      const errors = waterfall.runs.map((run) => run.error).filter(Boolean);
+      if (errors.length === waterfall.runs.length && errors.length > 0) throw new Error(errors.join("; "));
+    }
+    const seenOfferIds: string[] = [];
+    for (const search of searches) {
+      if (search.missingAffiliateUrlCount > 0) console.warn("Part offer provider results omitted affiliate URLs", {
+        provider: search.provider.code,
         model: mapping.model.name,
         component: mapping.componentType.name,
         count: search.missingAffiliateUrlCount,
-        campaignConfigured: provider.code !== "EBAY" || Boolean(process.env.EBAY_EPN_CAMPAIGN_ID?.trim()),
-        affiliateReferenceId: referenceId,
       });
-    }
-    const existingOffers = await loadExistingOffers(prisma, {
-      mappingId: mapping.id,
-      provider: provider.code,
-      externalItemIds: search.offers.map((offer) => offer.externalItemId),
-    });
-    const seenOfferIds: string[] = [];
-    for (const offer of search.offers) {
-      const expiresAt = offer.itemEndDate && offer.itemEndDate > now
-        ? offer.itemEndDate
-        : new Date(now.getTime() + COMPONENT_OFFER_TTL_MS);
-      const stored = await persistDiscoveredOffer(prisma, {
-        makeName: mapping.model.make.name,
-        knownBrands: preferredBrands.map((brand) => brand.name),
-        offer,
-        partnerId: provider.affiliatePartnerId,
-        providerId: provider.id,
+      const existingOffers = await loadExistingOffers(prisma, {
         mappingId: mapping.id,
-        modelId: mapping.model.id,
-        makeId: mapping.model.makeId,
-        modelYearStart: mapping.model.productionStartYear,
-        modelYearEnd: mapping.model.productionEndYear,
-        categoryId: mapping.componentType.categoryId,
-        categorySlug: mapping.componentType.category.slug,
-        componentTypeId: mapping.componentType.id,
-        componentName: mapping.componentType.name,
-        performanceRelated: mapping.componentType.performanceRelated,
-        now,
-        expiresAt,
-        existingOffer: existingOffers.get(offer.externalItemId) ?? null,
+        provider: search.provider.code,
+        externalItemIds: search.offers.map((offer) => offer.externalItemId),
       });
-      seenOfferIds.push(stored.offerId);
+      for (const offer of search.offers) {
+        const expiresAt = offer.itemEndDate && offer.itemEndDate > now ? offer.itemEndDate : new Date(now.getTime() + COMPONENT_OFFER_TTL_MS);
+        const stored = await persistDiscoveredOffer(prisma, {
+          makeName: mapping.model.make.name,
+          knownBrands: preferredBrands.map((brand) => brand.name),
+          offer,
+          partnerId: search.provider.affiliatePartnerId,
+          providerId: search.provider.id,
+          mappingId: mapping.id,
+          modelId: mapping.model.id,
+          makeId: mapping.model.makeId,
+          modelYearStart: mapping.model.productionStartYear,
+          modelYearEnd: mapping.model.productionEndYear,
+          categoryId: mapping.componentType.categoryId,
+          categorySlug: mapping.componentType.category.slug,
+          componentTypeId: mapping.componentType.id,
+          componentName: mapping.componentType.name,
+          performanceRelated: mapping.componentType.performanceRelated,
+          now,
+          expiresAt,
+          existingOffer: existingOffers.get(offer.externalItemId) ?? null,
+        });
+        seenOfferIds.push(stored.offerId);
+      }
     }
+    const runProviderIds = searches.map((search) => search.provider.id);
     await prisma.partOfferContext.updateMany({
       where: {
         modelPartComponentId: mapping.id,
         active: true,
+        ...(runProviderIds.length ? { offer: { providerId: { in: runProviderIds } } } : {}),
         ...(seenOfferIds.length ? { offerId: { notIn: seenOfferIds } } : {}),
       },
       data: { active: false, lastCheckedAt: now },
     });
-    const searchStatus = search.offers.length > 0
+    const acceptedCount = searches.reduce((sum, search) => sum + search.offers.length, 0);
+    const examinedCount = searches.reduce((sum, search) => sum + search.examinedCount, 0);
+    const rejectedCount = searches.reduce((sum, search) => sum + search.rejectedCount, 0);
+    const missingAffiliateUrlCount = searches.reduce((sum, search) => sum + search.missingAffiliateUrlCount, 0);
+    const searchStatus = acceptedCount > 0
       ? "COMPLETED"
-      : search.examinedCount === 0
+      : examinedCount === 0
         ? "SEARCH_EXHAUSTED"
-        : search.rejectedCount > 0
+        : rejectedCount > 0
           ? "LOW_CONFIDENCE_ONLY"
           : "ZERO_OFFERS";
     await prisma.modelPartComponent.update({
@@ -404,23 +431,24 @@ export async function getAvailableOffers(input: {
       data: {
         lastOfferSearchAt: now,
         lastOfferSearchStatus: searchStatus,
-        lastOfferRejectedCount: search.rejectedCount,
+        lastOfferRejectedCount: rejectedCount,
       },
     });
     const response = await buildComponentOfferResponse(
-      { ...mapping, lastOfferSearchAt: now, lastOfferSearchStatus: searchStatus, lastOfferRejectedCount: search.rejectedCount },
+      { ...mapping, lastOfferSearchAt: now, lastOfferSearchStatus: searchStatus, lastOfferRejectedCount: rejectedCount },
       true,
       page,
     );
     return {
       ...response,
       discovery: {
-        queries: search.queries,
-        examinedResults: search.examinedCount,
-        acceptedResults: search.offers.length,
-        rejectedResults: search.rejectedCount,
-        missingAffiliateUrls: search.missingAffiliateUrlCount,
-        rejectionReasons: search.rejectionReasons,
+        queries: searches.flatMap((search) => search.queries),
+        examinedResults: examinedCount,
+        acceptedResults: acceptedCount,
+        rejectedResults: rejectedCount,
+        missingAffiliateUrls: missingAffiliateUrlCount,
+        rejectionReasons: mergeRejectionReasons(searches.map((search) => search.rejectionReasons)),
+        providers: waterfall.runs.map((run) => ({ code: run.provider.code, accepted: run.accepted, error: run.error })),
       },
     };
   } catch (error) {
@@ -429,35 +457,58 @@ export async function getAvailableOffers(input: {
   }
 }
 
-async function resolvePartTypeOfferProvider(makeId: string) {
+async function resolvePartTypeOfferProviders(makeId: string): Promise<ResolvedOfferProvider[]> {
   const marqueConfig = await prisma.partsMarqueConfig.findUnique({
     where: { makeId },
     select: { enabledProviders: true },
   });
   const configuredProviderCodes = readProviderCodes(marqueConfig?.enabledProviders);
-  const enabledProviderCodes = configuredProviderCodes.length > 0 ? configuredProviderCodes : ["EBAY"];
+  const enabledProviderCodes = [...new Set([...configuredProviderCodes, "EBAY"])];
   const configured = await prisma.partOfferProvider.findMany({
     where: { active: true, code: { in: enabledProviderCodes } },
     select: { id: true, code: true, providerType: true, affiliatePartnerId: true },
   });
-  const priority: Record<string, number> = {
-    DIRECT_MANUFACTURER: 0,
-    DIRECT_AFFILIATE: 1,
-    AUTHORIZED_RETAILER: 2,
-    SCUDERIA: 3,
-    EBAY: 10,
-    OTHER_MARKETPLACE: 20,
-  };
-  for (const provider of configured.sort((left, right) => (priority[left.providerType] ?? 50) - (priority[right.providerType] ?? 50))) {
+  const resolved: ResolvedOfferProvider[] = [];
+  for (const provider of configured) {
     const adapter = getPartOfferProviderAdapter(provider.code);
-    if (adapter?.searchPartTypeOffers) return { ...provider, adapter };
+    if (adapter?.searchPartTypeOffers) resolved.push({ ...provider, adapter });
   }
+  if (!resolved.some((provider) => provider.code === "EBAY")) {
+    const ebay = await ensureEbayOfferProvider(prisma);
+    const adapter = getPartOfferProviderAdapter("EBAY");
+    if (adapter?.searchPartTypeOffers) resolved.push({ ...ebay, code: "EBAY", providerType: "EBAY", adapter });
+  }
+  const ordered = orderOfferProviders(resolved);
+  if (ordered.length === 0) throw new Error("No active part offer provider adapter is configured.");
+  return ordered;
+}
 
-  if (!enabledProviderCodes.includes("EBAY")) throw new Error("No enabled part offer provider adapter is configured.");
-  const ebay = await ensureEbayOfferProvider(prisma);
-  const adapter = getPartOfferProviderAdapter("EBAY");
-  if (!adapter?.searchPartTypeOffers) throw new Error("No active part offer provider adapter is configured.");
-  return { ...ebay, code: "EBAY", providerType: "EBAY", adapter };
+type ProviderSearchResult = {
+  offers: EbayComponentOffer[];
+  queries: string[];
+  examinedCount: number;
+  rejectedCount: number;
+  missingAffiliateUrlCount: number;
+  rejectionReasons: Record<string, number>;
+};
+
+type ProviderOfferSearch = ProviderSearchResult & { provider: ResolvedOfferProvider };
+
+function mergeRejectionReasons(groups: Array<Record<string, number>>) {
+  const merged: Record<string, number> = {};
+  for (const group of groups) for (const [reason, count] of Object.entries(group)) merged[reason] = (merged[reason] ?? 0) + count;
+  return merged;
+}
+
+function getOfferProductIdentity(offer: {
+  manufacturerPartNumber: string | null;
+  oemPartNumber: string | null;
+  title: string;
+}) {
+  const identifier = offer.oemPartNumber ?? offer.manufacturerPartNumber;
+  if (identifier) return `part:${identifier.toUpperCase().replace(/[^A-Z0-9]+/g, "")}`;
+  const normalizedTitle = offer.title.toLowerCase().replace(/\b(new|used|genuine|oem|free shipping)\b/g, " ").replace(/[^a-z0-9]+/g, " ").trim();
+  return normalizedTitle ? `title:${normalizedTitle}` : null;
 }
 
 function readProviderCodes(value: unknown) {
@@ -501,7 +552,23 @@ async function buildComponentOfferResponse(
     select: {
       id: true,
       fitmentConfidence: true,
-      offer: { select: { title: true } },
+      confidenceScore: true,
+      offer: {
+        select: {
+          id: true,
+          title: true,
+          priceCents: true,
+          affiliateUrl: true,
+          brandName: true,
+          manufacturerPartNumber: true,
+          oemPartNumber: true,
+          oemMatchType: true,
+          genuineOemStatus: true,
+          sellerFeedbackPercentage: true,
+          offerProvider: { select: { code: true, providerType: true, active: true } },
+          part: { select: { brandId: true, partNumber: true, oemPartNumber: true } },
+        },
+      },
     },
     orderBy: [{ confidenceScore: "desc" }, { offer: { priceCents: "asc" } }],
     take: 100,
@@ -511,13 +578,54 @@ async function buildComponentOfferResponse(
     categoryId: mapping.componentType.categoryId,
     componentTypeId: mapping.componentType.id,
   })]);
-  const eligibleCandidateIds = candidateRows.filter((context) => {
+  const eligibleCandidateRows = candidateRows.filter((context) => {
     if (getPartTypeTitleConflict(mapping.componentType.name, context.offer.title)) return false;
     return isDisplayEligiblePartOffer({
       fitmentConfidence: context.fitmentConfidence,
       fitmentRisk: mapping.componentType.fitmentRisk,
     });
-  }).map((context) => context.id);
+  });
+  const rankedCandidateRows = rankPartOffers({
+    offers: eligibleCandidateRows.map((context) => ({
+      id: context.id,
+      providerCode: context.offer.offerProvider?.code ?? "UNKNOWN",
+      providerType: context.offer.offerProvider?.providerType ?? "UNKNOWN",
+      providerActive: context.offer.offerProvider?.active ?? false,
+      partBrandId: context.offer.part?.brandId,
+      canonicalOemPartNumber: context.offer.part?.oemPartNumber,
+      canonicalManufacturerPartNumber: context.offer.part?.partNumber,
+      affiliateUrl: context.offer.affiliateUrl,
+      confidenceScore: context.confidenceScore,
+      fitmentConfidence: context.fitmentConfidence,
+      oemMatchType: context.offer.oemMatchType,
+      manufacturerPartNumber: context.offer.manufacturerPartNumber,
+      oemPartNumber: context.offer.oemPartNumber,
+      priceCents: context.offer.priceCents,
+      brandName: context.offer.brandName,
+      genuineOemStatus: context.offer.genuineOemStatus,
+      sellerFeedbackPercentage: context.offer.sellerFeedbackPercentage,
+      context,
+    })),
+    preferredBrands: preferredBrands.map((brand) => ({
+      partBrandId: brand.partBrandId,
+      name: brand.name,
+      relationshipType: brand.relationshipType,
+      priority: brand.priority,
+      affiliateEnabled: brand.affiliateEnabled,
+      affiliateStatus: brand.affiliateStatus,
+      providerCode: brand.provider?.code,
+      brandType: brand.brandType,
+      qualityWeight: brand.qualityWeight,
+    })),
+  });
+  const eligibleCandidateIds: string[] = [];
+  const productIdentities = new Set<string>();
+  for (const ranked of rankedCandidateRows) {
+    const identity = getOfferProductIdentity(ranked.context.offer);
+    if (identity && productIdentities.has(identity)) continue;
+    if (identity) productIdentities.add(identity);
+    eligibleCandidateIds.push(ranked.id);
+  }
   const pageStart = (page - 1) * COMPONENT_OFFER_PAGE_SIZE;
   const selectedContextIds = eligibleCandidateIds.slice(pageStart, pageStart + COMPONENT_OFFER_PAGE_SIZE);
   const hasMore = eligibleCandidateIds.length > pageStart + COMPONENT_OFFER_PAGE_SIZE;

@@ -61,6 +61,7 @@ model Model {
   preferredPartBrands           PreferredPartBrand[]
   partApplicabilityOverrides    PartApplicabilityOverride[]
   engineeringProfiles           ModelEngineeringProfile[]
+  providerVehicleMappings       PartProviderVehicleMapping[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -773,15 +774,68 @@ model PartOfferProvider {
   affiliatePartnerId String?
   active             Boolean @default(false)
 
-  affiliatePartner AffiliatePartner?    @relation(fields: [affiliatePartnerId], references: [id], onDelete: SetNull)
+  affiliatePartner AffiliatePartner?             @relation(fields: [affiliatePartnerId], references: [id], onDelete: SetNull)
   offers           PartOffer[]
   preferredBrands  PreferredPartBrand[]
+  categoryMappings PartProviderCategoryMapping[]
+  vehicleMappings  PartProviderVehicleMapping[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([providerType, active])
   @@index([affiliatePartnerId])
+}
+
+model PartProviderCategoryMapping {
+  id                     String    @id @default(uuid())
+  providerId             String
+  componentTypeId        String
+  externalCategoryId     String
+  externalCategoryName   String?
+  taxonomyTreeId         String?
+  taxonomyTreeVersion    String?
+  compatibilitySupported Boolean   @default(false)
+  confidence             String    @default("DISCOVERED")
+  verifiedAt             DateTime  @default(now())
+  expiresAt              DateTime?
+  active                 Boolean   @default(true)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  provider        PartOfferProvider            @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  componentType   PartComponentType            @relation(fields: [componentTypeId], references: [id], onDelete: Cascade)
+  vehicleMappings PartProviderVehicleMapping[]
+
+  @@unique([providerId, componentTypeId, externalCategoryId])
+  @@index([componentTypeId, active, expiresAt])
+  @@index([providerId, active, expiresAt])
+}
+
+model PartProviderVehicleMapping {
+  id                String    @id @default(uuid())
+  providerId        String
+  modelId           String
+  categoryMappingId String
+  year              Int
+  makeValue         String
+  modelValue        String
+  trimValue         String?
+  engineValue       String?
+  confidence        String    @default("YEAR_MAKE_MODEL")
+  verifiedAt        DateTime  @default(now())
+  expiresAt         DateTime?
+  active            Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  provider        PartOfferProvider           @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  model           Model                       @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  categoryMapping PartProviderCategoryMapping @relation(fields: [categoryMappingId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, modelId, categoryMappingId, year])
+  @@index([modelId, year, active, expiresAt])
+  @@index([providerId, active, expiresAt])
 }
 
 model PreferredPartBrand {
@@ -914,17 +968,18 @@ model PartComponentType {
   performanceRelated Boolean @default(false)
   active             Boolean @default(true)
 
-  category               PartCategory                  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  searchTemplates        PartComponentSearchTemplate[]
-  modelMappings          ModelPartComponent[]
-  canonicalParts         PerformancePart[]
-  preferredBrands        PreferredPartBrand[]
-  applicabilityOverrides PartApplicabilityOverride[]
-  maintenanceLinks       MaintenanceRulePart[]
-  outgoingRelationships  PartTypeRelationship[]        @relation("PartTypeRelationshipSource")
-  incomingRelationships  PartTypeRelationship[]        @relation("PartTypeRelationshipTarget")
-  installedParts         VehicleInstalledPart[]
-  engineeringEffect      PartEngineeringEffect?
+  category                 PartCategory                  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  searchTemplates          PartComponentSearchTemplate[]
+  modelMappings            ModelPartComponent[]
+  canonicalParts           PerformancePart[]
+  preferredBrands          PreferredPartBrand[]
+  applicabilityOverrides   PartApplicabilityOverride[]
+  maintenanceLinks         MaintenanceRulePart[]
+  outgoingRelationships    PartTypeRelationship[]        @relation("PartTypeRelationshipSource")
+  incomingRelationships    PartTypeRelationship[]        @relation("PartTypeRelationshipTarget")
+  installedParts           VehicleInstalledPart[]
+  engineeringEffect        PartEngineeringEffect?
+  providerCategoryMappings PartProviderCategoryMapping[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

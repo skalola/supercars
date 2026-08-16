@@ -16,5 +16,6 @@ export function canMaterializePartContext(candidate: ApplicabilityCandidate) {
 
 export function isDisplayEligiblePartOffer(input: { fitmentConfidence: string; fitmentRisk: string }) {
   if (["EXACT_MATCH", "HIGH_CONFIDENCE", "HIGH"].includes(input.fitmentConfidence)) return true;
+  if (input.fitmentRisk === "MEDIUM" && input.fitmentConfidence === "LIKELY_COMPATIBLE") return true;
   return input.fitmentRisk === "LOW" && ["LIKELY_COMPATIBLE", "POSSIBLE_MATCH"].includes(input.fitmentConfidence);
 }

@@ -10,6 +10,8 @@ export type CanonicalPartOfferQuery = {
 };
 
 export type VehiclePartOfferQuery = {
+  providerId: string;
+  modelId: string;
   makeName: string;
   makeSlug: string;
   modelName: string;
@@ -20,6 +22,7 @@ export type VehiclePartOfferQuery = {
   systemSlug: string;
   aliases?: string[];
   identifiers?: string[];
+  knownMakes?: string[];
   knownModels?: string[];
   knownBrands?: string[];
   templates?: string[];

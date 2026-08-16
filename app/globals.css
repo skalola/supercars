@@ -23041,6 +23041,28 @@ canvas {
   line-height: 1.35;
 }
 
+.part-offer-product-copy > .part-offer-fitment {
+  width: fit-content;
+  margin-top: 2px;
+  padding: 3px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.035);
+  font-size: 8px;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.part-offer-product-copy > .part-offer-fitment.is-verified {
+  border-color: rgba(77, 205, 107, 0.42);
+  color: #76dc8d;
+}
+
+.part-offer-product-copy > .part-offer-fitment.is-candidate {
+  border-color: rgba(231, 185, 51, 0.42);
+  color: #e8ca70;
+}
+
 .part-offer-quality {
   min-width: 62px;
   min-height: 25px;

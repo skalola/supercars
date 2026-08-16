@@ -77,6 +77,9 @@ export function PartOfferList({ products, systemSlug }: { products: PartOfferPro
                     <strong>{product.productName}</strong>
                     <span>{formatPartNumber(product)}</span>
                     <small>{product.primaryOffer.condition || "Condition not listed"}{product.sellerCount > 1 ? ` · ${product.sellerCount} sellers` : ""}</small>
+                    <small className={`part-offer-fitment ${isVerifiedFitment(product.primaryOffer.fitmentConfidence) ? "is-verified" : "is-candidate"}`}>
+                      {isVerifiedFitment(product.primaryOffer.fitmentConfidence) ? "Verified fitment evidence" : "Model match · confirm fitment with seller"}
+                    </small>
                   </div>
                 </div>
               </td>
@@ -156,4 +159,8 @@ function formatMoney(value: number | null, currency: string) {
 
 function providerLabel(value: string) {
   return value.toUpperCase() === "EBAY" ? "eBay" : value.toLowerCase().replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function isVerifiedFitment(value: string) {
+  return ["EXACT_MATCH", "HIGH_CONFIDENCE", "HIGH"].includes(value.toUpperCase());
 }
