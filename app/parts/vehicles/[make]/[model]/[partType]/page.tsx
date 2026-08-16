@@ -12,7 +12,7 @@ import { getApplicablePartSystems, getApplicablePartTypes } from "@/lib/parts/ve
 
 type PageProps = {
   params: Promise<{ make: string; model: string; partType: string }>;
-  searchParams: Promise<{ system?: string | string[]; year?: string | string[]; vehicleId?: string | string[] }>;
+  searchParams: Promise<{ system?: string | string[]; year?: string | string[]; vehicleId?: string | string[]; offerPage?: string | string[] }>;
 };
 
 export default async function VehiclePartTypePage({ params, searchParams }: PageProps) {
@@ -22,6 +22,7 @@ export default async function VehiclePartTypePage({ params, searchParams }: Page
   const systemSlug = single(query.system);
   const year = parseYear(single(query.year));
   const vehicleId = single(query.vehicleId);
+  const offerPage = parsePage(single(query.offerPage));
   const detail = await getVehiclePartTypeDetail({
     makeSlug: values.make,
     modelSlug: values.model,
@@ -29,6 +30,7 @@ export default async function VehiclePartTypePage({ params, searchParams }: Page
     systemSlug,
     year,
     vehicleId,
+    offerPage,
     userId: session?.user?.id || null,
   });
   if (!detail) notFound();
@@ -58,12 +60,15 @@ export default async function VehiclePartTypePage({ params, searchParams }: Page
   ]);
 
   const backParams = new URLSearchParams({ make: detail.vehicle.make.slug, model: detail.vehicle.model.slug });
-  const hasRelationships = detail.relationships.requires.length > 0
-    || detail.relationships.recommendedWith.length > 0
-    || detail.relationships.conflictsWith.length > 0;
+  const changeVehicleParams = new URLSearchParams(backParams);
+  changeVehicleParams.set("selectVehicle", "1");
   const vehicleDetailPath = detail.vehicle.exactOwnedVehicle && detail.vehicle.vin
     ? `/vehicle/${detail.vehicle.vin}`
     : `/make/${detail.vehicle.make.slug}/${detail.vehicle.model.slug}`;
+  const offerPageParams = new URLSearchParams();
+  offerPageParams.set("system", detail.partType.system.slug);
+  if (detail.vehicle.year) offerPageParams.set("year", String(detail.vehicle.year));
+  if (detail.vehicle.exactOwnedVehicle && detail.vehicle.id) offerPageParams.set("vehicleId", detail.vehicle.id);
 
   return (
     <PartsWorkspaceShell
@@ -120,7 +125,7 @@ export default async function VehiclePartTypePage({ params, searchParams }: Page
           title: "Build your passport",
           summary: "Add installed modifications so the next balanced upgrade can be identified.",
         })}
-        changeVehicleControl={<Link href={`/parts?${backParams}`}>Change vehicle</Link>}
+        changeVehicleControl={<Link href={`/parts?${changeVehicleParams}`}>Change vehicle</Link>}
       />
 
       <PartTypeCategorySelector
@@ -134,41 +139,40 @@ export default async function VehiclePartTypePage({ params, searchParams }: Page
         vehicleId={detail.vehicle.exactOwnedVehicle ? detail.vehicle.id : null}
       />
 
-      {hasRelationships ? (
-        <section className="part-type-detail-grid is-support-only">
-          <div className="part-type-detail-main">
-            <article className="part-type-support-panel">
-              <div className="part-type-panel-heading"><div><span>Build Requirements</span><h2>Works With</h2></div></div>
-              <RelationshipRows label="Requires" items={detail.relationships.requires} />
-              <RelationshipRows label="Recommended With" items={detail.relationships.recommendedWith} />
-              <RelationshipRows label="Conflicts With" items={detail.relationships.conflictsWith} />
-            </article>
-          </div>
-        </section>
-      ) : null}
-
       <section className="part-type-available-section">
         <header>
           <div><span>Purchase Sources</span><h2>Available At</h2></div>
-          <p>{detail.offerSummary.productCount.toLocaleString()} products across {detail.offerSummary.providerCount.toLocaleString()} providers</p>
+          <p>{detail.offerSummary.productCount.toLocaleString()} products on page {detail.offerSummary.pagination.page.toLocaleString()}</p>
         </header>
         {detail.availableAt.length === 0 ? (
           <div className="part-type-no-offers"><strong>No verified offers right now</strong><p>The vehicle intelligence above remains valid. Availability is refreshed when qualified supplier products are found.</p></div>
         ) : (
           <PartOfferList products={detail.availableAt} systemSlug={detail.partType.system.slug} />
         )}
+        {detail.offerSummary.pagination.hasPrevious || detail.offerSummary.pagination.hasMore ? (
+          <nav className="parts-pagination part-offer-pagination" aria-label="Available parts pages">
+            {detail.offerSummary.pagination.hasPrevious ? (
+              <Link href={offerPageHref(offerPageParams, detail.offerSummary.pagination.page - 1)} scroll={false}>Previous</Link>
+            ) : <span className="is-disabled" aria-disabled="true">Previous</span>}
+            <span>Page {detail.offerSummary.pagination.page.toLocaleString()}</span>
+            {detail.offerSummary.pagination.hasMore ? (
+              <Link href={offerPageHref(offerPageParams, detail.offerSummary.pagination.page + 1)} scroll={false}>Next</Link>
+            ) : <span className="is-disabled" aria-disabled="true">Next</span>}
+          </nav>
+        ) : null}
         <p className="part-type-affiliate-disclosure">SUPERCAR DASH may earn a commission from qualifying purchases through partner links.</p>
       </section>
     </PartsWorkspaceShell>
   );
 }
 
-function RelationshipRows({ label, items }: { label: string; items: Array<{ partType: { id: string; name: string }; reason?: string | null }> }) {
-  if (items.length === 0) return null;
-  return <div className="part-type-relationship-row"><strong>{label}</strong><div>{items.map((item) => <span key={item.partType.id} title={item.reason || undefined}>{item.partType.name}</span>)}</div></div>;
-}
-
 function single(value?: string | string[]) { return Array.isArray(value) ? value[0] : value; }
 function parseYear(value?: string) { const year = Number.parseInt(value || "", 10); return Number.isFinite(year) ? year : null; }
+function parsePage(value?: string) { const page = Number.parseInt(value || "1", 10); return Number.isFinite(page) && page > 0 ? page : 1; }
+function offerPageHref(baseParams: URLSearchParams, page: number) {
+  const params = new URLSearchParams(baseParams);
+  if (page > 1) params.set("offerPage", String(page));
+  return `?${params.toString()}`;
+}
 function formatGainRange(min: number | null, max: number | null, suffix: string) { if (min == null || max == null) return "Not documented"; return min === max ? `+${min} ${suffix}` : `+${min}–${max} ${suffix}`; }
 function getAspiration(engine?: string | null) { if (!engine) return null; return /turbo|supercharg/i.test(engine) ? "Forced Induction" : "Naturally Aspirated"; }

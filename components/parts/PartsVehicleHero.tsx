@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 
-import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
+import { PerformanceRecommendationCarousel, type PartsRecommendationSummary } from "@/components/parts/PerformanceRecommendationCarousel";
 
 export type PartsVehicleHeroVehicle = {
   year: number | null;
@@ -35,19 +35,7 @@ type PartsVehicleHeroProps = {
     evidence: string;
     documented: boolean;
   };
-  recommendationSummary?: {
-    title: string;
-    summary: string;
-    href?: string | null;
-    limitingFactor?: string;
-    expectedBenefit?: string;
-    tradeoff?: string;
-    confidence?: string;
-    confidenceLevel?: string;
-    supportingRequirements?: string[];
-    warning?: string | null;
-    missingDataDisclosure?: string | null;
-  };
+  recommendationSummary?: PartsRecommendationSummary;
 };
 
 export function PartsVehicleHero({ vehicle, loading = false, changeVehicleControl, performanceAccent, recommendationSummary }: PartsVehicleHeroProps) {
@@ -70,6 +58,12 @@ export function PartsVehicleHero({ vehicle, loading = false, changeVehicleContro
   const vehicleTitle = vehicle
     ? [vehicle.year, vehicle.makeName, vehicle.modelName, vehicle.variant].filter(Boolean).join(" ")
     : "Build around your car";
+  const vehicleMakeLine = vehicle
+    ? [vehicle.year, vehicle.makeName].filter(Boolean).join(" ")
+    : loading ? "Loading vehicle" : "Select a vehicle";
+  const vehicleModelLine = vehicle
+    ? [vehicle.modelName, vehicle.variant].filter(Boolean).join(" ")
+    : "Build around your car";
   const heroStyle = vehicle?.imageUrl
     ? { "--parts-vehicle-hero-image": `url("${vehicle.imageUrl}")` } as CSSProperties
     : undefined;
@@ -88,7 +82,10 @@ export function PartsVehicleHero({ vehicle, loading = false, changeVehicleContro
         </div>
         <div className="parts-vehicle-identity-copy">
           <span className="parts-selected-vehicle-label">{vehicle?.buildStage ?? (loading ? "Loading vehicle" : "Vehicle required")}</span>
-          <h1>{vehicleTitle}</h1>
+          <h1>
+            <span className="parts-vehicle-title-make">{vehicleMakeLine}</span>
+            <span className="parts-vehicle-title-model">{vehicleModelLine}</span>
+          </h1>
           {metadata.length > 0 ? (
             <p className="parts-vehicle-summary-line">{metadata.join(" · ")}</p>
           ) : <p className="parts-vehicle-summary-line">Choose a garage car or browse by make and model.</p>}
@@ -122,23 +119,7 @@ export function PartsVehicleHero({ vehicle, loading = false, changeVehicleContro
       ) : null}
 
       {recommendationSummary ? (
-        <aside className="parts-vehicle-recommendation-summary" aria-label="Build recommendation">
-          <div>
-            <div className="parts-recommendation-kicker"><span>{recommendationSummary.limitingFactor ? `Limiting Factor · ${recommendationSummary.limitingFactor}` : "Recommended Next"}</span>{recommendationSummary.confidence ? <em data-confidence={recommendationSummary.confidenceLevel}>{recommendationSummary.confidence}</em> : null}</div>
-            <strong>{recommendationSummary.title}</strong>
-            <p>{recommendationSummary.summary}</p>
-            {recommendationSummary.expectedBenefit || recommendationSummary.tradeoff ? (
-              <dl>
-                {recommendationSummary.expectedBenefit ? <div><dt>Expected Benefit</dt><dd>{recommendationSummary.expectedBenefit}</dd></div> : null}
-                {recommendationSummary.tradeoff ? <div><dt>Tradeoff</dt><dd>{recommendationSummary.tradeoff}</dd></div> : null}
-              </dl>
-            ) : null}
-            {recommendationSummary.supportingRequirements?.length ? <small>Requires: {recommendationSummary.supportingRequirements.join(" · ")}</small> : null}
-            {recommendationSummary.warning ? <small className="is-warning">{recommendationSummary.warning}</small> : null}
-            {recommendationSummary.missingDataDisclosure ? <small className="is-disclosure">{recommendationSummary.missingDataDisclosure}</small> : null}
-          </div>
-          {recommendationSummary.href ? <Link href={recommendationSummary.href}>View Upgrade</Link> : null}
-        </aside>
+        <PerformanceRecommendationCarousel key={`${vehicleTitle}-${recommendationSummary.title}`} recommendation={recommendationSummary} />
       ) : null}
 
       {changeVehicleControl || vehicle?.detailPath ? (

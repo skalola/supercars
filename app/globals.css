@@ -13823,6 +13823,32 @@ canvas {
   text-transform: uppercase;
 }
 
+.part-offer-pagination a,
+.part-offer-pagination > .is-disabled {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding-inline: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.055);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.part-offer-pagination a:hover,
+.part-offer-pagination a:focus-visible {
+  border-color: rgba(239, 68, 68, 0.72);
+  outline: none;
+}
+
+.part-offer-pagination > .is-disabled {
+  opacity: 0.38;
+}
+
 .parts-pagination button:hover:not(:disabled),
 .parts-pagination button:focus-visible {
   border-color: rgba(239, 68, 68, 0.72);
@@ -21889,10 +21915,22 @@ canvas {
   font-weight: 900;
 }
 
+.part-type-browser-empty > div {
+  display: grid;
+  justify-items: center;
+}
+
+.part-type-browser-empty strong {
+  color: #d7dbe0;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
 .part-type-browser-empty p { max-width: 300px; margin: 7px 0 0; font-size: 12px; line-height: 1.5; }
 .part-type-browser-empty-wide { min-height: 104px; }
 .part-type-browser-status { grid-column: 1 / -1; min-height: 82px; font-size: 12px; }
 .part-type-browser-error { margin: 0; padding: 10px 12px; border-left: 2px solid #e12229; background: rgba(225, 34, 41, .08); color: #f1b4b7; font-size: 11px; }
+.part-type-browser-notice { margin: 0; padding: 10px 12px; border-left: 2px solid #e7b933; background: rgba(231, 185, 51, .08); color: #dfd3a5; font-size: 11px; line-height: 1.45; }
 
 .part-type-component-panel,
 .part-type-recommendation-panel,
@@ -22263,12 +22301,31 @@ canvas {
 }
 
 .parts-vehicle-identity-copy h1 {
+  display: grid;
+  gap: 2px;
   margin: 0;
   color: #fff;
-  font-size: clamp(27px, 2.4vw, 39px);
   font-weight: 820;
-  line-height: 1.03;
+  letter-spacing: 0;
+}
+
+.parts-vehicle-title-make,
+.parts-vehicle-title-model {
+  display: block;
+  max-width: 100%;
+}
+
+.parts-vehicle-title-make {
+  font-size: 19px;
+  line-height: 1.08;
+  white-space: nowrap;
+}
+
+.parts-vehicle-title-model {
+  font-size: 28px;
+  line-height: 1.02;
   overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 
 .parts-garage-layout .parts-vehicle-summary-line {
@@ -22422,15 +22479,15 @@ canvas {
   z-index: 2;
   grid-area: recommendation;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(42px, 1fr) auto;
   align-self: start;
   justify-self: end;
-  gap: 9px;
-  align-items: center;
-  width: min(440px, 100%);
+  gap: 4px;
+  width: min(460px, 100%);
   min-width: 0;
-  min-height: 118px;
-  padding: 12px 14px;
+  min-height: 98px;
+  padding: 8px 10px;
+  overflow: hidden;
   border: 1px solid rgba(69, 210, 107, .36);
   border-left: 3px solid #45d26b;
   border-radius: 5px;
@@ -22439,123 +22496,177 @@ canvas {
   backdrop-filter: blur(12px);
 }
 
-.parts-vehicle-recommendation-summary > div {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.parts-recommendation-kicker {
+.parts-recommendation-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
 }
 
-.parts-recommendation-kicker em {
-  flex: 0 0 auto;
-  padding: 3px 6px;
-  border: 1px solid rgba(69, 210, 107, .32);
+.parts-recommendation-controls {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  pointer-events: none;
+}
+
+.parts-recommendation-controls button {
+  position: absolute;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, .16);
   border-radius: 3px;
-  color: #a9efba;
-  font-size: 8px;
-  font-style: normal;
-  font-weight: 850;
+  background: rgba(255, 255, 255, .04);
+  color: rgba(255, 255, 255, .88);
+  font-size: 17px;
   line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+  transform: translateY(-50%);
+}
+
+.parts-recommendation-controls button:first-child {
+  left: 8px;
+}
+
+.parts-recommendation-controls button:last-child {
+  right: 8px;
+}
+
+.parts-recommendation-controls button:hover,
+.parts-recommendation-controls button:focus-visible {
+  border-color: rgba(69, 210, 107, .72);
+  background: rgba(69, 210, 107, .12);
+  outline: none;
+}
+
+.parts-recommendation-controls button:disabled {
+  opacity: .28;
+  cursor: default;
+}
+
+.parts-recommendation-viewport {
+  display: flex;
+  width: calc(100% - 70px);
+  min-width: 0;
+  margin-inline: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+
+.parts-recommendation-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+.parts-recommendation-viewport:focus-visible {
+  border-radius: 3px;
+  outline: 1px solid rgba(69, 210, 107, .6);
+  outline-offset: 3px;
+}
+
+.parts-recommendation-slide {
+  display: grid;
+  flex: 0 0 100%;
+  align-content: start;
+  gap: 2px;
+  min-width: 0;
+  padding-right: 4px;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+.parts-recommendation-slide > span {
+  color: #45d26b;
+  font-size: 8px;
+  font-weight: 850;
   text-transform: uppercase;
 }
 
-.parts-recommendation-kicker em[data-confidence="LOW"],
-.parts-recommendation-kicker em[data-confidence="UNKNOWN"] {
-  border-color: rgba(231, 185, 51, .4);
+.parts-recommendation-slide.is-warning > span {
   color: #eac95f;
 }
 
-.parts-vehicle-recommendation-summary span {
-  color: #45d26b;
-  font-size: 9px;
-  font-weight: 850;
-  text-transform: uppercase;
+.parts-recommendation-slide.is-disclosure > span {
+  color: rgba(255, 255, 255, .54);
 }
 
-.parts-vehicle-recommendation-summary strong {
+.parts-recommendation-slide strong {
+  display: -webkit-box;
   overflow: hidden;
   color: #fff;
-  font-size: 17px;
+  font-size: 14px;
   line-height: 1.15;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
-.parts-vehicle-recommendation-summary p {
+.parts-recommendation-slide p {
   display: -webkit-box;
   margin: 0;
   overflow: hidden;
   color: rgba(255, 255, 255, .62);
-  font-size: 10px;
-  line-height: 1.4;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.parts-vehicle-recommendation-summary dl {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
-  margin: 4px 0 0;
-}
-
-.parts-vehicle-recommendation-summary dl > div {
-  min-width: 0;
-  padding-top: 5px;
-  border-top: 1px solid rgba(255, 255, 255, .09);
-}
-
-.parts-vehicle-recommendation-summary dt {
-  margin-bottom: 2px;
-  color: rgba(255, 255, 255, .42);
-  font-size: 8px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.parts-vehicle-recommendation-summary dd {
-  display: -webkit-box;
-  margin: 0;
-  overflow: hidden;
-  color: rgba(255, 255, 255, .74);
   font-size: 9px;
   line-height: 1.35;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
-.parts-vehicle-recommendation-summary small {
-  color: rgba(255, 255, 255, .48);
-  font-size: 8px;
-  line-height: 1.35;
+.parts-recommendation-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.parts-vehicle-recommendation-summary small.is-warning {
-  color: #eac95f;
+.parts-recommendation-footer {
+  width: calc(100% - 70px);
+  margin-inline: auto;
 }
 
-.parts-vehicle-recommendation-summary small.is-disclosure {
-  display: -webkit-box;
-  overflow: hidden;
-  color: rgba(255, 255, 255, .4);
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 1;
+.parts-recommendation-dots button {
+  width: 18px;
+  height: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
 }
 
-.parts-vehicle-recommendation-summary > a {
+.parts-recommendation-dots button::before {
+  display: block;
+  width: 100%;
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, .22);
+  content: "";
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+
+.parts-recommendation-dots button.is-active::before {
+  background: #45d26b;
+  transform: scaleY(1.5);
+}
+
+.parts-recommendation-dots button:focus-visible {
+  outline: 1px solid #45d26b;
+  outline-offset: 2px;
+}
+
+.parts-recommendation-footer > a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   justify-self: end;
-  min-height: 36px;
-  padding: 0 11px;
+  min-height: 28px;
+  padding: 0 9px;
   border: 1px solid rgba(69, 210, 107, .58);
   border-radius: 4px;
   background: rgba(69, 210, 107, .09);
@@ -22567,8 +22678,8 @@ canvas {
   white-space: nowrap;
 }
 
-.parts-vehicle-recommendation-summary > a:hover,
-.parts-vehicle-recommendation-summary > a:focus-visible {
+.parts-recommendation-footer > a:hover,
+.parts-recommendation-footer > a:focus-visible {
   border-color: #45d26b;
   background: rgba(69, 210, 107, .17);
   color: #fff;
@@ -22580,7 +22691,7 @@ canvas {
   z-index: 2;
   grid-area: actions;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-self: center;
+  align-self: end;
   justify-self: end;
   width: min(390px, 100%);
   padding: 0;
@@ -22618,18 +22729,18 @@ canvas {
   .parts-vehicle-hero.parts-garage-layout.has-recommendation-summary {
     grid-template-areas:
       "image"
+      "recommendation"
       "identity"
       "stats"
-      "recommendation"
       "actions";
   }
 
   .parts-vehicle-hero.parts-garage-layout.has-performance-accent.has-recommendation-summary {
     grid-template-areas:
       "image"
+      "recommendation"
       "identity"
       "stats"
-      "recommendation"
       "accent"
       "actions";
   }
@@ -22706,8 +22817,16 @@ canvas {
   }
 
   .parts-vehicle-identity-copy h1 {
-    font-size: clamp(22px, 7vw, 28px);
-    line-height: 1.06;
+    gap: 3px;
+  }
+
+  .parts-vehicle-title-make {
+    font-size: 16px;
+  }
+
+  .parts-vehicle-title-model {
+    font-size: 23px;
+    line-height: 1.04;
   }
 
   .parts-garage-layout .parts-vehicle-summary-line {
@@ -22753,12 +22872,22 @@ canvas {
   }
 
   .parts-vehicle-recommendation-summary {
-    min-height: 0;
-    padding: 10px 11px;
+    min-height: 100px;
+    padding: 8px 9px;
   }
 
-  .parts-vehicle-recommendation-summary dl {
-    grid-template-columns: 1fr;
+  .parts-recommendation-slide strong {
+    font-size: 14px;
+  }
+
+  .parts-recommendation-controls button {
+    width: 30px;
+    height: 30px;
+  }
+
+  .parts-recommendation-viewport,
+  .parts-recommendation-footer {
+    width: calc(100% - 78px);
   }
 
   .parts-vehicle-gain-accent > div {
@@ -22783,9 +22912,9 @@ canvas {
   }
 }
 
-@media (max-width: 420px) {
-  .parts-garage-layout .parts-vehicle-actions {
-    grid-template-columns: 1fr;
+@media (prefers-reduced-motion: reduce) {
+  .parts-recommendation-viewport {
+    scroll-behavior: auto;
   }
 }
 

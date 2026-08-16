@@ -14,6 +14,7 @@ type PartSystem = {
 
 type VehiclePartType = {
   id: string;
+  mapped: boolean;
   componentGroup: { name: string; slug: string };
   componentType: {
     id: string;
@@ -58,6 +59,7 @@ export function PartTypeCategorySelector({
   const [selectionComplete, setSelectionComplete] = useState(Boolean(initialPartTypeSlug));
   const [loadingSystemSlug, setLoadingSystemSlug] = useState("");
   const [loadError, setLoadError] = useState("");
+  const [fitmentNotice, setFitmentNotice] = useState("");
   const [isNavigating, startNavigation] = useTransition();
 
   const activeSystem = systems.find((system) => system.slug === activeSystemSlug) ?? null;
@@ -92,6 +94,7 @@ export function PartTypeCategorySelector({
     setActivePartTypeSlug("");
     setSelectionComplete(false);
     setLoadError("");
+    setFitmentNotice("");
     if (partTypesBySystem[system.slug]) return;
 
     setLoadingSystemSlug(system.slug);
@@ -110,6 +113,12 @@ export function PartTypeCategorySelector({
   function selectPartType(partType: VehiclePartType) {
     if (!activeSystem) return;
     setActivePartTypeSlug(partType.componentType.slug);
+    if (!partType.mapped) {
+      setSelectionComplete(false);
+      setFitmentNotice(`${partType.componentType.name} is in the parts taxonomy. Verified ${makeSlug.replace(/-/g, " ")} ${modelSlug.replace(/-/g, " ")} fitment is still being mapped.`);
+      return;
+    }
+    setFitmentNotice("");
     setSelectionComplete(true);
     const path = getPartTypeDetailPath(
       { makeSlug, modelSlug },
@@ -142,8 +151,18 @@ export function PartTypeCategorySelector({
       </div>
 
       {loadError ? <p className="part-type-browser-error" role="alert">{loadError}</p> : null}
+      {fitmentNotice ? <p className="part-type-browser-notice" role="status">{fitmentNotice}</p> : null}
       {loading && systems.length === 0 ? <div className="part-type-browser-status">Loading compatible categories...</div> : null}
       {loadingSystemSlug && loadingSystemSlug === activeSystemSlug ? <div className="part-type-browser-status">Loading compatible components...</div> : null}
+
+      {!loading && systems.length === 0 ? (
+        <div className="part-type-browser-empty part-type-browser-empty-wide">
+          <div>
+            <strong>Parts taxonomy unavailable</strong>
+            <p>No active category definitions are currently available.</p>
+          </div>
+        </div>
+      ) : null}
 
       {activeSystem && !loadingSystemSlug && !selectionComplete ? (
         <div className="part-type-browser-carousel-stage" aria-live="polite">
@@ -173,7 +192,9 @@ export function PartTypeCategorySelector({
                 <CategoryLineIcon slug={activeSystem.slug} />
                 <span>
                   <strong>{partType.componentType.name}</strong>
-                  <small>{partType.componentType.description || "View fitment, performance, and available offers"}</small>
+                  <small>{partType.mapped && partType.componentType.description
+                    ? partType.componentType.description
+                    : "Review fitment, performance, and available offers"}</small>
                 </span>
                 <i aria-hidden="true">{isNavigating && activePartTypeSlug === partType.componentType.slug ? "..." : "›"}</i>
               </button>

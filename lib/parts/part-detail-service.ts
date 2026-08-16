@@ -21,6 +21,7 @@ export type PartDetailContextInput = {
   year?: number | null;
   vehicleId?: string | null;
   userId?: string | null;
+  offerPage?: number;
   refreshOffers?: boolean;
 };
 
@@ -223,6 +224,7 @@ export async function getVehiclePartTypeDetail(input: PartDetailContextInput) {
     componentSlug: mapping.componentType.slug,
     categorySlug: mapping.componentType.category.slug,
     year: selectedYear,
+    page: input.offerPage,
     ...(input.refreshOffers ? { forceRefresh: true } : {}),
   });
   const offers = offerPayload?.offers ?? [];
@@ -311,6 +313,12 @@ export async function getVehiclePartTypeDetail(input: PartDetailContextInput) {
       productCount: groupedOffers.length,
       providerCount: new Set(offers.map((offer) => offer.provider)).size,
       cache: offerPayload?.cache ?? null,
+      pagination: offerPayload?.pagination ?? {
+        page: 1,
+        pageSize: 5,
+        hasPrevious: false,
+        hasMore: false,
+      },
     },
   };
 }

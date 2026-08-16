@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { unstable_cache } from "next/cache";
 
 type PartsPageProps = {
-  searchParams?: Promise<{ make?: string; model?: string }>;
+  searchParams?: Promise<{ make?: string; model?: string; selectVehicle?: string }>;
 };
 
 export default async function PartsPage({ searchParams }: PartsPageProps) {
@@ -29,6 +29,7 @@ export default async function PartsPage({ searchParams }: PartsPageProps) {
       fitmentModels={publicCatalog.fitmentModels}
       initialMakeId={initialFilter.makeId}
       initialModelId={initialFilter.modelId}
+      initialSelectorOpen={resolvedSearchParams.selectVehicle === "1"}
     />
   );
 }

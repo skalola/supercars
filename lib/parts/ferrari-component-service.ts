@@ -1,4 +1,5 @@
 import type { EbayComponentOffer } from "@/lib/ebay/browse.server";
+import type { Prisma } from "@prisma/client";
 import {
   loadExistingOffers,
   persistDiscoveredOffer,
@@ -14,10 +15,46 @@ import { prisma } from "@/lib/prisma";
 import { getUniversalPartComponentGroup } from "@/lib/parts/part-type-hierarchy";
 import { getPartTypeTitleConflict } from "@/lib/parts/offer-quality";
 import { selectModelHeroImage } from "@/lib/model-catalog/model-display";
+import { unstable_cache } from "next/cache";
 
 const COMPONENT_OFFER_TTL_MS = 12 * 60 * 60 * 1000;
 const FAILED_RETRY_TTL_MS = 5 * 60 * 1000;
 const RUNNING_LOCK_TTL_MS = 2 * 60 * 1000;
+const COMPONENT_OFFER_PAGE_SIZE = 5;
+
+const getPartTaxonomySystemsCached = unstable_cache(
+  async () => prisma.partCategory.findMany({
+    where: { active: true, componentTypes: { some: { active: true } } },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      displayOrder: true,
+      _count: { select: { componentTypes: { where: { active: true } } } },
+    },
+    orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
+  }),
+  ["parts-static-system-taxonomy-v1"],
+  { revalidate: 86_400, tags: ["parts-catalog"] },
+);
+
+const getPartTaxonomyTypesCached = unstable_cache(
+  async (systemSlug: string) => prisma.partComponentType.findMany({
+    where: { active: true, category: { active: true, slug: systemSlug } },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      description: true,
+      displayOrder: true,
+      performanceRelated: true,
+      systemGroup: true,
+    },
+    orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
+  }),
+  ["parts-static-component-taxonomy-v1"],
+  { revalidate: 86_400, tags: ["parts-catalog"] },
+);
 
 export async function getPartModels(makeSlug: string) {
   return prisma.model.findMany({
@@ -91,33 +128,15 @@ export async function getPartVehicleSummary(input: { makeSlug: string; modelSlug
 }
 
 export async function getApplicablePartSystems(input: { makeSlug: string; modelSlug: string }) {
-  return prisma.$queryRaw<Array<{
-    id: string;
-    name: string;
-    slug: string;
-    displayOrder: number;
-    componentCount: number;
-  }>>`
-    SELECT
-      category.id,
-      category.name,
-      category.slug,
-      category."displayOrder",
-      COUNT(*)::int AS "componentCount"
-    FROM "ModelPartComponent" mapping
-    JOIN "Model" model ON model.id = mapping."modelId"
-    JOIN "Make" make ON make.id = model."makeId"
-    JOIN "PartsMarqueConfig" config ON config."makeId" = make.id
-    JOIN "PartComponentType" component ON component.id = mapping."componentTypeId"
-    JOIN "PartCategory" category ON category.id = component."categoryId"
-    WHERE mapping.active = true
-      AND component.active = true
-      AND model.slug = ${input.modelSlug}
-      AND make.slug = ${input.makeSlug}
-      AND config."partsEnabled" = true
-    GROUP BY category.id, category.name, category.slug, category."displayOrder"
-    ORDER BY category."displayOrder", category.name
-  `;
+  void input;
+  const systems = await getPartTaxonomySystemsCached();
+  return systems.map((system) => ({
+    id: system.id,
+    name: system.name,
+    slug: system.slug,
+    displayOrder: system.displayOrder,
+    componentCount: system._count.componentTypes,
+  }));
 }
 
 function inferAspiration(engine?: string | null) {
@@ -128,28 +147,42 @@ function inferAspiration(engine?: string | null) {
 }
 
 export async function getApplicablePartTypes(input: { makeSlug: string; modelSlug: string; systemSlug: string }) {
-  const partTypes = await prisma.modelPartComponent.findMany({
-    where: {
-      active: true,
-      model: { slug: input.modelSlug, make: { slug: input.makeSlug, partsMarqueConfig: { is: { partsEnabled: true } } } },
-      componentType: { active: true, category: { slug: input.systemSlug } },
-    },
-    select: {
-      id: true,
-      applicability: true,
-      lastOfferSearchAt: true,
-      lastOfferSearchStatus: true,
-      componentType: {
-        select: { id: true, name: true, slug: true, description: true, displayOrder: true, performanceRelated: true, systemGroup: true },
+  const [componentTypes, modelMappings] = await Promise.all([
+    getPartTaxonomyTypesCached(input.systemSlug),
+    prisma.modelPartComponent.findMany({
+      where: {
+        active: true,
+        model: { slug: input.modelSlug, make: { slug: input.makeSlug, partsMarqueConfig: { is: { partsEnabled: true } } } },
+        componentType: { active: true, category: { slug: input.systemSlug } },
       },
-      _count: { select: { offerContexts: { where: { active: true, offer: { active: true, affiliateUrl: { not: null } } } } } },
-    },
-    orderBy: [{ componentType: { displayOrder: "asc" } }, { componentType: { name: "asc" } }],
+      select: {
+        id: true,
+        applicability: true,
+        lastOfferSearchAt: true,
+        lastOfferSearchStatus: true,
+        componentType: {
+          select: { id: true, name: true, slug: true, description: true, displayOrder: true, performanceRelated: true, systemGroup: true },
+        },
+        _count: { select: { offerContexts: { where: { active: true, offer: { active: true, affiliateUrl: { not: null } } } } } },
+      },
+      orderBy: [{ componentType: { displayOrder: "asc" } }, { componentType: { name: "asc" } }],
+    }),
+  ]);
+  const mappingByComponentId = new Map(modelMappings.map((mapping) => [mapping.componentType.id, mapping]));
+
+  return componentTypes.map((componentType) => {
+    const mapping = mappingByComponentId.get(componentType.id);
+    return {
+      id: mapping?.id ?? componentType.id,
+      applicability: mapping?.applicability ?? "TAXONOMY_ONLY",
+      lastOfferSearchAt: mapping?.lastOfferSearchAt ?? null,
+      lastOfferSearchStatus: mapping?.lastOfferSearchStatus ?? "UNMAPPED",
+      componentType,
+      _count: { offerContexts: mapping?._count.offerContexts ?? 0 },
+      mapped: Boolean(mapping),
+      componentGroup: getUniversalPartComponentGroup(input.systemSlug, componentType.name, componentType.systemGroup),
+    };
   });
-  return partTypes.map((partType) => ({
-    ...partType,
-    componentGroup: getUniversalPartComponentGroup(input.systemSlug, partType.componentType.name, partType.componentType.systemGroup),
-  }));
 }
 
 export async function getAvailableOffers(input: {
@@ -158,6 +191,7 @@ export async function getAvailableOffers(input: {
   componentSlug: string;
   categorySlug?: string;
   year?: number | null;
+  page?: number;
   forceRefresh?: boolean;
   cacheOnly?: boolean;
 }) {
@@ -204,7 +238,8 @@ export async function getAvailableOffers(input: {
   if (!mapping) return null;
 
   const now = new Date();
-  if (input.cacheOnly) return buildComponentOfferResponse(mapping, false);
+  const page = Math.max(1, Math.floor(input.page || 1));
+  if (input.cacheOnly) return buildComponentOfferResponse(mapping, false, page);
   const retryMs = mapping.lastOfferSearchStatus === "RUNNING"
     ? RUNNING_LOCK_TTL_MS
     : ["FAILED", "API_ERROR", "ZERO_OFFERS", "SEARCH_EXHAUSTED", "LOW_CONFIDENCE_ONLY"].includes(mapping.lastOfferSearchStatus)
@@ -212,7 +247,7 @@ export async function getAvailableOffers(input: {
       : COMPONENT_OFFER_TTL_MS;
   const cacheFresh = !input.forceRefresh && mapping.lastOfferSearchAt && mapping.lastOfferSearchAt > new Date(now.getTime() - retryMs);
   if (cacheFresh || mapping.lastOfferSearchStatus === "RUNNING") {
-    return buildComponentOfferResponse(mapping, false);
+    return buildComponentOfferResponse(mapping, false, page);
   }
 
   const claim = await prisma.modelPartComponent.updateMany({
@@ -227,7 +262,7 @@ export async function getAvailableOffers(input: {
     },
     data: { lastOfferSearchAt: now, lastOfferSearchStatus: "RUNNING" },
   });
-  if (claim.count === 0) return buildComponentOfferResponse(mapping, false);
+  if (claim.count === 0) return buildComponentOfferResponse(mapping, false, page);
 
   try {
     const [knownModels, preferredBrands, refreshData] = await Promise.all([
@@ -372,7 +407,11 @@ export async function getAvailableOffers(input: {
         lastOfferRejectedCount: search.rejectedCount,
       },
     });
-    const response = await buildComponentOfferResponse({ ...mapping, lastOfferSearchAt: now, lastOfferSearchStatus: searchStatus, lastOfferRejectedCount: search.rejectedCount }, true);
+    const response = await buildComponentOfferResponse(
+      { ...mapping, lastOfferSearchAt: now, lastOfferSearchStatus: searchStatus, lastOfferRejectedCount: search.rejectedCount },
+      true,
+      page,
+    );
     return {
       ...response,
       discovery: {
@@ -446,19 +485,48 @@ async function buildComponentOfferResponse(
     componentType: { id: string; name: string; slug: string; categoryId: string; fitmentRisk: string; category: { name: string; slug: string } };
   },
   refreshed: boolean,
+  page: number,
 ) {
   const now = new Date();
-  const [contexts, preferredBrands] = await Promise.all([prisma.partOfferContext.findMany({
-    where: {
-      modelPartComponentId: mapping.id,
+  const activeContextWhere = {
+    modelPartComponentId: mapping.id,
+    active: true,
+    offer: {
       active: true,
-      offer: {
-        active: true,
-        affiliateUrl: { not: null },
-        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
-      },
+      affiliateUrl: { not: null },
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+    },
+  } satisfies Prisma.PartOfferContextWhereInput;
+  const [candidateRows, preferredBrands] = await Promise.all([prisma.partOfferContext.findMany({
+    where: activeContextWhere,
+    select: {
+      id: true,
+      fitmentConfidence: true,
+      offer: { select: { title: true } },
+    },
+    orderBy: [{ confidenceScore: "desc" }, { offer: { priceCents: "asc" } }],
+    take: 100,
+  }), getPreferredPartBrandsForComponent(prisma, {
+    makeId: mapping.model.makeId,
+    modelId: mapping.model.id,
+    categoryId: mapping.componentType.categoryId,
+    componentTypeId: mapping.componentType.id,
+  })]);
+  const eligibleCandidateIds = candidateRows.filter((context) => {
+    if (getPartTypeTitleConflict(mapping.componentType.name, context.offer.title)) return false;
+    if (["EXACT_MATCH", "HIGH_CONFIDENCE", "HIGH"].includes(context.fitmentConfidence)) return true;
+    return mapping.componentType.fitmentRisk === "LOW" && ["LIKELY_COMPATIBLE", "POSSIBLE"].includes(context.fitmentConfidence);
+  }).map((context) => context.id);
+  const pageStart = (page - 1) * COMPONENT_OFFER_PAGE_SIZE;
+  const selectedContextIds = eligibleCandidateIds.slice(pageStart, pageStart + COMPONENT_OFFER_PAGE_SIZE);
+  const hasMore = eligibleCandidateIds.length > pageStart + COMPONENT_OFFER_PAGE_SIZE;
+  const contextRows = selectedContextIds.length === 0 ? [] : await prisma.partOfferContext.findMany({
+    where: {
+      ...activeContextWhere,
+      id: { in: selectedContextIds },
     },
     select: {
+      id: true,
       fitmentConfidence: true,
       confidenceScore: true,
       matchReasons: true,
@@ -500,18 +568,11 @@ async function buildComponentOfferResponse(
         },
       },
     },
-    orderBy: [{ confidenceScore: "desc" }, { offer: { priceCents: "asc" } }],
-    take: 20,
-  }), getPreferredPartBrandsForComponent(prisma, {
-    makeId: mapping.model.makeId,
-    modelId: mapping.model.id,
-    categoryId: mapping.componentType.categoryId,
-    componentTypeId: mapping.componentType.id,
-  })]);
-  const displayContexts = contexts.filter((context) => {
-    if (getPartTypeTitleConflict(mapping.componentType.name, context.offer.title)) return false;
-    if (["EXACT_MATCH", "HIGH_CONFIDENCE", "HIGH"].includes(context.fitmentConfidence)) return true;
-    return mapping.componentType.fitmentRisk === "LOW" && ["LIKELY_COMPATIBLE", "POSSIBLE"].includes(context.fitmentConfidence);
+  });
+  const contextById = new Map(contextRows.map((context) => [context.id, context]));
+  const displayContexts = selectedContextIds.flatMap((id) => {
+    const context = contextById.get(id);
+    return context ? [context] : [];
   });
   const rankedOffers = rankPartOffers({
     offers: displayContexts.map((context) => ({
@@ -576,6 +637,12 @@ async function buildComponentOfferResponse(
       lastSearchedAt: mapping.lastOfferSearchAt,
       rejectedResults: mapping.lastOfferRejectedCount,
       ttlSeconds: COMPONENT_OFFER_TTL_MS / 1000,
+    },
+    pagination: {
+      page,
+      pageSize: COMPONENT_OFFER_PAGE_SIZE,
+      hasPrevious: page > 1,
+      hasMore,
     },
     discovery: null as null | {
       queries: string[];

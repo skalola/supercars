@@ -15,7 +15,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   const parsedYear = Number.parseInt(request.nextUrl.searchParams.get("year") || "", 10);
   const year = Number.isFinite(parsedYear) && parsedYear >= 1886 && parsedYear <= new Date().getFullYear() + 2 ? parsedYear : null;
-  const context = { makeSlug, modelSlug, componentSlug, categorySlug, year };
+  const parsedPage = Number.parseInt(request.nextUrl.searchParams.get("page") || "1", 10);
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+  const context = { makeSlug, modelSlug, componentSlug, categorySlug, year, page };
 
   try {
     let result = await getAvailableOffers({ ...context, cacheOnly: true });
@@ -23,7 +25,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const lastSearchedAt = result.cache.lastSearchedAt ? new Date(result.cache.lastSearchedAt).getTime() : 0;
     const stale = Date.now() - lastSearchedAt > result.cache.ttlSeconds * 1_000;
 
-    if (result.offers.length === 0 && result.cache.status !== "RUNNING") {
+    if (page === 1 && result.offers.length === 0 && result.cache.status !== "RUNNING") {
       result = await getAvailableOffers({ ...context, forceRefresh: true });
       if (!result) return NextResponse.json({ error: "Vehicle part type mapping not found." }, { status: 404 });
     } else if (stale && result.cache.status !== "RUNNING") {

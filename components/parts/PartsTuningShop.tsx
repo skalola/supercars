@@ -4,6 +4,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { getPartSystemsApiPath } from "@/lib/parts/parts-api";
 import type { PartsStorePage, PartsStoreSummary } from "@/lib/parts/storefront";
 import {
@@ -25,6 +26,7 @@ type PartsTuningShopProps = {
   fitmentModels: FitmentModel[];
   initialMakeId?: string;
   initialModelId?: string;
+  initialSelectorOpen?: boolean;
 };
 
 type FitmentModel = {
@@ -78,14 +80,11 @@ export function PartsTuningShop({
   fitmentModels,
   initialMakeId = "",
   initialModelId = "",
+  initialSelectorOpen = false,
 }: PartsTuningShopProps) {
+  const router = useRouter();
   const orderedCategories = useMemo(() => sortCategories(categories), [categories]);
-  const engineEnabledModelIds = useMemo(
-    () => new Set(fitmentModels.filter((model) => model.partsEngineEnabled).map((model) => model.id)),
-    [fitmentModels],
-  );
   const initialGarageCar = garageCars.find((car) => car.modelId === initialModelId)
-    ?? (!initialModelId ? garageCars.find((car) => engineEnabledModelIds.has(car.modelId)) : null)
     ?? (!initialModelId ? garageCars[0] : null)
     ?? null;
   const [activeGarageCarId, setActiveGarageCarId] = useState(initialGarageCar?.id ?? "");
@@ -101,13 +100,27 @@ export function PartsTuningShop({
   const [vehiclePartsSystems, setVehiclePartsSystems] = useState<PartSystem[]>([]);
   const [catalogVehicle, setCatalogVehicle] = useState<PartsVehicleSummary | null>(null);
   const [engineeringRecommendation, setEngineeringRecommendation] = useState<PartsEngineeringRecommendationSummary | null>(null);
-  const [selectorOpen, setSelectorOpen] = useState(!initialGarageCar && !initialModelId);
+  const [selectorOpen, setSelectorOpen] = useState(initialSelectorOpen || (!initialGarageCar && !initialModelId));
   const [partsLoading, setPartsLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const selectedGarageCar = garageCars.find((car) => car.id === activeGarageCarId) ?? null;
-  const selectedMake = fitmentMakes.find((make) => make.id === activeMakeId);
-  const selectedModel = fitmentModels.find((model) => model.id === activeModelId);
-  const usesVehiclePartsEngine = Boolean(selectedModel?.partsEngineEnabled);
+  const selectedMake = useMemo(() => fitmentMakes.find((make) => make.id === activeMakeId)
+    ?? (selectedGarageCar?.makeSlug && selectedGarageCar.makeName ? {
+      id: selectedGarageCar.makeId,
+      name: selectedGarageCar.makeName,
+      slug: selectedGarageCar.makeSlug,
+    } : undefined), [activeMakeId, fitmentMakes, selectedGarageCar]);
+  const selectedModel = useMemo(() => fitmentModels.find((model) => model.id === activeModelId)
+    ?? (selectedGarageCar?.modelSlug && selectedGarageCar.modelName ? {
+      id: selectedGarageCar.modelId,
+      name: selectedGarageCar.modelName,
+      makeId: selectedGarageCar.makeId,
+      slug: selectedGarageCar.modelSlug,
+      productionStartYear: selectedGarageCar.year,
+      productionEndYear: selectedGarageCar.year,
+      partsEngineEnabled: false,
+    } : undefined), [activeModelId, fitmentModels, selectedGarageCar]);
+  const hasResolvedVehicleSelection = Boolean(selectedMake && selectedModel);
 
   useEffect(() => {
     if (!selectedMake || !selectedModel) return;
@@ -133,7 +146,7 @@ export function PartsTuningShop({
 
   useEffect(() => {
     if (!activeMakeId && !activeModelId) return;
-    if (usesVehiclePartsEngine) return;
+    if (hasResolvedVehicleSelection) return;
 
     const controller = new AbortController();
     const params = new URLSearchParams();
@@ -155,11 +168,11 @@ export function PartsTuningShop({
       });
 
     return () => controller.abort();
-  }, [activeMakeId, activeModelId, usesVehiclePartsEngine]);
+  }, [activeMakeId, activeModelId, hasResolvedVehicleSelection]);
 
   useEffect(() => {
     if (!activeCategoryId || (!activeMakeId && !activeModelId)) return;
-    if (usesVehiclePartsEngine) return;
+    if (hasResolvedVehicleSelection) return;
 
     const controller = new AbortController();
     const params = new URLSearchParams({ category: activeCategoryId, page: String(page) });
@@ -188,9 +201,13 @@ export function PartsTuningShop({
       });
 
     return () => controller.abort();
-  }, [activeBrandId, activeCategoryId, activeMakeId, activeModelId, usesVehiclePartsEngine, page]);
+  }, [activeBrandId, activeCategoryId, activeMakeId, activeModelId, hasResolvedVehicleSelection, page]);
 
   const modelOptions = fitmentModels.filter((model) => !activeMakeId || model.makeId === activeMakeId);
+  if (selectedModel && !modelOptions.some((model) => model.id === selectedModel.id)) {
+    modelOptions.push(selectedModel);
+    modelOptions.sort((left, right) => left.name.localeCompare(right.name));
+  }
   const selectedVehicleLabel = selectedGarageCar?.label
     ?? ([selectedMake?.name, selectedModel?.name].filter(Boolean).join(" ") || "Select a vehicle");
   const hasVehicleSelection = Boolean(activeMakeId || activeModelId);
@@ -252,7 +269,15 @@ export function PartsTuningShop({
           vehicle={selectedVehicle}
           loading={summaryLoading}
           recommendationSummary={engineeringRecommendation ?? undefined}
-          changeVehicleControl={<button type="button" onClick={() => setSelectorOpen((open) => !open)}>Change vehicle</button>}
+          changeVehicleControl={(
+            <button
+              type="button"
+              aria-expanded={selectorOpen}
+              onClick={() => setSelectorOpen((open) => hasResolvedVehicleSelection ? !open : true)}
+            >
+              Change vehicle
+            </button>
+          )}
         />
 
         {selectorOpen ? (
@@ -274,7 +299,10 @@ export function PartsTuningShop({
                 const car = garageCars.find((item) => item.id === garageCarId);
                 setActiveMakeId(car?.makeId ?? "");
                 setActiveModelId(car?.modelId ?? "");
-                if (car) setSelectorOpen(false);
+                if (car) {
+                  setSelectorOpen(false);
+                  syncVehicleUrl(router, car.makeSlug, car.modelSlug);
+                }
                 else setSummaryLoading(false);
               }}
               onMakeChange={(makeId) => {
@@ -282,13 +310,20 @@ export function PartsTuningShop({
                 setActiveGarageCarId("");
                 setActiveMakeId(makeId);
                 setActiveModelId("");
+                const make = fitmentMakes.find((item) => item.id === makeId);
+                syncVehicleUrl(router, make?.slug, null, true);
                 if (!makeId) setSummaryLoading(false);
               }}
               onModelChange={(modelId) => {
                 prepareVehicleChange();
                 setActiveGarageCarId("");
                 setActiveModelId(modelId);
-                if (modelId) setSelectorOpen(false);
+                if (modelId) {
+                  const model = fitmentModels.find((item) => item.id === modelId);
+                  const make = fitmentMakes.find((item) => item.id === model?.makeId);
+                  setSelectorOpen(false);
+                  syncVehicleUrl(router, make?.slug, model?.slug);
+                }
               }}
             />
           </div>
@@ -296,7 +331,7 @@ export function PartsTuningShop({
 
         {loadError ? <div className="parts-load-error" role="alert">{loadError}</div> : null}
 
-        {usesVehiclePartsEngine && selectedModel && selectedMake ? (
+        {!selectorOpen && selectedModel && selectedMake ? (
           <PartTypeCategorySelector
             key={`${selectedModel.slug}:${selectedGarageCar?.year ?? "model"}`}
             makeSlug={selectedMake.slug}
@@ -306,7 +341,7 @@ export function PartsTuningShop({
             systems={vehiclePartsSystems}
             loading={summaryLoading}
           />
-        ) : !activeCategory ? (
+        ) : !selectorOpen && !activeCategory ? (
           <section className="parts-tuning-category-hub" aria-busy={summaryLoading}>
             <div className="parts-tuning-section-heading">
               <span>Parts Systems</span>
@@ -347,7 +382,7 @@ export function PartsTuningShop({
               </div>
             ) : null}
           </section>
-        ) : (
+        ) : !selectorOpen && activeCategory ? (
           <section className="parts-tuning-category-detail">
             <header className="parts-tuning-category-header">
               <button type="button" onClick={returnToCategories}>Back to Categories</button>
@@ -425,7 +460,7 @@ export function PartsTuningShop({
               </nav>
             ) : null}
           </section>
-        )}
+        ) : null}
     </PartsWorkspaceShell>
   );
 }
@@ -499,6 +534,20 @@ async function readJson<T>(response: Response): Promise<T> {
 function handleComponentError(error: unknown, controller: AbortController, setError: (value: string) => void) {
   if (controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) return;
   setError(error instanceof Error ? error.message : "Compatible parts are unavailable.");
+}
+
+function syncVehicleUrl(
+  router: ReturnType<typeof useRouter>,
+  makeSlug?: string | null,
+  modelSlug?: string | null,
+  keepSelectorOpen = false,
+) {
+  const params = new URLSearchParams();
+  if (makeSlug) params.set("make", makeSlug);
+  if (modelSlug) params.set("model", modelSlug);
+  if (keepSelectorOpen) params.set("selectVehicle", "1");
+  const query = params.toString();
+  router.replace(query ? `/parts?${query}` : "/parts", { scroll: false });
 }
 
 function BrandButton({ brand, active, onClick }: { brand: PartsBrandRow; active: boolean; onClick: () => void }) {
