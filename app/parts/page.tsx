@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { unstable_cache } from "next/cache";
 
 type PartsPageProps = {
-  searchParams?: Promise<{ make?: string; model?: string; selectVehicle?: string }>;
+  searchParams?: Promise<{ make?: string; model?: string; vehicleId?: string; selectVehicle?: string }>;
 };
 
 export default async function PartsPage({ searchParams }: PartsPageProps) {
@@ -29,9 +29,23 @@ export default async function PartsPage({ searchParams }: PartsPageProps) {
       fitmentModels={publicCatalog.fitmentModels}
       initialMakeId={initialFilter.makeId}
       initialModelId={initialFilter.modelId}
+      initialGarageCarId={getInitialGarageCarId(garageCars, resolvedSearchParams.vehicleId)}
       initialSelectorOpen={resolvedSearchParams.selectVehicle === "1"}
     />
   );
+}
+
+function getInitialGarageCarId(
+  garageCars: Awaited<ReturnType<typeof getGarageCars>>,
+  vehicleId: string | undefined,
+) {
+  const requestedVehicleId = vehicleId?.trim();
+  if (requestedVehicleId) {
+    const exactVehicle = garageCars.find((car) => car.id === `claimed:${requestedVehicleId}`);
+    if (exactVehicle) return exactVehicle.id;
+  }
+
+  return "";
 }
 
 const getPublicPartsStoreShellCached = unstable_cache(

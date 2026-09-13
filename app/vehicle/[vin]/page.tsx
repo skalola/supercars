@@ -460,7 +460,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
     ? null
     : activeListing?.url || listings.find((listing) => !listing.sellerId && listing.url)?.url || null;
   const matchingInventoryHref = `/inventory?make=${encodeURIComponent(vehicle.model.make.slug)}&model=${encodeURIComponent(vehicle.model.slug)}`;
-  const matchingPartsHref = `/parts?make=${encodeURIComponent(vehicle.model.make.slug)}&model=${encodeURIComponent(vehicle.model.slug)}`;
+  const matchingPartsHref = `/parts?make=${encodeURIComponent(vehicle.model.make.slug)}&model=${encodeURIComponent(vehicle.model.slug)}&vehicleId=${encodeURIComponent(vehicle.id)}`;
   const galleryImages = buildVehicleGalleryImages(vehicle, resolvedHeroImage, activeListing?.imageUrl || null);
   const heroStyle = resolvedHeroImage
     ? ({ "--vehicle-passport-hero-image": `url("${resolvedHeroImage}")` } as CSSProperties)
@@ -830,7 +830,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
             <section className="vehicle-intelligence-card">
               <div className="vehicle-intelligence-card-heading">
                 <span>Next Recommended Parts</span>
-                <Link href="/parts">View Parts Store</Link>
+                <Link href={matchingPartsHref}>View Parts Store</Link>
               </div>
               {recommendedParts.length === 0 ? (
                 <p className="vehicle-intelligence-empty">No compatible catalog upgrades are active yet for this model.</p>

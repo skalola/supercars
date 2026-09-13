@@ -16,6 +16,7 @@ import {
 import { PartsVehicleHero, type PartsVehicleHeroVehicle } from "./PartsVehicleHero";
 import { PartTypeCategorySelector } from "./PartTypeCategorySelector";
 import { PartsWorkspaceShell } from "./PartsWorkspaceShell";
+import { PartsStoreHero } from "./PartsStoreHero";
 import type { PartsEngineeringRecommendationSummary } from "@/lib/parts/engineering-recommendation-service";
 
 type PartsTuningShopProps = {
@@ -26,6 +27,7 @@ type PartsTuningShopProps = {
   fitmentModels: FitmentModel[];
   initialMakeId?: string;
   initialModelId?: string;
+  initialGarageCarId?: string;
   initialSelectorOpen?: boolean;
 };
 
@@ -80,13 +82,12 @@ export function PartsTuningShop({
   fitmentModels,
   initialMakeId = "",
   initialModelId = "",
+  initialGarageCarId = "",
   initialSelectorOpen = false,
 }: PartsTuningShopProps) {
   const router = useRouter();
   const orderedCategories = useMemo(() => sortCategories(categories), [categories]);
-  const initialGarageCar = garageCars.find((car) => car.modelId === initialModelId)
-    ?? (!initialModelId ? garageCars[0] : null)
-    ?? null;
+  const initialGarageCar = garageCars.find((car) => car.id === initialGarageCarId) ?? null;
   const [activeGarageCarId, setActiveGarageCarId] = useState(initialGarageCar?.id ?? "");
   const [activeMakeId, setActiveMakeId] = useState(initialMakeId || initialGarageCar?.makeId || "");
   const [activeModelId, setActiveModelId] = useState(initialModelId || initialGarageCar?.modelId || "");
@@ -265,20 +266,22 @@ export function PartsTuningShop({
           <Link href="/">Home</Link><span aria-hidden="true">/</span><strong>Parts</strong><span aria-hidden="true">/</span><span>{selectedVehicle ? "Selected vehicle" : "Select vehicle"}</span>
         </nav>
 
-        <PartsVehicleHero
-          vehicle={selectedVehicle}
-          loading={summaryLoading}
-          recommendationSummary={engineeringRecommendation ?? undefined}
-          changeVehicleControl={(
-            <button
-              type="button"
-              aria-expanded={selectorOpen}
-              onClick={() => setSelectorOpen((open) => hasResolvedVehicleSelection ? !open : true)}
-            >
-              Change vehicle
-            </button>
-          )}
-        />
+        {selectedVehicle || hasResolvedVehicleSelection ? (
+          <PartsVehicleHero
+            vehicle={selectedVehicle}
+            loading={summaryLoading}
+            recommendationSummary={engineeringRecommendation ?? undefined}
+            changeVehicleControl={(
+              <button
+                type="button"
+                aria-expanded={selectorOpen}
+                onClick={() => setSelectorOpen((open) => hasResolvedVehicleSelection ? !open : true)}
+              >
+                Change vehicle
+              </button>
+            )}
+          />
+        ) : <PartsStoreHero />}
 
         {selectorOpen ? (
           <div className="parts-vehicle-selector-drawer">
@@ -301,7 +304,7 @@ export function PartsTuningShop({
                 setActiveModelId(car?.modelId ?? "");
                 if (car) {
                   setSelectorOpen(false);
-                  syncVehicleUrl(router, car.makeSlug, car.modelSlug);
+                  syncVehicleUrl(router, car.makeSlug, car.modelSlug, false, getClaimedVehicleId(car.id));
                 }
                 else setSummaryLoading(false);
               }}
@@ -541,13 +544,19 @@ function syncVehicleUrl(
   makeSlug?: string | null,
   modelSlug?: string | null,
   keepSelectorOpen = false,
+  vehicleId?: string | null,
 ) {
   const params = new URLSearchParams();
   if (makeSlug) params.set("make", makeSlug);
   if (modelSlug) params.set("model", modelSlug);
+  if (vehicleId) params.set("vehicleId", vehicleId);
   if (keepSelectorOpen) params.set("selectVehicle", "1");
   const query = params.toString();
   router.replace(query ? `/parts?${query}` : "/parts", { scroll: false });
+}
+
+function getClaimedVehicleId(garageCarId: string) {
+  return garageCarId.startsWith("claimed:") ? garageCarId.slice("claimed:".length) : null;
 }
 
 function BrandButton({ brand, active, onClick }: { brand: PartsBrandRow; active: boolean; onClick: () => void }) {

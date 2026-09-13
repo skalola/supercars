@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PART_CATEGORY_ICON_BY_SLUG } from "@/lib/parts/category-icons";
 import type { PartsStorePage } from "@/lib/parts/storefront";
+import { PartsStoreHero } from "./PartsStoreHero";
 
 export { PART_CATEGORY_ICON_BY_SLUG } from "@/lib/parts/category-icons";
 
@@ -234,18 +235,7 @@ export function PartsStoreExplorer({
 
   return (
     <main className="parts-store-shell">
-      <section className="parts-store-hero">
-        <div>
-          <h1>Parts Shop</h1>
-          <p className="parts-store-subtitle">
-            <span className="parts-subtitle-dash" aria-hidden="true" />
-            <span>Performance. Precision. Passion.</span>
-          </p>
-          <p className="parts-store-disclosure">
-            SupercarDash may earn a commission when you purchase through partner links.
-          </p>
-        </div>
-      </section>
+      <PartsStoreHero />
 
       <section className="parts-store-layout" aria-label="Parts catalog browser">
         <aside className="parts-category-panel">
