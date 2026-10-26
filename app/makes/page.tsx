@@ -3,6 +3,8 @@ import { getCatalogMakeSummaries } from "@/lib/makes/catalog";
 import { compareCatalogLabels } from "@/lib/makes/catalog-order";
 import { getMakeMetadata } from "@/lib/makes/make-metadata";
 
+export const dynamic = "force-dynamic";
+
 const regionOrder = ["Japan", "Europe", "United Kingdom", "United States", "Korea", "China", "Specialist / Tuner"];
 
 export default async function MakesPage() {

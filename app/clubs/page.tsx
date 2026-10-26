@@ -7,7 +7,7 @@ import ClubLogoCropField from "./ClubLogoCropField";
 import ClubModelSelector from "./ClubModelSelector";
 import ClubDirectoryList, { type PublicClubListItem } from "./ClubDirectoryList";
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export default async function ClubsPage() {
   const clubsPromise = getPublicClubs();
