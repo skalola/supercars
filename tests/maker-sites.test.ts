@@ -27,4 +27,6 @@ test("production and local maker hostnames resolve to the same catalog slug", ()
 
   assert.equal(getMakerSlugFromHostname("supercardash.com"), null);
   assert.equal(getMakerSlugFromHostname("unknown.supercardash.com"), null);
+  assert.equal(getMakerSlugFromHostname("mercedes.supercardash.com"), "mercedes-benz");
+  assert.equal(getMakerSlugFromHostname("mercedes.localhost:3010"), "mercedes-benz");
 });

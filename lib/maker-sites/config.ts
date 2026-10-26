@@ -25,7 +25,7 @@ export const MAKER_SITE_CONFIGS = [
   { slug: "lexus", hostname: "lexus.supercardash.com", displayName: "Lexus", flagshipModelSlug: "lfa", accent: "#d6d7d9", enabled: true },
   { slug: "mazda", hostname: "mazda.supercardash.com", displayName: "Mazda", flagshipModelSlug: "rx-vision", accent: "#910a2d", enabled: true },
   { slug: "mclaren", hostname: "mclaren.supercardash.com", displayName: "McLaren", flagshipModelSlug: "w1", accent: "#ff7900", enabled: true },
-  { slug: "mercedes-benz", hostname: "mercedes.supercardash.com", displayName: "Mercedes-Benz", flagshipModelSlug: "slr-mclaren", accent: "#b9c0c7", enabled: true },
+  { slug: "mercedes-benz", hostname: "mercedes-benz.supercardash.com", displayName: "Mercedes-Benz", flagshipModelSlug: "slr-mclaren", accent: "#b9c0c7", enabled: true },
   { slug: "mitsubishi", hostname: "mitsubishi.supercardash.com", displayName: "Mitsubishi", flagshipModelSlug: "lancer-evolution-final", accent: "#e60012", enabled: true },
   { slug: "nissan", hostname: "nissan.supercardash.com", displayName: "Nissan", flagshipModelSlug: "gt-r-nismo", accent: "#c3002f", enabled: true },
   { slug: "porsche", hostname: "porsche.supercardash.com", displayName: "Porsche", flagshipModelSlug: "918-spyder", accent: "#d5001c", enabled: true },
@@ -42,6 +42,9 @@ export function getMakerSiteConfig(slug: string) {
 
 export function getMakerSlugFromHostname(hostname: string) {
   const normalized = hostname.toLowerCase().split(":")[0];
+  if (normalized === "mercedes.supercardash.com" || normalized === "mercedes.localhost") {
+    return "mercedes-benz";
+  }
   const production = MAKER_SITE_CONFIGS.find((site) => site.enabled && site.hostname === normalized);
   if (production) return production.slug;
 
