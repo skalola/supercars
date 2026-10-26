@@ -7862,8 +7862,15 @@ canvas {
   letter-spacing: 0.06em;
   line-height: 1;
   text-overflow: ellipsis;
+  text-decoration: none;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+.site-maker-badge:hover,
+.site-maker-badge:focus-visible {
+  background: #f01927;
+  color: #ffffff;
 }
 
 .site-mobile-menu {

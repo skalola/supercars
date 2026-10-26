@@ -32,9 +32,8 @@ const navigationMakes = [...MAKER_SITE_CONFIGS]
 
 const subscribeToHostname = () => () => undefined;
 
-function getMakerNameFromHostname() {
-  const makerSlug = getMakerSlugFromHostname(window.location.hostname);
-  return makerSlug ? getMakerSiteConfig(makerSlug)?.displayName ?? null : null;
+function getCurrentMakerSlug() {
+  return getMakerSlugFromHostname(window.location.hostname);
 }
 
 export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garageHref, trackersHref, profileImageUrl }: SiteHeaderProps) {
@@ -42,7 +41,8 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
   const [isMobileMakesOpen, setIsMobileMakesOpen] = useState(false);
   const [isMakesOpen, setIsMakesOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
-  const makerName = useSyncExternalStore(subscribeToHostname, getMakerNameFromHostname, () => null);
+  const makerSlug = useSyncExternalStore(subscribeToHostname, getCurrentMakerSlug, () => null);
+  const makerSite = makerSlug ? getMakerSiteConfig(makerSlug) : null;
   const accountRef = useRef<HTMLDivElement | null>(null);
   const makesRef = useRef<HTMLDivElement | null>(null);
 
@@ -84,10 +84,24 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
   return (
     <header className="site-header">
       <div className="site-brand-lockup">
-        <Link href="/" className="site-brand" aria-label="SUPERCAR DASH home" onClick={closeMenus}>
+        <a
+          href={makerSite ? "https://supercardash.com" : "/"}
+          className="site-brand"
+          aria-label="SUPERCAR DASH main site"
+          onClick={closeMenus}
+        >
           <img src="/images/supercar-dash-wordmark.svg" alt="" aria-hidden="true" />
-        </Link>
-        {makerName ? <span className="site-maker-badge">{makerName}</span> : null}
+        </a>
+        {makerSite ? (
+          <a
+            className="site-maker-badge"
+            href={`https://${makerSite.hostname}`}
+            aria-label={`${makerSite.displayName} home`}
+            onClick={closeMenus}
+          >
+            {makerSite.displayName}
+          </a>
+        ) : null}
       </div>
 
       <div className="site-mobile-menu">
