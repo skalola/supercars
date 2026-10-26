@@ -42,7 +42,7 @@ export default async function MakerSitePage({ params }: MakerSitePageProps) {
           {make.logoUrl ? <img className="maker-site-logo" src={make.logoUrl} alt={`${make.name} logo`} /> : null}
           <p>Brand Central</p>
           <h1>{flagship?.name || make.name}</h1>
-          <span>{make.name} performance, history, ownership and parts in one place.</span>
+          <span>Every {make.name} model, past and present, connected to ownership intelligence and parts.</span>
           {flagship ? <Link href={`/models/${flagship.slug}`}>Explore {flagship.name}</Link> : null}
         </div>
       </section>
@@ -51,7 +51,7 @@ export default async function MakerSitePage({ params }: MakerSitePageProps) {
         <header>
           <div>
             <p>{make.name}</p>
-            <h2 id="maker-catalog-title">Past and Present</h2>
+            <h2 id="maker-catalog-title">Full Model Lineup</h2>
           </div>
           <span>{make.models.length} models</span>
         </header>

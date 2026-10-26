@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { logoutAction } from "@/app/actions/auth-session";
 import { ClaimVinButton } from "@/components/garage/ClaimVinButton";
 import { clearCachedNavigationSession } from "@/components/site/navigation-session-cache";
-import { MAKER_SITE_CONFIGS } from "@/lib/maker-sites/config";
+import { MAKER_SITE_CONFIGS, getMakerSiteConfig, getMakerSlugFromHostname } from "@/lib/maker-sites/config";
 
 export type SiteHeaderProps = {
   isSignedIn: boolean;
@@ -26,11 +26,23 @@ const leftNavLinks = [
 
 const rightNavLinks: typeof leftNavLinks = [];
 
+const navigationMakes = [...MAKER_SITE_CONFIGS]
+  .filter((maker) => maker.enabled)
+  .sort((left, right) => left.displayName.localeCompare(right.displayName));
+
+const subscribeToHostname = () => () => undefined;
+
+function getMakerNameFromHostname() {
+  const makerSlug = getMakerSlugFromHostname(window.location.hostname);
+  return makerSlug ? getMakerSiteConfig(makerSlug)?.displayName ?? null : null;
+}
+
 export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garageHref, trackersHref, profileImageUrl }: SiteHeaderProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isMobileMakesOpen, setIsMobileMakesOpen] = useState(false);
   const [isMakesOpen, setIsMakesOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const makerName = useSyncExternalStore(subscribeToHostname, getMakerNameFromHostname, () => null);
   const accountRef = useRef<HTMLDivElement | null>(null);
   const makesRef = useRef<HTMLDivElement | null>(null);
 
@@ -71,9 +83,12 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
 
   return (
     <header className="site-header">
-      <Link href="/" className="site-brand" aria-label="SUPERCAR DASH home" onClick={closeMenus}>
-        <img src="/images/supercar-dash-wordmark.svg" alt="" aria-hidden="true" />
-      </Link>
+      <div className="site-brand-lockup">
+        <Link href="/" className="site-brand" aria-label="SUPERCAR DASH home" onClick={closeMenus}>
+          <img src="/images/supercar-dash-wordmark.svg" alt="" aria-hidden="true" />
+        </Link>
+        {makerName ? <span className="site-maker-badge">{makerName}</span> : null}
+      </div>
 
       <div className="site-mobile-menu">
         <button
@@ -111,7 +126,7 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
             id="site-mobile-makes"
             className={`site-mobile-makes${isMobileMakesOpen ? " is-open" : ""}`}
           >
-            {MAKER_SITE_CONFIGS.map((maker) => (
+            {navigationMakes.map((maker) => (
               <a key={maker.slug} href={`https://${maker.hostname}`} onClick={closeMenus}>
                 {maker.displayName}
               </a>
@@ -138,7 +153,7 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
             <span aria-hidden="true" />
           </button>
           <div className="site-makes-dropdown" role="menu" aria-label="Vehicle makes">
-            {MAKER_SITE_CONFIGS.map((maker) => (
+            {navigationMakes.map((maker) => (
               <a key={maker.slug} href={`https://${maker.hostname}`} role="menuitem" onClick={closeMenus}>
                 {maker.displayName}
               </a>
