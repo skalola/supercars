@@ -1,9 +1,11 @@
 import { auth } from "@/auth";
 import { PartsTuningShop } from "@/components/parts/PartsTuningShop";
+import { getMakerSiteConfig, getMakerSlugFromHostname } from "@/lib/maker-sites/config";
 import { getPublicPartsStoreShell } from "@/lib/parts/storefront";
 import { calculateModifiedPerformance } from "@/lib/parts/performance";
 import { prisma } from "@/lib/prisma";
 import { unstable_cache } from "next/cache";
+import { headers } from "next/headers";
 
 type PartsPageProps = {
   searchParams?: Promise<{ make?: string; model?: string; vehicleId?: string; selectVehicle?: string }>;
@@ -13,11 +15,15 @@ export default async function PartsPage({ searchParams }: PartsPageProps) {
   const session = await auth();
   const userId = session?.user?.id as string | undefined;
   const resolvedSearchParams = (await searchParams) || {};
+  const makerDefault = await getMakerDefaultPartsFilter(resolvedSearchParams);
 
   const [publicCatalog, garageCars, initialFilter] = await Promise.all([
     getPublicPartsStoreShellCached(),
     getGarageCars(userId),
-    getInitialPartsFilter(resolvedSearchParams.make, resolvedSearchParams.model),
+    getInitialPartsFilter(
+      resolvedSearchParams.make ?? makerDefault?.makeSlug,
+      resolvedSearchParams.model ?? makerDefault?.modelSlug,
+    ),
   ]);
 
   return (
@@ -33,6 +39,19 @@ export default async function PartsPage({ searchParams }: PartsPageProps) {
       initialSelectorOpen={resolvedSearchParams.selectVehicle === "1"}
     />
   );
+}
+
+async function getMakerDefaultPartsFilter(searchParams: Awaited<NonNullable<PartsPageProps["searchParams"]>>) {
+  if (searchParams.make || searchParams.model || searchParams.vehicleId) return null;
+
+  const requestHeaders = await headers();
+  const makerSlug = getMakerSlugFromHostname(
+    requestHeaders.get("x-forwarded-host") || requestHeaders.get("host") || "",
+  );
+  if (!makerSlug) return null;
+
+  const maker = getMakerSiteConfig(makerSlug);
+  return maker ? { makeSlug: maker.slug, modelSlug: maker.flagshipModelSlug } : null;
 }
 
 function getInitialGarageCarId(
