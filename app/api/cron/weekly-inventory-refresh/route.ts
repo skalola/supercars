@@ -1,6 +1,6 @@
-import { spawn } from "node:child_process";
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthorizedCronRequest } from "@/lib/security/cron-auth";
+import { VEHICLE_MARKETPLACE_ENABLED } from "@/lib/marketplace/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,41 +11,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized cron request." }, { status: 401 });
   }
 
-  const startedAt = new Date();
-  const output = await runWeeklyRefresh();
+  if (!VEHICLE_MARKETPLACE_ENABLED) {
+    return NextResponse.json(
+      { success: false, disabled: true, message: "Vehicle marketplace acquisition is paused." },
+      { status: 410 },
+    );
+  }
 
-  return NextResponse.json({
-    success: true,
-    startedAt: startedAt.toISOString(),
-    finishedAt: new Date().toISOString(),
-    output,
-  });
-}
-
-async function runWeeklyRefresh() {
-  const logs: string[] = [];
-
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn("npm", ["run", "refresh-inventory-weekly"], {
-      cwd: process.cwd(),
-      env: process.env,
-      shell: false,
-    });
-
-    child.stdout.on("data", (chunk) => {
-      logs.push(String(chunk));
-    });
-
-    child.stderr.on("data", (chunk) => {
-      logs.push(String(chunk));
-    });
-
-    child.on("error", reject);
-    child.on("exit", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`Weekly inventory refresh failed with exit code ${code}.`));
-    });
-  });
-
-  return logs.join("").slice(-20_000);
+  return NextResponse.json({ error: "Inventory refresh is not available through this route." }, { status: 501 });
 }

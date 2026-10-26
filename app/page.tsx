@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
+import type { Session } from "next-auth";
 import type { ReactNode } from "react";
 import { auth } from "@/auth";
 import { ClaimVinButton } from "@/components/garage/ClaimVinButton";
@@ -15,7 +16,12 @@ export const metadata: Metadata = buildPublicMetadata({
 });
 
 export default async function HomePage() {
-  const session = await auth();
+  let session: Session | null = null;
+  try {
+    session = await auth();
+  } catch (error) {
+    console.error("[homepage] Session unavailable; continuing as a signed-out visitor.", error);
+  }
   const summary = await getHomepageSummary(session?.user);
 
   return (
@@ -46,7 +52,7 @@ export default async function HomePage() {
           </div>
 
           <div className="garage-home-kpis" aria-label="Garage status">
-            <KpiCard label={summary.garageValueLabel} value={formatCurrency(summary.garageValue)} detail="Live priced cars" icon="$" href="/inventory" />
+            <KpiCard label={summary.garageValueLabel} value={formatCurrency(summary.garageValue)} detail="Your owned vehicles" icon="$" href="/garage" />
             <KpiCard
               label="Most Expensive"
               value={formatCurrency(summary.mostExpensiveValue)}
@@ -187,7 +193,7 @@ function GarageRail({
           <ClaimVinButton label="Claim your first car" className="garage-home-empty-card" isSignedIn={isSignedIn} variant="empty" />
         }
       />
-      <GarageRailGroup title="View The Market" vehicles={dreamVehicles} emptyText="Browse live inventory" emptyHref="/inventory" wide carousel />
+      <GarageRailGroup title="Dream Garage" vehicles={dreamVehicles} emptyText="Explore makes and models" emptyHref="/makes" wide carousel />
       <GarageRailGroup title="Previously Owned" vehicles={previousVehicles} emptyText="Add cars to dream garage" emptyHref="/makes" />
     </div>
   );

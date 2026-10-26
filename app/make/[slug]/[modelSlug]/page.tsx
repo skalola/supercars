@@ -194,46 +194,8 @@ export default async function ModelPage({ params }: ModelPageProps) {
   }
 
   const { model, maintenanceRules } = catalogData;
-  const [market, rawListings, recommendedParts, garageItem, claimedVehicle] = await Promise.all([
+  const [market, recommendedParts, garageItem, claimedVehicle] = await Promise.all([
     getMarketSummary(model.id),
-    // Public model inventory preview follows the same source-backed trust rules as market pages.
-    prisma.listing.findMany({
-      where: {
-        status: "ACTIVE",
-        modelId: model.id,
-        vehicleId: { not: null },
-        sourceId: { not: null },
-        externalListingId: { not: null },
-        url: { not: null },
-        sellerId: null,
-        vehicle: {
-          is: {
-            // ACTIVE covers older VIN-backed rows created before the VALID/WARNING quality pass existed.
-            // VALID and WARNING are safe to display publicly.
-            // NEEDS_REVIEW = confirmed identity conflict, hidden from public pages.
-            // REMOVED = duplicate/invalid VIN, permanently hidden.
-            inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
-          }
-        },
-        validationStatus: "VALID",
-        priceStatus: { not: "PRICE_INVALID" },
-        OR: [
-          { askingPrice: { gte: 10000 } },
-          { price: { gte: 10000 } }
-        ],
-        NOT: [
-          { source: { is: { type: "AUCTION" } } },
-          { url: { contains: "bringatrailer.com", mode: "insensitive" } },
-          { externalListingId: { contains: "sprint-", mode: "insensitive" } },
-          { externalListingId: { contains: "admin-ops", mode: "insensitive" } },
-          { externalListingId: { contains: "demo", mode: "insensitive" } },
-          { externalListingId: { contains: "test", mode: "insensitive" } },
-        ]
-      },
-      select: modelListingPreviewSelect,
-      orderBy: { createdAt: "desc" },
-      take: 12,
-    }),
     prisma.performancePart.findMany({
       where: {
         status: "ACTIVE",
@@ -319,6 +281,7 @@ export default async function ModelPage({ params }: ModelPageProps) {
         })
       : null,
   ]);
+  const rawListings: Prisma.ListingGetPayload<{ select: typeof modelListingPreviewSelect }>[] = [];
 
   // Validate and filter listings to ensure they match current make and model
   const validListings = rawListings.filter((l) => isListingMatchForModel(l, model));
@@ -547,7 +510,6 @@ export default async function ModelPage({ params }: ModelPageProps) {
           ) : (
             <Link href={`/claim/${model.id}`}><span aria-hidden="true">▣</span>Claim This Car</Link>
           )}
-          <Link href={inventoryHref}><span aria-hidden="true">⌁</span>View Inventory</Link>
           <Link href={partsHref}><span aria-hidden="true">⌘</span>View Parts</Link>
         </aside>
       </section>
@@ -657,9 +619,7 @@ export default async function ModelPage({ params }: ModelPageProps) {
                   ) : null}
                   <article>
                     <span>Active Listings</span>
-                    <Link href={inventoryHref}>
-                      <strong>{market.supply.activeListingCount.toLocaleString()}</strong>
-                    </Link>
+                    <strong>{market.supply.activeListingCount.toLocaleString()}</strong>
                   </article>
                   <article>
                     <span>Recent Sales</span>
@@ -679,13 +639,13 @@ export default async function ModelPage({ params }: ModelPageProps) {
               <ModelEmptyState
                 title="Market data is building"
                 detail="SUPERCAR DASH needs source-backed listings or sold comps before this model gets a market range."
-                actionHref={inventoryHref}
-                actionLabel="Check Inventory"
+                actionHref="/makes"
+                actionLabel="Explore Models"
               />
             )}
           </section>
 
-          <section className="vehicle-intelligence-card model-intelligence-inventory-card">
+          {false ? <section className="vehicle-intelligence-card model-intelligence-inventory-card">
             <div className="vehicle-intelligence-card-heading">
               <span>Available Inventory</span>
               <Link href={inventoryHref}>View Inventory</Link>
@@ -745,7 +705,7 @@ export default async function ModelPage({ params }: ModelPageProps) {
                 })}
               </div>
             )}
-          </section>
+          </section> : null}
         </div>
 
         <aside className="vehicle-intelligence-side-column">

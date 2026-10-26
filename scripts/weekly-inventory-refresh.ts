@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { assertVehicleMarketplaceEnabled } from "../lib/marketplace/config";
 
 type Step = {
   label: string;
@@ -82,6 +83,7 @@ async function runStep(step: Step) {
 }
 
 async function main() {
+  assertVehicleMarketplaceEnabled();
   for (const step of steps) {
     await runStep(step);
   }

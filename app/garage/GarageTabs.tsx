@@ -505,13 +505,13 @@ function getEmptyCopy(activeTab: ActiveTab) {
 function getEmptyActionHref(activeTab: ActiveTab) {
   if (activeTab === "claimed") return "/claim";
   if (activeTab === "saved") return "/makes";
-  return "/inventory";
+  return "/makes";
 }
 
 function getEmptyActionLabel(activeTab: ActiveTab) {
   if (activeTab === "claimed") return "Claim Car";
   if (activeTab === "saved") return "Browse Makes";
-  return "Browse Market";
+  return "Explore Models";
 }
 
 function formatTrackerCount(item: GarageSavedVehicle) {

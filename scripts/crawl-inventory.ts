@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { crawlInventory } from "@/lib/market-crawlers/crawler-engine";
+import { assertVehicleMarketplaceEnabled } from "@/lib/marketplace/config";
 
 async function main() {
+  assertVehicleMarketplaceEnabled();
   console.log("Starting public inventory crawl (VIN-first)...");
 
   const result = await crawlInventory();

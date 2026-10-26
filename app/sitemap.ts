@@ -10,7 +10,6 @@ const staticRoutes: Array<{
   priority: number;
 }> = [
   { path: "/", changeFrequency: "daily", priority: 1 },
-  { path: "/inventory", changeFrequency: "hourly", priority: 0.95 },
   { path: "/makes", changeFrequency: "weekly", priority: 0.85 },
   { path: "/meets", changeFrequency: "daily", priority: 0.8 },
   { path: "/clubs", changeFrequency: "daily", priority: 0.75 },
@@ -30,7 +29,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   try {
-    const [makes, models, meets, clubs, garages, listingVehicles, parts] = await Promise.all([
+    const [makes, models, meets, clubs, garages, parts] = await Promise.all([
       prisma.make.findMany({ select: { slug: true, updatedAt: true } }),
       prisma.model.findMany({
         select: {
@@ -59,22 +58,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         where: { username: { not: null } },
         select: { username: true, updatedAt: true, image: true },
         take: 5_000,
-      }),
-      prisma.listing.findMany({
-        where: {
-          status: "ACTIVE",
-          validationStatus: "VALID",
-          vehicleId: { not: null },
-          imageUrl: { not: null },
-          vehicle: { is: { inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] } } },
-        },
-        distinct: ["vehicleId"],
-        select: {
-          updatedAt: true,
-          imageUrl: true,
-          vehicle: { select: { vin: true } },
-        },
-        take: 10_000,
       }),
       prisma.performancePart.findMany({
         where: {
@@ -128,13 +111,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         priority: 0.6,
         images: user.image ? [absoluteUrl(user.image)] : undefined,
       })),
-      ...listingVehicles.flatMap((listing) => listing.vehicle ? [{
-        url: `${SITE_URL}/vehicle/${listing.vehicle.vin}`,
-        lastModified: listing.updatedAt,
-        changeFrequency: "daily" as const,
-        priority: 0.75,
-        images: listing.imageUrl ? [absoluteUrl(listing.imageUrl)] : undefined,
-      }] : []),
       ...parts.map((part) => ({
         url: `${SITE_URL}/parts/${part.brand.slug}/${part.slug}`,
         lastModified: part.updatedAt,

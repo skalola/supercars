@@ -167,8 +167,8 @@ export function TransactionCenterClient({
         <section style={styles.emptyState}>
           <h2 style={styles.emptyTitle}>No matching transactions</h2>
           <p style={styles.emptyText}>{searchQuery ? `No results for "${searchQuery}".` : "New requests will appear here as soon as they are created."}</p>
-          <Link href="/inventory" style={styles.secondaryAction}>
-            Browse inventory
+          <Link href="/makes" style={styles.secondaryAction}>
+            Explore models
           </Link>
         </section>
       ) : (

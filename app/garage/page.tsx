@@ -92,7 +92,7 @@ export default async function GaragePage() {
         </div>
 
         <div className="garage-page-stats garage-profile-stats" aria-label="Garage summary">
-          <GarageStatCell href="/inventory" label="Total Collection Value" value={garageStats.totalCollectionValue} detail="vs last 30 days" />
+          <GarageStatCell href="#garage-collection" label="Total Collection Value" value={garageStats.totalCollectionValue} detail="Owned collection" />
           <GarageStatCell href="#garage-collection" label="Cars Owned" value={garageStats.totalCars.toLocaleString()} detail="View all cars" />
           <GarageStatCell href={garageStats.mostValuableHref} label="Most Valuable" value={garageStats.mostValuable} detail={garageStats.mostValuableLabel} />
           <GarageStatCell href={garageStats.fastestCarHref} label="Fastest Car (HP)" value={garageStats.fastestCar} detail={garageStats.fastestCarPower} />
@@ -103,7 +103,7 @@ export default async function GaragePage() {
             <span className="garage-button-plus" aria-hidden="true" />
             Add Car
           </Link>
-          <Link href="/inventory" className="garage-profile-secondary-button">View Market</Link>
+          <Link href="/makes" className="garage-profile-secondary-button">Explore Models</Link>
         </div>
       </section>
       <section id="garage-collection" className="garage-dashboard-layout" aria-label="Garage dashboard">
