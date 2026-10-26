@@ -62,6 +62,7 @@
     "seed-mclaren": "tsx --env-file .env scripts/seed-mclaren.ts",
     "import-gt7-model-catalog": "tsx --env-file .env scripts/import-gt7-model-catalog.ts",
     "backfill-make-metadata": "tsx --env-file .env scripts/backfill-make-metadata.ts",
+    "ingest-maker-site-logos": "tsx --env-file .env scripts/ingest-maker-site-logos.ts",
     "audit-model-catalog": "tsx --env-file .env scripts/audit-model-catalog.ts",
     "audit-model-images": "tsx --env-file .env scripts/audit-model-image-identity.ts",
     "audit-parts-vehicle-knowledge": "tsx --env-file .env scripts/audit-parts-vehicle-knowledge.ts",

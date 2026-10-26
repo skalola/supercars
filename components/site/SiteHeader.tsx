@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { logoutAction } from "@/app/actions/auth-session";
 import { ClaimVinButton } from "@/components/garage/ClaimVinButton";
 import { clearCachedNavigationSession } from "@/components/site/navigation-session-cache";
+import { MAKER_SITE_CONFIGS } from "@/lib/maker-sites/config";
 
 export type SiteHeaderProps = {
   isSignedIn: boolean;
@@ -27,19 +28,27 @@ const rightNavLinks: typeof leftNavLinks = [];
 
 export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garageHref, trackersHref, profileImageUrl }: SiteHeaderProps) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isMobileMakesOpen, setIsMobileMakesOpen] = useState(false);
+  const [isMakesOpen, setIsMakesOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const accountRef = useRef<HTMLDivElement | null>(null);
+  const makesRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
       if (!accountRef.current?.contains(event.target as Node)) {
         setIsAccountOpen(false);
       }
+      if (!makesRef.current?.contains(event.target as Node)) {
+        setIsMakesOpen(false);
+      }
     }
 
     function handleEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setIsMobileOpen(false);
+        setIsMobileMakesOpen(false);
+        setIsMakesOpen(false);
         setIsAccountOpen(false);
       }
     }
@@ -55,6 +64,8 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
 
   const closeMenus = () => {
     setIsMobileOpen(false);
+    setIsMobileMakesOpen(false);
+    setIsMakesOpen(false);
     setIsAccountOpen(false);
   };
 
@@ -86,6 +97,26 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
               {link.label}
             </Link>
           ))}
+          <button
+            type="button"
+            className="site-mobile-makes-toggle"
+            aria-expanded={isMobileMakesOpen}
+            aria-controls="site-mobile-makes"
+            onClick={() => setIsMobileMakesOpen((open) => !open)}
+          >
+            Makes
+            <span aria-hidden="true" />
+          </button>
+          <div
+            id="site-mobile-makes"
+            className={`site-mobile-makes${isMobileMakesOpen ? " is-open" : ""}`}
+          >
+            {MAKER_SITE_CONFIGS.map((maker) => (
+              <a key={maker.slug} href={`https://${maker.hostname}`} onClick={closeMenus}>
+                {maker.displayName}
+              </a>
+            ))}
+          </div>
         </nav>
       </div>
 
@@ -95,6 +126,25 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
             {link.label}
           </Link>
         ))}
+        <div ref={makesRef} className={`site-makes-menu${isMakesOpen ? " is-open" : ""}`}>
+          <button
+            type="button"
+            className="site-nav-link site-makes-toggle"
+            aria-haspopup="menu"
+            aria-expanded={isMakesOpen}
+            onClick={() => setIsMakesOpen((open) => !open)}
+          >
+            Makes
+            <span aria-hidden="true" />
+          </button>
+          <div className="site-makes-dropdown" role="menu" aria-label="Vehicle makes">
+            {MAKER_SITE_CONFIGS.map((maker) => (
+              <a key={maker.slug} href={`https://${maker.hostname}`} role="menuitem" onClick={closeMenus}>
+                {maker.displayName}
+              </a>
+            ))}
+          </div>
+        </div>
       </nav>
 
       <div className="site-actions">
