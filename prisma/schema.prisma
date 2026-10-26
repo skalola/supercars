@@ -123,6 +123,10 @@ model ModelEngineeringProfile {
   yearEnd                 Int?
   engineCode              String?
   engineDescription       String?
+  displacementLiters      Float?
+  cylinders               Int?
+  fuelType                String?
+  vehicleClass            String?
   aspiration              String  @default("UNKNOWN")
   drivetrain              String  @default("UNKNOWN")
   transmissionType        String  @default("UNKNOWN")

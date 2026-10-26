@@ -120,8 +120,8 @@ async function fetchGt7CatalogRows(): Promise<CatalogRow[]> {
   }
 
   const appAsset = await fetchText(`${GT7_ASSET_BASE_URL}${appAssetMatch[1]}`);
-  const carsAsset = requireAsset(appAsset, /cars\.us\.ts":\(\)=>e\(\(\)=>import\("\.\/(cars\.us-[^"]+\.js)"/);
-  const tunersAsset = requireAsset(appAsset, /tuners\.us\.ts":\(\)=>e\(\(\)=>import\("\.\/(tuners\.us-[^"]+\.js)"/);
+  const carsAsset = requireAsset(appAsset, /cars\.us\.ts"[^\n]*?import\(["'`]\.\/(cars\.us-[^"'`]+\.js)["'`]\)/);
+  const tunersAsset = requireAsset(appAsset, /tuners\.us\.ts"[^\n]*?import\(["'`]\.\/(tuners\.us-[^"'`]+\.js)["'`]\)/);
 
   const [{ Cars }, { Tuners }] = await Promise.all([
     importRemoteModule<{ Cars: Record<string, Gt7Car> }>(`${GT7_ASSET_BASE_URL}${carsAsset}`),

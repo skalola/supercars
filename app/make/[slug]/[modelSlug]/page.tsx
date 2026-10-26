@@ -107,6 +107,15 @@ function formatPartPrice(value: number | null) {
   }).format(value / 100);
 }
 
+function formatEngineeringLabel(value: string | null | undefined) {
+  if (!value || value === "UNKNOWN") return null;
+  return value
+    .toLowerCase()
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 function ModelEmptyState({
   title,
   detail,
@@ -324,6 +333,7 @@ export default async function ModelPage({ params }: ModelPageProps) {
     : null;
   const heroImageCreditUrl = heroImage?.attributionUrl || heroImage?.sourceUrl || null;
 
+  const representativeProfile = model.engineeringProfiles[0] || null;
   const specs = [
     ["Engine", model.spec?.engine],
     ["Displacement", model.spec?.displacement],
@@ -335,6 +345,10 @@ export default async function ModelPage({ params }: ModelPageProps) {
     ["Top speed", model.spec?.topSpeed],
     ["0-60 mph", model.spec?.zeroToSixty],
     ["Weight", model.spec?.weight],
+    ["Fuel Type", representativeProfile?.fuelType],
+    ["Vehicle Class", representativeProfile?.vehicleClass],
+    ["Aspiration", formatEngineeringLabel(representativeProfile?.aspiration)],
+    ["Representative Spec Year", representativeProfile?.yearStart ? String(representativeProfile.yearStart) : null],
   ].filter((entry): entry is [string, string] => Boolean(entry[1]));
   const modelTitle = `${model.make.name} ${model.name}`;
   const modelTitleDensity =

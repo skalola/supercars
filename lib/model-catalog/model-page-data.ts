@@ -37,6 +37,23 @@ export const modelPageCatalogSelect = {
       weight: true,
     },
   },
+  engineeringProfiles: {
+    where: { scope: "MODEL_YEAR_REPRESENTATIVE" },
+    select: {
+      yearStart: true,
+      engineDescription: true,
+      displacementLiters: true,
+      cylinders: true,
+      fuelType: true,
+      vehicleClass: true,
+      aspiration: true,
+      drivetrain: true,
+      transmissionDescription: true,
+      confidence: true,
+    },
+    orderBy: { yearStart: "desc" },
+    take: 1,
+  },
   variants: {
     select: {
       id: true,
