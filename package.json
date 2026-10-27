@@ -69,6 +69,7 @@
     "ingest-oem-model-lineup": "tsx --env-file .env scripts/ingest-oem-model-lineup.ts",
     "ingest-oem-maintenance": "tsx --env-file .env scripts/ingest-oem-maintenance.ts",
     "audit-canonical-model-catalog": "tsx --env-file .env scripts/audit-canonical-model-catalog.ts",
+    "audit-model-variant-coverage": "tsx --env-file .env scripts/audit-model-variant-coverage.ts",
     "sync-trusted-model-catalog": "tsx --env-file .env scripts/sync-trusted-model-catalog.ts",
     "audit-trusted-model-coverage": "tsx --env-file .env scripts/audit-trusted-model-coverage.ts",
     "repair-trusted-model-associations": "tsx --env-file .env scripts/repair-trusted-model-associations.ts",

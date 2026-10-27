@@ -9,7 +9,8 @@ import {
   normalizeMakeName,
   type EpaVehicleRecord,
 } from "@/lib/model-catalog/sources/epa-fuel-economy";
-import { findTrustedModelMatch, slugifyTrustedModel } from "@/lib/model-catalog/trusted-model-matcher";
+import { findTrustedModelMatch, slugifyTrustedModel, trustedModelIdentity } from "@/lib/model-catalog/trusted-model-matcher";
+import { analyzeVariantCoverage } from "@/lib/model-catalog/variants/coverage";
 
 const prisma = new PrismaClient();
 
@@ -34,6 +35,13 @@ type CatalogModel = {
     transmission: string | null;
     drivetrain: string | null;
   } | null;
+  variants: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    productionStartYear: number | null;
+    productionEndYear: number | null;
+  }>;
 };
 
 async function main() {
@@ -65,6 +73,15 @@ async function main() {
               drivetrain: true,
             },
           },
+          variants: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              productionStartYear: true,
+              productionEndYear: true,
+            },
+          },
         },
       },
     },
@@ -82,7 +99,11 @@ async function main() {
     yearRangesUpdated: 0,
     specsCreated: 0,
     specFieldsFilled: 0,
+    sourceVariants: 0,
+    variantsMatched: 0,
     variantsCreated: 0,
+    catalogOnlyVariants: 0,
+    familiesWithoutSourceVariants: 0,
     profilesUpserted: 0,
     evidenceUpserted: 0,
     ambiguousFamilies: 0,
@@ -90,7 +111,7 @@ async function main() {
 
   for (const make of makes.sort((a, b) => a.name.localeCompare(b.name))) {
     const records = sourceRecords.filter((record) => normalizeMakeName(record.make) === normalizeMakeName(canonicalEpaMakeName(make.name)));
-    const families = groupFamilies(records);
+    const families = groupFamilies(records, make.name);
     const enrichedModelIds = new Set<string>();
     report.sourceFamilies += families.length;
     let makeCreates = 0;
@@ -150,6 +171,15 @@ async function main() {
                 drivetrain: true,
               },
             },
+            variants: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                productionStartYear: true,
+                productionEndYear: true,
+              },
+            },
           },
         });
         model = created;
@@ -163,7 +193,12 @@ async function main() {
       report.specFieldsFilled += Object.keys(specData).length;
       if (!model.spec) report.specsCreated += 1;
       const variants = summarizeVariants(family.records);
-      report.variantsCreated += variants.length;
+      const variantCoverage = analyzeVariantCoverage(variants, model.variants);
+      report.sourceVariants += variantCoverage.sourceVariantCount;
+      report.variantsMatched += variantCoverage.matchedCount;
+      report.variantsCreated += variantCoverage.missing.length;
+      report.catalogOnlyVariants += variantCoverage.catalogOnly.length;
+      if (variantCoverage.status === "NO_SOURCE_VARIANTS") report.familiesWithoutSourceVariants += 1;
       report.profilesUpserted += 1;
       report.evidenceUpserted += buildEvidence(summary).length;
 
@@ -220,15 +255,44 @@ async function main() {
           await tx.modelSpec.update({ where: { modelId: model!.id }, data: specData });
         }
 
-        const existingVariants = await tx.modelVariant.findMany({
-          where: { modelId: model!.id },
-          select: { slug: true },
-        });
-        const existingVariantSlugs = new Set(existingVariants.map((variant) => variant.slug));
-        const newVariants = variants.filter((variant) => !existingVariantSlugs.has(variant.slug));
+        const newVariants = variantCoverage.missing;
         if (newVariants.length > 0) {
           await tx.modelVariant.createMany({
             data: newVariants.map((variant) => ({ modelId: model!.id, ...variant })),
+            skipDuplicates: true,
+          });
+        }
+
+        const persistedVariants = variants.length > 0
+          ? await tx.modelVariant.findMany({
+              where: { modelId: model!.id, slug: { in: variants.map((variant) => variant.slug) } },
+              select: { id: true, name: true, slug: true },
+            })
+          : [];
+        const sourceBySlug = new Map(variants.map((variant) => [variant.slug, variant]));
+        if (persistedVariants.length > 0) {
+          await tx.modelCatalogEvidence.createMany({
+            data: persistedVariants.map((variant) => {
+              const source = sourceBySlug.get(variant.slug)!;
+              return {
+                evidenceKey: hash(`EPA:${make.id}:${family.name}:${variant.slug}`),
+                sourceType: "EPA",
+                sourceName: EPA_SOURCE_NAME,
+                sourceUrl: EPA_VEHICLE_DATA_URL,
+                externalId: source.externalId,
+                makeName: make.name,
+                modelName: source.name,
+                canonicalFamilyName: family.name,
+                normalizedFamilyKey: `${normalizeMakeName(make.name)}:${normalizeMakeName(family.name)}`,
+                productionStartYear: source.productionStartYear,
+                productionEndYear: source.productionEndYear,
+                confidence: "HIGH",
+                reviewStatus: "SOURCE_VERIFIED",
+                makeId: make.id,
+                modelId: model!.id,
+                variantId: variant.id,
+              };
+            }),
             skipDuplicates: true,
           });
         }
@@ -297,10 +361,10 @@ async function main() {
   console.log(JSON.stringify(report, null, 2));
 }
 
-function groupFamilies(records: EpaVehicleRecord[]) {
+function groupFamilies(records: EpaVehicleRecord[], makeName: string) {
   const groups = new Map<string, { name: string; records: EpaVehicleRecord[] }>();
   for (const record of records) {
-    const key = record.baseModel.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const key = trustedModelIdentity(record.baseModel, makeName);
     const group = groups.get(key) || { name: record.baseModel, records: [] };
     group.records.push(record);
     groups.set(key, group);
@@ -328,13 +392,14 @@ function summarizeFamily(records: EpaVehicleRecord[]) {
   };
 }
 
-function summarizeVariants(records: EpaVehicleRecord[]) {
-  const groups = new Map<string, { name: string; years: number[] }>();
+export function summarizeVariants(records: EpaVehicleRecord[]) {
+  const groups = new Map<string, { name: string; years: number[]; externalIds: string[] }>();
   for (const record of records) {
     if (normalizeName(record.model) === normalizeName(record.baseModel)) continue;
     const slug = slugifyTrustedModel(record.model);
-    const group = groups.get(slug) || { name: record.model, years: [] };
+    const group = groups.get(slug) || { name: record.model, years: [], externalIds: [] };
     group.years.push(record.year);
+    group.externalIds.push(record.sourceId);
     groups.set(slug, group);
   }
   return [...groups.entries()].map(([slug, group]) => ({
@@ -342,6 +407,7 @@ function summarizeVariants(records: EpaVehicleRecord[]) {
     slug,
     productionStartYear: Math.min(...group.years),
     productionEndYear: Math.max(...group.years),
+    externalId: group.externalIds.sort()[0] || null,
   }));
 }
 
