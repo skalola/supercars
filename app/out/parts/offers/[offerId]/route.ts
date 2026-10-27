@@ -67,25 +67,33 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     ].join(":"))
     .digest("hex");
 
-  await prisma.partAffiliateClick.createMany({
-    data: [{
-      partId: offer.partId,
+  try {
+    await prisma.partAffiliateClick.createMany({
+      data: [{
+        partId: offer.partId,
+        offerId: offer.id,
+        modelPartComponentId,
+        affiliatePartnerId: offer.affiliatePartnerId,
+        vehicleId,
+        userId,
+        outboundUrl: offer.affiliateUrl,
+        provider: offer.provider,
+        externalItemId: offer.externalItemId,
+        affiliateReferenceId: offer.affiliateReferenceId,
+        sourcePath,
+        ipHash,
+        userAgentHash,
+        clickRef,
+      }],
+      skipDuplicates: true,
+    });
+  } catch (error) {
+    console.error("Affiliate click tracking failed; continuing outbound redirect.", {
       offerId: offer.id,
-      modelPartComponentId,
-      affiliatePartnerId: offer.affiliatePartnerId,
-      vehicleId,
-      userId,
-      outboundUrl: offer.affiliateUrl,
       provider: offer.provider,
-      externalItemId: offer.externalItemId,
-      affiliateReferenceId: offer.affiliateReferenceId,
-      sourcePath,
-      ipHash,
-      userAgentHash,
-      clickRef,
-    }],
-    skipDuplicates: true,
-  });
+      error: error instanceof Error ? error.message : "Unknown tracking error",
+    });
+  }
 
   return NextResponse.redirect(offer.affiliateUrl, { status: 302 });
 }

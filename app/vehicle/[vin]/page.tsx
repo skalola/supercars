@@ -908,20 +908,25 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
                     const displayImage = ebayOffer.imageUrl || part.imageUrl;
                     const displayPrice = ebayOffer.priceCents ?? part.retailPriceCents;
                     return (
-                      <article key={part.id}>
-                        <a href={ebayOfferHref} className="vehicle-intelligence-part-media" aria-label={`View ${part.name} on eBay`} target="_blank" rel="sponsored noopener noreferrer">
+                      <a
+                        key={part.id}
+                        href={ebayOfferHref}
+                        className="vehicle-intelligence-part-card-link"
+                        aria-label={`View ${ebayOffer.title} on eBay`}
+                        target="_blank"
+                        rel="sponsored noopener noreferrer"
+                      >
+                        <span className="vehicle-intelligence-part-media" aria-hidden="true">
                           {displayImage ? <img src={displayImage} alt="" loading="lazy" /> : <div className="vehicle-intelligence-part-placeholder">{part.category.name}</div>}
-                        </a>
+                        </span>
                         <div>
                           <span>{part.category.name} · {ebayOffer.brandName || part.brand.name}</span>
-                          <strong>
-                            <a href={ebayOfferHref} target="_blank" rel="sponsored noopener noreferrer">{ebayOffer.title}</a>
-                          </strong>
+                          <strong>{ebayOffer.title}</strong>
                           <small>{[formatPartPrice(displayPrice), part.estimatedHpGain ? `+${part.estimatedHpGain.toLocaleString()} hp` : null, fitment[0]].filter(Boolean).join(" · ")}</small>
                           <p className="vehicle-parts-recommendation-reason">{part.recommendationReason}</p>
-                          <a href={ebayOfferHref} target="_blank" rel="sponsored noopener noreferrer">View on eBay</a>
+                          <span className="vehicle-intelligence-part-cta">View on eBay</span>
                         </div>
-                      </article>
+                      </a>
                     );
                   })}
                 </div>
