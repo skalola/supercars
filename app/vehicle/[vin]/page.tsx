@@ -15,7 +15,6 @@ import { AddToFavoritesButton } from "@/components/garage/AddToFavoritesButton";
 import { getVehicleHeroImage, isNonVehicleImageUrl } from "@/lib/vehicle-images";
 import { calculateModifiedPerformance } from "@/lib/parts/performance";
 import { rankBuildAwarePartRecommendations } from "@/lib/parts/recommendations";
-import { getPartDetailPath } from "@/lib/parts/routes";
 import {
   getExplicitCompatibilityScopeForVehicle,
   getExplicitPartCompatibilityWhereForVehicle,
@@ -275,7 +274,6 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
       .map((installedPart) => installedPart.partId)
       .filter((partId): partId is string => Boolean(partId))
   );
-
   const [maintenanceRules, market, savedFavorite, rawRecommendedParts, listings] = await Promise.all([
     getApplicableMaintenanceRules(prisma, {
       makeId: vehicle.model.makeId,
@@ -305,6 +303,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
       },
       select: {
         id: true,
+        componentTypeId: true,
         name: true,
         slug: true,
         imageUrl: true,
@@ -387,7 +386,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
     stockTorque: vehicle.model.spec?.torque,
     installedParts: vehicle.installedParts || [],
   });
-  const recommendedParts = rankBuildAwarePartRecommendations({
+  const rankedRecommendedParts = rankBuildAwarePartRecommendations({
     candidates: rawRecommendedParts,
     installedParts: vehicle.installedParts || [],
     vehicle: {
@@ -399,8 +398,74 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
       stockHorsepower: vehicle.engineHP || vehicle.model.spec?.horsepower,
       stockTorque: vehicle.model.spec?.torque,
     },
-    limit: 3,
+    limit: 12,
   });
+  const recommendationComponentIds = [...new Set(
+    rankedRecommendedParts
+      .map((part) => part.componentTypeId)
+      .filter((id): id is string => Boolean(id)),
+  )];
+  const recommendationCategorySlugs = [...new Set(rankedRecommendedParts.map((part) => part.category.slug))];
+  const recommendationOfferContexts = recommendationComponentIds.length > 0 || recommendationCategorySlugs.length > 0
+    ? await prisma.partOfferContext.findMany({
+        where: {
+          active: true,
+          fitmentConfidence: { in: ["EXACT_MATCH", "HIGH_CONFIDENCE"] },
+          modelPartComponent: {
+            active: true,
+            modelId: vehicle.modelId,
+            OR: [
+              ...(recommendationComponentIds.length > 0 ? [{ componentTypeId: { in: recommendationComponentIds } }] : []),
+              ...(recommendationCategorySlugs.length > 0 ? [{ componentType: { category: { slug: { in: recommendationCategorySlugs } } } }] : []),
+            ],
+          },
+          offer: {
+            provider: "EBAY",
+            active: true,
+            affiliateUrl: { not: null },
+            availability: "AVAILABLE",
+            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+          },
+        },
+        select: {
+          confidenceScore: true,
+          modelPartComponent: {
+            select: {
+              componentTypeId: true,
+              componentType: { select: { category: { select: { slug: true } } } },
+            },
+          },
+          offer: {
+            select: {
+              id: true,
+              title: true,
+              priceCents: true,
+              imageUrl: true,
+              brandName: true,
+            },
+          },
+        },
+        orderBy: [{ confidenceScore: "desc" }, { offer: { priceCents: "asc" } }],
+        take: 100,
+      })
+    : [];
+  const ebayOfferByComponent = new Map<string, (typeof recommendationOfferContexts)[number]["offer"]>();
+  const ebayOfferByCategory = new Map<string, (typeof recommendationOfferContexts)[number]["offer"]>();
+  for (const context of recommendationOfferContexts) {
+    if (!ebayOfferByComponent.has(context.modelPartComponent.componentTypeId)) {
+      ebayOfferByComponent.set(context.modelPartComponent.componentTypeId, context.offer);
+    }
+    const categorySlug = context.modelPartComponent.componentType.category.slug;
+    if (!ebayOfferByCategory.has(categorySlug)) ebayOfferByCategory.set(categorySlug, context.offer);
+  }
+  const recommendedParts = rankedRecommendedParts
+    .map((part) => ({
+      ...part,
+      ebayOffer: (part.componentTypeId ? ebayOfferByComponent.get(part.componentTypeId) : undefined)
+        || ebayOfferByCategory.get(part.category.slug),
+    }))
+    .filter((part) => Boolean(part.ebayOffer))
+    .slice(0, 3);
   const unlinkedModifications = (vehicle.modifications || []).filter((mod) => !mod.catalogInstall);
 
   const priorityOrder: Record<string, number> = {
@@ -833,25 +898,28 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
                 <Link href={matchingPartsHref}>View Parts Store</Link>
               </div>
               {recommendedParts.length === 0 ? (
-                <p className="vehicle-intelligence-empty">No compatible catalog upgrades are active yet for this model.</p>
+                <p className="vehicle-intelligence-empty">No current verified eBay offers are available for the recommended upgrades.</p>
               ) : (
                 <div className="vehicle-intelligence-part-list">
-                  {recommendedParts.slice(0, 3).map((part) => {
+                  {recommendedParts.map((part) => {
                     const fitment = part.compatibility.map(formatPartCompatibility).filter(Boolean);
-                    const partDetailHref = getPartDetailPath(part);
+                    const ebayOffer = part.ebayOffer!;
+                    const ebayOfferHref = `/out/parts/offers/${ebayOffer.id}?source=vehicle-recommendation&vehicleId=${vehicle.id}`;
+                    const displayImage = ebayOffer.imageUrl || part.imageUrl;
+                    const displayPrice = ebayOffer.priceCents ?? part.retailPriceCents;
                     return (
                       <article key={part.id}>
-                        <Link href={partDetailHref} className="vehicle-intelligence-part-media" aria-label={`View ${part.name}`}>
-                          {part.imageUrl ? <img src={part.imageUrl} alt="" loading="lazy" /> : <div className="vehicle-intelligence-part-placeholder">{part.category.name}</div>}
-                        </Link>
+                        <a href={ebayOfferHref} className="vehicle-intelligence-part-media" aria-label={`View ${part.name} on eBay`} target="_blank" rel="sponsored noopener noreferrer">
+                          {displayImage ? <img src={displayImage} alt="" loading="lazy" /> : <div className="vehicle-intelligence-part-placeholder">{part.category.name}</div>}
+                        </a>
                         <div>
-                          <span>{part.category.name} · {part.brand.name}</span>
+                          <span>{part.category.name} · {ebayOffer.brandName || part.brand.name}</span>
                           <strong>
-                            <Link href={partDetailHref}>{part.name}</Link>
+                            <a href={ebayOfferHref} target="_blank" rel="sponsored noopener noreferrer">{ebayOffer.title}</a>
                           </strong>
-                          <small>{[formatPartPrice(part.retailPriceCents), part.estimatedHpGain ? `+${part.estimatedHpGain.toLocaleString()} hp` : null, fitment[0]].filter(Boolean).join(" · ")}</small>
+                          <small>{[formatPartPrice(displayPrice), part.estimatedHpGain ? `+${part.estimatedHpGain.toLocaleString()} hp` : null, fitment[0]].filter(Boolean).join(" · ")}</small>
                           <p className="vehicle-parts-recommendation-reason">{part.recommendationReason}</p>
-                          <Link href={partDetailHref}>View Part</Link>
+                          <a href={ebayOfferHref} target="_blank" rel="sponsored noopener noreferrer">View on eBay</a>
                         </div>
                       </article>
                     );
