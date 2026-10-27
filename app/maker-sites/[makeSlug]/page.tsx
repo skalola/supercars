@@ -29,8 +29,11 @@ export default async function MakerSitePage({ params }: MakerSitePageProps) {
 
   const flagship = make.models.find((model) => model.slug === config.flagshipModelSlug) ?? make.models[0];
   const currentYear = new Date().getFullYear();
-  const currentModels = make.models.filter((model) => !model.productionEndYear || model.productionEndYear >= currentYear - 2);
+  const currentModels = make.models.filter((model) =>
+    Boolean(model.productionStartYear) && (!model.productionEndYear || model.productionEndYear >= currentYear - 2),
+  );
   const heritageModels = make.models.filter((model) => model.productionEndYear && model.productionEndYear < currentYear - 2);
+  const archiveModels = make.models.filter((model) => !model.productionStartYear && !model.productionEndYear);
   const style = { "--maker-accent": config.accent } as CSSProperties;
 
   return (
@@ -57,6 +60,7 @@ export default async function MakerSitePage({ params }: MakerSitePageProps) {
         </header>
         <ModelSection title="Current Lineup" models={currentModels} />
         <ModelSection title="Heritage" models={heritageModels} />
+        <ModelSection title="Model Archive" models={archiveModels} />
       </section>
     </main>
   );

@@ -66,6 +66,7 @@
     "ingest-maker-site-logos": "tsx --env-file .env scripts/ingest-maker-site-logos.ts",
     "sync-maker-model-lineups": "tsx --env-file .env scripts/sync-canonical-model-catalog.ts",
     "sync-canonical-model-catalog": "tsx --env-file .env scripts/sync-canonical-model-catalog.ts",
+    "sync-heritage-model-catalog": "tsx --env-file .env scripts/sync-canonical-model-catalog.ts --source=wikidata",
     "ingest-oem-model-lineup": "tsx --env-file .env scripts/ingest-oem-model-lineup.ts",
     "ingest-oem-maintenance": "tsx --env-file .env scripts/ingest-oem-maintenance.ts",
     "audit-canonical-model-catalog": "tsx --env-file .env scripts/audit-canonical-model-catalog.ts",

@@ -27,6 +27,17 @@ export function evaluateCatalogIdentity(candidateInput: ModelLineupCandidate, ex
     return decision("CREATE_MODEL", key, family, "SOURCE_VERIFIED", ["Government source provides an explicit base-model family."]);
   }
 
+  if (
+    candidate.sourceType === "WIKIDATA" &&
+    candidate.canonicalFamilyName &&
+    candidate.externalId &&
+    candidate.confidence === "HIGH"
+  ) {
+    return decision("CREATE_MODEL", key, family, "NEEDS_REVIEW", [
+      "A structured Wikidata car-model entity identifies the branded model family.",
+    ]);
+  }
+
   return decision("REVIEW", key, family, "NEEDS_REVIEW", [
     `${candidate.sourceName} is useful evidence but cannot create a family without corroboration.`,
   ]);

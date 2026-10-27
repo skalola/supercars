@@ -36,6 +36,6 @@ export const getMakerSiteCatalog = unstable_cache(
     if (!make) return null;
     return { ...make, models: [...make.models].sort(compareCatalogLabels) };
   },
-  ["maker-site-catalog-v1"],
+  ["maker-site-catalog-v2"],
   { revalidate: 86_400, tags: ["make-model-catalog"] },
 );
