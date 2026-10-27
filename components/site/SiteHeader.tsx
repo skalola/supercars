@@ -130,26 +130,30 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
               {link.label}
             </Link>
           ))}
-          <button
-            type="button"
-            className="site-mobile-makes-toggle"
-            aria-expanded={isMobileMakesOpen}
-            aria-controls="site-mobile-makes"
-            onClick={() => setIsMobileMakesOpen((open) => !open)}
-          >
-            Makes
-            <span aria-hidden="true" />
-          </button>
-          <div
-            id="site-mobile-makes"
-            className={`site-mobile-makes${isMobileMakesOpen ? " is-open" : ""}`}
-          >
-            {navigationMakes.map((maker) => (
-              <a key={maker.slug} href={`https://${maker.hostname}`} onClick={closeMenus}>
-                {maker.displayName}
-              </a>
-            ))}
-          </div>
+          {!makerSite ? (
+            <>
+              <button
+                type="button"
+                className="site-mobile-makes-toggle"
+                aria-expanded={isMobileMakesOpen}
+                aria-controls="site-mobile-makes"
+                onClick={() => setIsMobileMakesOpen((open) => !open)}
+              >
+                Makes
+                <span aria-hidden="true" />
+              </button>
+              <div
+                id="site-mobile-makes"
+                className={`site-mobile-makes${isMobileMakesOpen ? " is-open" : ""}`}
+              >
+                {navigationMakes.map((maker) => (
+                  <a key={maker.slug} href={`https://${maker.hostname}`} onClick={closeMenus}>
+                    {maker.displayName}
+                  </a>
+                ))}
+              </div>
+            </>
+          ) : null}
         </nav>
       </div>
 
@@ -159,25 +163,27 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
             {link.label}
           </Link>
         ))}
-        <div ref={makesRef} className={`site-makes-menu${isMakesOpen ? " is-open" : ""}`}>
-          <button
-            type="button"
-            className="site-nav-link site-makes-toggle"
-            aria-haspopup="menu"
-            aria-expanded={isMakesOpen}
-            onClick={() => setIsMakesOpen((open) => !open)}
-          >
-            Makes
-            <span aria-hidden="true" />
-          </button>
-          <div className="site-makes-dropdown" role="menu" aria-label="Vehicle makes">
-            {navigationMakes.map((maker) => (
-              <a key={maker.slug} href={`https://${maker.hostname}`} role="menuitem" onClick={closeMenus}>
-                {maker.displayName}
-              </a>
-            ))}
+        {!makerSite ? (
+          <div ref={makesRef} className={`site-makes-menu${isMakesOpen ? " is-open" : ""}`}>
+            <button
+              type="button"
+              className="site-nav-link site-makes-toggle"
+              aria-haspopup="menu"
+              aria-expanded={isMakesOpen}
+              onClick={() => setIsMakesOpen((open) => !open)}
+            >
+              Makes
+              <span aria-hidden="true" />
+            </button>
+            <div className="site-makes-dropdown" role="menu" aria-label="Vehicle makes">
+              {navigationMakes.map((maker) => (
+                <a key={maker.slug} href={`https://${maker.hostname}`} role="menuitem" onClick={closeMenus}>
+                  {maker.displayName}
+                </a>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : null}
       </nav>
 
       <div className="site-actions">
