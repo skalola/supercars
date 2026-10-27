@@ -55,8 +55,8 @@ export default async function MakerSitePage({ params }: MakerSitePageProps) {
           </div>
           <span>{make.models.length} models</span>
         </header>
-        <ModelSection title="Current Lineup" models={currentModels} makeName={make.name} />
-        <ModelSection title="Heritage" models={heritageModels} makeName={make.name} />
+        <ModelSection title="Current Lineup" models={currentModels} />
+        <ModelSection title="Heritage" models={heritageModels} />
       </section>
     </main>
   );
@@ -64,7 +64,7 @@ export default async function MakerSitePage({ params }: MakerSitePageProps) {
 
 type ModelCard = NonNullable<Awaited<ReturnType<typeof getMakerSiteCatalog>>>["models"][number];
 
-function ModelSection({ title, models, makeName }: { title: string; models: ModelCard[]; makeName: string }) {
+function ModelSection({ title, models }: { title: string; models: ModelCard[] }) {
   if (models.length === 0) return null;
   return (
     <section className="maker-site-model-section">
@@ -72,9 +72,6 @@ function ModelSection({ title, models, makeName }: { title: string; models: Mode
       <div className="maker-site-model-grid">
         {models.map((model) => (
           <Link key={model.id} href={`/models/${model.slug}`} className="maker-site-model-card">
-            <span className="maker-site-model-image">
-              {model.images[0]?.url ? <img src={model.images[0].url} alt={`${makeName} ${model.name}`} loading="lazy" /> : null}
-            </span>
             <span className="maker-site-model-copy">
               <small>{formatYears(model.productionStartYear, model.productionEndYear)}</small>
               <strong>{model.name}</strong>

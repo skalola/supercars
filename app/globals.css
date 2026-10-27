@@ -13284,18 +13284,17 @@ canvas {
 
 .maker-site-model-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
   gap: 12px;
 }
 
 .maker-site-model-card {
-  display: grid;
-  grid-template-rows: 180px auto;
+  display: block;
   min-width: 0;
-  overflow: hidden;
+  min-height: 126px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 6px;
-  background: #111317;
+  background: linear-gradient(145deg, rgba(25, 27, 31, 0.96), rgba(13, 14, 17, 0.98));
   color: #fff;
   text-decoration: none;
   transition: border-color 180ms ease, transform 180ms ease;
@@ -13307,22 +13306,12 @@ canvas {
   transform: translateY(-2px);
 }
 
-.maker-site-model-image {
-  display: block;
-  overflow: hidden;
-  background: linear-gradient(145deg, #202329, #0c0d0f);
-}
-
-.maker-site-model-image img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
 .maker-site-model-copy {
   display: grid;
   gap: 7px;
-  padding: 16px;
+  align-content: center;
+  min-height: 124px;
+  padding: 20px;
 }
 
 .maker-site-model-copy small,
@@ -13379,8 +13368,12 @@ canvas {
   }
 
   .maker-site-model-card {
-    grid-template-columns: 132px minmax(0, 1fr);
-    grid-template-rows: 112px;
+    min-height: 108px;
+  }
+
+  .maker-site-model-copy {
+    min-height: 106px;
+    padding: 16px;
   }
 }
 
