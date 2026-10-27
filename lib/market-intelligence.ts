@@ -76,37 +76,6 @@ function toTrendDirection(value: string): TrendDirection {
   return value === "UP" || value === "DOWN" || value === "STABLE" ? value : "STABLE";
 }
 
-function sourceBackedInventoryListingWhere(modelId: string): Prisma.ListingWhereInput {
-  return {
-    modelId,
-    status: "ACTIVE",
-    validationStatus: "VALID",
-    vehicleId: { not: null },
-    sourceId: { not: null },
-    externalListingId: { not: null },
-    url: { not: null },
-    sellerId: null,
-    priceStatus: { not: "PRICE_INVALID" },
-    vehicle: {
-      is: {
-        inventoryStatus: { in: ["ACTIVE", "VALID", "WARNING"] },
-      },
-    },
-    OR: [
-      { askingPrice: { gte: 10000 } },
-      { price: { gte: 10000 } },
-    ],
-    NOT: [
-      { source: { is: { type: "AUCTION" } } },
-      { url: { contains: "bringatrailer.com", mode: "insensitive" } },
-      { externalListingId: { contains: "sprint-", mode: "insensitive" } },
-      { externalListingId: { contains: "admin-ops", mode: "insensitive" } },
-      { externalListingId: { contains: "demo", mode: "insensitive" } },
-      { externalListingId: { contains: "test", mode: "insensitive" } },
-    ],
-  };
-}
-
 async function getMarketModelSummaryRow(modelId: string) {
   return prisma.marketModelSummary.findUnique({
     where: { modelId },
@@ -129,57 +98,6 @@ async function getMarketModelSummaryRow(modelId: string) {
       trendSnapshotCount: true,
     },
   });
-}
-
-type MarketRangeAggregate = {
-  lowestPrice: number | null;
-  highestPrice: number | null;
-  averageAskingPrice: number | null;
-  medianAskingPrice: number | null;
-  activeListingCount: number;
-};
-
-async function calculateMarketRange(modelId: string): Promise<MarketRange | null> {
-  const [aggregate] = await prisma.$queryRaw<MarketRangeAggregate[]>(Prisma.sql`
-    SELECT
-      MIN(COALESCE(listing."askingPrice", listing."price"))::double precision AS "lowestPrice",
-      MAX(COALESCE(listing."askingPrice", listing."price"))::double precision AS "highestPrice",
-      AVG(COALESCE(listing."askingPrice", listing."price"))::double precision AS "averageAskingPrice",
-      percentile_cont(0.5) WITHIN GROUP (
-        ORDER BY COALESCE(listing."askingPrice", listing."price")
-      )::double precision AS "medianAskingPrice",
-      COUNT(*)::int AS "activeListingCount"
-    FROM "Listing" listing
-    INNER JOIN "Vehicle" vehicle ON vehicle."id" = listing."vehicleId"
-    LEFT JOIN "MarketSource" source ON source."id" = listing."sourceId"
-    WHERE listing."modelId" = ${modelId}
-      AND listing."status" = 'ACTIVE'
-      AND listing."validationStatus" = 'VALID'
-      AND listing."vehicleId" IS NOT NULL
-      AND listing."sourceId" IS NOT NULL
-      AND listing."externalListingId" IS NOT NULL
-      AND listing."url" IS NOT NULL
-      AND listing."sellerId" IS NULL
-      AND listing."priceStatus" IS DISTINCT FROM 'PRICE_INVALID'
-      AND vehicle."inventoryStatus" IN ('ACTIVE', 'VALID', 'WARNING')
-      AND COALESCE(listing."askingPrice", listing."price") >= 10000
-      AND (source."type" IS NULL OR source."type" <> 'AUCTION')
-      AND listing."url" NOT ILIKE '%bringatrailer.com%'
-      AND listing."externalListingId" NOT ILIKE '%sprint-%'
-      AND listing."externalListingId" NOT ILIKE '%admin-ops%'
-      AND listing."externalListingId" NOT ILIKE '%demo%'
-      AND listing."externalListingId" NOT ILIKE '%test%'
-  `);
-
-  if (!aggregate || aggregate.activeListingCount === 0) return null;
-
-  return {
-    lowestPrice: aggregate.lowestPrice ?? 0,
-    highestPrice: aggregate.highestPrice ?? 0,
-    averageAskingPrice: Math.round(aggregate.averageAskingPrice ?? 0),
-    medianAskingPrice: Math.round(aggregate.medianAskingPrice ?? aggregate.averageAskingPrice ?? 0),
-    activeListingCount: aggregate.activeListingCount,
-  };
 }
 
 type RecentSalesAggregate = {
@@ -275,7 +193,7 @@ export const getMarketRange = unstable_cache(
     } : null;
   }
 
-  return calculateMarketRange(modelId);
+  return null;
   },
   ["market-range-v2"],
   { revalidate: 900, tags: ["market-intelligence"] }
@@ -288,11 +206,7 @@ export const getMarketSupply = unstable_cache(
   const summary = await getMarketModelSummaryRow(modelId);
   if (summary) return { activeListingCount: summary.activeListingCount };
 
-  // Supply uses the same source-backed active inventory filter as market range.
-  const activeListingCount = await prisma.listing.count({
-    where: sourceBackedInventoryListingWhere(modelId),
-  });
-  return { activeListingCount };
+  return { activeListingCount: 0 };
   },
   ["market-supply-v2"],
   { revalidate: 900, tags: ["market-intelligence"] }
@@ -437,13 +351,13 @@ export const getMarketSummary = unstable_cache(
     };
   }
 
-  const [range, recentSales, trend] = await Promise.all([
-    calculateMarketRange(modelId),
+  const [recentSales, trend] = await Promise.all([
     calculateRecentSales(modelId, 90),
     calculateMarketTrend(modelId, 12),
   ]);
-  const supply = { activeListingCount: range?.activeListingCount ?? 0 };
-  const averageAskingPrice = range?.averageAskingPrice ?? null;
+  const range: MarketRange | null = null;
+  const supply = { activeListingCount: 0 };
+  const averageAskingPrice: number | null = null;
   const averageSoldPrice = recentSales.averageSalePrice;
   const difference = averageAskingPrice !== null && averageSoldPrice !== null
     ? averageSoldPrice - averageAskingPrice

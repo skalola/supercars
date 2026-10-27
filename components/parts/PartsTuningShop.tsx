@@ -273,6 +273,7 @@ export function PartsTuningShop({
             recommendationSummary={engineeringRecommendation ?? undefined}
             changeVehicleControl={(
               <button
+                className="parts-vehicle-change-action"
                 type="button"
                 aria-expanded={selectorOpen}
                 onClick={() => setSelectorOpen((open) => hasResolvedVehicleSelection ? !open : true)}

@@ -125,7 +125,7 @@ export default async function VehiclePartTypePage({ params, searchParams }: Page
           title: "Build your passport",
           summary: "Add installed modifications so the next balanced upgrade can be identified.",
         })}
-        changeVehicleControl={<Link href={`/parts?${changeVehicleParams}`}>Change vehicle</Link>}
+        changeVehicleControl={<Link className="parts-vehicle-change-action" href={`/parts?${changeVehicleParams}`}>Change vehicle</Link>}
       />
 
       <PartTypeCategorySelector

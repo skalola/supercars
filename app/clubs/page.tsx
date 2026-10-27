@@ -1,5 +1,8 @@
 import { unstable_cache } from "next/cache";
+import { headers } from "next/headers";
 import { createCarClubAction } from "@/app/actions/clubs";
+import { getMakerSiteCatalog } from "@/lib/maker-sites/catalog";
+import { getMakerSiteConfig, getMakerSlugFromHostname } from "@/lib/maker-sites/config";
 import { getCatalogMakeOptions } from "@/lib/makes/catalog";
 import { prisma } from "@/lib/prisma";
 import ClubLocationFields from "./ClubLocationFields";
@@ -10,9 +13,14 @@ import ClubDirectoryList, { type PublicClubListItem } from "./ClubDirectoryList"
 export const dynamic = "force-dynamic";
 
 export default async function ClubsPage() {
+  const makerHeroPromise = getMakerClubsHero();
   const clubsPromise = getPublicClubs();
   const makeOptionsPromise = getCatalogMakeOptions();
-  const [clubs, makeOptions] = await Promise.all([clubsPromise, makeOptionsPromise]);
+  const [clubs, makeOptions, makerHero] = await Promise.all([
+    clubsPromise,
+    makeOptionsPromise,
+    makerHeroPromise,
+  ]);
 
   const publicClubs: PublicClubListItem[] = clubs.map((club) => {
       const makeNames = Array.from(new Set(club.models.map(({ model }) => model.make.name))).slice(0, 3);
@@ -34,9 +42,14 @@ export default async function ClubsPage() {
 
   return (
     <main className="clubs-shell">
-      <section className="clubs-hero">
+      <section
+        className="clubs-hero"
+        style={makerHero?.imageUrl ? {
+          backgroundImage: `linear-gradient(90deg, rgba(0,0,0,.9), rgba(0,0,0,.3)), url("${makerHero.imageUrl}")`,
+        } : undefined}
+      >
         <div>
-          <span>Owner Clubs</span>
+          <span>{makerHero ? `${makerHero.makeName} Owner Clubs` : "Owner Clubs"}</span>
           <h1>Find your driver circle.</h1>
           <p>Build model-led car clubs, connect them to meets, and let verified garages become the social layer of SUPERCAR DASH.</p>
           <div className="clubs-hero-actions">
@@ -86,6 +99,26 @@ export default async function ClubsPage() {
       </section>
     </main>
   );
+}
+
+async function getMakerClubsHero() {
+  const requestHeaders = await headers();
+  const makeSlug = getMakerSlugFromHostname(
+    requestHeaders.get("x-forwarded-host") || requestHeaders.get("host") || "",
+  );
+  if (!makeSlug) return null;
+
+  const config = getMakerSiteConfig(makeSlug);
+  if (!config?.enabled) return null;
+
+  const make = await getMakerSiteCatalog(makeSlug);
+  if (!make) return null;
+
+  const flagship = make.models.find((model) => model.slug === config.flagshipModelSlug) ?? make.models[0];
+  return {
+    makeName: make.name,
+    imageUrl: flagship?.images[0]?.url ?? null,
+  };
 }
 
 const getPublicClubs = unstable_cache(

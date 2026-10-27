@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { auth, signIn } from "@/auth";
+import { auth } from "@/auth";
 import { acceptClubInviteAction } from "@/app/actions/clubs";
 import { verifyClubInviteToken } from "@/lib/clubs/invite-token";
 import { prisma } from "@/lib/prisma";
@@ -37,11 +37,6 @@ export default async function ClubInvitePage({ params }: { params: Promise<{ tok
   const heroImage = club.models[0]?.model.images[0]?.url || club.models[0]?.model.make.logoUrl || "/images/garage-home-hero.png?v=garage-2";
   const modelLabels = club.models.map(({ model }) => `${model.make.name} ${model.name}`);
   const returnTo = `/clubs/invite/${token}`;
-
-  async function googleInviteSignIn() {
-    "use server";
-    await signIn("google", { redirectTo: returnTo });
-  }
 
   return (
     <main className="club-invite-page">
@@ -81,9 +76,9 @@ export default async function ClubInvitePage({ params }: { params: Promise<{ tok
             </form>
           ) : (
             <>
-              <form action={googleInviteSignIn}>
-                <button type="submit" className="garage-primary-button">Continue with Google</button>
-              </form>
+              <Link href={`/login?returnTo=${encodeURIComponent(returnTo)}`} className="garage-primary-button">
+                Continue with Google
+              </Link>
               <Link href={`/login?returnTo=${encodeURIComponent(returnTo)}`} className="meets-secondary-button">
                 Sign in with email
               </Link>

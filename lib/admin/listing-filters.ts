@@ -4,6 +4,7 @@ import {
   NON_VEHICLE_IMAGE_URL_PATTERN,
   NON_VEHICLE_IMAGE_URL_TERMS,
 } from "@/lib/vehicle-images";
+import { VEHICLE_MARKETPLACE_ENABLED } from "@/lib/marketplace/config";
 
 const SUPPORTED_INVENTORY_MAKES = ["Ferrari", "Lamborghini", "McLaren"];
 const ADMIN_LISTING_LIMIT = 1000;
@@ -84,6 +85,8 @@ const adminInventoryListingSelect = {
 } satisfies Prisma.ListingSelect;
 
 export async function getInventoryDashboardListings() {
+  if (!VEHICLE_MARKETPLACE_ENABLED) return [];
+
   return prisma.listing.findMany({
     where: liveInventoryWhere,
     select: {
@@ -129,6 +132,7 @@ export async function getInventoryDashboardListings() {
 export async function getAdminInventoryListings(page = 1) {
   return prisma.listing.findMany({
     where: {
+      sellerId: { not: null },
       vehicleId: { not: null },
       NOT: [
         { source: { is: { type: "AUCTION" } } },
@@ -145,6 +149,7 @@ export async function getAdminInventoryListings(page = 1) {
 export async function getAdminInventoryListingCount() {
   return prisma.listing.count({
     where: {
+      sellerId: { not: null },
       vehicleId: { not: null },
       NOT: [
         { source: { is: { type: "AUCTION" } } },
@@ -155,6 +160,7 @@ export async function getAdminInventoryListingCount() {
 }
 
 export async function getInventoryDashboardListingCount() {
+  if (!VEHICLE_MARKETPLACE_ENABLED) return 0;
   return prisma.listing.count({
     where: liveInventoryWhere,
   });
@@ -169,6 +175,18 @@ export async function getLiveInventoryListingStats() {
     listingsByMake: Array<{ label: string; value: number }>;
     topSources: Array<{ label: string; value: number }>;
   };
+
+  if (!VEHICLE_MARKETPLACE_ENABLED) {
+    return {
+      listings: [],
+      listingsByMake: [],
+      topSources: [],
+      liveListingCount: 0,
+      pricedListingCount: 0,
+      totalLiveListingValue: 0,
+      averageLiveListingPrice: 0,
+    };
+  }
 
   const [stats] = await prisma.$queryRaw<InventoryStatsRow[]>`
     WITH clean_listings AS (

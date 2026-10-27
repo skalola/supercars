@@ -149,11 +149,25 @@ const testCredentialProviders = testCredentialsEnabled
     ]
   : [];
 
+const sharedSessionCookie = process.env.NODE_ENV === "production"
+  ? {
+      name: "__Secure-supercardash.session-token",
+      options: {
+        domain: ".supercardash.com",
+        httpOnly: true,
+        sameSite: "lax" as const,
+        path: "/",
+        secure: true,
+      },
+    }
+  : undefined;
+
 export const { handlers: { GET, POST }, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt",
   },
+  cookies: sharedSessionCookie ? { sessionToken: sharedSessionCookie } : undefined,
   providers: [
     Google,
     accountCredentialProvider,

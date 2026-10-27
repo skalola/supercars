@@ -71,6 +71,7 @@ const garageClaimedVehicleSelect = {
   },
   listings: {
     where: {
+      sellerId: { not: null },
       status: "ACTIVE",
       OR: [{ askingPrice: { gte: 10000 } }, { price: { gte: 10000 } }],
     },
@@ -119,6 +120,7 @@ const garagePreviousVehicleSelect = {
   },
   listings: {
     where: {
+      sellerId: { not: null },
       OR: [{ askingPrice: { gte: 10000 } }, { price: { gte: 10000 } }],
     },
     select: { askingPrice: true, price: true },

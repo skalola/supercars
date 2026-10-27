@@ -125,7 +125,7 @@ export function PartsVehicleHero({ vehicle, loading = false, changeVehicleContro
       {changeVehicleControl || vehicle?.detailPath ? (
         <div className="parts-vehicle-actions">
           {changeVehicleControl}
-          {vehicle?.detailPath ? <a href={vehicle.detailPath}>{vehicle.exactOwnedVehicle ? "View my build" : "View vehicle"}</a> : null}
+          {vehicle?.detailPath ? <a className="parts-vehicle-view-action" href={vehicle.detailPath}>{vehicle.exactOwnedVehicle ? "View my build" : "View vehicle"}</a> : null}
         </div>
       ) : null}
     </header>

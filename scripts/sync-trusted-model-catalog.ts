@@ -169,6 +169,36 @@ async function main() {
 
       if (!options.apply) continue;
       await prisma.$transaction(async (tx) => {
+        const catalogEvidenceKey = hash(`EPA:${make.id}:${family.name}`);
+        await tx.modelCatalogEvidence.upsert({
+          where: { evidenceKey: catalogEvidenceKey },
+          create: {
+            evidenceKey: catalogEvidenceKey,
+            sourceType: "EPA",
+            sourceName: EPA_SOURCE_NAME,
+            sourceUrl: EPA_VEHICLE_DATA_URL,
+            externalId: summary.representative.sourceId,
+            makeName: make.name,
+            modelName: summary.representative.model,
+            canonicalFamilyName: family.name,
+            normalizedFamilyKey: `${normalizeMakeName(make.name)}:${normalizeMakeName(family.name)}`,
+            productionStartYear: summary.firstYear,
+            productionEndYear: summary.lastYear,
+            bodyStyle: summary.bodyStyle,
+            category: summary.category,
+            confidence: "HIGH",
+            reviewStatus: "SOURCE_VERIFIED",
+            makeId: make.id,
+            modelId: model!.id,
+          },
+          update: {
+            lastSeenAt: new Date(),
+            externalId: summary.representative.sourceId,
+            productionStartYear: summary.firstYear,
+            productionEndYear: summary.lastYear,
+            modelId: model!.id,
+          },
+        });
         if (Object.keys(yearData).length > 0 || !model?.category || !model.bodyStyle) {
           await tx.model.update({
             where: { id: model!.id },

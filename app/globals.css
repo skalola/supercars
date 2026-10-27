@@ -226,9 +226,29 @@
   text-transform: uppercase;
 }
 
-.parts-vehicle-actions a {
+.parts-vehicle-actions .parts-vehicle-change-action {
+  border-color: #ffffff;
+  background: #ffffff;
+  color: #d7192d;
+}
+
+.parts-vehicle-actions .parts-vehicle-view-action {
   border-color: #ef233c;
-  color: #ff4157;
+  background: #ef233c;
+  color: #ffffff;
+}
+
+.parts-vehicle-actions .parts-vehicle-change-action:hover,
+.parts-vehicle-actions .parts-vehicle-change-action:focus-visible {
+  background: #e5e5e5;
+  color: #b70f22;
+}
+
+.parts-vehicle-actions .parts-vehicle-view-action:hover,
+.parts-vehicle-actions .parts-vehicle-view-action:focus-visible {
+  border-color: #ff4157;
+  background: #ff3048;
+  color: #ffffff;
 }
 
 .parts-vehicle-selector-drawer {

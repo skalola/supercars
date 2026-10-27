@@ -43,6 +43,10 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const makerSlug = useSyncExternalStore(subscribeToHostname, getCurrentMakerSlug, () => null);
   const makerSite = makerSlug ? getMakerSiteConfig(makerSlug) : null;
+  const mainSiteOrigin = makerSite ? getMainSiteOrigin() : null;
+  const resolveSharedHref = (href: string) => mainSiteOrigin && href.startsWith("/")
+    ? `${mainSiteOrigin}${href}`
+    : href;
   const accountRef = useRef<HTMLDivElement | null>(null);
   const makesRef = useRef<HTMLDivElement | null>(null);
 
@@ -122,7 +126,7 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
           aria-hidden={!isMobileOpen}
         >
           {[...leftNavLinks, ...rightNavLinks].map((link) => (
-            <Link key={`${link.label}:${link.href}`} href={link.href} className="site-nav-link" onClick={closeMenus}>
+            <Link key={`${link.label}:${link.href}`} href={link.label === "Garage" ? resolveSharedHref(link.href) : link.href} className="site-nav-link" onClick={closeMenus}>
               {link.label}
             </Link>
           ))}
@@ -151,7 +155,7 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
 
       <nav className="site-nav" aria-label="Primary navigation">
         {leftNavLinks.map((link) => (
-          <Link key={`${link.label}:${link.href}`} href={link.href} className="site-nav-link">
+          <Link key={`${link.label}:${link.href}`} href={link.label === "Garage" ? resolveSharedHref(link.href) : link.href} className="site-nav-link">
             {link.label}
           </Link>
         ))}
@@ -189,7 +193,7 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
             ref={accountRef}
             className={`site-account-menu${isAccountOpen ? " is-open" : ""}`}
           >
-            <Link href={profileHref} className="site-profile-button" onClick={closeMenus}>
+            <Link href={profileHref.startsWith("/garage") ? resolveSharedHref(profileHref) : profileHref} className="site-profile-button" onClick={closeMenus}>
               {profileImageUrl ? (
                 <img className="site-profile-avatar" src={profileImageUrl} alt="" referrerPolicy="no-referrer" />
               ) : (
@@ -219,12 +223,12 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
                   Admin Portal
                 </Link>
               ) : null}
-              <Link href={garageHref} className="site-account-link" role="menuitem" onClick={closeMenus}>
+              <Link href={resolveSharedHref(garageHref)} className="site-account-link" role="menuitem" onClick={closeMenus}>
                 My Garage
               </Link>
               <ClaimVinButton label="Claim Car" isSignedIn={isSignedIn} variant="menu" onOpen={closeMenus} />
               {!isAdmin && trackersHref ? (
-                <Link href={trackersHref} className="site-account-link" role="menuitem" onClick={closeMenus}>
+                <Link href={resolveSharedHref(trackersHref)} className="site-account-link" role="menuitem" onClick={closeMenus}>
                   Trackers
                 </Link>
               ) : null}
@@ -239,11 +243,18 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
             </div>
           </div>
         ) : (
-          <Link href="/login" className="site-button" onClick={closeMenus}>
+          <Link href={resolveSharedHref("/login")} className="site-button" onClick={closeMenus}>
             Sign in
           </Link>
         )}
       </div>
     </header>
   );
+}
+
+function getMainSiteOrigin() {
+  const port = window.location.port ? `:${window.location.port}` : "";
+  return window.location.hostname.endsWith(".localhost")
+    ? `${window.location.protocol}//localhost${port}`
+    : "https://supercardash.com";
 }

@@ -213,6 +213,7 @@ async function getCurrentLowestListingPrice(modelId: string) {
   const listing = await prisma.listing.findFirst({
     where: {
       modelId,
+      sellerId: { not: null },
       status: "ACTIVE",
       priceStatus: { not: "PRICE_INVALID" },
       OR: [{ askingPrice: { gt: 0 } }, { price: { gt: 0 } }],

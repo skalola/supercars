@@ -16,7 +16,7 @@ export default function TermsPage() {
         
         <h2 className="text-xl font-semibold mt-8">1. AGREEMENT TO OUR LEGAL TERMS</h2>
         <p>
-          We are SUPERCAR DASH ("Company," "we," "us," "our"), a company registered in North Carolina, doing business nationwide.
+          We are Smartware Labs ("Company," "we," "us," "our"), doing business as SUPERCAR DASH, a company registered in North Carolina.
         </p>
         <p>
           We operate the website (the "Site"), as well as any other related products and services that refer or link to these legal terms (the "Legal Terms") (collectively, the "Services"). We provide an online marketplace for the purchase, sale, transport, and servicing of high-end vehicles.

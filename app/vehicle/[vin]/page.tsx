@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { getMarketSummary } from "@/lib/market-intelligence";
+import { getApplicableMaintenanceRules } from "@/lib/maintenance/applicability";
 import MarketPriceHistory from "@/components/market/MarketPriceHistory";
 import PurchaseWizard from "@/components/market/PurchaseWizard";
 import OwnerSaleControls from "@/components/market/OwnerSaleControls";
@@ -48,7 +49,7 @@ export async function generateMetadata({ params }: VehiclePageProps): Promise<Me
       },
       images: { where: { validationStatus: "VALID" }, select: { url: true }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }], take: 1 },
       photos: { select: { filePath: true }, orderBy: [{ isHero: "desc" }, { displayOrder: "asc" }, { createdAt: "asc" }], take: 1 },
-      listings: { where: { status: "ACTIVE", validationStatus: "VALID" }, select: { imageUrl: true, askingPrice: true, price: true }, take: 1 },
+      listings: { where: { status: "ACTIVE", validationStatus: "VALID", sellerId: { not: null } }, select: { imageUrl: true, askingPrice: true, price: true }, take: 1 },
     },
   });
   if (!vehicle || ["REMOVED", "NEEDS_REVIEW", "ADMIN_TEST"].includes(vehicle.inventoryStatus || "")) return privateMetadata;
@@ -221,6 +222,8 @@ const vehiclePageListingSelect = {
 
 const vehiclePageMaintenanceRuleSelect = {
   id: true,
+  scope: true,
+  confidence: true,
   modelId: true,
   category: true,
   serviceName: true,
@@ -274,15 +277,11 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
   );
 
   const [maintenanceRules, market, savedFavorite, rawRecommendedParts, listings] = await Promise.all([
-    prisma.maintenanceRule.findMany({
-      where: {
-        OR: [
-          { modelId: null },
-          { modelId: vehicle.modelId }
-        ]
-      },
-      select: vehiclePageMaintenanceRuleSelect,
-    }),
+    getApplicableMaintenanceRules(prisma, {
+      makeId: vehicle.model.makeId,
+      modelId: vehicle.modelId,
+      year: vehicle.year,
+    }, vehiclePageMaintenanceRuleSelect),
     getMarketSummary(vehicle.modelId),
     session?.user?.id
       ? prisma.garageItem.findUnique({
@@ -364,6 +363,7 @@ export default async function VehiclePage({ params, searchParams }: VehiclePageP
     prisma.listing.findMany({
       where: {
         vehicleId: vehicle.id,
+        sellerId: { not: null },
         status: "ACTIVE",
         validationStatus: { in: isAdmin ? ["VALID", "ADMIN_TEST"] : ["VALID"] },
         priceStatus: { not: "PRICE_INVALID" },

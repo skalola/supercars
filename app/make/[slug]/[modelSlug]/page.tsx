@@ -3,7 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
 import type { Prisma } from "@prisma/client";
-import { auth, signIn } from "@/auth";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { toggleGarageItem } from "@/app/actions/garage";
 import { getMarketSummary } from "@/lib/market-intelligence";
@@ -504,21 +504,21 @@ export default async function ModelPage({ params }: ModelPageProps) {
         </div>
 
         <aside className="vehicle-intelligence-actions model-intelligence-actions" aria-label="Model actions">
-          <form action={async () => {
+          {session?.user?.id ? <form action={async () => {
             "use server";
-            if (!session?.user?.id) {
-              await signIn("google", { redirectTo: `/make/${slug}/${modelSlug}` });
-              return;
-            }
             await toggleGarageItem(model.id);
           }}>
               <button
                 type="submit"
               >
                 <span aria-hidden="true">♡</span>
-                {session?.user?.id && garageItem ? "Remove Dream Car" : "Add to Dream Garage"}
+                {garageItem ? "Remove Dream Car" : "Add to Dream Garage"}
               </button>
-          </form>
+          </form> : (
+            <Link href={`/login?returnTo=${encodeURIComponent(`/make/${slug}/${modelSlug}`)}`}>
+              <span aria-hidden="true">♡</span>Add to Dream Garage
+            </Link>
+          )}
           {claimedVehicle ? (
             <Link href={`/vehicle/${claimedVehicle.vin}`}><span aria-hidden="true">▣</span>View Passport</Link>
           ) : (

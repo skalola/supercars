@@ -19,6 +19,8 @@ model Make {
   preferredPartBrands        PreferredPartBrand[]
   partsMarqueConfig          PartsMarqueConfig?
   partApplicabilityOverrides PartApplicabilityOverride[]
+  catalogEvidence            ModelCatalogEvidence[]
+  maintenanceRules           MaintenanceRule[]
   createdAt                  DateTime                    @default(now())
   updatedAt                  DateTime                    @updatedAt
 }
@@ -62,6 +64,7 @@ model Model {
   partApplicabilityOverrides    PartApplicabilityOverride[]
   engineeringProfiles           ModelEngineeringProfile[]
   providerVehicleMappings       PartProviderVehicleMapping[]
+  catalogEvidence               ModelCatalogEvidence[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -106,6 +109,8 @@ model ModelVariant {
   partCatalogReferences         PartCatalogReference[]
   partPerformanceConfigurations PartPerformanceConfiguration[]
   engineeringProfiles           ModelEngineeringProfile[]
+  catalogEvidence               ModelCatalogEvidence[]
+  maintenanceRules              MaintenanceRule[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -185,6 +190,43 @@ model ModelEngineeringEvidence {
 
   @@index([profileId, fieldName])
   @@index([sourceType, confidence])
+}
+
+model ModelCatalogEvidence {
+  id                  String   @id @default(uuid())
+  evidenceKey         String   @unique
+  sourceType          String
+  sourceName          String
+  sourceUrl           String?
+  externalId          String?
+  makeName            String
+  modelName           String
+  canonicalFamilyName String?
+  normalizedFamilyKey String
+  productionStartYear Int?
+  productionEndYear   Int?
+  bodyStyle           String?
+  category            String?
+  confidence          String   @default("UNKNOWN")
+  reviewStatus        String   @default("NEEDS_REVIEW")
+  payloadHash         String?
+  makeId              String?
+  modelId             String?
+  variantId           String?
+  capturedAt          DateTime @default(now())
+  firstSeenAt         DateTime @default(now())
+  lastSeenAt          DateTime @default(now())
+
+  make    Make?         @relation(fields: [makeId], references: [id], onDelete: SetNull)
+  model   Model?        @relation(fields: [modelId], references: [id], onDelete: SetNull)
+  variant ModelVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([makeId, normalizedFamilyKey])
+  @@index([modelId, reviewStatus])
+  @@index([sourceType, reviewStatus])
 }
 
 model ModelImage {
@@ -1592,20 +1634,37 @@ model VehicleDocument {
 
 model MaintenanceRule {
   id             String   @id @default(uuid())
+  scope          String   @default("UNIVERSAL")
+  makeId         String?
   modelId        String?
+  variantId      String?
+  yearStart      Int?
+  yearEnd        Int?
+  powertrainType String?
   category       String
   serviceName    String
   description    String?
   intervalMiles  Int?
   intervalMonths Int?
   priority       String
+  sourceKey      String?  @unique
+  sourceType     String   @default("LEGACY")
+  sourceName     String   @default("SUPERCAR DASH legacy guidance")
+  sourceUrl      String?
+  confidence     String   @default("LOW")
+  reviewStatus   String   @default("NEEDS_REVIEW")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  model Model?                @relation(fields: [modelId], references: [id], onDelete: Cascade)
-  parts MaintenanceRulePart[]
+  make    Make?                 @relation(fields: [makeId], references: [id], onDelete: Cascade)
+  model   Model?                @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  variant ModelVariant?         @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  parts   MaintenanceRulePart[]
 
   @@index([modelId, priority])
+  @@index([makeId, scope, priority])
+  @@index([variantId, priority])
+  @@index([reviewStatus, confidence])
 }
 
 model MaintenanceRulePart {

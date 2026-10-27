@@ -16,7 +16,7 @@ export default function PrivacyPage() {
         
         <h2 className="text-xl font-semibold mt-8">INTRODUCTION</h2>
         <p>
-          This privacy notice for SUPERCAR DASH ("Company," "we," "us," or "our"), describes how and why we might collect, store, use, and/or share ("process") your information when you use our services ("Services"), such as when you visit our website, engage with us for vehicle purchases, sales, financing, transport, or servicing.
+          This privacy notice for Smartware Labs ("Company," "we," "us," or "our"), doing business as SUPERCAR DASH, describes how and why we might collect, store, use, and/or share ("process") your information when you use our services ("Services"), such as when you visit our website, engage with us for vehicle purchases, sales, financing, transport, or servicing.
         </p>
         <p>
           Reading this privacy notice will help you understand your privacy rights and choices. If you do not agree with our policies and practices, please do not use our Services.

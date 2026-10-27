@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { getApplicableMaintenanceRules } from "@/lib/maintenance/applicability";
 
 export const modelPageCatalogSelect = {
   id: true,
@@ -85,6 +86,8 @@ export const modelPageCatalogSelect = {
 
 const maintenanceRuleSelect = {
   id: true,
+  scope: true,
+  confidence: true,
   serviceName: true,
   description: true,
   intervalMiles: true,
@@ -104,24 +107,14 @@ export const getModelPageCatalogData = unstable_cache(
 
     if (!model) return null;
 
-    const maintenanceRules = await prisma.maintenanceRule.findMany({
-      where: {
-        OR: [
-          { modelId: null },
-          { modelId: model.id },
-        ],
-      },
-      select: maintenanceRuleSelect,
-      orderBy: [
-        { priority: "asc" },
-        { intervalMiles: "asc" },
-      ],
-      take: 6,
-    });
+    const maintenanceRules = await getApplicableMaintenanceRules(prisma, {
+      makeId: model.makeId,
+      modelId: model.id,
+    }, maintenanceRuleSelect, 6);
 
     return { model, maintenanceRules };
   },
-  ["model-page-catalog-data-v2"],
+  ["model-page-catalog-data-v3"],
   { revalidate: 86_400, tags: ["make-model-catalog", "model-page-catalog"] },
 );
 
