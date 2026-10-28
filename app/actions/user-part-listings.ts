@@ -12,6 +12,7 @@ import { deleteStoredFile, isUploadableImageFile, uploadPublicImage } from "@/li
 import { prisma } from "@/lib/prisma";
 import { enforceActionRateLimit } from "@/lib/security/action-rate-limit";
 import { databaseIdSchema } from "@/lib/validation/common-inputs";
+import { expireUserPartCheckoutSession } from "@/lib/payments/user-part-payments";
 
 async function requireUser() {
   const session = await auth();
@@ -144,5 +145,67 @@ export async function duplicateUserPartListingAction(listingId: string) {
     return { ok: true as const, listingId: listing.id };
   } catch (error) {
     return { ok: false as const, error: error instanceof Error ? error.message : "Could not duplicate the listing." };
+  }
+}
+
+export async function unpublishUserPartListingAction(listingId: string) {
+  try {
+    const userId = await requireUser();
+    listingId = databaseIdSchema.parse(listingId);
+    await enforceActionRateLimit({
+      actorId: userId,
+      action: "user_part_listing_write",
+      bucketKey: `unpublish:${listingId}`,
+      limit: 30,
+      windowMs: 60 * 60 * 1000,
+    });
+
+    const listing = await prisma.userPartListing.findFirst({
+      where: { id: listingId, sellerId: userId },
+      select: {
+        id: true,
+        status: true,
+        orders: {
+          where: { status: "CHECKOUT_PENDING" },
+          select: { id: true, checkoutSessionId: true, connectedAccountId: true },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+      },
+    });
+    if (!listing) throw new Error("Part listing not found.");
+    if (listing.status === "INACTIVE" || listing.status === "DRAFT") return { ok: true as const };
+
+    if (listing.status === "ACTIVE") {
+      await transitionUserPartListing(userId, listing.id, "INACTIVE");
+    } else if (listing.status === "RESERVED") {
+      const order = listing.orders[0];
+      if (!order?.checkoutSessionId) {
+        throw new Error("Checkout is still being prepared. Try unpublishing again shortly.");
+      }
+      await expireUserPartCheckoutSession({
+        sessionId: order.checkoutSessionId,
+        connectedAccountId: order.connectedAccountId,
+      });
+      await prisma.$transaction(async (transaction) => {
+        const cancelled = await transaction.userPartOrder.updateMany({
+          where: { id: order.id, status: "CHECKOUT_PENDING" },
+          data: { status: "CANCELLED", cancelledAt: new Date() },
+        });
+        if (cancelled.count !== 1) throw new Error("Checkout changed before the listing could be unpublished.");
+        const unpublished = await transaction.userPartListing.updateMany({
+          where: { id: listing.id, sellerId: userId, status: "RESERVED" },
+          data: { status: "INACTIVE" },
+        });
+        if (unpublished.count !== 1) throw new Error("Listing changed before it could be unpublished.");
+      });
+    } else {
+      throw new Error("This listing can no longer be unpublished.");
+    }
+
+    await revalidateSellerGarage(userId);
+    return { ok: true as const };
+  } catch (error) {
+    return { ok: false as const, error: error instanceof Error ? error.message : "Could not unpublish the listing." };
   }
 }

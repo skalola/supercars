@@ -8,6 +8,7 @@ import {
   duplicateUserPartListingAction,
   saveUserPartListingAction,
   setUserPartListingStatusAction,
+  unpublishUserPartListingAction,
   uploadUserPartListingImageAction,
 } from "@/app/actions/user-part-listings";
 import { prepareVehiclePhoto } from "@/lib/media/client-image-upload";
@@ -201,10 +202,11 @@ export default function GaragePartListings({
                 <div className="garage-part-listing-actions">
                   <button type="button" onClick={() => openEditor(listing)}>Edit</button>
                   <button type="button" onClick={() => duplicateListing(listing.id)}>Duplicate</button>
+                  {listing.status === "ACTIVE" || listing.status === "RESERVED" ? (
+                    <button type="button" onClick={() => unpublishListing(listing)}>Unpublish</button>
+                  ) : null}
                   {listing.status === "DRAFT" || listing.status === "INACTIVE" ? (
                     <button type="button" className="is-primary" onClick={() => updateStatus(listing.id, "ACTIVE")}>Publish</button>
-                  ) : listing.status === "ACTIVE" ? (
-                    <button type="button" onClick={() => updateStatus(listing.id, "INACTIVE")}>Unpublish</button>
                   ) : null}
                   <button type="button" className="is-danger" onClick={() => confirmRemove(listing.id)}>Remove</button>
                 </div>
@@ -430,6 +432,16 @@ export default function GaragePartListings({
     setError("");
     startTransition(async () => {
       const result = await duplicateUserPartListingAction(listingId);
+      if (!result.ok) setError(result.error);
+      router.refresh();
+    });
+  }
+
+  function unpublishListing(listing: GaragePartListing) {
+    if (listing.status === "RESERVED" && !window.confirm("A buyer has an unpaid checkout open for this part. Unpublishing will cancel that checkout. Continue?")) return;
+    setError("");
+    startTransition(async () => {
+      const result = await unpublishUserPartListingAction(listing.id);
       if (!result.ok) setError(result.error);
       router.refresh();
     });

@@ -55,6 +55,20 @@ export async function createUserPartCheckoutSession(input: {
   };
 }
 
+export async function expireUserPartCheckoutSession(input: {
+  sessionId: string;
+  connectedAccountId: string;
+}) {
+  return stripeConnectRequest<{ id: string; status?: string }>(
+    `/checkout/sessions/${encodeURIComponent(input.sessionId)}/expire`,
+    {
+      method: "POST",
+      connectedAccountId: input.connectedAccountId,
+      idempotencyKey: `scd:user-part-checkout-expire:${input.sessionId}`,
+    },
+  );
+}
+
 export async function refundUserPartOrderPayment(input: {
   orderId: string;
   paymentIntentId: string;
