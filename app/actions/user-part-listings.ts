@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import {
   createUserPartListing,
+  duplicateUserPartListing,
   transitionUserPartListing,
   updateUserPartListing,
 } from "@/lib/parts/user-part-listings";
@@ -124,5 +125,24 @@ export async function setUserPartListingStatusAction(listingId: string, status: 
     return { ok: true as const };
   } catch (error) {
     return { ok: false as const, error: error instanceof Error ? error.message : "Could not update the listing." };
+  }
+}
+
+export async function duplicateUserPartListingAction(listingId: string) {
+  try {
+    const userId = await requireUser();
+    listingId = databaseIdSchema.parse(listingId);
+    await enforceActionRateLimit({
+      actorId: userId,
+      action: "user_part_listing_write",
+      bucketKey: `duplicate:${listingId}`,
+      limit: 30,
+      windowMs: 60 * 60 * 1000,
+    });
+    const listing = await duplicateUserPartListing(userId, listingId);
+    await revalidateSellerGarage(userId);
+    return { ok: true as const, listingId: listing.id };
+  } catch (error) {
+    return { ok: false as const, error: error instanceof Error ? error.message : "Could not duplicate the listing." };
   }
 }

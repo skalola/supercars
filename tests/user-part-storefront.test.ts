@@ -16,6 +16,28 @@ test("qualified owner listings rank after direct suppliers and before eBay fallb
   assert.deepEqual(offers.map((offer) => offer.id), ["manufacturer", "retailer", "owner", "ebay"]);
 });
 
+test("exact vehicle owner listings rank ahead of universal owner listings", () => {
+  const offers = prioritizeStorefrontOffers(
+    [{ id: "ebay", provider: "EBAY" }],
+    [
+      { id: "universal", provider: "GARAGE_OWNER", offerKind: "USER_LISTING", fitmentConfidence: "UNIVERSAL" },
+      { id: "exact-model", provider: "GARAGE_OWNER", offerKind: "USER_LISTING", fitmentConfidence: "SELLER_DECLARED_EXACT_MODEL" },
+      { id: "exact-variant", provider: "GARAGE_OWNER", offerKind: "USER_LISTING", fitmentConfidence: "SELLER_DECLARED_EXACT_VARIANT" },
+    ],
+  );
+
+  assert.deepEqual(offers.map((offer) => offer.id), ["exact-variant", "exact-model", "universal", "ebay"]);
+});
+
+test("ranking preserves recency within the same owner fitment confidence", () => {
+  const offers = prioritizeStorefrontOffers([], [
+    { id: "newest", provider: "GARAGE_OWNER", fitmentConfidence: "SELLER_DECLARED_EXACT_MODEL" },
+    { id: "older", provider: "GARAGE_OWNER", fitmentConfidence: "SELLER_DECLARED_EXACT_MODEL" },
+  ]);
+
+  assert.deepEqual(offers.map((offer) => offer.id), ["newest", "older"]);
+});
+
 test("combined storefront pagination does not repeat or skip owner and fallback offers", () => {
   const ordered = ["direct", "owner-1", "owner-2", "ebay-1", "ebay-2", "ebay-3"];
   const first = paginateStorefrontOffers(ordered, 1, 5);

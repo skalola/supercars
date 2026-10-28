@@ -102,10 +102,25 @@ export async function refundUserPartOrderAction(orderId: string) {
     lockedStatus = order.status;
     const lock = await prisma.userPartOrder.updateMany({ where: { id: order.id, sellerId: userId, status: order.status }, data: { status: "REFUND_PENDING" } });
     if (lock.count !== 1) throw new Error("A refund or order update is already in progress.");
-    await refundUserPartOrderPayment({ orderId: order.id, paymentIntentId: order.paymentIntentId, connectedAccountId: order.connectedAccountId });
-    await prisma.userPartOrder.update({ where: { id: order.id }, data: { status: "REFUNDED", refundedAt: new Date() } });
+    const refund = await refundUserPartOrderPayment({ orderId: order.id, paymentIntentId: order.paymentIntentId, connectedAccountId: order.connectedAccountId });
+    if (refund.status === "failed" || refund.status === "canceled") {
+      throw new Error("Stripe did not accept this refund. Try again or review it in Stripe.");
+    }
+    const refundConfirmed = refund.status === "succeeded";
+    if (refundConfirmed) {
+      await prisma.userPartOrder.update({ where: { id: order.id }, data: { status: "REFUNDED", refundedAt: new Date() } });
+    }
     refresh(order.id);
-    await sendUserPartOrderNotice({ recipientEmail: order.buyer.email, recipientName: order.buyer.name || "Buyer", subject: `Refund issued: ${order.listing.title}`, heading: "Your refund was issued", message: `The seller refunded your payment for ${order.listing.title}. Stripe will return the funds to the original payment method according to your bank's timing.`, orderId: order.id }).catch(() => undefined);
+    await sendUserPartOrderNotice({
+      recipientEmail: order.buyer.email,
+      recipientName: order.buyer.name || "Buyer",
+      subject: `${refundConfirmed ? "Refund issued" : "Refund submitted"}: ${order.listing.title}`,
+      heading: refundConfirmed ? "Your refund was issued" : "Your refund is processing",
+      message: refundConfirmed
+        ? `The seller refunded your payment for ${order.listing.title}. Stripe will return the funds to the original payment method according to your bank's timing.`
+        : `The seller submitted a refund for ${order.listing.title}. You will receive another update after Stripe confirms it.`,
+      orderId: order.id,
+    }).catch(() => undefined);
     return { ok: true as const };
   } catch (error) {
     if (lockedStatus && orderId) {

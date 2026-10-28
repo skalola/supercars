@@ -85,11 +85,22 @@ export async function getCompatibleUserPartOffers(input: {
 
 export function prioritizeStorefrontOffers<
   S extends { provider: string; offerKind?: string },
-  U extends { provider: string; offerKind?: string },
+  U extends { provider: string; offerKind?: string; fitmentConfidence?: string | null },
 >(supplierOffers: S[], userOffers: U[]): Array<S | U> {
   const direct = supplierOffers.filter((offer) => offer.provider.toUpperCase() !== "EBAY");
   const fallback = supplierOffers.filter((offer) => offer.provider.toUpperCase() === "EBAY");
-  return [...direct, ...userOffers, ...fallback];
+  const rankedUserOffers = [...userOffers].sort(
+    (left, right) => userFitmentPriority(right.fitmentConfidence) - userFitmentPriority(left.fitmentConfidence),
+  );
+  return [...direct, ...rankedUserOffers, ...fallback];
+}
+
+function userFitmentPriority(confidence?: string | null) {
+  if (confidence === "SELLER_DECLARED_EXACT_VARIANT") return 4;
+  if (confidence === "SELLER_DECLARED_EXACT_MODEL") return 3;
+  if (confidence === "SELLER_DECLARED") return 2;
+  if (confidence === "UNIVERSAL") return 1;
+  return 0;
 }
 
 export function paginateStorefrontOffers<T>(offers: T[], page: number, pageSize: number) {

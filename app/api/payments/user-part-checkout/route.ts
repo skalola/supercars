@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { createUserPartCheckoutSession } from "@/lib/payments/user-part-payments";
-import { getUserPartCheckoutKey, getUserPartPlatformFeeCents, isReusableUserPartCheckout } from "@/lib/payments/user-part-payment-policy";
+import { getUserPartCheckoutKey, getUserPartPlatformFeeCents, isExpiredOrAbandonedUserPartCheckout, isReusableUserPartCheckout } from "@/lib/payments/user-part-payment-policy";
 import { isSellerPaymentReady } from "@/lib/payments/stripe-connect-policy";
 import { prisma } from "@/lib/prisma";
 import { enforceActionRateLimit, isActionRateLimitError } from "@/lib/security/action-rate-limit";
@@ -55,6 +55,24 @@ export async function POST(request: Request) {
     });
     if (existing && isReusableUserPartCheckout(existing) && existing.checkoutUrl) {
       return NextResponse.json({ url: existing.checkoutUrl, orderId: existing.id });
+    }
+    if (existing && isExpiredOrAbandonedUserPartCheckout(existing)) {
+      const released = await prisma.$transaction(async (transaction) => {
+        const cancelled = await transaction.userPartOrder.updateMany({
+          where: { id: existing.id, status: "CHECKOUT_PENDING" },
+          data: { status: "CANCELLED", cancelledAt: new Date() },
+        });
+        if (cancelled.count !== 1) return false;
+        const listingReleased = await transaction.userPartListing.updateMany({
+          where: { id: listing.id, status: "RESERVED" },
+          data: { status: "ACTIVE" },
+        });
+        return listingReleased.count === 1;
+      });
+      if (!released) return NextResponse.json({ error: "This checkout changed while it was being refreshed. Reload and try again." }, { status: 409 });
+      listing.status = "ACTIVE";
+    } else if (existing) {
+      return NextResponse.json({ error: "Your existing checkout is still being prepared. Try again shortly." }, { status: 409 });
     }
 
     const paymentAccount = listing.seller.sellerPaymentAccount;

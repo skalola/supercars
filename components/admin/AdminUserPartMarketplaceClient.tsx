@@ -49,6 +49,15 @@ export default function AdminUserPartMarketplaceClient({ summary, listings, orde
       <Metric label="Gross Sales" value={money(summary.grossSalesCents)} />
       <Metric label="Platform Fees" value={money(summary.platformFeesCents)} />
     </div>
+    <details className="admin-user-parts-guide">
+      <summary>Marketplace response guide</summary>
+      <div>
+        <article><strong>Listings</strong><span>Hide while reviewing accuracy or safety. Remove prohibited, fraudulent, or repeatedly misleading inventory and record a clear reason.</span></article>
+        <article><strong>Orders</strong><span>Use the transaction page as the source of truth. Do not manually change payment states; expired checkout reservations release automatically.</span></article>
+        <article><strong>Refunds</strong><span>The seller starts refunds from the transaction. Treat Refund Pending as processing and wait for Stripe confirmation before considering funds returned.</span></article>
+        <article><strong>Disputes</strong><span>Pause fulfillment during an open dispute. Review evidence in Stripe and avoid a separate refund while Stripe controls the disputed payment.</span></article>
+      </div>
+    </details>
     <div className="admin-user-parts-tabs" role="tablist"><button className={tab === "listings" ? "is-active" : ""} onClick={() => setTab("listings")}>Listings <b>{listings.length}</b></button><button className={tab === "orders" ? "is-active" : ""} onClick={() => setTab("orders")}>Orders <b>{orders.length}</b></button><button className={tab === "issues" ? "is-active" : ""} onClick={() => setTab("issues")}>Issues <b>{summary.openIssues}</b></button><button className={tab === "disputes" ? "is-active" : ""} onClick={() => setTab("disputes")}>Disputes <b>{summary.openDisputes}</b></button></div>
     {message ? <p className="admin-user-parts-message" role="status">{message}</p> : null}
     {tab === "listings" ? <div className="admin-user-parts-list">

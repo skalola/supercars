@@ -5,6 +5,7 @@ import { canBuyerCompleteUserPartOrder, canSellerFulfillUserPartOrder, canSeller
 const credentialMode = getStripeCredentialMode(process.env.STRIPE_SECRET_KEY);
 const paymentProviderReady = process.env.PAYMENT_PROVIDER === "stripe";
 const webhookReady = Boolean(process.env.STRIPE_WEBHOOK_SECRET?.trim());
+const connectWebhookReady = Boolean(process.env.STRIPE_CONNECT_WEBHOOK_SECRET?.trim());
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "";
 const productionUrlReady = /^https:\/\//.test(appUrl);
 const fee = getUserPartPlatformFeeCents(10_000);
@@ -18,6 +19,7 @@ const checks = [
   ["Payment provider", paymentProviderReady, process.env.PAYMENT_PROVIDER || "unset"],
   ["Stripe credential mode", credentialMode === "test" || credentialMode === "live", credentialMode],
   ["Webhook signing secret", webhookReady, webhookReady ? "configured" : "missing"],
+  ["Connect webhook signing secret", connectWebhookReady, connectWebhookReady ? "configured" : "missing"],
   ["Production application URL", productionUrlReady, productionUrlReady ? "configured" : "missing or local"],
   ["Five-percent fee policy", fee === 500, `$${(fee / 100).toFixed(2)} on $100.00`],
   ["Order lifecycle policy", lifecycleReady, lifecycleReady ? "valid" : "invalid"],

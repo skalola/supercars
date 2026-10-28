@@ -242,10 +242,20 @@ export async function processUserPartStripeEvent(event: UserPartStripeEvent, res
   }
 
   if (eventType === "charge.refunded" && Number(object?.amount_refunded || 0) >= order.totalAmountCents) {
-    await prisma.userPartOrder.updateMany({
+    const refunded = await prisma.userPartOrder.updateMany({
       where: { id: order.id, status: { in: ["PAID", "FULFILLED", "REFUND_PENDING"] } },
       data: { status: "REFUNDED", refundedAt: new Date() },
     });
+    if (refunded.count === 1) {
+      await sendUserPartOrderNotice({
+        recipientEmail: order.buyer.email,
+        recipientName: order.buyer.name || "Buyer",
+        subject: `Refund confirmed: ${order.listing.title}`,
+        heading: "Your refund was confirmed",
+        message: `Stripe confirmed the refund for ${order.listing.title}. Your bank will return the funds to the original payment method according to its processing time.`,
+        orderId: order.id,
+      });
+    }
     return { orderId: order.id, processed: true };
   }
 

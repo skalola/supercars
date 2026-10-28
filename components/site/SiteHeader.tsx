@@ -40,6 +40,7 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isMobileMakesOpen, setIsMobileMakesOpen] = useState(false);
   const [isMakesOpen, setIsMakesOpen] = useState(false);
+  const [isGarageOpen, setIsGarageOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const makerSlug = useSyncExternalStore(subscribeToHostname, getCurrentMakerSlug, () => null);
   const makerSite = makerSlug ? getMakerSiteConfig(makerSlug) : null;
@@ -49,6 +50,7 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
     : href;
   const accountRef = useRef<HTMLDivElement | null>(null);
   const makesRef = useRef<HTMLDivElement | null>(null);
+  const garageRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -58,6 +60,9 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
       if (!makesRef.current?.contains(event.target as Node)) {
         setIsMakesOpen(false);
       }
+      if (!garageRef.current?.contains(event.target as Node)) {
+        setIsGarageOpen(false);
+      }
     }
 
     function handleEscape(event: KeyboardEvent) {
@@ -65,6 +70,7 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
         setIsMobileOpen(false);
         setIsMobileMakesOpen(false);
         setIsMakesOpen(false);
+        setIsGarageOpen(false);
         setIsAccountOpen(false);
       }
     }
@@ -82,8 +88,11 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
     setIsMobileOpen(false);
     setIsMobileMakesOpen(false);
     setIsMakesOpen(false);
+    setIsGarageOpen(false);
     setIsAccountOpen(false);
   };
+
+  const myPartsHref = appendGarageTab(garageHref, "partsForSale");
 
   return (
     <header className="site-header">
@@ -125,7 +134,12 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
           aria-label="Mobile navigation"
           aria-hidden={!isMobileOpen}
         >
-          {[...leftNavLinks, ...rightNavLinks].map((link) => (
+          {[...leftNavLinks, ...rightNavLinks].map((link) => link.label === "Garage" && isSignedIn ? (
+            <div key={`${link.label}:${link.href}`} className="site-mobile-garage-group">
+              <Link href={resolveSharedHref(garageHref)} className="site-nav-link" onClick={closeMenus}>Garage</Link>
+              <Link href={resolveSharedHref(myPartsHref)} className="site-mobile-nav-child" onClick={closeMenus}>My Parts</Link>
+            </div>
+          ) : (
             <Link key={`${link.label}:${link.href}`} href={link.label === "Garage" ? resolveSharedHref(link.href) : link.href} className="site-nav-link" onClick={closeMenus}>
               {link.label}
             </Link>
@@ -158,7 +172,25 @@ export function SiteHeader({ isSignedIn, isAdmin, userLabel, profileHref, garage
       </div>
 
       <nav className="site-nav" aria-label="Primary navigation">
-        {leftNavLinks.map((link) => (
+        {leftNavLinks.map((link) => link.label === "Garage" && isSignedIn ? (
+          <div ref={garageRef} key={`${link.label}:${link.href}`} className={`site-garage-menu${isGarageOpen ? " is-open" : ""}`}>
+            <Link href={resolveSharedHref(garageHref)} className="site-nav-link" onClick={closeMenus}>Garage</Link>
+            <button
+              type="button"
+              className="site-garage-toggle"
+              aria-label="Open Garage menu"
+              aria-haspopup="menu"
+              aria-expanded={isGarageOpen}
+              onClick={() => setIsGarageOpen((open) => !open)}
+            >
+              <span aria-hidden="true" />
+            </button>
+            <div className="site-garage-dropdown" role="menu" aria-label="Garage menu">
+              <Link href={resolveSharedHref(garageHref)} role="menuitem" onClick={closeMenus}>My Garage</Link>
+              <Link href={resolveSharedHref(myPartsHref)} role="menuitem" onClick={closeMenus}>My Parts</Link>
+            </div>
+          </div>
+        ) : (
           <Link key={`${link.label}:${link.href}`} href={link.label === "Garage" ? resolveSharedHref(link.href) : link.href} className="site-nav-link">
             {link.label}
           </Link>
@@ -263,4 +295,9 @@ function getMainSiteOrigin() {
   return window.location.hostname.endsWith(".localhost")
     ? `${window.location.protocol}//localhost${port}`
     : "https://supercardash.com";
+}
+
+function appendGarageTab(href: string, tab: string) {
+  const separator = href.includes("?") ? "&" : "?";
+  return `${href}${separator}tab=${encodeURIComponent(tab)}#garage-collection`;
 }

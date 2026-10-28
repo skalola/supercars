@@ -1,5 +1,7 @@
 import { getUserPartCheckoutKey } from "@/lib/payments/user-part-payment-policy";
 
+export const USER_PART_CHECKOUT_RESERVATION_SECONDS = 30 * 60;
+
 export type UserPartCheckoutContractInput = {
   orderId: string;
   listingTitle: string;
@@ -28,6 +30,10 @@ export function buildUserPartCheckoutContract(input: UserPartCheckoutContractInp
   const baseUrl = input.baseUrl.replace(/\/$/, "");
   const body = new URLSearchParams();
   body.set("mode", "payment");
+  // Stripe Checkout requires expires_at to be at least 30 minutes ahead.
+  // Keeping the window at that minimum prevents abandoned checkouts from
+  // removing an owner listing from purchasable inventory for a full day.
+  body.set("expires_at", String(Math.floor(Date.now() / 1000) + USER_PART_CHECKOUT_RESERVATION_SECONDS));
   body.set("success_url", `${baseUrl}/parts/orders/${input.orderId}?payment=success`);
   body.set("cancel_url", `${baseUrl}/api/payments/user-part-checkout/cancel?orderId=${input.orderId}`);
   body.set("line_items[0][quantity]", "1");

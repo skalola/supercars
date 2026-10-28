@@ -2,11 +2,15 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { getUserPartDisputeOrderStatus } from "../lib/parts/user-part-dispute-policy";
-import { buildUserPartCheckoutContract } from "../lib/payments/user-part-checkout-contract";
+import {
+  buildUserPartCheckoutContract,
+  USER_PART_CHECKOUT_RESERVATION_SECONDS,
+} from "../lib/payments/user-part-checkout-contract";
 import { canBuyerCompleteUserPartOrder, canSellerFulfillUserPartOrder, canSellerRefundUserPartOrder } from "../lib/payments/user-part-order-policy";
 import { getUserPartPlatformFeeCents } from "../lib/payments/user-part-payment-policy";
 
 test("user-part commerce contract covers checkout, fee, fulfillment, refund, and disputes without a Stripe request", () => {
+  const checkoutStartedAt = Math.floor(Date.now() / 1000);
   const itemAmountCents = 40_000;
   const shippingAmountCents = 2_500;
   const platformFeeCents = getUserPartPlatformFeeCents(itemAmountCents);
@@ -32,6 +36,9 @@ test("user-part commerce contract covers checkout, fee, fulfillment, refund, and
   assert.equal(contract.body.get("metadata[commerceType]"), "USER_PART_SALE");
   assert.equal(contract.body.get("payment_intent_data[metadata][userPartOrderId]"), "order-e2e");
   assert.equal(contract.body.get("shipping_address_collection[allowed_countries][0]"), "US");
+  const expiresAt = Number(contract.body.get("expires_at"));
+  assert.ok(expiresAt >= checkoutStartedAt + USER_PART_CHECKOUT_RESERVATION_SECONDS);
+  assert.ok(expiresAt <= checkoutStartedAt + USER_PART_CHECKOUT_RESERVATION_SECONDS + 2);
   assert.match(contract.idempotencyKey, /^scd:user-part:order-e2e:42500:/);
 
   assert.equal(canSellerFulfillUserPartOrder("CHECKOUT_PENDING"), false);

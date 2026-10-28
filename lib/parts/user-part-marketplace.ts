@@ -2,6 +2,7 @@ import "server-only";
 
 import { unstable_cache } from "next/cache";
 import { getCatalogMakeOptions } from "@/lib/makes/catalog";
+import { sortCatalogLabels } from "@/lib/makes/catalog-order";
 import { isSellerPaymentReady } from "@/lib/payments/stripe-connect-policy";
 import {
   getUserPartShippingRestriction,
@@ -54,7 +55,10 @@ export async function getGaragePartListings(userId: string, isOwner: boolean): P
   const rows = await prisma.userPartListing.findMany({
     where: {
       sellerId: userId,
-      status: isOwner ? { not: "REMOVED" } : "ACTIVE",
+      // Keep reserved inventory visible in the seller's public Garage. A
+      // checkout reservation affects availability, not the listing's public
+      // history; storefront search continues to return ACTIVE inventory only.
+      status: isOwner ? { not: "REMOVED" } : { in: ["ACTIVE", "RESERVED"] },
     },
     select: {
       id: true,
@@ -137,7 +141,9 @@ const getSellerPartCatalogOptions = unstable_cache(
       }),
     ]);
     return {
-      makes: makes.map(({ id, name }) => ({ id, name })),
+      // The seller editor is a single select, so region grouping only makes
+      // scanning harder. Keep this contract flat and alphabetic.
+      makes: sortCatalogLabels(makes.map(({ id, name }) => ({ id, name }))),
       components: components.map((component) => ({
         id: component.id,
         name: component.name,
@@ -150,7 +156,7 @@ const getSellerPartCatalogOptions = unstable_cache(
       brands,
     };
   },
-  ["seller-part-catalog-options-v1"],
+  ["seller-part-catalog-options-v2"],
   { revalidate: 86_400, tags: ["make-model-catalog", "parts-taxonomy"] },
 );
 

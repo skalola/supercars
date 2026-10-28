@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { removeClaimedVehicle, removeSavedGarageItem, toggleGarageAlert } from "@/app/actions/garage";
 import GaragePartListings, { type GaragePartCatalogOptions } from "./GaragePartListings";
@@ -69,13 +69,15 @@ type PendingRemoval =
 
 export default function GarageTabs({ claimedVehicles, savedVehicles, previousVehicles = [], partListings = [], partCatalog = null, isOwner = true }: GarageTabsProps) {
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<ActiveTab>(claimedVehicles.length > 0 || savedVehicles.length === 0 ? "claimed" : "saved");
+  const activeTab = getLinkedGarageTab(searchParams.get("tab"))
+    ?? (claimedVehicles.length > 0 || savedVehicles.length === 0 ? "claimed" : "saved");
   const [localClaimedVehicles, setLocalClaimedVehicles] = useState(claimedVehicles);
   const [localSavedVehicles, setLocalSavedVehicles] = useState(savedVehicles);
   const [pendingAlertId, setPendingAlertId] = useState<string | null>(null);
   const [pendingRemoval, setPendingRemoval] = useState<PendingRemoval | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [collectionPage, setCollectionPage] = useState(0);
+  const tabListRef = useRef<HTMLDivElement>(null);
   const pageSize = useGarageCollectionPageSize();
   const [isPending, startTransition] = useTransition();
   const previouslyOwnedCount = previousVehicles.length;
@@ -94,12 +96,13 @@ export default function GarageTabs({ claimedVehicles, savedVehicles, previousVeh
   const visiblePreviousVehicles = previousVehicles.slice(activePage * pageSize, activePage * pageSize + pageSize);
 
   useEffect(() => {
-    if (searchParams.get("tab") === "partsForSale") setActiveTab("partsForSale");
-  }, [searchParams]);
+    const activeButton = tabListRef.current?.querySelector<HTMLElement>("[role='tab'][aria-selected='true']");
+    activeButton?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [activeTab]);
 
   return (
     <section className="garage-collection-shell">
-      <div role="tablist" aria-label="Garage vehicle categories" className="garage-collection-tabs">
+      <div ref={tabListRef} role="tablist" aria-label="Garage vehicle categories" className="garage-collection-tabs">
         <button
           type="button"
           role="tab"
@@ -359,8 +362,12 @@ export default function GarageTabs({ claimedVehicles, savedVehicles, previousVeh
   );
 
   function selectTab(tab: ActiveTab) {
-    setActiveTab(tab);
     setCollectionPage(0);
+    const url = new URL(window.location.href);
+    if (tab === "claimed") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", tab);
+    if (tab !== "partsForSale") url.searchParams.delete("listing");
+    window.history.pushState(null, "", `${url.pathname}${url.search}${url.hash}`);
   }
 
   function confirmRemoval() {
@@ -422,6 +429,11 @@ export default function GarageTabs({ claimedVehicles, savedVehicles, previousVeh
       setPendingAlertId(null);
     });
   }
+}
+
+function getLinkedGarageTab(value: string | null): ActiveTab | null {
+  if (value === "claimed" || value === "saved" || value === "previouslyOwned" || value === "partsForSale") return value;
+  return null;
 }
 
 function useGarageCollectionPageSize() {

@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   deleteUserPartListingImageAction,
+  duplicateUserPartListingAction,
   saveUserPartListingAction,
   setUserPartListingStatusAction,
   uploadUserPartListingImageAction,
@@ -97,17 +98,14 @@ export default function GaragePartListings({
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [models, setModels] = useState<ModelOption[]>([]);
   const [files, setFiles] = useState<File[]>([]);
-  const [purchaseListing, setPurchaseListing] = useState<GaragePartListing | null>(null);
+  const [purchaseListing, setPurchaseListing] = useState<GaragePartListing | null>(() => {
+    if (isOwner || !initialPurchaseListingId) return null;
+    return listings.find((item) => item.id === initialPurchaseListingId && item.status === "ACTIVE") ?? null;
+  });
   const [purchaseTermsAccepted, setPurchaseTermsAccepted] = useState(false);
   const [checkoutPending, setCheckoutPending] = useState(false);
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
-
-  useEffect(() => {
-    if (isOwner || !initialPurchaseListingId) return;
-    const listing = listings.find((item) => item.id === initialPurchaseListingId);
-    if (listing) setPurchaseListing(listing);
-  }, [initialPurchaseListingId, isOwner, listings]);
 
   useEffect(() => {
     if (!editor?.makeId) return;
@@ -129,11 +127,34 @@ export default function GaragePartListings({
   );
   useEffect(() => () => previewUrls.forEach((url) => URL.revokeObjectURL(url)), [previewUrls]);
 
+  useEffect(() => {
+    if (!editor && !purchaseListing) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeDialog = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (editor && !isPending) {
+        setEditor(null);
+        setFiles([]);
+        setError("");
+      }
+      if (purchaseListing && !checkoutPending) setPurchaseListing(null);
+    };
+    window.addEventListener("keydown", closeDialog);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeDialog);
+    };
+  }, [checkoutPending, editor, isPending, purchaseListing]);
+
   if (listings.length === 0 && !isOwner) {
     return (
       <div className="garage-collection-empty">
         <div className="garage-collection-empty-mark" aria-hidden="true">SD</div>
-        <div><h2>No parts listed</h2><p>This garage does not have any active parts for sale.</p></div>
+        <div>
+          <h2>{initialPurchaseListingId ? "Part no longer available" : "No parts listed"}</h2>
+          <p>{initialPurchaseListingId ? "This listing was sold, paused, removed, or is no longer eligible for checkout." : "This garage does not have any active parts for sale."}</p>
+        </div>
       </div>
     );
   }
@@ -147,6 +168,13 @@ export default function GaragePartListings({
             <span>List genuine parts with exact fitment and condition details.</span>
           </div>
           <button type="button" onClick={() => openEditor(null)}>+ Add Part</button>
+        </div>
+      ) : null}
+
+      {!isOwner && initialPurchaseListingId && !listings.some((listing) => listing.id === initialPurchaseListingId) ? (
+        <div className="garage-part-availability-notice" role="status">
+          <strong>That part is no longer available</strong>
+          <span>It may have been sold, paused, or removed. The active listings below are still available.</span>
         </div>
       ) : null}
 
@@ -172,17 +200,30 @@ export default function GaragePartListings({
               {isOwner ? (
                 <div className="garage-part-listing-actions">
                   <button type="button" onClick={() => openEditor(listing)}>Edit</button>
+                  <button type="button" onClick={() => duplicateListing(listing.id)}>Duplicate</button>
                   {listing.status === "DRAFT" || listing.status === "INACTIVE" ? (
                     <button type="button" className="is-primary" onClick={() => updateStatus(listing.id, "ACTIVE")}>Publish</button>
                   ) : listing.status === "ACTIVE" ? (
-                    <button type="button" onClick={() => updateStatus(listing.id, "INACTIVE")}>Pause</button>
+                    <button type="button" onClick={() => updateStatus(listing.id, "INACTIVE")}>Unpublish</button>
                   ) : null}
                   <button type="button" className="is-danger" onClick={() => confirmRemove(listing.id)}>Remove</button>
                 </div>
               ) : (
                 <div className="garage-part-listing-actions is-public">
-                  <span>Sold directly by this garage owner</span>
-                  <button type="button" className="is-primary" onClick={() => { setPurchaseListing(listing); setPurchaseTermsAccepted(false); setError(""); }}>Purchase Part</button>
+                  <span>{listing.status === "RESERVED" ? "A checkout is currently in progress" : "Sold directly by this garage owner"}</span>
+                  <button
+                    type="button"
+                    className="is-primary"
+                    disabled={listing.status !== "ACTIVE"}
+                    onClick={() => {
+                      if (listing.status !== "ACTIVE") return;
+                      setPurchaseListing(listing);
+                      setPurchaseTermsAccepted(false);
+                      setError("");
+                    }}
+                  >
+                    {listing.status === "RESERVED" ? "Reserved" : "Purchase Part"}
+                  </button>
                 </div>
               )}
             </article>
@@ -197,7 +238,9 @@ export default function GaragePartListings({
       )}
 
       {editor && catalog ? (
-        <div className="garage-part-editor-backdrop" role="dialog" aria-modal="true" aria-labelledby="part-editor-title">
+        <div className="garage-part-editor-backdrop" role="dialog" aria-modal="true" aria-labelledby="part-editor-title" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) closeEditor();
+        }}>
           <form className="garage-part-editor" onSubmit={submitListing}>
             <header>
               <div><span>Garage Marketplace</span><h2 id="part-editor-title">{editor.id ? "Edit Part Listing" : "Add Part for Sale"}</h2></div>
@@ -277,7 +320,9 @@ export default function GaragePartListings({
         </div>
       ) : null}
       {purchaseListing ? (
-        <div className="garage-part-editor-backdrop" role="dialog" aria-modal="true" aria-labelledby="part-purchase-title">
+        <div className="garage-part-editor-backdrop" role="dialog" aria-modal="true" aria-labelledby="part-purchase-title" onMouseDown={(event) => {
+          if (event.target === event.currentTarget && !checkoutPending) setPurchaseListing(null);
+        }}>
           <section className="garage-part-purchase-modal">
             <header>
               <div><span>Purchase Review</span><h2 id="part-purchase-title">{purchaseListing.title}</h2></div>
@@ -376,6 +421,15 @@ export default function GaragePartListings({
     if (!window.confirm("Remove this part listing? This cannot be undone.")) return;
     startTransition(async () => {
       const result = await setUserPartListingStatusAction(listingId, "REMOVED");
+      if (!result.ok) setError(result.error);
+      router.refresh();
+    });
+  }
+
+  function duplicateListing(listingId: string) {
+    setError("");
+    startTransition(async () => {
+      const result = await duplicateUserPartListingAction(listingId);
       if (!result.ok) setError(result.error);
       router.refresh();
     });

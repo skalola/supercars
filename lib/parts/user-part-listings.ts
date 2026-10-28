@@ -177,6 +177,76 @@ export async function updateUserPartListing(userId: string, listingId: string, r
   });
 }
 
+export async function duplicateUserPartListing(userId: string, listingId: string) {
+  const source = await prisma.userPartListing.findFirst({
+    where: { id: listingId, sellerId: userId, status: { not: "REMOVED" } },
+    select: {
+      componentTypeId: true,
+      brandId: true,
+      removedFromVehicleId: true,
+      title: true,
+      description: true,
+      brandName: true,
+      manufacturerPartNumber: true,
+      condition: true,
+      priceCents: true,
+      currency: true,
+      quantity: true,
+      mileageOnPart: true,
+      includedHardware: true,
+      knownDefects: true,
+      shippingMode: true,
+      shippingCostCents: true,
+      shipsFromCity: true,
+      shipsFromState: true,
+      returnPolicy: true,
+      shippingRestriction: true,
+      universalFitment: true,
+      fitments: {
+        select: {
+          makeId: true,
+          modelId: true,
+          modelVariantId: true,
+          yearStart: true,
+          yearEnd: true,
+          trim: true,
+          engine: true,
+          transmission: true,
+          drivetrain: true,
+          bodyStyle: true,
+          confidence: true,
+        },
+      },
+    },
+  });
+  if (!source) throw new Error("This part listing cannot be duplicated.");
+
+  return prisma.$transaction(async (transaction) => {
+    const { fitments, ...listing } = source;
+    const duplicate = await transaction.userPartListing.create({
+      data: {
+        ...listing,
+        sellerId: userId,
+        status: "DRAFT",
+        sellerAttestedAt: null,
+        sellerPolicyVersion: null,
+        publishedAt: null,
+      },
+      select: { id: true, status: true },
+    });
+    if (fitments.length) {
+      await transaction.userPartListingFitment.createMany({
+        data: fitments.map((fitment) => ({
+          ...fitment,
+          listingId: duplicate.id,
+          fitmentKey: fitmentKey(duplicate.id, fitment),
+        })),
+      });
+    }
+    return duplicate;
+  });
+}
+
 export async function transitionUserPartListing(userId: string, listingId: string, nextStatus: string) {
   const listing = await prisma.userPartListing.findFirst({
     where: { id: listingId, sellerId: userId },

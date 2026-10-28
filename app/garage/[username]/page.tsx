@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import GarageTabs from "../GarageTabs";
 import GarageSupportRail from "../GarageSupportRail";
 import GarageClubBadges from "../GarageClubBadges";
+import GarageShareMenu from "../GarageShareMenu";
 import { getGarageDashboardData } from "../garage-data";
 import { buildPublicMetadata, humanizeSlug, privateMetadata } from "@/lib/seo";
 import { getGaragePartListings, getGaragePartSellerContext } from "@/lib/parts/user-part-marketplace";
@@ -94,7 +95,8 @@ export default async function UserGaragePage({ params }: UserGaragePageProps) {
     recentActivity,
     clubSummary,
   } = dashboard;
-  const displayName = user.name || user.username;
+  const publicUsername = user.username || username;
+  const displayName = user.name || user.username || humanizeSlug(username);
   const garageHandle = user.username ? `@${user.username}` : "SUPERCAR DASH member";
   const garageLocation = getGarageLocation(clubSummary);
   const heroClaimedVehicle = claimedVehicles[0] || null;
@@ -147,7 +149,7 @@ export default async function UserGaragePage({ params }: UserGaragePageProps) {
               Add Car
             </Link>
           ) : null}
-          <Link href="/makes" className="garage-profile-secondary-button">Explore Models</Link>
+          <GarageShareMenu username={publicUsername} displayName={displayName} />
         </div>
       </section>
       <section id="garage-collection" className="garage-dashboard-layout" aria-label="Garage dashboard">

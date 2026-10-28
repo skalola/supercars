@@ -20,3 +20,14 @@ export function isReusableUserPartCheckout(input: {
     && Boolean(input.checkoutUrl)
     && Boolean(input.checkoutExpiresAt && input.checkoutExpiresAt.getTime() > Date.now() + 60_000);
 }
+
+export function isExpiredOrAbandonedUserPartCheckout(input: {
+  status: string;
+  checkoutUrl: string | null;
+  checkoutExpiresAt: Date | null;
+  createdAt: Date;
+}, now = new Date()) {
+  if (input.status !== "CHECKOUT_PENDING") return false;
+  if (input.checkoutExpiresAt) return input.checkoutExpiresAt.getTime() <= now.getTime();
+  return !input.checkoutUrl && input.createdAt.getTime() <= now.getTime() - 5 * 60_000;
+}

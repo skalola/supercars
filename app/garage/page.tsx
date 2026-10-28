@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import GarageTabs from "./GarageTabs";
 import GarageSupportRail from "./GarageSupportRail";
 import GarageClubBadges from "./GarageClubBadges";
+import GarageShareMenu from "./GarageShareMenu";
 import { getGarageDashboardData } from "./garage-data";
 import { getGaragePartListings, getGaragePartSellerContext } from "@/lib/parts/user-part-marketplace";
 
@@ -109,7 +110,7 @@ export default async function GaragePage() {
             <span className="garage-button-plus" aria-hidden="true" />
             Add Car
           </Link>
-          <Link href="/makes" className="garage-profile-secondary-button">Explore Models</Link>
+          <GarageShareMenu username={user.username} displayName={displayName} />
         </div>
       </section>
       <section id="garage-collection" className="garage-dashboard-layout" aria-label="Garage dashboard">
