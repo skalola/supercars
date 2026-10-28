@@ -9,6 +9,8 @@ import {
 } from "@/lib/fulfillment/service";
 import { TransactionCenterClient, type TransactionCenterItem } from "@/components/transactions/TransactionCenterClient";
 import { AdminPagination, parseAdminPage } from "@/components/admin/AdminPagination";
+import Link from "next/link";
+import { prisma } from "@/lib/prisma";
 
 const transactionCategories = new Set<UserFulfillmentCategory>([
   "ALL",
@@ -34,12 +36,27 @@ export default async function TransactionsPage({
   const search = params?.q?.trim() || undefined;
   const filters = { category, search };
 
-  const [summary, searchedTransactionCount] = userId
+  const [summary, searchedTransactionCount, partOrders] = userId
     ? await Promise.all([
         getUserFulfillmentSummary(userId),
         search
           ? getUserFulfillmentTransactionCount(userId, filters)
           : Promise.resolve(null),
+        prisma.userPartOrder.findMany({
+          where: { OR: [{ buyerId: userId }, { sellerId: userId }] },
+          select: {
+            id: true,
+            buyerId: true,
+            status: true,
+            totalAmountCents: true,
+            createdAt: true,
+            listing: { select: { title: true, images: { where: { validationStatus: "VALID" }, select: { url: true }, orderBy: [{ isPrimary: "desc" }, { displayOrder: "asc" }], take: 1 } } },
+            buyer: { select: { name: true, username: true } },
+            seller: { select: { name: true, username: true } },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+        }),
       ])
     : [
         {
@@ -50,6 +67,7 @@ export default async function TransactionsPage({
           tabCounts: Object.fromEntries([...transactionCategories].map((key) => [key, 0])) as Record<UserFulfillmentCategory, number>,
         },
         null,
+        [],
       ];
   const totalTransactions = searchedTransactionCount ?? summary.tabCounts[category];
   const totalPages = Math.max(1, Math.ceil(totalTransactions / USER_FULFILLMENT_PAGE_SIZE));
@@ -109,6 +127,26 @@ export default async function TransactionsPage({
 
   return (
     <>
+      {userId && partOrders.length ? (
+        <section className="transaction-part-orders" aria-labelledby="part-order-history-title">
+          <div><span>Garage Marketplace</span><h2 id="part-order-history-title">Part Transactions</h2></div>
+          <div className="transaction-part-order-list">
+            {partOrders.map((order) => {
+              const isBuyer = order.buyerId === userId;
+              const counterpart = isBuyer ? order.seller : order.buyer;
+              return (
+                <Link key={order.id} href={`/parts/orders/${order.id}`}>
+                  <span>{isBuyer ? "Purchased" : "Sold"}</span>
+                  <strong>{order.listing.title}</strong>
+                  <small>{counterpart.name || counterpart.username || "SUPERCAR DASH member"}</small>
+                  <em>{formatPartOrderCents(order.totalAmountCents)}</em>
+                  <b data-status={order.status}>{order.status.replaceAll("_", " ")}</b>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
       <TransactionCenterClient
         userId={userId}
         transactions={items}
@@ -125,4 +163,8 @@ export default async function TransactionsPage({
       />
     </>
   );
+}
+
+function formatPartOrderCents(value: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value / 100);
 }

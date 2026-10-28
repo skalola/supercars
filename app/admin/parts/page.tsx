@@ -5,6 +5,7 @@ import { auditPerformancePartTrust } from "@/lib/parts/trust";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { AdminPagination, parseAdminPage } from "@/components/admin/AdminPagination";
+import { AdminUserPartMarketplace } from "@/components/admin/AdminUserPartMarketplace";
 
 const ADMIN_PARTS_PAGE_LIMIT = 50;
 
@@ -414,6 +415,7 @@ export default async function AdminPartsPage({
         }}
         ariaLabel="Parts catalog pages"
       />
+      <AdminUserPartMarketplace />
     </main>
   );
 }

@@ -98,6 +98,7 @@
     "verify:neon": "tsx --env-file .env scripts/verify-neon-migration.ts",
     "verify:ebay-oauth": "tsx --env-file .env scripts/verify-ebay-oauth.ts",
     "verify:ebay-browse": "tsx --env-file .env scripts/verify-ebay-browse.ts",
+    "verify:user-part-commerce": "tsx --env-file .env scripts/verify-user-part-commerce.ts",
     "crawl-ferrari-parts": "tsx --env-file .env scripts/crawl-ferrari-parts.ts",
     "seed-ferrari-components": "tsx --env-file .env scripts/seed-ferrari-component-library.ts",
     "seed-ferrari-parts-ecosystem": "tsx --env-file .env scripts/seed-ferrari-parts-ecosystem.ts",

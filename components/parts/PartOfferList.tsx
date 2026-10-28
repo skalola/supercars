@@ -21,6 +21,7 @@ export type PartOfferProduct = {
     condition: string | null;
     fitmentConfidence: string;
     buyUrl: string;
+    offerKind?: string;
   };
 };
 
@@ -86,7 +87,11 @@ export function PartOfferList({ products, systemSlug }: { products: PartOfferPro
               <td data-label="Quality"><span className={`part-offer-quality is-${productQualityLabel(product).toLowerCase()}`}>{productQualityLabel(product)}</span></td>
               <td data-label="Brand"><strong className="part-offer-brand">{brandLabel(product)}</strong></td>
               <td data-label="Price"><strong className="part-offer-list-price">{formatMoney(product.fromPriceCents, product.currency)}</strong></td>
-              <td data-label="Link"><a className="part-offer-retailer-link" href={product.primaryOffer.buyUrl} target="_blank" rel="nofollow sponsored">View at {providerLabel(product.primaryOffer.provider)}</a></td>
+              <td data-label="Link">{product.primaryOffer.offerKind === "USER_LISTING" ? (
+                <a className="part-offer-retailer-link" href={product.primaryOffer.buyUrl}>Purchase from owner</a>
+              ) : (
+                <a className="part-offer-retailer-link" href={product.primaryOffer.buyUrl} target="_blank" rel="nofollow sponsored">View at {providerLabel(product.primaryOffer.provider)}</a>
+              )}</td>
             </tr>
           ))}
         </tbody>

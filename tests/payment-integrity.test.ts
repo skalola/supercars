@@ -82,6 +82,7 @@ test("cancellation settlement never refunds a negative amount", () => {
 
 test("Stripe signatures require a current timestamp and matching digest", () => {
   const previousSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const previousConnectSecret = process.env.STRIPE_CONNECT_WEBHOOK_SECRET;
   const previousProvider = process.env.PAYMENT_PROVIDER;
   process.env.STRIPE_WEBHOOK_SECRET = "whsec_test";
   process.env.PAYMENT_PROVIDER = "stripe";
@@ -97,8 +98,19 @@ test("Stripe signatures require a current timestamp and matching digest", () => 
     assert.equal(verifyStripeWebhookSignature(payload, `t=${timestamp},v1=${digest}`), true);
     assert.equal(verifyStripeWebhookSignature(`${payload}x`, `t=${timestamp},v1=${digest}`), false);
     assert.equal(verifyStripeWebhookSignature(payload, `t=${timestamp - 600},v1=${digest}`), false);
+
+    process.env.STRIPE_CONNECT_WEBHOOK_SECRET = "whsec_connect_test";
+    const connectDigest = crypto
+      .createHmac("sha256", "whsec_connect_test")
+      .update(`${timestamp}.${payload}`)
+      .digest("hex");
+    assert.equal(verifyStripeWebhookSignature(payload, `t=${timestamp},v1=invalid,v1=${connectDigest}`), true);
   } finally {
-    process.env.STRIPE_WEBHOOK_SECRET = previousSecret;
-    process.env.PAYMENT_PROVIDER = previousProvider;
+    if (previousSecret === undefined) delete process.env.STRIPE_WEBHOOK_SECRET;
+    else process.env.STRIPE_WEBHOOK_SECRET = previousSecret;
+    if (previousConnectSecret === undefined) delete process.env.STRIPE_CONNECT_WEBHOOK_SECRET;
+    else process.env.STRIPE_CONNECT_WEBHOOK_SECRET = previousConnectSecret;
+    if (previousProvider === undefined) delete process.env.PAYMENT_PROVIDER;
+    else process.env.PAYMENT_PROVIDER = previousProvider;
   }
 });

@@ -46,6 +46,7 @@ The fulfillment payment layer defaults to `PAYMENT_PROVIDER=ledger`, which recor
 PAYMENT_PROVIDER=stripe
 STRIPE_SECRET_KEY="..."
 STRIPE_WEBHOOK_SECRET="..."
+STRIPE_CONNECT_WEBHOOK_SECRET="..." # signing secret for events on connected accounts
 ```
 
 Stripe mode requires a real Stripe payment method id in fulfillment `depositIntent.paymentMethod`. The platform creates a manual-capture authorization first, captures only after partner acceptance, voids on partner decline/expiration/pre-accept cancellation, and refunds according to cancellation policy after acceptance.
@@ -80,6 +81,7 @@ MAIL_PROVIDER="log|resend"
 RESEND_API_KEY="..."            # if MAIL_PROVIDER=resend
 STRIPE_SECRET_KEY="..."         # if PAYMENT_PROVIDER=stripe
 STRIPE_WEBHOOK_SECRET="..."     # for Stripe webhook verification
+STRIPE_CONNECT_WEBHOOK_SECRET="..." # for connected-account event verification
 PAYMENT_PROVIDER="ledger|stripe"
 ```
 

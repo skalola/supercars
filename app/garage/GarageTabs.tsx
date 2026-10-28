@@ -3,7 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState, useTransition, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 import { removeClaimedVehicle, removeSavedGarageItem, toggleGarageAlert } from "@/app/actions/garage";
+import GaragePartListings, { type GaragePartCatalogOptions } from "./GaragePartListings";
+import type { GaragePartListing } from "@/lib/parts/user-part-marketplace";
 
 export type GarageClaimedVehicle = {
   id: string;
@@ -54,15 +57,18 @@ type GarageTabsProps = {
   claimedVehicles: GarageClaimedVehicle[];
   savedVehicles: GarageSavedVehicle[];
   previousVehicles?: GaragePreviousVehicle[];
+  partListings?: GaragePartListing[];
+  partCatalog?: GaragePartCatalogOptions | null;
   isOwner?: boolean;
 };
 
-type ActiveTab = "claimed" | "saved" | "previouslyOwned";
+type ActiveTab = "claimed" | "saved" | "previouslyOwned" | "partsForSale";
 type PendingRemoval =
   | { kind: "claimed"; id: string; label: string }
   | { kind: "saved"; id: string; label: string };
 
-export default function GarageTabs({ claimedVehicles, savedVehicles, previousVehicles = [], isOwner = true }: GarageTabsProps) {
+export default function GarageTabs({ claimedVehicles, savedVehicles, previousVehicles = [], partListings = [], partCatalog = null, isOwner = true }: GarageTabsProps) {
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<ActiveTab>(claimedVehicles.length > 0 || savedVehicles.length === 0 ? "claimed" : "saved");
   const [localClaimedVehicles, setLocalClaimedVehicles] = useState(claimedVehicles);
   const [localSavedVehicles, setLocalSavedVehicles] = useState(savedVehicles);
@@ -78,12 +84,18 @@ export default function GarageTabs({ claimedVehicles, savedVehicles, previousVeh
       ? localClaimedVehicles.length
       : activeTab === "saved"
         ? localSavedVehicles.length
-        : previouslyOwnedCount;
+        : activeTab === "previouslyOwned"
+          ? previouslyOwnedCount
+          : partListings.length;
   const pageCount = Math.max(1, Math.ceil(activeCount / pageSize));
   const activePage = Math.min(collectionPage, pageCount - 1);
   const visibleClaimedVehicles = localClaimedVehicles.slice(activePage * pageSize, activePage * pageSize + pageSize);
   const visibleSavedVehicles = localSavedVehicles.slice(activePage * pageSize, activePage * pageSize + pageSize);
   const visiblePreviousVehicles = previousVehicles.slice(activePage * pageSize, activePage * pageSize + pageSize);
+
+  useEffect(() => {
+    if (searchParams.get("tab") === "partsForSale") setActiveTab("partsForSale");
+  }, [searchParams]);
 
   return (
     <section className="garage-collection-shell">
@@ -118,9 +130,21 @@ export default function GarageTabs({ claimedVehicles, savedVehicles, previousVeh
           <span>Previously Owned</span>
           <strong>{previouslyOwnedCount}</strong>
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "partsForSale"}
+          onClick={() => selectTab("partsForSale")}
+          className={activeTab === "partsForSale" ? "is-active" : undefined}
+        >
+          <span>Parts for Sale</span>
+          <strong>{partListings.length}</strong>
+        </button>
       </div>
 
-      {activeCount === 0 ? (
+      {activeTab === "partsForSale" ? (
+        <GaragePartListings listings={partListings} isOwner={isOwner} catalog={partCatalog} initialPurchaseListingId={searchParams.get("listing")} />
+      ) : activeCount === 0 ? (
         <div className="garage-collection-empty">
           <div className="garage-collection-empty-mark" aria-hidden="true">SD</div>
           <div>
@@ -303,7 +327,7 @@ export default function GarageTabs({ claimedVehicles, savedVehicles, previousVeh
           ))}
         </div>
       ) : null}
-      {activeCount > pageSize ? (
+      {activeTab !== "partsForSale" && activeCount > pageSize ? (
         <GarageCarouselControls
           activePage={activePage}
           pageCount={pageCount}

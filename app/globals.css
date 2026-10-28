@@ -3206,6 +3206,689 @@ canvas {
   margin: 0;
 }
 
+/* Garage peer-to-peer parts marketplace */
+.garage-parts-marketplace {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding-top: 16px;
+}
+
+.garage-parts-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(13, 14, 16, 0.88);
+}
+
+.garage-parts-toolbar > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.garage-parts-toolbar strong {
+  color: #fff;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+}
+
+.garage-parts-toolbar span {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 12px;
+}
+
+.garage-parts-toolbar button,
+.garage-collection-empty > button {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0 18px;
+  border: 1px solid #ef233c;
+  border-radius: 5px;
+  background: #e20f1b;
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.garage-part-listing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(310px, 100%), 1fr));
+  gap: 14px;
+  min-width: 0;
+}
+
+.garage-part-listing-card {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 7px;
+  background: linear-gradient(145deg, rgba(27, 29, 32, 0.96), rgba(8, 9, 11, 0.98));
+  color: #fff;
+}
+
+.garage-part-listing-image {
+  position: relative;
+  display: grid;
+  min-height: 190px;
+  place-items: center;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.1), transparent 56%), #111317;
+}
+
+.garage-part-listing-image img {
+  width: 100%;
+  height: 210px;
+  object-fit: contain;
+  padding: 12px;
+}
+
+.garage-part-listing-image > span {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.garage-part-listing-image > em {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 5px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  background: rgba(8, 9, 11, 0.86);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.garage-part-listing-image > em[data-status="ACTIVE"] {
+  border-color: rgba(75, 220, 120, 0.55);
+  color: #69e58f;
+}
+
+.garage-part-listing-body {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  padding: 15px;
+}
+
+.garage-part-listing-body > span {
+  color: #ef233c;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.garage-part-listing-body h2 {
+  margin: 0;
+  color: #fff;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.garage-part-listing-body > p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 12px;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.garage-part-listing-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.garage-part-listing-meta > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.garage-part-listing-meta em {
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.garage-part-listing-meta strong {
+  overflow: hidden;
+  color: #fff;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.garage-part-listing-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px 15px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.garage-part-listing-actions button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.garage-part-listing-actions button.is-primary {
+  border-color: #ef233c;
+  background: #e20f1b;
+}
+
+.garage-part-listing-actions button.is-danger {
+  margin-left: auto;
+  color: #ff6673;
+}
+
+.garage-part-listing-actions.is-public {
+  color: rgba(255, 255, 255, 0.46);
+  font-size: 11px;
+}
+
+.garage-part-editor-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  padding: clamp(10px, 3vw, 32px);
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(12px);
+}
+
+.garage-part-editor {
+  display: grid;
+  gap: 18px;
+  width: min(900px, 100%);
+  margin: auto;
+  padding: clamp(18px, 3vw, 28px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: #0c0d0f;
+  color: #fff;
+  box-shadow: 0 36px 120px rgba(0, 0, 0, 0.68);
+}
+
+.garage-part-editor > header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.garage-part-editor > header > div {
+  display: grid;
+  gap: 4px;
+}
+
+.garage-part-editor > header span {
+  color: #ef233c;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.garage-part-editor h2 {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(22px, 4vw, 30px);
+}
+
+.garage-part-editor > header > button {
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 50%;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  font-size: 24px;
+}
+
+.garage-part-payment-notice {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 3px 16px;
+  padding: 13px 15px;
+  border: 1px solid rgba(240, 181, 58, 0.36);
+  border-radius: 5px;
+  background: rgba(240, 181, 58, 0.08);
+}
+
+.garage-part-payment-notice strong,
+.garage-part-payment-notice span {
+  grid-column: 1;
+}
+
+.garage-part-payment-notice strong { color: #f3c55d; font-size: 13px; }
+.garage-part-payment-notice span { color: rgba(255, 255, 255, 0.62); font-size: 11px; }
+.garage-part-payment-notice a { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: #fff; font-size: 11px; font-weight: 900; text-transform: uppercase; }
+
+.garage-part-editor fieldset {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px;
+  min-width: 0;
+  margin: 0;
+  padding: 17px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+}
+
+.garage-part-editor legend {
+  padding: 0 8px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.garage-part-editor label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 10px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.garage-part-editor label.is-wide,
+.garage-part-photo-grid.is-wide {
+  grid-column: 1 / -1;
+}
+
+.garage-part-compliance-notice {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(240, 181, 58, 0.36);
+  border-radius: 5px;
+  background: rgba(240, 181, 58, 0.08);
+}
+
+.garage-part-compliance-notice strong { color: #f3c55d; font-size: 12px; }
+.garage-part-compliance-notice span { color: rgba(255, 255, 255, 0.62); font-size: 11px; }
+
+.garage-part-seller-attestation {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 11px !important;
+  padding: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(255, 255, 255, 0.72) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  line-height: 1.55;
+  text-transform: none !important;
+}
+
+.garage-part-seller-attestation input {
+  width: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  margin: 1px 0 0;
+  padding: 0;
+  accent-color: #e20f1b;
+}
+
+.garage-part-seller-attestation a { color: #fff; }
+
+.garage-part-editor input,
+.garage-part-editor select,
+.garage-part-editor textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  outline: 0;
+  background: #15171a;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: none;
+}
+
+.garage-part-editor textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.garage-part-editor input:focus,
+.garage-part-editor select:focus,
+.garage-part-editor textarea:focus {
+  border-color: #ef233c;
+  box-shadow: 0 0 0 2px rgba(239, 35, 60, 0.14);
+}
+
+.garage-part-photo-input span {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 10px;
+  text-transform: none;
+}
+
+.garage-part-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 8px;
+}
+
+.garage-part-photo-grid > div {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 4px;
+  background: #15171a;
+}
+
+.garage-part-photo-grid img { width: 100%; height: 100%; object-fit: cover; }
+.garage-part-photo-grid button { position: absolute; top: 5px; right: 5px; width: 26px; height: 26px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.78); color: #fff; cursor: pointer; }
+
+.garage-part-editor-error {
+  margin: 0;
+  padding: 11px 13px;
+  border: 1px solid rgba(239, 35, 60, 0.42);
+  border-radius: 4px;
+  background: rgba(239, 35, 60, 0.08);
+  color: #ff8a95;
+  font-size: 12px;
+}
+
+.garage-part-editor > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.garage-part-editor > footer button {
+  min-width: 130px;
+  min-height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.garage-part-editor > footer button.is-primary { border-color: #ef233c; background: #e20f1b; }
+.garage-part-editor > footer button:disabled { cursor: progress; opacity: 0.65; }
+
+.garage-part-purchase-modal {
+  display: grid;
+  gap: 18px;
+  width: min(760px, 100%);
+  margin: auto;
+  padding: clamp(18px, 3vw, 28px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: #0c0d0f;
+  color: #fff;
+  box-shadow: 0 36px 120px rgba(0, 0, 0, 0.68);
+}
+
+.garage-part-purchase-modal > header,
+.garage-part-purchase-modal > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.garage-part-purchase-modal > header div { display: grid; gap: 4px; }
+.garage-part-purchase-modal > header span { color: #ef233c; font-size: 10px; font-weight: 900; text-transform: uppercase; }
+.garage-part-purchase-modal h2 { margin: 0; color: #fff; font-size: clamp(21px, 4vw, 28px); }
+.garage-part-purchase-modal > header > button { width: 38px; height: 38px; border: 1px solid rgba(255,255,255,.16); border-radius: 50%; background: transparent; color: #fff; cursor: pointer; font-size: 24px; }
+
+.garage-part-purchase-summary {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(0, 1.3fr);
+  gap: 20px;
+}
+
+.garage-part-purchase-image {
+  position: relative;
+  min-height: 220px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: #15171a;
+}
+
+.garage-part-purchase-image img { object-fit: contain; padding: 10px; }
+.garage-part-purchase-summary > div:last-child { display: grid; align-content: start; gap: 7px; min-width: 0; }
+.garage-part-purchase-summary > div:last-child > span { color: #ef233c; font-size: 10px; font-weight: 900; text-transform: uppercase; }
+.garage-part-purchase-summary > div:last-child > strong { font-size: 14px; }
+.garage-part-purchase-summary p { margin: 2px 0 6px; color: rgba(255,255,255,.62); font-size: 12px; line-height: 1.5; }
+.garage-part-purchase-summary dl,
+.part-order-panel dl { display: grid; gap: 8px; margin: 0; }
+.garage-part-purchase-summary dl div,
+.part-order-panel dl div { display: flex; justify-content: space-between; gap: 16px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,.09); }
+.garage-part-purchase-summary dt,
+.part-order-panel dt { color: rgba(255,255,255,.5); font-size: 11px; }
+.garage-part-purchase-summary dd,
+.part-order-panel dd { margin: 0; color: #fff; font-size: 11px; font-weight: 800; text-align: right; }
+.garage-part-purchase-summary .is-total,
+.part-order-panel .is-total { padding-top: 5px; border: 0; }
+.garage-part-purchase-summary .is-total dd,
+.part-order-panel .is-total dd { color: #fff; font-size: 18px; }
+
+.garage-part-purchase-terms {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 10px;
+  align-items: start;
+  color: rgba(255,255,255,.68);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.garage-part-purchase-terms input { width: 18px; height: 18px; margin: 0; accent-color: #e20f1b; }
+.garage-part-purchase-terms a { color: #fff; }
+.garage-part-purchase-modal > footer { justify-content: flex-end; }
+.garage-part-purchase-modal > footer button { min-height: 44px; padding: 0 18px; border: 1px solid rgba(255,255,255,.18); border-radius: 5px; background: rgba(255,255,255,.05); color: #fff; cursor: pointer; font-size: 11px; font-weight: 900; text-transform: uppercase; }
+.garage-part-purchase-modal > footer button.is-primary { border-color: #ef233c; background: #e20f1b; }
+.garage-part-purchase-modal > footer button:disabled { cursor: not-allowed; opacity: .48; }
+
+.part-order-page {
+  min-height: calc(100vh - var(--site-header-height, 72px));
+  padding: clamp(28px, 5vw, 72px) clamp(16px, 4vw, 42px);
+  background: radial-gradient(circle at 70% 10%, rgba(226, 15, 27, 0.13), transparent 32%), #08090b;
+  color: #fff;
+}
+
+.part-order-panel {
+  display: grid;
+  gap: 22px;
+  width: min(920px, 100%);
+  margin: 0 auto;
+  padding: clamp(20px, 4vw, 34px);
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 8px;
+  background: rgba(13,14,16,.94);
+}
+
+.part-order-eyebrow { color: #ef233c; font-size: 11px; font-weight: 900; text-transform: uppercase; }
+.part-order-heading { display: flex; align-items: start; justify-content: space-between; gap: 18px; }
+.part-order-heading h1 { margin: 0; font-size: clamp(24px, 5vw, 38px); line-height: 1.1; }
+.part-order-heading p { margin: 7px 0 0; color: rgba(255,255,255,.4); font-size: 10px; overflow-wrap: anywhere; }
+.part-order-heading > strong { flex: 0 0 auto; padding: 7px 10px; border: 1px solid rgba(255,255,255,.17); border-radius: 4px; color: rgba(255,255,255,.72); font-size: 10px; text-transform: uppercase; }
+.part-order-heading > strong[data-status="PAID"],
+.part-order-heading > strong[data-status="FULFILLED"],
+.part-order-heading > strong[data-status="COMPLETED"] { border-color: rgba(74,220,119,.5); color: #69e58f; }
+.part-order-heading > strong[data-status="REFUNDED"] { border-color: rgba(243,208,110,.5); color: #f3d06e; }
+.part-order-heading > strong[data-status="DISPUTED"],
+.part-order-heading > strong[data-status="CHARGEBACK"] { border-color: rgba(239,35,60,.55); color: #ff7c87; }
+.part-order-dispute { display: grid; grid-template-columns: minmax(180px,.55fr) minmax(0,1fr); gap: 8px 20px; padding: 16px 18px; border: 1px solid rgba(239,35,60,.42); border-radius: 6px; background: rgba(239,35,60,.07); }
+.part-order-dispute span { color: #ff6673; font-size: 9px; font-weight: 900; text-transform: uppercase; }
+.part-order-dispute h2 { margin: 3px 0 0; font-size: 16px; }
+.part-order-dispute p { grid-column: 2; grid-row: 1; margin: 0; color: rgba(255,255,255,.68); font-size: 11px; line-height: 1.55; }
+.part-order-dispute small { grid-column: 2; color: rgba(255,255,255,.42); font-size: 9px; text-transform: uppercase; }
+.part-order-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 14px; }
+.part-order-grid article { padding: 18px; border: 1px solid rgba(255,255,255,.11); border-radius: 6px; background: rgba(255,255,255,.025); }
+.part-order-grid h2 { margin: 0 0 15px; font-size: 14px; text-transform: uppercase; }
+.part-order-grid article > p { margin: 0 0 7px; font-size: 15px; font-weight: 800; }
+.part-order-grid small { color: rgba(255,255,255,.48); }
+.part-order-grid .part-order-shipping { margin-top: 18px; color: rgba(255,255,255,.67); font-size: 12px; font-weight: 500; line-height: 1.5; }
+.part-order-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.part-order-actions a { display: inline-flex; align-items: center; min-height: 42px; padding: 0 16px; border: 1px solid rgba(255,255,255,.18); border-radius: 5px; color: #fff; font-size: 11px; font-weight: 900; text-decoration: none; text-transform: uppercase; }
+.part-order-actions a:last-child { border-color: #ef233c; background: #e20f1b; }
+.part-order-delivery { display: flex; align-items: center; gap: 20px; padding: 16px 18px; border: 1px solid rgba(74,220,119,.3); border-radius: 6px; background: rgba(74,220,119,.04); }
+.part-order-delivery > div { margin-right: auto; }
+.part-order-delivery span, .part-order-workflow > div > span { color: #69e58f; font-size: 9px; font-weight: 900; text-transform: uppercase; }
+.part-order-delivery h2, .part-order-workflow h2 { margin: 3px 0 0; font-size: 16px; }
+.part-order-delivery p { display: grid; gap: 3px; margin: 0; }
+.part-order-delivery small { color: rgba(255,255,255,.45); font-size: 9px; text-transform: uppercase; }
+.part-order-delivery strong { font-size: 12px; overflow-wrap: anywhere; }
+.part-order-delivery a { color: #fff; font-size: 11px; font-weight: 900; text-transform: uppercase; }
+.part-order-workflow { position: relative; display: grid; grid-template-columns: minmax(180px,.7fr) minmax(0,1.3fr); gap: 18px; padding: 18px; border: 1px solid rgba(239,35,60,.3); border-radius: 6px; background: rgba(239,35,60,.035); }
+.part-order-workflow > div > p { max-width: 440px; margin: 7px 0 0; color: rgba(255,255,255,.56); font-size: 11px; line-height: 1.5; }
+.part-order-workflow form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.part-order-workflow label { display: grid; gap: 5px; color: rgba(255,255,255,.55); font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.part-order-workflow label.is-wide { grid-column: 1 / -1; }
+.part-order-workflow input, .part-order-workflow textarea { width: 100%; border: 1px solid rgba(255,255,255,.16); border-radius: 4px; background: #101216; color: #fff; font: inherit; font-size: 12px; padding: 10px; text-transform: none; }
+.part-order-workflow textarea { resize: vertical; }
+.part-order-workflow button, .part-order-confirm button { min-height: 42px; padding: 0 16px; border: 1px solid rgba(255,255,255,.18); border-radius: 4px; background: rgba(255,255,255,.05); color: #fff; cursor: pointer; font-size: 10px; font-weight: 900; text-transform: uppercase; }
+.part-order-workflow form > button { grid-column: 1 / -1; justify-self: end; }
+.part-order-workflow button.is-primary { border-color: #ef233c; background: #e20f1b; }
+.part-order-workflow > button.is-danger { grid-column: 2; justify-self: end; color: #ff7c87; }
+.part-order-workflow.is-compact { align-items: center; }
+.part-order-workflow.is-compact > button { grid-column: auto; }
+.part-order-workflow button:disabled, .part-order-confirm button:disabled { cursor: progress; opacity: .55; }
+.part-order-message { grid-column: 1 / -1; margin: 0; color: #f3d06e; font-size: 11px; }
+.part-order-confirm-backdrop { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 18px; background: rgba(0,0,0,.78); backdrop-filter: blur(8px); }
+.part-order-confirm { display: grid; gap: 13px; width: min(480px,100%); padding: 24px; border: 1px solid rgba(239,35,60,.5); border-radius: 7px; background: #0d0e11; box-shadow: 0 30px 100px rgba(0,0,0,.75); }
+.part-order-confirm > span { color: #ef233c; font-size: 9px; font-weight: 900; text-transform: uppercase; }
+.part-order-confirm h2 { margin: 0; font-size: 22px; }
+.part-order-confirm p { margin: 0; color: rgba(255,255,255,.62); font-size: 12px; line-height: 1.55; }
+.part-order-confirm > div { display: flex; justify-content: flex-end; gap: 9px; }
+.part-order-confirm button.is-danger { border-color: #ef233c; background: #e20f1b; }
+.part-order-report-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; border: 1px solid rgba(255,255,255,.1); border-radius: 5px; }
+.part-order-report-row > div { display: grid; gap: 3px; }
+.part-order-report-row strong { font-size: 12px; }
+.part-order-report-row span { color: rgba(255,255,255,.5); font-size: 10px; }
+.part-order-report-row button { min-height: 38px; padding: 0 13px; border: 1px solid rgba(255,255,255,.18); border-radius: 4px; background: transparent; color: #fff; cursor: pointer; font-size: 9px; font-weight: 900; text-transform: uppercase; }
+.part-order-issue-modal label { display: grid; gap: 6px; color: rgba(255,255,255,.55); font-size: 9px; font-weight: 850; text-transform: uppercase; }
+.part-order-issue-modal select, .part-order-issue-modal textarea { width: 100%; padding: 10px; border: 1px solid rgba(255,255,255,.16); border-radius: 4px; background: #101216; color: #fff; font: inherit; font-size: 12px; text-transform: none; }
+.part-order-issue-modal textarea { resize: vertical; }
+.part-order-issue-status { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px 18px; padding: 16px 18px; border: 1px solid rgba(243,208,110,.28); border-radius: 6px; background: rgba(243,208,110,.035); }
+.part-order-issue-status span { color: #f3d06e; font-size: 9px; font-weight: 900; text-transform: uppercase; }
+.part-order-issue-status h2 { margin: 3px 0 0; font-size: 15px; }
+.part-order-issue-status > b { align-self: start; padding: 5px 7px; border: 1px solid rgba(243,208,110,.35); border-radius: 3px; color: #f3d06e; font-size: 9px; text-transform: uppercase; }
+.part-order-issue-status p, .part-order-issue-status small { grid-column: 1 / -1; margin: 0; color: rgba(255,255,255,.62); font-size: 11px; line-height: 1.5; }
+
+.transaction-part-orders {
+  display: grid;
+  gap: 14px;
+  width: min(1480px, calc(100% - 32px));
+  margin: 24px auto 0;
+  padding: 18px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 7px;
+  background: rgba(11,12,14,.92);
+  color: #fff;
+}
+.transaction-part-orders > div:first-child span { color: #ef233c; font-size: 10px; font-weight: 900; text-transform: uppercase; }
+.transaction-part-orders h2 { margin: 3px 0 0; font-size: 21px; }
+.transaction-part-order-list { display: grid; gap: 7px; }
+.transaction-part-order-list a { display: grid; grid-template-columns: 80px minmax(180px, 1fr) minmax(130px, .55fr) 100px 110px; gap: 12px; align-items: center; min-height: 54px; padding: 9px 12px; border: 1px solid rgba(255,255,255,.09); border-radius: 4px; color: #fff; text-decoration: none; }
+.transaction-part-order-list a:hover { border-color: rgba(239,35,60,.45); background: rgba(239,35,60,.05); }
+.transaction-part-order-list span { color: #ef233c; font-size: 9px; font-weight: 900; text-transform: uppercase; }
+.transaction-part-order-list strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.transaction-part-order-list small { overflow: hidden; color: rgba(255,255,255,.5); text-overflow: ellipsis; white-space: nowrap; }
+.transaction-part-order-list em { font-size: 12px; font-style: normal; font-weight: 850; text-align: right; }
+.transaction-part-order-list b { padding: 5px 7px; border: 1px solid rgba(255,255,255,.14); border-radius: 3px; color: rgba(255,255,255,.65); font-size: 9px; text-align: center; text-transform: uppercase; }
+.transaction-part-order-list b[data-status="PAID"], .transaction-part-order-list b[data-status="FULFILLED"], .transaction-part-order-list b[data-status="COMPLETED"] { border-color: rgba(74,220,119,.45); color: #69e58f; }
+
+@media (max-width: 700px) {
+  .garage-parts-toolbar { align-items: stretch; flex-direction: column; }
+  .garage-parts-toolbar button { width: 100%; }
+  .garage-part-listing-grid { grid-template-columns: 1fr; }
+  .garage-part-listing-card { grid-template-columns: 112px minmax(0, 1fr); grid-template-rows: auto auto; }
+  .garage-part-listing-image { min-height: 100%; }
+  .garage-part-listing-image img { height: 100%; min-height: 150px; padding: 7px; }
+  .garage-part-listing-image > em { top: 7px; left: 7px; max-width: calc(100% - 14px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .garage-part-listing-body { padding: 12px; }
+  .garage-part-listing-body h2 { font-size: 15px; }
+  .garage-part-listing-body > p { -webkit-line-clamp: 2; }
+  .garage-part-listing-meta { grid-template-columns: 1fr; gap: 6px; }
+  .garage-part-listing-meta > span:nth-child(n + 3) { display: none; }
+  .garage-part-listing-actions { grid-column: 1 / -1; }
+  .garage-part-editor-backdrop { padding: 0; }
+  .garage-part-editor { width: 100%; min-height: 100dvh; margin: 0; border: 0; border-radius: 0; }
+  .garage-part-editor fieldset { grid-template-columns: 1fr; padding: 14px; }
+  .garage-part-editor label.is-wide,
+  .garage-part-photo-grid.is-wide { grid-column: auto; }
+  .garage-part-payment-notice { grid-template-columns: 1fr; }
+  .garage-part-payment-notice a { grid-column: 1; grid-row: auto; margin-top: 6px; }
+  .garage-part-editor > footer { position: sticky; bottom: 0; z-index: 1; margin: 0 -18px -18px; padding: 12px 18px calc(12px + env(safe-area-inset-bottom)); background: rgba(12, 13, 15, 0.96); backdrop-filter: blur(10px); }
+  .garage-part-editor > footer button { min-width: 0; flex: 1; }
+  .garage-part-purchase-modal { width: 100%; min-height: 100dvh; margin: 0; border: 0; border-radius: 0; align-content: start; }
+  .garage-part-purchase-summary { grid-template-columns: 1fr; }
+  .garage-part-purchase-image { min-height: 190px; }
+  .garage-part-purchase-modal > footer { position: sticky; bottom: 0; margin: auto -18px -18px; padding: 12px 18px calc(12px + env(safe-area-inset-bottom)); background: rgba(12,13,15,.96); }
+  .garage-part-purchase-modal > footer button { flex: 1; padding: 0 10px; }
+  .part-order-heading { align-items: stretch; flex-direction: column; }
+  .part-order-heading > strong { align-self: start; }
+  .part-order-grid { grid-template-columns: 1fr; }
+  .part-order-delivery { align-items: stretch; flex-direction: column; gap: 12px; }
+  .part-order-workflow { grid-template-columns: 1fr; }
+  .part-order-dispute { grid-template-columns: 1fr; }
+  .part-order-dispute p, .part-order-dispute small { grid-column: 1; grid-row: auto; }
+  .part-order-workflow form { grid-template-columns: 1fr; }
+  .part-order-workflow label.is-wide, .part-order-workflow form > button { grid-column: auto; }
+  .part-order-workflow form > button, .part-order-workflow > button.is-danger { grid-column: auto; justify-self: stretch; }
+  .part-order-actions { flex-direction: column; }
+  .part-order-actions a { justify-content: center; }
+  .transaction-part-orders { width: calc(100% - 20px); padding: 14px; }
+  .transaction-part-order-list a { grid-template-columns: minmax(0, 1fr) auto; gap: 5px 12px; }
+  .transaction-part-order-list span,
+  .transaction-part-order-list small { grid-column: 1; }
+  .transaction-part-order-list strong { grid-column: 1; white-space: normal; }
+  .transaction-part-order-list em { grid-column: 2; grid-row: 2; }
+  .transaction-part-order-list b { grid-column: 2; grid-row: 1; }
+}
+
 @media (max-width: 1180px) {
   .garage-dashboard-layout {
     grid-template-columns: 1fr;
@@ -12906,6 +13589,147 @@ canvas {
   color: #bbf7d0;
 }
 
+.seller-payment-panel {
+  display: grid;
+  gap: 16px;
+  padding: clamp(18px, 3vw, 24px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.seller-payment-heading,
+.seller-payment-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.seller-payment-heading span {
+  color: #ef3340;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.seller-payment-heading h2 {
+  margin: 3px 0 0;
+  color: #fff;
+  font-size: 24px;
+}
+
+.seller-payment-status {
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.seller-payment-status.is-ready {
+  border-color: rgba(34, 197, 94, 0.42);
+  color: #86efac;
+}
+
+.seller-payment-status.is-attention {
+  border-color: rgba(248, 113, 113, 0.42);
+  color: #fecaca;
+}
+
+.seller-payment-panel > p,
+.seller-payment-panel > small {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.62);
+  line-height: 1.55;
+}
+
+.seller-payment-panel ul {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.seller-payment-panel li {
+  padding: 11px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 12px;
+}
+
+.seller-payment-panel li.is-complete {
+  border-color: rgba(34, 197, 94, 0.26);
+  color: #bbf7d0;
+}
+
+.seller-payment-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.seller-payment-actions form {
+  margin: 0;
+}
+
+.seller-payment-actions button {
+  min-height: 42px;
+  padding: 0 15px;
+  border: 1px solid rgba(229, 9, 20, 0.58);
+  border-radius: 5px;
+  background: #d80f1f;
+  color: #fff;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.seller-payment-actions button.is-secondary {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.seller-payment-notice {
+  padding: 10px 12px;
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.seller-payment-notice.is-success {
+  background: rgba(22, 101, 52, 0.24);
+  color: #bbf7d0;
+}
+
+.seller-payment-notice.is-error {
+  background: rgba(127, 29, 29, 0.28);
+  color: #fecaca;
+}
+
+@media (max-width: 680px) {
+  .seller-payment-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .seller-payment-panel ul {
+    grid-template-columns: 1fr;
+  }
+
+  .seller-payment-actions,
+  .seller-payment-actions form,
+  .seller-payment-actions button {
+    width: 100%;
+  }
+}
+
 .claim-page-shell {
   align-content: center;
   min-height: calc(100vh - 82px);
@@ -17648,6 +18472,110 @@ canvas {
 
 .admin-parts-modal-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-user-parts-marketplace { position: relative; display: grid; gap: 18px; margin-top: 18px; padding: clamp(16px, 3vw, 24px); }
+.admin-user-parts-marketplace > header { display: flex; justify-content: space-between; gap: 18px; }
+.admin-user-parts-marketplace > header h2 { margin: 3px 0 0; color: var(--foreground); font-size: 23px; }
+.admin-user-parts-marketplace > header p:last-child { max-width: 720px; margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.admin-user-parts-webhook-health { display: grid; align-content: start; justify-items: end; gap: 5px; flex: 0 0 auto; }
+.admin-user-parts-webhook-health span { color: var(--muted); font-size: 9px; font-weight: 850; text-transform: uppercase; }
+.admin-user-parts-webhook-health b { padding: 4px 7px; border: 1px solid rgba(220,38,38,.35); border-radius: 3px; color: #dc2626; font-size: 9px; text-transform: uppercase; }
+.admin-user-parts-webhook-health b[data-ready="true"] { border-color: rgba(22,163,74,.35); color: #16a34a; }
+.admin-user-parts-kpis { display: grid; grid-template-columns: repeat(auto-fit,minmax(130px,1fr)); gap: 10px; }
+.admin-user-parts-kpis > div { display: grid; gap: 8px; min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-soft); }
+.admin-user-parts-kpis span { color: var(--muted); font-size: 9px; font-weight: 850; text-transform: uppercase; }
+.admin-user-parts-kpis strong { overflow: hidden; color: var(--foreground); font-size: clamp(18px,2.2vw,28px); text-overflow: ellipsis; white-space: nowrap; }
+.admin-user-parts-tabs { display: flex; gap: 3px; border-bottom: 1px solid var(--line); }
+.admin-user-parts-tabs button { min-height: 40px; padding: 0 15px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 850; text-transform: uppercase; }
+.admin-user-parts-tabs button.is-active { border-color: var(--accent); color: var(--foreground); }
+.admin-user-parts-tabs b { margin-left: 6px; color: var(--accent); }
+.admin-user-parts-message { margin: 0; padding: 10px 12px; border: 1px solid var(--line); color: var(--foreground); font-size: 12px; }
+.admin-user-parts-list, .admin-user-part-orders { display: grid; gap: 7px; min-width: 0; }
+.admin-user-parts-list > article { display: grid; grid-template-columns: 72px minmax(190px,1fr) 90px 100px minmax(190px,auto); gap: 12px; align-items: center; min-width: 0; padding: 9px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-soft); }
+.admin-user-parts-image { position: relative; width: 72px; aspect-ratio: 1; overflow: hidden; border-radius: 3px; background: var(--surface); }
+.admin-user-parts-image img { object-fit: contain; }
+.admin-user-parts-image span { display: grid; place-items: center; height: 100%; color: var(--muted); font-size: 9px; }
+.admin-user-parts-list article > div:nth-child(2) { display: grid; gap: 3px; min-width: 0; }
+.admin-user-parts-list article > div:nth-child(2) > span { color: var(--accent); font-size: 9px; font-weight: 850; text-transform: uppercase; }
+.admin-user-parts-list article > div:nth-child(2) > strong { overflow: hidden; color: var(--foreground); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.admin-user-parts-list article small, .admin-user-parts-list article em { overflow: hidden; color: var(--muted); font-size: 10px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+.admin-user-parts-list article > b, .admin-user-part-orders b { padding: 5px 7px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); font-size: 9px; text-align: center; text-transform: uppercase; }
+.admin-user-parts-list article > strong { color: var(--foreground); font-size: 13px; text-align: right; }
+.admin-user-parts-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.admin-user-parts-actions a, .admin-user-parts-actions button { display: inline-flex; align-items: center; justify-content: center; min-height: 32px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 3px; background: var(--surface); color: var(--foreground); cursor: pointer; font-size: 9px; font-weight: 850; text-decoration: none; text-transform: uppercase; }
+.admin-user-parts-actions .is-danger { color: #dc2626; }
+.admin-user-part-orders a { display: grid; grid-template-columns: 90px minmax(180px,1fr) minmax(180px,.8fr) 110px 100px; gap: 12px; align-items: center; min-height: 48px; padding: 9px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-soft); color: var(--foreground); text-decoration: none; }
+.admin-user-part-orders span, .admin-user-part-orders small { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.admin-user-part-orders strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.admin-user-part-orders em { font-size: 12px; font-style: normal; font-weight: 850; text-align: right; }
+.admin-user-part-disputes { display: grid; gap: 7px; }
+.admin-user-part-disputes > a { display: grid; grid-template-columns: minmax(220px,1fr) 100px 120px 100px; gap: 12px; align-items: center; min-height: 58px; padding: 10px 12px; border: 1px solid rgba(220,38,38,.32); border-radius: var(--radius-sm); background: rgba(220,38,38,.035); color: var(--foreground); text-decoration: none; }
+.admin-user-part-disputes div { display: grid; gap: 3px; min-width: 0; }
+.admin-user-part-disputes span { color: #dc2626; font-size: 9px; font-weight: 850; text-transform: uppercase; }
+.admin-user-part-disputes strong, .admin-user-part-disputes small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-user-part-disputes strong { font-size: 12px; }
+.admin-user-part-disputes small { color: var(--muted); font-size: 10px; }
+.admin-user-part-disputes b { padding: 5px 7px; border: 1px solid rgba(220,38,38,.36); border-radius: 3px; color: #dc2626; font-size: 9px; text-align: center; text-transform: uppercase; }
+.admin-user-part-disputes em { font-size: 12px; font-style: normal; font-weight: 850; text-align: right; }
+.admin-user-parts-modal-backdrop { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 16px; background: rgba(0,0,0,.76); backdrop-filter: blur(7px); }
+.admin-user-parts-modal { display: grid; gap: 12px; width: min(470px,100%); padding: 22px; border: 1px solid rgba(220,38,38,.45); border-radius: var(--radius); background: var(--surface); box-shadow: 0 30px 100px rgba(0,0,0,.6); }
+.admin-user-parts-modal > span { color: var(--accent); font-size: 9px; font-weight: 900; text-transform: uppercase; }
+.admin-user-parts-modal h3, .admin-user-parts-modal p { margin: 0; }
+.admin-user-parts-modal p { color: var(--muted); font-size: 12px; }
+.admin-user-parts-modal label { display: grid; gap: 6px; color: var(--muted); font-size: 10px; font-weight: 850; text-transform: uppercase; }
+.admin-user-parts-modal textarea { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface-soft); color: var(--foreground); font: inherit; resize: vertical; text-transform: none; }
+.admin-user-parts-modal select { width: 100%; min-height: 42px; padding: 0 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface-soft); color: var(--foreground); font: inherit; text-transform: none; }
+.admin-user-parts-modal > div { display: flex; justify-content: flex-end; gap: 8px; }
+.admin-user-parts-modal button { min-height: 40px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 3px; background: var(--surface-soft); color: var(--foreground); cursor: pointer; font-size: 10px; font-weight: 850; text-transform: uppercase; }
+.admin-user-parts-modal button.is-danger { border-color: #dc2626; background: #dc2626; color: #fff; }
+.admin-user-parts-modal button:disabled { cursor: not-allowed; opacity: .5; }
+.admin-user-part-issues { display: grid; gap: 7px; }
+.admin-user-part-issues article { display: grid; grid-template-columns: minmax(170px,.7fr) minmax(220px,1.3fr) 90px 86px 72px; gap: 12px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-soft); }
+.admin-user-part-issues article > div { display: grid; gap: 3px; min-width: 0; }
+.admin-user-part-issues span { color: var(--accent); font-size: 9px; font-weight: 850; text-transform: uppercase; }
+.admin-user-part-issues strong, .admin-user-part-issues small, .admin-user-part-issues p { overflow: hidden; margin: 0; text-overflow: ellipsis; white-space: nowrap; }
+.admin-user-part-issues strong { color: var(--foreground); font-size: 12px; }
+.admin-user-part-issues small, .admin-user-part-issues p { color: var(--muted); font-size: 10px; }
+.admin-user-part-issues b { padding: 5px 7px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted); font-size: 9px; text-align: center; text-transform: uppercase; }
+.admin-user-part-issues a, .admin-user-part-issues button { display: inline-flex; align-items: center; justify-content: center; min-height: 32px; padding: 0 8px; border: 1px solid var(--line-strong); border-radius: 3px; background: var(--surface); color: var(--foreground); cursor: pointer; font-size: 9px; font-weight: 850; text-decoration: none; text-transform: uppercase; }
+
+@media (max-width: 900px) {
+  .admin-user-parts-kpis { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .admin-user-parts-marketplace > header { align-items: stretch; flex-direction: column; }
+  .admin-user-parts-webhook-health { justify-items: start; }
+  .admin-user-parts-list > article { grid-template-columns: 64px minmax(0,1fr) auto; }
+  .admin-user-parts-image { width: 64px; }
+  .admin-user-parts-list article > strong { text-align: left; }
+  .admin-user-parts-actions { grid-column: 1 / -1; justify-content: stretch; }
+  .admin-user-parts-actions > * { flex: 1; }
+  .admin-user-part-orders a { grid-template-columns: 82px minmax(0,1fr) auto; }
+  .admin-user-part-orders small { grid-column: 2; }
+  .admin-user-part-orders em { grid-column: 3; grid-row: 1 / 3; }
+  .admin-user-part-issues article { grid-template-columns: minmax(0,1fr) auto auto; }
+  .admin-user-part-disputes > a { grid-template-columns: minmax(0,1fr) auto; }
+  .admin-user-part-disputes > a > small { grid-column: 1; }
+  .admin-user-part-disputes b, .admin-user-part-disputes em { grid-column: 2; }
+  .admin-user-part-issues article > p { grid-column: 1 / -1; white-space: normal; }
+}
+
+@media (max-width: 560px) {
+  .admin-user-parts-kpis { grid-template-columns: 1fr 1fr; }
+  .admin-user-parts-kpis > div:nth-child(4) { grid-column: 1 / -1; }
+  .admin-user-parts-list > article { grid-template-columns: 58px minmax(0,1fr); }
+  .admin-user-parts-image { width: 58px; }
+  .admin-user-parts-list article > b, .admin-user-parts-list article > strong { grid-column: auto; }
+  .admin-user-part-orders a { grid-template-columns: minmax(0,1fr) auto; }
+  .admin-user-part-orders span { grid-column: 1; }
+  .admin-user-part-orders strong { grid-column: 1; }
+  .admin-user-part-orders small { grid-column: 1; }
+  .admin-user-part-orders b { grid-column: 2; grid-row: 1; }
+  .admin-user-part-orders em { grid-column: 2; grid-row: 2 / 4; }
+  .part-order-report-row { align-items: stretch; flex-direction: column; }
+  .part-order-report-row button { width: 100%; }
+  .admin-user-part-issues article { grid-template-columns: 1fr 1fr; }
+  .admin-user-part-disputes > a { grid-template-columns: minmax(0,1fr) auto; }
+  .admin-user-part-issues article > div, .admin-user-part-issues article > p { grid-column: 1 / -1; }
 }
 
 .directory-tabs {

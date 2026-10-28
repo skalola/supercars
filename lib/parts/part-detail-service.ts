@@ -4,6 +4,7 @@ import { getAvailableOffers } from "@/lib/parts/vehicle-parts-service";
 import { buildVehiclePerformanceProfile } from "@/lib/parts/build-profile";
 import { describeVehicleBuild, rankBuildAwarePartRecommendations } from "@/lib/parts/recommendations";
 import { toBuildCategorySlug } from "@/lib/parts/category-system";
+import { getCompatibleUserPartOffers, paginateStorefrontOffers, prioritizeStorefrontOffers } from "@/lib/parts/user-part-storefront";
 import {
   buildPerformanceProjection,
   getPartRecommendation,
@@ -224,12 +225,24 @@ export async function getVehiclePartTypeDetail(input: PartDetailContextInput) {
     componentSlug: mapping.componentType.slug,
     categorySlug: mapping.componentType.category.slug,
     year: selectedYear,
-    page: input.offerPage,
+    page: 1,
+    pageSize: 100,
     cacheOnly: !input.refreshOffers,
     ...(input.refreshOffers ? { forceRefresh: true } : {}),
   });
-  const offers = offerPayload?.offers ?? [];
-  const groupedOffers = groupPartOffers(offers);
+  const supplierOffers = offerPayload?.offers ?? [];
+  const userOffers = await getCompatibleUserPartOffers({
+    makeId: mapping.model.make.id,
+    modelId: mapping.model.id,
+    componentTypeId: mapping.componentType.id,
+    year: selectedYear ?? null,
+  });
+  const prioritizedOffers = prioritizeStorefrontOffers(supplierOffers, userOffers);
+  const allGroupedOffers = groupPartOffers(prioritizedOffers);
+  const storefrontPageSize = 5;
+  const storefrontPage = Math.max(1, Math.floor(input.offerPage || 1));
+  const storefrontOffers = paginateStorefrontOffers(allGroupedOffers, storefrontPage, storefrontPageSize);
+  const groupedOffers = storefrontOffers.items;
 
   return {
     partType: {
@@ -310,16 +323,11 @@ export async function getVehiclePartTypeDetail(input: PartDetailContextInput) {
     maintenance: mapping.componentType.maintenanceLinks,
     availableAt: groupedOffers,
     offerSummary: {
-      rawOfferCount: offers.length,
-      productCount: groupedOffers.length,
-      providerCount: new Set(offers.map((offer) => offer.provider)).size,
+      rawOfferCount: prioritizedOffers.length,
+      productCount: allGroupedOffers.length,
+      providerCount: new Set(prioritizedOffers.map((offer) => offer.provider)).size,
       cache: offerPayload?.cache ?? null,
-      pagination: offerPayload?.pagination ?? {
-        page: 1,
-        pageSize: 5,
-        hasPrevious: false,
-        hasMore: false,
-      },
+      pagination: storefrontOffers.pagination,
     },
   };
 }
@@ -510,7 +518,7 @@ function isMaintenanceDue(
 
 export function groupPartOffers<T extends {
   id: string; provider: string; title: string; manufacturer: string | null; manufacturerPartNumber: string | null; oemPartNumber: string | null;
-  priceCents: number | null; currency: string; qualityTier: string; imageUrl: string | null; condition: string | null; sellerName: string | null;
+  priceCents: number | null; currency: string; qualityTier: string; imageUrl: string | null; condition: string | null; sellerName: string | null; offerKind?: string;
   sellerFeedbackPercentage: number | null; shippingCostCents: number | null; shippingCurrency: string | null; fitmentConfidence: string; buyUrl: string;
 }>(offers: T[]) {
   const groups = new Map<string, T[]>();

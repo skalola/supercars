@@ -3,21 +3,36 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ProfileEditForm } from "./ProfileEditForm";
+import { SellerPaymentPanel } from "./SellerPaymentPanel";
 
-export default async function EditProfilePage() {
+export default async function EditProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ seller?: string }>;
+}) {
   const session = await auth();
   const userId = session?.user?.id as string | undefined;
   if (!userId) redirect("/login");
 
-  const user = await prisma.user.findUnique({
+  const [user, params] = await Promise.all([prisma.user.findUnique({
     where: { id: userId },
     select: {
       name: true,
       username: true,
       email: true,
       image: true,
+      sellerPaymentAccount: {
+        select: {
+          onboardingStatus: true,
+          chargesEnabled: true,
+          payoutsEnabled: true,
+          requirementsDue: true,
+          disabledReason: true,
+          lastSyncedAt: true,
+        },
+      },
     },
-  });
+  }), searchParams]);
 
   if (!user) redirect("/login");
 
@@ -43,6 +58,8 @@ export default async function EditProfilePage() {
           </div>
           <ProfileEditForm user={user} />
         </div>
+
+        <SellerPaymentPanel account={user.sellerPaymentAccount} notice={params.seller} />
       </section>
     </main>
   );

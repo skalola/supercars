@@ -254,6 +254,7 @@ export async function getAvailableOffers(input: {
   categorySlug?: string;
   year?: number | null;
   page?: number;
+  pageSize?: number;
   forceRefresh?: boolean;
   cacheOnly?: boolean;
 }) {
@@ -301,7 +302,8 @@ export async function getAvailableOffers(input: {
 
   const now = new Date();
   const page = Math.max(1, Math.floor(input.page || 1));
-  if (input.cacheOnly) return buildComponentOfferResponse(mapping, false, page);
+  const pageSize = Math.min(100, Math.max(1, Math.floor(input.pageSize || COMPONENT_OFFER_PAGE_SIZE)));
+  if (input.cacheOnly) return buildComponentOfferResponse(mapping, false, page, pageSize);
   const retryMs = mapping.lastOfferSearchStatus === "RUNNING"
     ? RUNNING_LOCK_TTL_MS
     : ["FAILED", "API_ERROR", "ZERO_OFFERS", "SEARCH_EXHAUSTED", "LOW_CONFIDENCE_ONLY"].includes(mapping.lastOfferSearchStatus)
@@ -309,7 +311,7 @@ export async function getAvailableOffers(input: {
       : COMPONENT_OFFER_TTL_MS;
   const cacheFresh = !input.forceRefresh && mapping.lastOfferSearchAt && mapping.lastOfferSearchAt > new Date(now.getTime() - retryMs);
   if (cacheFresh || mapping.lastOfferSearchStatus === "RUNNING") {
-    return buildComponentOfferResponse(mapping, false, page);
+    return buildComponentOfferResponse(mapping, false, page, pageSize);
   }
 
   const claim = await prisma.modelPartComponent.updateMany({
@@ -324,7 +326,7 @@ export async function getAvailableOffers(input: {
     },
     data: { lastOfferSearchAt: now, lastOfferSearchStatus: "RUNNING" },
   });
-  if (claim.count === 0) return buildComponentOfferResponse(mapping, false, page);
+  if (claim.count === 0) return buildComponentOfferResponse(mapping, false, page, pageSize);
 
   try {
     const [knownMakes, knownModels, preferredBrands, refreshData] = await Promise.all([
@@ -486,6 +488,7 @@ export async function getAvailableOffers(input: {
       { ...mapping, lastOfferSearchAt: now, lastOfferSearchStatus: searchStatus, lastOfferRejectedCount: rejectedCount },
       true,
       page,
+      pageSize,
     );
     return {
       ...response,
@@ -584,6 +587,7 @@ async function buildComponentOfferResponse(
   },
   refreshed: boolean,
   page: number,
+  pageSize = COMPONENT_OFFER_PAGE_SIZE,
 ) {
   const now = new Date();
   const activeContextWhere = {
@@ -674,9 +678,9 @@ async function buildComponentOfferResponse(
     if (identity) productIdentities.add(identity);
     eligibleCandidateIds.push(ranked.id);
   }
-  const pageStart = (page - 1) * COMPONENT_OFFER_PAGE_SIZE;
-  const selectedContextIds = eligibleCandidateIds.slice(pageStart, pageStart + COMPONENT_OFFER_PAGE_SIZE);
-  const hasMore = eligibleCandidateIds.length > pageStart + COMPONENT_OFFER_PAGE_SIZE;
+  const pageStart = (page - 1) * pageSize;
+  const selectedContextIds = eligibleCandidateIds.slice(pageStart, pageStart + pageSize);
+  const hasMore = eligibleCandidateIds.length > pageStart + pageSize;
   const contextRows = selectedContextIds.length === 0 ? [] : await prisma.partOfferContext.findMany({
     where: {
       ...activeContextWhere,
@@ -797,7 +801,7 @@ async function buildComponentOfferResponse(
     },
     pagination: {
       page,
-      pageSize: COMPONENT_OFFER_PAGE_SIZE,
+      pageSize,
       total: eligibleCandidateIds.length,
       hasPrevious: page > 1,
       hasMore,

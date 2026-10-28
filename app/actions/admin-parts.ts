@@ -14,6 +14,9 @@ import {
 } from "@/lib/validation/admin-parts-inputs";
 import { validationMessage } from "@/lib/validation/common-inputs";
 import { buildPreferredBrandScopeKey } from "@/lib/parts/ecosystem-config";
+import { canModerateUserPartListing, getModeratedListingStatus, normalizeModerationReason, type UserPartModerationAction } from "@/lib/parts/user-part-moderation-policy";
+import { databaseIdSchema } from "@/lib/validation/common-inputs";
+import { normalizeOrderIssueAdminNote, USER_PART_ORDER_ISSUE_STATUSES, type UserPartOrderIssueStatus } from "@/lib/parts/user-part-order-issue-policy";
 
 type AddPartCategoryInput = {
   name: string;
@@ -80,6 +83,59 @@ const installComplexities = new Set(["DIY", "SHOP_RECOMMENDED", "PRO_ONLY"]);
 const trackingStatuses = new Set(["NOT_CONFIGURED", "CONFIGURED", "DISABLED", "NEEDS_REVIEW"]);
 const affiliatePartnerStatuses = new Set(["CANDIDATE", "APPROVED", "ACTIVE", "INACTIVE", "REJECTED"]);
 const activeAffiliatePartnerStatuses = new Set(["APPROVED", "ACTIVE"]);
+
+export async function moderateUserPartListingAction(input: { listingId: string; action: UserPartModerationAction; reason: string }) {
+  try {
+    const session = await assertAdmin();
+    const adminId = session.user?.id;
+    if (!adminId) throw new Error("Admin identity is unavailable.");
+    const listingId = databaseIdSchema.parse(input.listingId);
+    if (input.action !== "HIDE" && input.action !== "REMOVE") throw new Error("Unsupported moderation action.");
+    const reason = normalizeModerationReason(input.reason);
+    const listing = await prisma.userPartListing.findUnique({ where: { id: listingId }, select: { id: true, status: true, seller: { select: { username: true } } } });
+    if (!listing) throw new Error("User part listing not found.");
+    if (!canModerateUserPartListing(listing.status, input.action)) {
+      throw new Error("Reserved or completed listings cannot be changed through moderation.");
+    }
+    const nextStatus = getModeratedListingStatus(input.action);
+    const updated = await prisma.userPartListing.updateMany({
+      where: { id: listing.id, status: listing.status },
+      data: {
+        status: nextStatus,
+        moderatedAt: new Date(),
+        moderatedById: adminId,
+        moderationReason: reason,
+        removedAt: nextStatus === "REMOVED" ? new Date() : undefined,
+      },
+    });
+    if (updated.count !== 1) throw new Error("The listing changed before moderation was saved.");
+    revalidatePath("/admin/parts");
+    if (listing.seller.username) revalidatePath(`/garage/${listing.seller.username}`);
+    return { success: true as const, message: nextStatus === "REMOVED" ? "Listing removed." : "Listing hidden from buyers." };
+  } catch (error) {
+    return { success: false as const, message: error instanceof Error ? error.message : "Could not moderate the listing." };
+  }
+}
+
+export async function reviewUserPartOrderIssueAction(input: { issueId: string; status: UserPartOrderIssueStatus; adminNote: string }) {
+  try {
+    const session = await assertAdmin();
+    const adminId = session.user?.id;
+    if (!adminId) throw new Error("Admin identity is unavailable.");
+    const issueId = databaseIdSchema.parse(input.issueId);
+    if (!USER_PART_ORDER_ISSUE_STATUSES.includes(input.status) || input.status === "OPEN") throw new Error("Choose a valid review status.");
+    const adminNote = normalizeOrderIssueAdminNote(input.adminNote);
+    const result = await prisma.userPartOrderIssue.updateMany({
+      where: { id: issueId, status: { not: "CLOSED" } },
+      data: { status: input.status, adminNote, reviewedById: adminId, resolvedAt: ["RESOLVED", "CLOSED"].includes(input.status) ? new Date() : null },
+    });
+    if (result.count !== 1) throw new Error("Issue not found or already closed.");
+    revalidatePath("/admin/parts");
+    return { success: true as const, message: "Issue review updated." };
+  } catch (error) {
+    return { success: false as const, message: error instanceof Error ? error.message : "Could not update issue review." };
+  }
+}
 
 export async function addPartCategoryAction(input: AddPartCategoryInput) {
   try {

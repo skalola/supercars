@@ -9,6 +9,7 @@ import GarageSupportRail from "../GarageSupportRail";
 import GarageClubBadges from "../GarageClubBadges";
 import { getGarageDashboardData } from "../garage-data";
 import { buildPublicMetadata, humanizeSlug, privateMetadata } from "@/lib/seo";
+import { getGaragePartListings, getGaragePartSellerContext } from "@/lib/parts/user-part-marketplace";
 
 type UserGaragePageProps = { params: Promise<{ username: string }> };
 
@@ -79,6 +80,11 @@ export default async function UserGaragePage({ params }: UserGaragePageProps) {
 
   const isOwner = session?.user?.id === user.id;
 
+  const [dashboard, partListings, partCatalog] = await Promise.all([
+    getGarageDashboardData(user.id, isOwner),
+    getGaragePartListings(user.id, isOwner),
+    isOwner ? getGaragePartSellerContext(user.id) : Promise.resolve(null),
+  ]);
   const {
     claimedVehicles,
     savedVehicles,
@@ -87,7 +93,7 @@ export default async function UserGaragePage({ params }: UserGaragePageProps) {
     serviceWatch,
     recentActivity,
     clubSummary,
-  } = await getGarageDashboardData(user.id, isOwner);
+  } = dashboard;
   const displayName = user.name || user.username;
   const garageHandle = user.username ? `@${user.username}` : "SUPERCAR DASH member";
   const garageLocation = getGarageLocation(clubSummary);
@@ -145,7 +151,14 @@ export default async function UserGaragePage({ params }: UserGaragePageProps) {
         </div>
       </section>
       <section id="garage-collection" className="garage-dashboard-layout" aria-label="Garage dashboard">
-        <GarageTabs claimedVehicles={claimedVehicles} savedVehicles={savedVehicles} previousVehicles={previousVehicles} isOwner={isOwner} />
+        <GarageTabs
+          claimedVehicles={claimedVehicles}
+          savedVehicles={savedVehicles}
+          previousVehicles={previousVehicles}
+          partListings={partListings}
+          partCatalog={partCatalog}
+          isOwner={isOwner}
+        />
         <aside className="garage-support-grid" aria-label="Garage social summary">
           <GarageSupportRail
             serviceWatch={serviceWatch}

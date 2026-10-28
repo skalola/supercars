@@ -33,6 +33,7 @@ export interface PaymentWebhookResult {
   received: boolean;
   eventType?: string;
   fulfillmentRequestId?: string | null;
+  userPartOrderId?: string | null;
   alreadyProcessed?: boolean;
 }
 
@@ -515,54 +516,83 @@ export async function refundDeposit(transactionRef: string, amount?: number): Pr
 }
 
 export function verifyStripeWebhookSignature(payload: string, signatureHeader: string | null): boolean {
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!secret) {
+  const secrets = [process.env.STRIPE_WEBHOOK_SECRET, process.env.STRIPE_CONNECT_WEBHOOK_SECRET]
+    .map((secret) => secret?.trim())
+    .filter((secret): secret is string => Boolean(secret))
+    .filter((secret, index, values) => values.indexOf(secret) === index);
+  if (secrets.length === 0) {
     return process.env.NODE_ENV !== "production" && getPaymentProvider() !== "stripe";
   }
   if (!signatureHeader) return false;
 
-  const timestamp = signatureHeader
-    .split(",")
-    .find((part) => part.startsWith("t="))
-    ?.slice(2);
-  const signature = signatureHeader
-    .split(",")
-    .find((part) => part.startsWith("v1="))
-    ?.slice(3);
+  const parts = signatureHeader.split(",").map((part) => part.trim());
+  const timestamp = parts.find((part) => part.startsWith("t="))?.slice(2);
+  const signatures = parts.filter((part) => part.startsWith("v1=")).map((part) => part.slice(3));
 
-  if (!timestamp || !signature) return false;
+  if (!timestamp || signatures.length === 0) return false;
   const timestampSeconds = Number(timestamp);
   if (!Number.isFinite(timestampSeconds) || Math.abs(Date.now() / 1000 - timestampSeconds) > 5 * 60) {
     return false;
   }
 
-  const expected = crypto
-    .createHmac("sha256", secret)
-    .update(`${timestamp}.${payload}`)
-    .digest("hex");
+  return secrets.some((secret) => {
+    const expected = crypto.createHmac("sha256", secret).update(`${timestamp}.${payload}`).digest("hex");
+    return signatures.some((signature) => {
+      try {
+        const expectedBuffer = Buffer.from(expected, "hex");
+        const signatureBuffer = Buffer.from(signature, "hex");
+        return expectedBuffer.length === signatureBuffer.length
+          && crypto.timingSafeEqual(expectedBuffer, signatureBuffer);
+      } catch {
+        return false;
+      }
+    });
+  });
+}
 
-  try {
-    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
-  } catch {
-    return false;
-  }
+export function getStripeWebhookConfigurationStatus() {
+  return {
+    platformConfigured: Boolean(process.env.STRIPE_WEBHOOK_SECRET?.trim()),
+    connectConfigured: Boolean(process.env.STRIPE_CONNECT_WEBHOOK_SECRET?.trim()),
+  };
 }
 
 type StripeWebhookEvent = {
   id?: string;
   type?: string;
+  account?: string;
   data?: {
     object?: {
       id?: string;
+      country?: string | null;
+      default_currency?: string | null;
+      charges_enabled?: boolean;
+      payouts_enabled?: boolean;
+      details_submitted?: boolean;
+      requirements?: {
+        currently_due?: string[];
+        past_due?: string[];
+        disabled_reason?: string | null;
+      } | null;
       amount_total?: number;
       amount?: number;
+      amount_refunded?: number;
+      charge?: string;
       payment_intent?: string;
+      payment_status?: string;
+      status?: string;
+      reason?: string;
+      customer_details?: { email?: string | null; name?: string | null } | null;
+      shipping_details?: { name?: string | null; address?: Record<string, unknown> | null } | null;
+      collected_information?: { shipping_details?: { name?: string | null; address?: Record<string, unknown> | null } | null } | null;
       metadata?: {
         dealerPurchaseId?: string;
         serviceBookingId?: string;
         fulfillmentRequestId?: string;
         publicTransactionToken?: string;
         feeType?: string;
+        userPartOrderId?: string;
+        commerceType?: string;
       };
     };
   };
@@ -763,6 +793,52 @@ async function processStripeWebhookEvent(
 ): Promise<PaymentWebhookResult> {
   const eventType = event.type || "unknown";
   const object = event.data?.object;
+
+  if (eventType === "account.updated" && object?.id) {
+    const { syncSellerPaymentAccount } = await import("@/lib/payments/stripe-connect");
+    await syncSellerPaymentAccount({
+      id: object.id,
+      country: object.country,
+      default_currency: object.default_currency,
+      charges_enabled: object.charges_enabled,
+      payouts_enabled: object.payouts_enabled,
+      details_submitted: object.details_submitted,
+      requirements: object.requirements,
+    });
+    return { received: true, eventType, fulfillmentRequestId: null };
+  }
+
+  if (object?.metadata?.userPartOrderId && object.metadata.commerceType === "USER_PART_SALE") {
+    const { processUserPartStripeEvent } = await import("@/lib/payments/user-part-payments");
+    const orderResult = await processUserPartStripeEvent(event);
+    return {
+      received: true,
+      eventType,
+      fulfillmentRequestId: null,
+      userPartOrderId: orderResult?.orderId || null,
+    };
+  }
+  if (eventType.startsWith("charge.dispute.") && (object?.payment_intent || object?.charge)) {
+    const order = await prisma.userPartOrder.findFirst({
+      where: {
+        OR: [
+          ...(object.payment_intent ? [{ paymentIntentId: object.payment_intent }] : []),
+          ...(object.charge ? [{ chargeId: object.charge }] : []),
+        ],
+      },
+      select: { id: true },
+    });
+    if (order) {
+      const { processUserPartStripeEvent } = await import("@/lib/payments/user-part-payments");
+      const orderResult = await processUserPartStripeEvent(event, order.id);
+      return {
+        received: true,
+        eventType,
+        fulfillmentRequestId: null,
+        userPartOrderId: orderResult?.orderId || null,
+      };
+    }
+  }
   const fulfillmentRequestId = object?.metadata?.serviceBookingId || object?.metadata?.fulfillmentRequestId;
   const publicTransactionToken = object?.metadata?.publicTransactionToken;
 
@@ -1031,6 +1107,7 @@ export async function processStripeWebhookPayload(payload: string): Promise<Paym
       data: {
         status: "PROCESSED",
         fulfillmentRequestId: result.fulfillmentRequestId || null,
+        userPartOrderId: result.userPartOrderId || null,
         processedAt: new Date(),
         errorMessage: null,
       },

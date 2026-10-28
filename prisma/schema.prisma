@@ -21,6 +21,7 @@ model Make {
   partApplicabilityOverrides PartApplicabilityOverride[]
   catalogEvidence            ModelCatalogEvidence[]
   maintenanceRules           MaintenanceRule[]
+  userPartFitments           UserPartListingFitment[]
   createdAt                  DateTime                    @default(now())
   updatedAt                  DateTime                    @updatedAt
 }
@@ -65,6 +66,7 @@ model Model {
   engineeringProfiles           ModelEngineeringProfile[]
   providerVehicleMappings       PartProviderVehicleMapping[]
   catalogEvidence               ModelCatalogEvidence[]
+  userPartFitments              UserPartListingFitment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -111,6 +113,7 @@ model ModelVariant {
   engineeringProfiles           ModelEngineeringProfile[]
   catalogEvidence               ModelCatalogEvidence[]
   maintenanceRules              MaintenanceRule[]
+  userPartFitments              UserPartListingFitment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -361,6 +364,7 @@ model Vehicle {
   meetRsvps              MeetRsvp[]
   meetPhotos             MeetPhoto[]
   partAffiliateClicks    PartAffiliateClick[]
+  removedPartListings    UserPartListing[]
 
   mileageStatus             String? @default("COMPLETE")
   vinIdentityStatus         String? @default("VALID")
@@ -398,28 +402,231 @@ model User {
   passwordHash  String?
   role          String?   @default("USER")
 
-  accounts               Account[]
-  sessions               Session[]
-  trackerPreference      UserTrackerPreference?
-  trackerAlertDeliveries TrackerAlertDelivery[]
-  garageItems            GarageItem[]
-  vehicles               Vehicle[]
-  listings               Listing[]
-  purchases              Purchase[]
-  insuranceRequests      InsuranceRequest[]
-  deliveryRequests       DeliveryRequest[]
-  fulfillmentRequests    FulfillmentRequest[]
-  hostedMeets            Meet[]
-  meetRsvps              MeetRsvp[]
-  meetPhotos             MeetPhoto[]
-  meetNotifications      MeetNotification[]
-  createdCarClubs        CarClub[]              @relation("CarClubCreator")
-  carClubMemberships     CarClubMember[]
-  vehicleInstalledParts  VehicleInstalledPart[]
-  partAffiliateClicks    PartAffiliateClick[]
+  accounts                Account[]
+  sessions                Session[]
+  trackerPreference       UserTrackerPreference?
+  trackerAlertDeliveries  TrackerAlertDelivery[]
+  garageItems             GarageItem[]
+  vehicles                Vehicle[]
+  listings                Listing[]
+  purchases               Purchase[]
+  insuranceRequests       InsuranceRequest[]
+  deliveryRequests        DeliveryRequest[]
+  fulfillmentRequests     FulfillmentRequest[]
+  hostedMeets             Meet[]
+  meetRsvps               MeetRsvp[]
+  meetPhotos              MeetPhoto[]
+  meetNotifications       MeetNotification[]
+  createdCarClubs         CarClub[]              @relation("CarClubCreator")
+  carClubMemberships      CarClubMember[]
+  vehicleInstalledParts   VehicleInstalledPart[]
+  partAffiliateClicks     PartAffiliateClick[]
+  sellerPaymentAccount    SellerPaymentAccount?
+  partListings            UserPartListing[]
+  purchasedPartOrders     UserPartOrder[]        @relation("UserPartOrderBuyer")
+  soldPartOrders          UserPartOrder[]        @relation("UserPartOrderSeller")
+  reportedPartOrderIssues UserPartOrderIssue[]   @relation("UserPartOrderIssueReporter")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model SellerPaymentAccount {
+  id                  String    @id @default(uuid())
+  userId              String    @unique
+  provider            String    @default("STRIPE")
+  providerAccountId   String    @unique
+  onboardingStatus    String    @default("INCOMPLETE")
+  chargesEnabled      Boolean   @default(false)
+  payoutsEnabled      Boolean   @default(false)
+  detailsSubmitted    Boolean   @default(false)
+  requirementsDue     String[]  @default([])
+  requirementsPastDue String[]  @default([])
+  disabledReason      String?
+  country             String?
+  defaultCurrency     String?
+  lastSyncedAt        DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([onboardingStatus])
+  @@index([chargesEnabled, payoutsEnabled])
+}
+
+model UserPartListing {
+  id                     String    @id @default(uuid())
+  sellerId               String
+  componentTypeId        String
+  brandId                String?
+  removedFromVehicleId   String?
+  title                  String
+  description            String
+  brandName              String?
+  manufacturerPartNumber String?
+  condition              String
+  priceCents             Int
+  currency               String    @default("USD")
+  quantity               Int       @default(1)
+  mileageOnPart          Int?
+  includedHardware       String?
+  knownDefects           String?
+  shippingMode           String    @default("SHIPPING")
+  shippingCostCents      Int?
+  shipsFromCity          String?
+  shipsFromState         String?
+  returnPolicy           String    @default("NO_RETURNS")
+  shippingRestriction    String    @default("STANDARD")
+  sellerAttestedAt       DateTime?
+  sellerPolicyVersion    String?
+  universalFitment       Boolean   @default(false)
+  status                 String    @default("DRAFT")
+  publishedAt            DateTime?
+  soldAt                 DateTime?
+  removedAt              DateTime?
+  moderatedAt            DateTime?
+  moderatedById          String?
+  moderationReason       String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  seller             User                     @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  componentType      PartComponentType        @relation(fields: [componentTypeId], references: [id], onDelete: Restrict)
+  brand              PartBrand?               @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  removedFromVehicle Vehicle?                 @relation(fields: [removedFromVehicleId], references: [id], onDelete: SetNull)
+  images             UserPartListingImage[]
+  fitments           UserPartListingFitment[]
+  orders             UserPartOrder[]
+
+  @@index([sellerId, status, createdAt])
+  @@index([componentTypeId, status, publishedAt])
+  @@index([brandId, status])
+  @@index([status, publishedAt])
+}
+
+model UserPartOrder {
+  id                               String    @id @default(uuid())
+  listingId                        String
+  buyerId                          String
+  sellerId                         String
+  quantity                         Int       @default(1)
+  itemAmountCents                  Int
+  shippingAmountCents              Int       @default(0)
+  platformFeeCents                 Int
+  totalAmountCents                 Int
+  currency                         String    @default("USD")
+  status                           String    @default("CHECKOUT_PENDING")
+  checkoutKey                      String    @unique
+  checkoutSessionId                String?   @unique
+  checkoutUrl                      String?
+  checkoutExpiresAt                DateTime?
+  paymentIntentId                  String?   @unique
+  chargeId                         String?
+  connectedAccountId               String
+  buyerEmail                       String?
+  buyerName                        String?
+  shippingName                     String?
+  shippingAddress                  Json?
+  paidAt                           DateTime?
+  cancelledAt                      DateTime?
+  fulfilledAt                      DateTime?
+  completedAt                      DateTime?
+  refundedAt                       DateTime?
+  disputeId                        String?   @unique
+  disputeStatus                    String?
+  disputeReason                    String?
+  preDisputeStatus                 String?
+  disputedAt                       DateTime?
+  disputeResolvedAt                DateTime?
+  shippingCarrier                  String?
+  trackingNumber                   String?
+  trackingUrl                      String?
+  sellerNote                       String?
+  fulfillmentReminderSentAt        DateTime?
+  fulfillmentReminderLastAttemptAt DateTime?
+  fulfillmentReminderAttempts      Int       @default(0)
+  createdAt                        DateTime  @default(now())
+  updatedAt                        DateTime  @updatedAt
+
+  listing       UserPartListing       @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  buyer         User                  @relation("UserPartOrderBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
+  seller        User                  @relation("UserPartOrderSeller", fields: [sellerId], references: [id], onDelete: Restrict)
+  webhookEvents PaymentWebhookEvent[]
+  issues        UserPartOrderIssue[]
+
+  @@index([buyerId, status, createdAt])
+  @@index([sellerId, status, createdAt])
+  @@index([listingId, status])
+  @@index([status, checkoutExpiresAt])
+}
+
+model UserPartOrderIssue {
+  id           String    @id @default(uuid())
+  orderId      String
+  reporterId   String
+  issueType    String
+  description  String
+  status       String    @default("OPEN")
+  adminNote    String?
+  reviewedById String?
+  resolvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  order    UserPartOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  reporter User          @relation("UserPartOrderIssueReporter", fields: [reporterId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, reporterId])
+  @@index([status, createdAt])
+  @@index([reporterId, createdAt])
+}
+
+model UserPartListingImage {
+  id               String   @id @default(uuid())
+  listingId        String
+  url              String
+  storagePath      String?
+  alt              String?
+  displayOrder     Int      @default(0)
+  isPrimary        Boolean  @default(false)
+  validationStatus String   @default("VALID")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  listing UserPartListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([listingId, url])
+  @@index([listingId, validationStatus, displayOrder])
+  @@index([listingId, isPrimary])
+}
+
+model UserPartListingFitment {
+  id             String   @id @default(uuid())
+  listingId      String
+  fitmentKey     String   @unique
+  makeId         String
+  modelId        String
+  modelVariantId String?
+  yearStart      Int?
+  yearEnd        Int?
+  trim           String?
+  engine         String?
+  transmission   String?
+  drivetrain     String?
+  bodyStyle      String?
+  confidence     String   @default("SELLER_DECLARED")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  listing      UserPartListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  make         Make            @relation(fields: [makeId], references: [id], onDelete: Restrict)
+  model        Model           @relation(fields: [modelId], references: [id], onDelete: Restrict)
+  modelVariant ModelVariant?   @relation(fields: [modelVariantId], references: [id], onDelete: SetNull)
+
+  @@index([listingId])
+  @@index([makeId, modelId, yearStart, yearEnd])
+  @@index([modelVariantId])
 }
 
 model UserTrackerPreference {
@@ -780,6 +987,7 @@ model PartBrand {
 
   parts             PerformancePart[]
   preferredMappings PreferredPartBrand[]
+  userPartListings  UserPartListing[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1002,17 +1210,18 @@ model PerformancePart {
 }
 
 model PartComponentType {
-  id                 String  @id @default(uuid())
-  categoryId         String
-  name               String
-  slug               String
-  description        String?
-  aliases            Json?
-  systemGroup        String?
-  fitmentRisk        String  @default("MEDIUM")
-  displayOrder       Int     @default(0)
-  performanceRelated Boolean @default(false)
-  active             Boolean @default(true)
+  id                     String  @id @default(uuid())
+  categoryId             String
+  name                   String
+  slug                   String
+  description            String?
+  aliases                Json?
+  systemGroup            String?
+  fitmentRisk            String  @default("MEDIUM")
+  displayOrder           Int     @default(0)
+  performanceRelated     Boolean @default(false)
+  active                 Boolean @default(true)
+  allowsUniversalFitment Boolean @default(false)
 
   category                 PartCategory                  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   searchTemplates          PartComponentSearchTemplate[]
@@ -1026,6 +1235,7 @@ model PartComponentType {
   installedParts           VehicleInstalledPart[]
   engineeringEffect        PartEngineeringEffect?
   providerCategoryMappings PartProviderCategoryMapping[]
+  userPartListings         UserPartListing[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2070,14 +2280,18 @@ model PaymentWebhookEvent {
   status               String    @default("PROCESSING")
   attempts             Int       @default(1)
   fulfillmentRequestId String?
+  userPartOrderId      String?
   errorMessage         String?
   receivedAt           DateTime  @default(now())
   processedAt          DateTime?
   updatedAt            DateTime  @updatedAt
 
+  userPartOrder UserPartOrder? @relation(fields: [userPartOrderId], references: [id], onDelete: SetNull)
+
   @@unique([provider, eventId])
   @@index([status, receivedAt])
   @@index([fulfillmentRequestId])
+  @@index([userPartOrderId])
 }
 
 model PartnerDecisionToken {

@@ -8,6 +8,7 @@ import GarageTabs from "./GarageTabs";
 import GarageSupportRail from "./GarageSupportRail";
 import GarageClubBadges from "./GarageClubBadges";
 import { getGarageDashboardData } from "./garage-data";
+import { getGaragePartListings, getGaragePartSellerContext } from "@/lib/parts/user-part-marketplace";
 
 export default async function GaragePage() {
   const session = await auth();
@@ -43,6 +44,11 @@ export default async function GaragePage() {
     redirect("/onboarding");
   }
 
+  const [dashboard, partListings, partCatalog] = await Promise.all([
+    getGarageDashboardData(session.user.id as string, true),
+    getGaragePartListings(session.user.id as string, true),
+    getGaragePartSellerContext(session.user.id as string),
+  ]);
   const {
     claimedVehicles,
     savedVehicles,
@@ -51,7 +57,7 @@ export default async function GaragePage() {
     serviceWatch,
     recentActivity,
     clubSummary,
-  } = await getGarageDashboardData(session.user.id as string, true);
+  } = dashboard;
   const displayName = user.name || user.username;
   const garageHandle = user.username ? `@${user.username}` : user.email || "SUPERCAR DASH member";
   const garageLocation = getGarageLocation(clubSummary);
@@ -107,7 +113,14 @@ export default async function GaragePage() {
         </div>
       </section>
       <section id="garage-collection" className="garage-dashboard-layout" aria-label="Garage dashboard">
-        <GarageTabs claimedVehicles={claimedVehicles} savedVehicles={savedVehicles} previousVehicles={previousVehicles} isOwner />
+        <GarageTabs
+          claimedVehicles={claimedVehicles}
+          savedVehicles={savedVehicles}
+          previousVehicles={previousVehicles}
+          partListings={partListings}
+          partCatalog={partCatalog}
+          isOwner
+        />
         <aside className="garage-support-grid" aria-label="Garage social summary">
           <GarageSupportRail
             serviceWatch={serviceWatch}
