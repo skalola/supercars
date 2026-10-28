@@ -10,7 +10,6 @@ import { getMarketSummary } from "@/lib/market-intelligence";
 import { isNonVehicleImageUrl } from "@/lib/vehicle-images";
 import MarketPriceHistory from "@/components/market/MarketPriceHistory";
 import { isListingMatchForModel } from "@/lib/inventory/validate-listing-identity";
-import { getPartDetailPath } from "@/lib/parts/routes";
 import { getModelPageCatalogData } from "@/lib/model-catalog/model-page-data";
 import { isDisplayableModelImage, selectModelHeroImage } from "@/lib/model-catalog/model-display";
 import { absoluteUrl, buildPublicMetadata, humanizeSlug, safeJsonLd } from "@/lib/seo";
@@ -203,71 +202,55 @@ export default async function ModelPage({ params }: ModelPageProps) {
   }
 
   const { model, maintenanceRules } = catalogData;
-  const [market, recommendedParts, garageItem, claimedVehicle] = await Promise.all([
+  const [market, recommendedOfferContexts, garageItem, claimedVehicle] = await Promise.all([
     getMarketSummary(model.id),
-    prisma.performancePart.findMany({
+    prisma.partOfferContext.findMany({
       where: {
-        status: "ACTIVE",
-        OR: [
-          { compatibility: { none: {} } },
-          {
-            compatibility: {
-              some: {
-                AND: [
-                  {
-                    OR: [
-                      { makeId: null },
-                      { makeId: model.makeId },
-                    ],
-                  },
-                  {
-                    OR: [
-                      { modelId: null },
-                      { modelId: model.id },
-                    ],
-                  },
-                  {
-                    OR: [
-                      { yearStart: null },
-                      { yearStart: { lte: model.productionEndYear ?? model.productionStartYear ?? 9999 } },
-                    ],
-                  },
-                  {
-                    OR: [
-                      { yearEnd: null },
-                      { yearEnd: { gte: model.productionStartYear ?? model.productionEndYear ?? 0 } },
-                    ],
-                  },
-                ],
+        active: true,
+        fitmentConfidence: { in: ["EXACT_MATCH", "HIGH_CONFIDENCE"] },
+        modelPartComponent: {
+          modelId: model.id,
+          active: true,
+        },
+        offer: {
+          provider: "EBAY",
+          active: true,
+          affiliateUrl: { not: null },
+          availability: "AVAILABLE",
+          OR: [
+            { expiresAt: null },
+            { expiresAt: { gt: new Date() } },
+          ],
+        },
+      },
+      select: {
+        confidenceScore: true,
+        modelPartComponent: {
+          select: {
+            id: true,
+            componentType: {
+              select: {
+                name: true,
+                category: { select: { name: true } },
               },
             },
           },
-        ],
-      },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        imageUrl: true,
-        retailPriceCents: true,
-        category: {
-          select: {
-            name: true,
-          },
         },
-        brand: {
+        offer: {
           select: {
-            name: true,
-            slug: true,
+            id: true,
+            title: true,
+            imageUrl: true,
+            priceCents: true,
+            brandName: true,
           },
         },
       },
       orderBy: [
-        { category: { displayOrder: "asc" } },
-        { brand: { name: "asc" } },
-        { name: "asc" },
+        { confidenceScore: "desc" },
+        { offer: { priceCents: "asc" } },
       ],
-      take: 4,
+      take: 16,
     }),
     session?.user
       ? prisma.garageItem.findUnique({
@@ -290,6 +273,12 @@ export default async function ModelPage({ params }: ModelPageProps) {
         })
       : null,
   ]);
+  const seenRecommendedOfferIds = new Set<string>();
+  const recommendedParts = recommendedOfferContexts.filter((context) => {
+    if (seenRecommendedOfferIds.has(context.offer.id)) return false;
+    seenRecommendedOfferIds.add(context.offer.id);
+    return true;
+  }).slice(0, 4);
   const rawListings: Prisma.ListingGetPayload<{ select: typeof modelListingPreviewSelect }>[] = [];
 
   // Validate and filter listings to ensure they match current make and model
@@ -755,16 +744,21 @@ export default async function ModelPage({ params }: ModelPageProps) {
             </div>
             {recommendedParts.length > 0 ? (
               <div className="model-intelligence-part-list">
-                {recommendedParts.map((part) => (
-                  <Link key={part.id} href={getPartDetailPath(part)}>
-                    {part.imageUrl ? <img src={part.imageUrl} alt="" loading="lazy" /> : <span>{part.category.name}</span>}
+                {recommendedParts.map((context) => {
+                  const { offer, modelPartComponent } = context;
+                  const categoryName = modelPartComponent.componentType.category.name;
+                  const href = `/out/parts/offers/${offer.id}?source=model-recommendation&componentContext=${modelPartComponent.id}`;
+                  return (
+                  <a key={offer.id} href={href} target="_blank" rel="sponsored noopener noreferrer" aria-label={`View ${offer.title} on eBay`}>
+                    {offer.imageUrl ? <img src={offer.imageUrl} alt="" loading="lazy" /> : <span>{categoryName}</span>}
                     <div>
-                      <small>{part.category.name} · {part.brand.name}</small>
-                      <strong>{part.name}</strong>
-                      <em>{formatPartPrice(part.retailPriceCents)}</em>
+                      <small>{categoryName} · {offer.brandName || modelPartComponent.componentType.name}</small>
+                      <strong>{offer.title}</strong>
+                      <em>{formatPartPrice(offer.priceCents)} · View on eBay</em>
                     </div>
-                  </Link>
-                ))}
+                  </a>
+                  );
+                })}
               </div>
             ) : (
               <ModelEmptyState
