@@ -8,6 +8,7 @@ test("universal hierarchy projects systems into components and leaf part types",
   assert.deepEqual(getUniversalPartComponentGroup("brakes", "Front Brake Pads"), { name: "Brake Pads", slug: "brake-pads" });
   assert.deepEqual(getUniversalPartComponentGroup("brakes", "Rear Brake Rotors"), { name: "Brake Rotors", slug: "brake-rotors" });
   assert.deepEqual(getUniversalPartComponentGroup("air-induction", "Engine Air Filter"), { name: "Air Filters", slug: "air-filters" });
+  assert.deepEqual(getUniversalPartComponentGroup("maintenance-service", "Engine Oil"), { name: "Fluids", slug: "fluids" });
 });
 
 test("marketplace offers cannot create permanent canonical products", () => {

@@ -14,7 +14,7 @@ import {
   type PartsGarageCarRow,
 } from "./PartsStoreExplorer";
 import { PartsVehicleHero, type PartsVehicleHeroVehicle } from "./PartsVehicleHero";
-import { PartTypeCategorySelector } from "./PartTypeCategorySelector";
+import { PartTypeCategorySelector, type PartTaxonomySearchItem } from "./PartTypeCategorySelector";
 import { PartsWorkspaceShell } from "./PartsWorkspaceShell";
 import { PartsStoreHero } from "./PartsStoreHero";
 import type { PartsEngineeringRecommendationSummary } from "@/lib/parts/engineering-recommendation-service";
@@ -99,6 +99,7 @@ export function PartsTuningShop({
   const [page, setPage] = useState(1);
   const [summaryLoading, setSummaryLoading] = useState(Boolean(initialMakeId || initialModelId || initialGarageCar));
   const [vehiclePartsSystems, setVehiclePartsSystems] = useState<PartSystem[]>([]);
+  const [taxonomySearchIndex, setTaxonomySearchIndex] = useState<PartTaxonomySearchItem[]>([]);
   const [catalogVehicle, setCatalogVehicle] = useState<PartsVehicleSummary | null>(null);
   const [engineeringRecommendation, setEngineeringRecommendation] = useState<PartsEngineeringRecommendationSummary | null>(null);
   const [selectorOpen, setSelectorOpen] = useState(initialSelectorOpen || (!initialGarageCar && !initialModelId));
@@ -132,11 +133,12 @@ export function PartsTuningShop({
       signal: controller.signal,
       cache: "no-cache",
     })
-      .then(readJson<{ vehicle: PartsVehicleSummary; systems: PartSystem[]; recommendation: PartsEngineeringRecommendationSummary | null }>)
+      .then(readJson<{ vehicle: PartsVehicleSummary; systems: PartSystem[]; searchIndex: PartTaxonomySearchItem[]; recommendation: PartsEngineeringRecommendationSummary | null }>)
       .then((result) => {
         if (controller.signal.aborted) return;
         setCatalogVehicle(result.vehicle);
         setVehiclePartsSystems(result.systems);
+        setTaxonomySearchIndex(result.searchIndex);
         setEngineeringRecommendation(result.recommendation);
       })
       .catch((error) => handleComponentError(error, controller, setLoadError))
@@ -343,6 +345,7 @@ export function PartsTuningShop({
             year={selectedGarageCar?.year ?? selectedModel.productionEndYear ?? selectedModel.productionStartYear}
             vehicleId={selectedGarageCar?.id.startsWith("claimed:") ? selectedGarageCar.id.slice("claimed:".length) : null}
             systems={vehiclePartsSystems}
+            searchIndex={taxonomySearchIndex}
             loading={summaryLoading}
           />
         ) : !selectorOpen && !activeCategory ? (

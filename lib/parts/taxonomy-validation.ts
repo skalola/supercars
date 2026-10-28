@@ -13,6 +13,17 @@ import { toPartSlug } from "@/lib/parts/slug";
 
 export const FERRARI_COMPONENT_COUNT_RANGE = { minimum: 120, maximum: 200 } as const;
 
+export const REQUIRED_SERVICE_FLUIDS = [
+  "Engine Oil",
+  "Coolant",
+  "Brake Fluid",
+  "Transmission Fluid",
+  "Differential Fluid",
+  "Power Steering Fluid",
+  "Transfer Case Fluid",
+  "Windshield Washer Fluid",
+] as const;
+
 export type TaxonomyIssue = {
   code: string;
   path: string;
@@ -121,6 +132,15 @@ export function buildFerrariTaxonomySnapshot(
 
   for (const system of AUTOMOTIVE_PART_SYSTEMS) {
     if (!seenSystemSlugs.has(system.slug)) issues.push(issue("MISSING_SYSTEM", "systems", `Missing approved system ${system.slug}.`));
+  }
+  const maintenanceSystem = library.find((system) => system.slug === "maintenance-service");
+  const maintenanceComponents = new Set(
+    (maintenanceSystem?.components ?? []).map((component) => normalizeTaxonomyTerm(normalizeFerrariComponent(component).name)),
+  );
+  for (const fluid of REQUIRED_SERVICE_FLUIDS) {
+    if (!maintenanceComponents.has(normalizeTaxonomyTerm(fluid))) {
+      issues.push(issue("MISSING_SERVICE_FLUID", "systems.maintenance-service", `Missing required service fluid ${fluid}.`));
+    }
   }
   if (componentCount < FERRARI_COMPONENT_COUNT_RANGE.minimum || componentCount > FERRARI_COMPONENT_COUNT_RANGE.maximum) {
     issues.push(issue(

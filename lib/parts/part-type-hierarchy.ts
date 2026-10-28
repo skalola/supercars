@@ -7,7 +7,7 @@ type GroupRule = PartComponentGroup & { pattern: RegExp };
 const GROUP_RULES: Record<string, GroupRule[]> = {
   "maintenance-service": [
     group("Filters", /filter/i), group("Ignition Service", /spark|ignition/i), group("Belts", /belt/i),
-    group("Battery Service", /battery/i), group("Fluids", /coolant|fluid/i), group("Service Kits", /kit/i), group("Visibility", /wiper/i),
+    group("Battery Service", /battery/i), group("Fluids", /engine oil|motor oil|coolant|fluid/i), group("Service Kits", /kit/i), group("Visibility", /wiper/i),
   ],
   engine: [
     group("Engine Mounting", /mount/i), group("Gaskets & Seals", /gasket/i), group("Engine Sensors", /sensor/i),

@@ -9,16 +9,24 @@ import {
   buildFerrariTaxonomySnapshot,
   FERRARI_COMPONENT_COUNT_RANGE,
   normalizeTaxonomyTerm,
+  REQUIRED_SERVICE_FLUIDS,
 } from "../lib/parts/taxonomy-validation";
 
 test("canonical Ferrari taxonomy passes the integrity gate", () => {
   const snapshot = buildFerrariTaxonomySnapshot();
   assert.equal(snapshot.issues.length, 0);
   assert.equal(snapshot.systemCount, 17);
-  assert.equal(snapshot.componentCount, 183);
+  assert.equal(snapshot.componentCount, 190);
   assert.ok(snapshot.componentCount >= FERRARI_COMPONENT_COUNT_RANGE.minimum);
   assert.ok(snapshot.componentCount <= FERRARI_COMPONENT_COUNT_RANGE.maximum);
   assert.equal(snapshot.componentsBySystem.every((system) => Boolean(system.icon)), true);
+});
+
+test("maintenance taxonomy retains every major service fluid", () => {
+  const maintenance = FERRARI_COMPONENT_LIBRARY.find((system) => system.slug === "maintenance-service");
+  assert.ok(maintenance);
+  const names = new Set(maintenance.components.map((component) => normalizeTaxonomyTerm(typeof component === "string" ? component : component.name)));
+  for (const fluid of REQUIRED_SERVICE_FLUIDS) assert.equal(names.has(normalizeTaxonomyTerm(fluid)), true, fluid);
 });
 
 test("taxonomy gate rejects duplicate component identities", () => {

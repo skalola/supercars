@@ -8,7 +8,7 @@ import { PartsVehicleHero } from "@/components/parts/PartsVehicleHero";
 import { PartsWorkspaceShell } from "@/components/parts/PartsWorkspaceShell";
 import { getVehiclePartTypeDetail } from "@/lib/parts/part-detail-service";
 import { getPartsEngineeringRecommendation } from "@/lib/parts/engineering-recommendation-service";
-import { getApplicablePartSystems, getApplicablePartTypes } from "@/lib/parts/vehicle-parts-service";
+import { getApplicablePartSystems, getApplicablePartTypes, getPartTaxonomySearchIndex } from "@/lib/parts/vehicle-parts-service";
 
 type PageProps = {
   params: Promise<{ make: string; model: string; partType: string }>;
@@ -35,13 +35,14 @@ export default async function VehiclePartTypePage({ params, searchParams }: Page
   });
   if (!detail) notFound();
 
-  const [systems, initialPartTypes, engineeringRecommendation] = await Promise.all([
+  const [systems, initialPartTypes, searchIndex, engineeringRecommendation] = await Promise.all([
     getApplicablePartSystems({ makeSlug: detail.vehicle.make.slug, modelSlug: detail.vehicle.model.slug }),
     getApplicablePartTypes({
       makeSlug: detail.vehicle.make.slug,
       modelSlug: detail.vehicle.model.slug,
       systemSlug: detail.partType.system.slug,
     }),
+    getPartTaxonomySearchIndex(),
     getPartsEngineeringRecommendation({
       makeSlug: detail.vehicle.make.slug,
       modelSlug: detail.vehicle.model.slug,
@@ -130,6 +131,7 @@ export default async function VehiclePartTypePage({ params, searchParams }: Page
 
       <PartTypeCategorySelector
         systems={systems}
+        searchIndex={searchIndex}
         initialPartTypes={initialPartTypes}
         initialSystemSlug={detail.partType.system.slug}
         initialPartTypeSlug={detail.partType.slug}

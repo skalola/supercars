@@ -31,8 +31,9 @@ const category = (name: string, slug: string, components: Array<string | Ferrari
 export const LEGACY_FERRARI_COMPONENT_LIBRARY: FerrariComponentCategorySeed[] = [
   category("Maintenance", "maintenance", [
     "Oil Filter", "Engine Air Filter", "Cabin Air Filter", "Fuel Filter", "Spark Plugs", "Ignition Coils", "Drive Belt",
-    "Accessory Belt", "Battery", "Battery Tender", "Oil Service Kit", "Coolant", "Brake Fluid", "Transmission Fluid",
-    "Gearbox Service Kit", "Wiper Blade",
+    "Accessory Belt", "Battery", "Battery Tender", "Oil Service Kit", "Engine Oil", "Coolant", "Brake Fluid", "Transmission Fluid",
+    "Differential Fluid", "Power Steering Fluid", "Transfer Case Fluid", "Windshield Washer Fluid", "Hydraulic System Fluid",
+    "Diesel Exhaust Fluid", "Gearbox Service Kit", "Wiper Blade",
   ]),
   category("Engine", "engine", [
     "Engine Mount", "Engine Gasket", "Valve Cover Gasket", "Engine Sensor", "Crankshaft Sensor", "Camshaft Sensor",

@@ -4,6 +4,7 @@ import {
   getApplicablePartTypes,
   getAvailableOffers,
   getPartModels,
+  getPartTaxonomySearchIndex,
   getPartVehicleSummary,
 } from "@/lib/parts/ferrari-component-service";
 import { rankPartOffers } from "@/lib/parts/offer-ranking";
@@ -23,7 +24,7 @@ export type VehiclePartsContext = {
   drivetrain?: string | null;
 };
 
-export { getApplicablePartSystems, getApplicablePartTypes, getAvailableOffers, getPartModels, getPartVehicleSummary };
+export { getApplicablePartSystems, getApplicablePartTypes, getAvailableOffers, getPartModels, getPartTaxonomySearchIndex, getPartVehicleSummary };
 
 export async function getPreferredBrands(
   prisma: PrismaClient,

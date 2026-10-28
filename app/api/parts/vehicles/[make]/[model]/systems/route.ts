@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { reportServerError } from "@/lib/observability/error-reporting";
 import { getPartsEngineeringRecommendation } from "@/lib/parts/engineering-recommendation-service";
-import { getApplicablePartSystems, getPartVehicleSummary } from "@/lib/parts/vehicle-parts-service";
+import { getApplicablePartSystems, getPartTaxonomySearchIndex, getPartVehicleSummary } from "@/lib/parts/vehicle-parts-service";
 
 type RouteParams = { params: Promise<{ make: string; model: string }> };
 
@@ -14,9 +14,10 @@ export async function GET(request: Request, { params }: RouteParams) {
 
   const vehicleId = new URL(request.url).searchParams.get("vehicleId")?.trim() || null;
   const session = vehicleId ? await auth() : null;
-  const [vehicle, systems, recommendation] = await Promise.all([
+  const [vehicle, systems, searchIndex, recommendation] = await Promise.all([
     getPartVehicleSummary({ makeSlug, modelSlug }),
     getApplicablePartSystems({ makeSlug, modelSlug }),
+    getPartTaxonomySearchIndex(),
     getPartsEngineeringRecommendation({ makeSlug, modelSlug, vehicleId, userId: session?.user?.id || null })
       .catch((error) => {
         reportServerError(error, { route: "parts-vehicle-systems", makeSlug, modelSlug, operation: "engineering-recommendation" });
@@ -25,7 +26,7 @@ export async function GET(request: Request, { params }: RouteParams) {
   ]);
   if (!vehicle) return NextResponse.json({ error: "Vehicle is not available in the parts catalog." }, { status: 404 });
 
-  return NextResponse.json({ vehicle, systems, recommendation }, {
+  return NextResponse.json({ vehicle, systems, searchIndex, recommendation }, {
     headers: { "Cache-Control": vehicleId ? "private, no-store" : "public, max-age=0, s-maxage=3600, stale-while-revalidate=86400" },
   });
 }

@@ -12,6 +12,17 @@ type PartSystem = {
   componentCount: number;
 };
 
+export type PartTaxonomySearchItem = {
+  kind: "system" | "part";
+  id: string;
+  name: string;
+  slug: string;
+  systemName: string;
+  systemSlug: string;
+  groupName: string | null;
+  groupSlug: string | null;
+};
+
 type VehiclePartType = {
   id: string;
   mapped: boolean;
@@ -34,6 +45,7 @@ type PartTypeCategorySelectorProps = {
   modelSlug: string;
   year: number | null;
   vehicleId: string | null;
+  searchIndex?: PartTaxonomySearchItem[];
   loading?: boolean;
 };
 
@@ -46,6 +58,7 @@ export function PartTypeCategorySelector({
   modelSlug,
   year,
   vehicleId,
+  searchIndex = [],
   loading = false,
 }: PartTypeCategorySelectorProps) {
   const router = useRouter();
@@ -61,6 +74,8 @@ export function PartTypeCategorySelector({
   const [loadingPartTypeSlug, setLoadingPartTypeSlug] = useState("");
   const [loadError, setLoadError] = useState("");
   const [fitmentNotice, setFitmentNotice] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
   const [isNavigating, startNavigation] = useTransition();
   const discoveryRequest = useRef<AbortController | null>(null);
 
@@ -91,6 +106,43 @@ export function PartTypeCategorySelector({
       .filter((partType) => partType.componentGroup.slug === activeGroupSlug)
       .sort((left, right) => alphabeticalCompare(left.componentType.name, right.componentType.name))
     : [];
+  const activeGroup = componentGroups.find((group) => group.slug === activeGroupSlug)
+    ?? (activePartTypeSlug ? initialGroup : null);
+  const activePartType = activePartTypes.find((partType) => partType.componentType.slug === activePartTypeSlug)
+    ?? initialPartTypes.find((partType) => partType.componentType.slug === activePartTypeSlug)
+    ?? null;
+  const searchResults = useMemo(() => {
+    const normalized = normalizeSearch(searchQuery);
+    if (normalized.length < 2) return [];
+    const tokens = normalized.split(" ").filter(Boolean);
+    return searchIndex
+      .map((item) => {
+        const haystack = normalizeSearch([item.name, item.groupName, item.systemName].filter(Boolean).join(" "));
+        if (!tokens.every((token) => haystack.includes(token))) return null;
+        const name = normalizeSearch(item.name);
+        const score = name === normalized ? 0 : name.startsWith(normalized) ? 1 : haystack.startsWith(normalized) ? 2 : 3;
+        return { item, score };
+      })
+      .filter((result): result is { item: PartTaxonomySearchItem; score: number } => Boolean(result))
+      .sort((left, right) => left.score - right.score || alphabeticalCompare(left.item.name, right.item.name))
+      .slice(0, 8)
+      .map((result) => result.item);
+  }, [searchIndex, searchQuery]);
+
+  async function loadPartTypes(system: PartSystem) {
+    const cached = partTypesBySystem[system.slug];
+    if (cached) return cached;
+    setLoadingSystemSlug(system.slug);
+    try {
+      const response = await fetch(getPartTypesApiPath({ makeSlug, modelSlug }, system.slug));
+      const payload = await response.json() as { partTypes?: VehiclePartType[]; error?: string };
+      if (!response.ok || !payload.partTypes) throw new Error(payload.error || "Parts are unavailable for this category.");
+      setPartTypesBySystem((current) => ({ ...current, [system.slug]: payload.partTypes ?? [] }));
+      return payload.partTypes;
+    } finally {
+      setLoadingSystemSlug("");
+    }
+  }
 
   async function selectSystem(system: PartSystem) {
     discoveryRequest.current?.abort();
@@ -100,19 +152,52 @@ export function PartTypeCategorySelector({
     setSelectionComplete(false);
     setLoadError("");
     setFitmentNotice("");
-    if (partTypesBySystem[system.slug]) return;
-
-    setLoadingSystemSlug(system.slug);
     try {
-      const response = await fetch(getPartTypesApiPath({ makeSlug, modelSlug }, system.slug));
-      const payload = await response.json() as { partTypes?: VehiclePartType[]; error?: string };
-      if (!response.ok || !payload.partTypes) throw new Error(payload.error || "Parts are unavailable for this category.");
-      setPartTypesBySystem((current) => ({ ...current, [system.slug]: payload.partTypes ?? [] }));
+      await loadPartTypes(system);
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : "Parts are unavailable for this category.");
-    } finally {
-      setLoadingSystemSlug("");
     }
+  }
+
+  async function selectSearchResult(result: PartTaxonomySearchItem) {
+    const system = systems.find((candidate) => candidate.slug === result.systemSlug);
+    if (!system) return;
+    discoveryRequest.current?.abort();
+    setActiveSystemSlug(system.slug);
+    setActiveGroupSlug("");
+    setActivePartTypeSlug("");
+    setSelectionComplete(false);
+    setLoadError("");
+    setFitmentNotice("");
+    setSearchQuery("");
+    setSearchFocused(false);
+    if (result.kind === "system") {
+      try {
+        await loadPartTypes(system);
+      } catch (error) {
+        setLoadError(error instanceof Error ? error.message : "Parts are unavailable for this category.");
+      }
+      return;
+    }
+    try {
+      const partTypes = await loadPartTypes(system);
+      const partType = partTypes.find((candidate) => candidate.componentType.slug === result.slug);
+      if (!partType) throw new Error("That part type is not currently available.");
+      setActiveGroupSlug(partType.componentGroup.slug);
+      setActivePartTypeSlug(partType.componentType.slug);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Parts are unavailable for this category.");
+    }
+  }
+
+  function resetBrowser() {
+    discoveryRequest.current?.abort();
+    setActiveSystemSlug("");
+    setActiveGroupSlug("");
+    setActivePartTypeSlug("");
+    setSelectionComplete(false);
+    setLoadError("");
+    setFitmentNotice("");
   }
 
   async function selectPartType(partType: VehiclePartType) {
@@ -159,8 +244,44 @@ export function PartTypeCategorySelector({
     <section className="part-type-browser" aria-label="Browse compatible parts" aria-busy={loading || Boolean(loadingSystemSlug) || Boolean(loadingPartTypeSlug) || isNavigating}>
       <header className="part-type-browser-heading">
         <div><span>Compatible Catalog</span><h2>Choose a Category</h2></div>
-        <p>Move from system to component to a vehicle-specific part without leaving this workspace.</p>
+        <div className="part-type-browser-search">
+          <label htmlFor="parts-taxonomy-search">Search categories and parts</label>
+          <div>
+            <span aria-hidden="true">⌕</span>
+            <input
+              id="parts-taxonomy-search"
+              type="search"
+              value={searchQuery}
+              placeholder="Search oil, brakes, intake..."
+              autoComplete="off"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={searchFocused && searchQuery.trim().length >= 2}
+              aria-controls="parts-taxonomy-search-results"
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => window.setTimeout(() => setSearchFocused(false), 120)}
+              onChange={(event) => setSearchQuery(event.target.value)}
+            />
+          </div>
+          {searchFocused && searchQuery.trim().length >= 2 ? (
+            <div id="parts-taxonomy-search-results" className="part-type-browser-search-results" role="listbox">
+              {searchResults.length > 0 ? searchResults.map((result) => (
+                <button key={`${result.kind}:${result.id}`} type="button" role="option" aria-selected="false" onMouseDown={(event) => event.preventDefault()} onClick={() => void selectSearchResult(result)}>
+                  <strong>{result.name}</strong>
+                  <small>{result.kind === "system" ? "Category" : [result.systemName, result.groupName].filter(Boolean).join(" / ")}</small>
+                </button>
+              )) : <p>No matching categories or parts.</p>}
+            </div>
+          ) : null}
+        </div>
       </header>
+
+      <nav className="part-type-browser-breadcrumbs" aria-label="Parts catalog breadcrumb">
+        <button type="button" onClick={resetBrowser}>Parts</button>
+        {activeSystem ? <><span aria-hidden="true">/</span><button type="button" onClick={() => void selectSystem(activeSystem)}>{activeSystem.name}</button></> : null}
+        {activeGroup ? <><span aria-hidden="true">/</span><button type="button" onClick={() => { setActiveGroupSlug(activeGroup.slug); setActivePartTypeSlug(""); setSelectionComplete(false); }}>{activeGroup.name}</button></> : null}
+        {activePartType ? <><span aria-hidden="true">/</span><strong>{activePartType.componentType.name}</strong></> : null}
+      </nav>
 
       <div className="part-type-browser-systems" role="list" aria-label="Part categories">
         {orderedSystems.map((system) => (
@@ -261,4 +382,8 @@ function shortSystemName(name: string) {
 
 function alphabeticalCompare(left: string, right: string) {
   return left.localeCompare(right, "en", { sensitivity: "base", numeric: true });
+}
+
+function normalizeSearch(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ");
 }

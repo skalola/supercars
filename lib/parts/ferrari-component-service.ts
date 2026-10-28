@@ -54,7 +54,26 @@ const getPartTaxonomyTypesCached = unstable_cache(
     },
     orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
   }),
-  ["parts-static-component-taxonomy-v1"],
+  ["parts-static-component-taxonomy-v2"],
+  { revalidate: 86_400, tags: ["parts-catalog"] },
+);
+
+const getPartTaxonomySearchIndexCached = unstable_cache(
+  async () => prisma.partCategory.findMany({
+    where: { active: true, componentTypes: { some: { active: true } } },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      componentTypes: {
+        where: { active: true },
+        select: { id: true, name: true, slug: true, systemGroup: true },
+        orderBy: { name: "asc" },
+      },
+    },
+    orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
+  }),
+  ["parts-static-taxonomy-search-v1"],
   { revalidate: 86_400, tags: ["parts-catalog"] },
 );
 
@@ -151,6 +170,35 @@ export async function getApplicablePartSystems(input: { makeSlug: string; modelS
     displayOrder: system.displayOrder,
     componentCount: system._count.componentTypes,
   }));
+}
+
+export async function getPartTaxonomySearchIndex() {
+  const systems = await getPartTaxonomySearchIndexCached();
+  return systems.flatMap((system) => [
+    {
+      kind: "system" as const,
+      id: system.id,
+      name: system.name,
+      slug: system.slug,
+      systemName: system.name,
+      systemSlug: system.slug,
+      groupName: null,
+      groupSlug: null,
+    },
+    ...system.componentTypes.map((component) => {
+      const group = getUniversalPartComponentGroup(system.slug, component.name, component.systemGroup);
+      return {
+        kind: "part" as const,
+        id: component.id,
+        name: component.name,
+        slug: component.slug,
+        systemName: system.name,
+        systemSlug: system.slug,
+        groupName: group.name,
+        groupSlug: group.slug,
+      };
+    }),
+  ]);
 }
 
 function inferAspiration(engine?: string | null) {
